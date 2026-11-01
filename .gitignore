@@ -6,11 +6,3 @@ override.cfg
 builds/
 release/*.zip
 *.mp4
-
-# Lizenzierte Audiodateien von Pixabay: dürfen nicht einzeln weiterverbreitet werden
-music/*.mp3
-music/*.ogg
-music/*.wav
-music/*.import
-assets/intro_sound.mp3
-assets/intro_sound.mp3.import

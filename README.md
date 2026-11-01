@@ -28,9 +28,8 @@ Kein Geld: Jeder 1. Platz zählt als Sieg. Siege schalten Autos, Strecken und Tu
 (Werte in `scripts/catalog.gd`). Gesperrte Teile kann man in der Garage als Vorschau ansehen.
 
 ## Musik und Sounds
-Die Musik und der Intro-Sound stammen von Pixabay und sind nicht im Repo (Lizenz erlaubt keine Weitergabe als Einzeldatei).
-- Musik: beliebige mp3/ogg-Dateien in `music/` legen, die Tracks laufen per Zufall.
-- Intro-Sound: optional als `assets/intro_sound.mp3`.
+Musik (`music/`) und Intro-Sound (`assets/intro_sound.mp3`) sind lizenzfreie Tracks von Pixabay.
+Weitere mp3/ogg-Dateien in `music/` laufen automatisch mit, in zufälliger Reihenfolge.
 
 Motorsound, Reifen, Nitro und Crashs werden im Spiel erzeugt und brauchen keine Dateien.
 
