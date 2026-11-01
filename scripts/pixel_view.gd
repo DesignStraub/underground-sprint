@@ -1,6 +1,7 @@
 extends TextureRect
-## Rendert die 3D-Welt in eine eigene, kleinere Auflösung und skaliert sie pixelgenau hoch.
-## Passt sich an Fenstergröße und Monitor an (720p bis 4K); die Oberfläche bleibt dabei scharf.
+## Rendert die 3D-Welt in eine eigene Auflösung und skaliert sie auf das Fenster hoch.
+## Pixel-Look: 540 Zeilen, pixelgenau (nearest). Sonst je nach Grafikstufe höchstens 720/900/1080 Zeilen,
+## weich hochskaliert – auf 4K-Bildschirmen spart das die meiste Arbeit. Die Oberfläche bleibt immer scharf.
 ## 3D-Inhalte gehören als Kinder in `world`.
 
 var world: SubViewport
@@ -28,9 +29,16 @@ func _ready() -> void:
 
 func _resize() -> void:
 	var px := Vector2(DisplayServer.window_get_size())
-	var target: float = GameState.PIXEL_MODES[GameState.pixel_mode]["height"]
-	var shrink := maxf(1.0, roundf(px.y / target))
-	world.size = Vector2i(maxi(int(px.x / shrink), 16), maxi(int(px.y / shrink), 16))
-	# Ab "Leicht" Kantenglättung, damit Linien und Kanten scharf statt flimmernd sind
-	world.msaa_3d = Viewport.MSAA_4X if GameState.pixel_mode >= 2 else Viewport.MSAA_DISABLED
-	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST if shrink > 1.0 else CanvasItem.TEXTURE_FILTER_LINEAR
+	var q: Dictionary = GameState.q()
+	if GameState.pixel_look:
+		var shrink := maxf(1.0, roundf(px.y / GameState.PIXEL_H))
+		world.size = Vector2i(maxi(int(px.x / shrink), 16), maxi(int(px.y / shrink), 16))
+		world.msaa_3d = Viewport.MSAA_DISABLED
+		world.screen_space_aa = Viewport.SCREEN_SPACE_AA_DISABLED
+		texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		return
+	var scale := minf(1.0, q["max_h"] / maxf(px.y, 1.0))
+	world.size = Vector2i(maxi(int(px.x * scale), 16), maxi(int(px.y * scale), 16))
+	world.msaa_3d = Viewport.MSAA_2X if q["aa"] == "msaa" else Viewport.MSAA_DISABLED
+	world.screen_space_aa = Viewport.SCREEN_SPACE_AA_FXAA if q["aa"] == "fxaa" else Viewport.SCREEN_SPACE_AA_DISABLED
+	texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR

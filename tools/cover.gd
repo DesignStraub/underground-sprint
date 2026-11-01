@@ -14,7 +14,8 @@ var _t := 0.0
 
 
 func _ready() -> void:
-	GameState.pixel_mode = 2  # scharf rendern, ohne zu speichern
+	GameState.pixel_look = false  # scharf rendern, ohne zu speichern
+	GameState.quality = 2
 	garage = preload("res://scenes/garage.tscn").instantiate()
 	add_child(garage)
 	garage.set_process(false)

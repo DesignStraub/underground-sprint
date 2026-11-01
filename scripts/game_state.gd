@@ -3,17 +3,25 @@ extends Node
 
 const Catalog := preload("res://scripts/catalog.gd")
 const SAVE_PATH := "user://save.json"
-## Pixel-Look: Höhe der 3D-Auflösung, auf die heruntergerechnet wird
-const PIXEL_MODES := [
-	{"name": "Stark", "height": 360.0},
-	{"name": "Mittel", "height": 540.0},
-	{"name": "Leicht", "height": 720.0},
-	{"name": "Aus", "height": 100000.0},
+## Grafikstufen. max_h: höchste 3D-Auflösung (Zeilen), darüber wird hochskaliert – bei diesem Stil sieht man den
+## Unterschied zu 4K kaum, die Grafikkarte aber sehr. aa: Kantenglättung, ssr: Spiegelungen auf nasser Straße,
+## ssao: Schatten in Ecken, far: Sichtweite, lod: ab welcher Entfernung Kleinteile/Lampen ausgeblendet werden.
+const QUALITY := [
+	{"name": "Niedrig", "max_h": 720.0, "aa": "aus", "ssr": 0, "ssao": false, "far": 650.0, "lod": [140.0, 280.0, 120.0], "steam": false},
+	{"name": "Mittel", "max_h": 900.0, "aa": "fxaa", "ssr": 16, "ssao": false, "far": 900.0, "lod": [220.0, 420.0, 170.0], "steam": true},
+	{"name": "Hoch", "max_h": 1080.0, "aa": "msaa", "ssr": 32, "ssao": true, "far": 1200.0, "lod": [320.0, 650.0, 240.0], "steam": true},
 ]
+const PIXEL_H := 540.0  # Pixel-Look: 3D in 540 Zeilen, pixelgenau hochskaliert
+const FPS_LIMITS := [0, 30, 60, 120]
 
 signal graphics_changed
 
-var pixel_mode := 1 if OS.has_feature("web") else 2  # im Browser ohne Kantenglättung (spart viel)
+## Grafik-Einstellungen (werden gespeichert)
+var quality := 0 if OS.has_feature("web") else 1
+var pixel_look := false
+var vsync := true
+var fps_limit := 0
+var fullscreen := false
 
 var wins := 0  # Rennsiege (Sprint + Rundkurs)
 var drift_wins := 0
@@ -30,6 +38,11 @@ func _ready() -> void:
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--race="):
 			race_index = clampi(int(a.substr(7)), 0, Catalog.RACES.size() - 1)
+		elif a.begins_with("--quality="):  # nur für Tests, wird nicht gespeichert
+			quality = clampi(int(a.substr(10)), 0, QUALITY.size() - 1)
+		elif a.begins_with("--pixel="):
+			pixel_look = a.substr(8) == "1"
+	apply_display()
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--shot=") or a.begins_with("--at=") or a.begins_with("--quit=") or a in ["--drive", "--demo"]:
 			add_child(preload("res://scripts/debug_shot.gd").new())
@@ -93,12 +106,53 @@ func toggle_fullscreen() -> void:
 		return
 	var fs := DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN
 	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED if fs else DisplayServer.WINDOW_MODE_FULLSCREEN)
+	fullscreen = not fs
+	save_game()
 
 
-func cycle_pixel_mode() -> void:
-	pixel_mode = (pixel_mode + 1) % PIXEL_MODES.size()
+func q() -> Dictionary:
+	return QUALITY[quality]
+
+
+## V-Sync, FPS-Limit und Vollbild auf das Fenster anwenden
+func apply_display() -> void:
+	Engine.max_fps = FPS_LIMITS[fps_limit]
+	if DisplayServer.get_name() == "headless" or OS.has_feature("web"):
+		return
+	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_ENABLED if vsync else DisplayServer.VSYNC_DISABLED)
+	if fullscreen and DisplayServer.window_get_mode() != DisplayServer.WINDOW_MODE_FULLSCREEN:
+		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
+
+
+## Eine Einstellung weiterschalten, anwenden und speichern
+func cycle_setting(key: String) -> void:
+	match key:
+		"quality":
+			quality = (quality + 1) % QUALITY.size()
+		"pixel":
+			pixel_look = not pixel_look
+		"vsync":
+			vsync = not vsync
+		"fps":
+			fps_limit = (fps_limit + 1) % FPS_LIMITS.size()
+	apply_display()
 	graphics_changed.emit()
 	save_game()
+
+
+func setting_text(key: String) -> String:
+	match key:
+		"quality":
+			return "Grafik: " + q()["name"]
+		"pixel":
+			return "Pixel-Look: " + ("An" if pixel_look else "Aus")
+		"vsync":
+			return "V-Sync: " + ("An" if vsync else "Aus")
+		"fps":
+			return "FPS-Limit: " + (str(FPS_LIMITS[fps_limit]) if FPS_LIMITS[fps_limit] > 0 else "Aus")
+		"fullscreen":
+			return "Vollbild: " + ("An" if fullscreen else "Aus")
+	return key
 
 
 func _add_action(action: String, keys: Array, buttons: Array, axis: Array) -> void:
@@ -197,7 +251,8 @@ func save_game() -> void:
 		return
 	f.store_string(JSON.stringify({
 		"wins": wins, "drift_wins": drift_wins, "current_car": current_car, "race_index": race_index,
-		"best_times": best_times, "car_configs": car_configs, "pixel_mode_v2": pixel_mode,
+		"best_times": best_times, "car_configs": car_configs,
+		"gfx": {"quality": quality, "pixel": pixel_look, "vsync": vsync, "fps": fps_limit, "fullscreen": fullscreen},
 	}, "\t"))
 
 
@@ -214,7 +269,13 @@ func load_game() -> void:
 		current_car = "kaizen"
 	race_index = clampi(int(data.get("race_index", 0)), 0, Catalog.RACES.size() - 1)
 	best_times = data.get("best_times", {})
-	pixel_mode = clampi(int(data.get("pixel_mode_v2", pixel_mode)), 0, PIXEL_MODES.size() - 1)
+	var gfx: Dictionary = data.get("gfx", {})
+	quality = clampi(int(gfx.get("quality", quality)), 0, QUALITY.size() - 1)
+	# alter Spielstand: Pixel-Stufe Stark/Mittel = Pixel-Look an
+	pixel_look = bool(gfx.get("pixel", int(data.get("pixel_mode_v2", 2)) <= 1))
+	vsync = bool(gfx.get("vsync", true))
+	fps_limit = clampi(int(gfx.get("fps", 0)), 0, FPS_LIMITS.size() - 1)
+	fullscreen = bool(gfx.get("fullscreen", false))
 	car_configs = {}
 	var cc: Dictionary = data.get("car_configs", {})
 	for car_id in cc:

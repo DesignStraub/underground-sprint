@@ -70,6 +70,7 @@ func _ready() -> void:
 
 	track = Track.build(race)
 	curve = track["curve"]
+	Track.apply_lod(track["node"], GameState.q()["lod"])
 	track["node"].process_mode = Node.PROCESS_MODE_PAUSABLE
 	world.add_child(track["node"])
 	_setup_environment()
@@ -115,15 +116,18 @@ func _ready() -> void:
 	player.audio.bus = "Hall"
 	for n in get_tree().get_nodes_in_group("ambient"):
 		n.target = player
-	if event_type != "drift":
+	# Verkehr nach Schwierigkeit: leicht ohne, mittel wenig, schwer voll
+	if event_type != "drift" and race.get("tier", 1) >= 2:
 		_spawn_traffic()
 	_build_hud()
 
 
 ## Verkehr: rechts in Fahrtrichtung, links Gegenverkehr. Erst ein Stück nach dem Start.
+## Mittlere Events (2 Sterne) mit halb so viel Verkehr wie schwere.
 func _spawn_traffic() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = race["seed"] * 7 + 1
+	var gap: float = 1.0 if race.get("tier", 1) >= 3 else 1.9
 	var d: float = track["start"] + 160.0
 	while d < track["length"] - 30.0:
 		var lane: float = Track.LANES[rng.randi() % 4]
@@ -147,7 +151,7 @@ func _spawn_traffic() -> void:
 			world.add_child(t)
 			t.setup(Traffic.KINDS[rng.randi() % Traffic.KINDS.size()], rng)
 			traffic.append(t)
-		d += rng.randf_range(45.0, 95.0)
+		d += rng.randf_range(45.0, 95.0) * gap
 	# Gabelungen: zweispurig mit Gegenverkehr (deshalb dort kürzer, aber riskant)
 	for p in track["paths"]:
 		if p["kind"] != "fork":
@@ -168,7 +172,7 @@ func _spawn_traffic() -> void:
 			world.add_child(t)
 			t.setup(Traffic.KINDS[rng.randi() % 6], rng)
 			traffic.append(t)
-			fd += rng.randf_range(30.0, 50.0)
+			fd += rng.randf_range(30.0, 50.0) * gap
 
 
 ## Bus mit Hall für Motor und Effekte; im Tunnel wird der Hall aufgedreht
@@ -218,9 +222,14 @@ func _setup_environment() -> void:
 	env.fog_light_color = Color(0.09, 0.07, 0.16)
 	env.fog_density = 0.0045
 	env.fog_sky_affect = 0.15
-	env.ssr_enabled = true
-	env.ssr_max_steps = 48
-	env.ssao_enabled = true
+	# Spiegelungen und Umgebungsverdeckung nur, wenn die Grafikstufe sie vorsieht (die teuersten Effekte)
+	var q: Dictionary = GameState.q()
+	env.ssr_enabled = q["ssr"] > 0
+	env.ssr_max_steps = maxi(q["ssr"], 8)
+	env.ssao_enabled = q["ssao"]
+	# günstige Varianten: Spiegelungen ohne Unschärfe-Berechnung, Umgebungsverdeckung in halber Auflösung
+	RenderingServer.environment_set_ssr_roughness_quality(RenderingServer.ENV_SSR_ROUGHNESS_QUALITY_DISABLED)
+	RenderingServer.environment_set_ssao_quality(RenderingServer.ENV_SSAO_QUALITY_LOW, true, 0.5, 2, 50.0, 300.0)
 	env.ssao_radius = 1.5
 	env.ssao_intensity = 1.6
 	var we := WorldEnvironment.new()

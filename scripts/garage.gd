@@ -42,7 +42,7 @@ func _build_scene() -> void:
 	env.glow_enabled = true
 	env.glow_intensity = 1.0
 	env.glow_hdr_threshold = 0.9
-	env.ssr_enabled = true
+	env.ssr_enabled = GameState.q()["ssr"] > 0
 	var we := WorldEnvironment.new()
 	we.environment = env
 	world.add_child(we)
@@ -239,15 +239,26 @@ func _show_main() -> void:
 ## Grafik, Vollbild, Spielstand: nicht auf der Startseite, sondern gesammelt hier
 func _show_settings() -> void:
 	_clear_menu()
-	var gfx := _button("", func(): pass)
-	gfx.pressed.connect(func():
-		GameState.cycle_pixel_mode()
-		gfx.text = "Pixel-Look: " + GameState.PIXEL_MODES[GameState.pixel_mode]["name"])
-	gfx.text = "Pixel-Look: " + GameState.PIXEL_MODES[GameState.pixel_mode]["name"]
-	_button("Vollbild", GameState.toggle_fullscreen)
+	var hints := {
+		"quality": "Niedrig: schnell, ohne Spiegelungen. Mittel: Spiegelungen auf nasser Straße. Hoch: alles, braucht eine starke Grafikkarte. Gilt ab dem nächsten Rennen.",
+		"pixel": "Pixel-Look: die 3D-Welt grob gerastert wie ein Retro-Spiel. Spart zusätzlich Leistung.",
+		"vsync": "V-Sync: kein Bildreißen. Aus = mehr FPS, aber evtl. Tearing.",
+		"fps": "FPS-Limit: begrenzt die Bildrate (schont Akku und Lüfter).",
+		"fullscreen": "Vollbild (auch F / F11).",
+	}
+	for key in ["quality", "pixel", "vsync", "fps", "fullscreen"]:
+		var k: String = key
+		var b := _button(GameState.setting_text(k), func(): pass)
+		b.pressed.connect(func():
+			if k == "fullscreen":
+				GameState.toggle_fullscreen()
+			else:
+				GameState.cycle_setting(k)
+			b.text = GameState.setting_text(k))
+		b.focus_entered.connect(func(): info.text = hints[k])
 	_button("Spielstand zurücksetzen", _confirm_reset)
 	_button("< Zurück", _show_main)
-	info.text = "Pixel-Look: wie grob die 3D-Welt gerendert wird. F / F11: Vollbild."
+	info.text = hints["quality"]
 	_focus_first()
 
 

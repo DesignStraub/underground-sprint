@@ -204,8 +204,6 @@ static func build(race: Dictionary) -> Dictionary:
 	gb.add_child(gs)
 	root.add_child(gb)
 	_bb_flush(root)
-	if OS.has_feature("web"):
-		_apply_lod(root)
 	return track
 
 
@@ -573,23 +571,26 @@ static func _road_mesh(root: Node3D, st: SurfaceTool, lanes: float, width: float
 	return mi
 
 
-## Nur im Browser: kleine Dinge in der Ferne nicht zeichnen, entfernte Lampen ausblenden.
-## Dort ist jedes gezeichnete Objekt teuer; auf dem Desktop bleiben die langen Lampenreihen sichtbar.
-static func _apply_lod(n: Node) -> void:
+## Detailstufen je nach Grafik-Einstellung: Kleinteile und mittlere Teile ab einer Entfernung nicht mehr zeichnen,
+## entfernte Lampen ausblenden. ranges = [klein, mittel, Licht]. Im Nebel sieht man den Unterschied kaum.
+static func apply_lod(n: Node, ranges: Array) -> void:
 	for c in n.get_children():
 		if c is GeometryInstance3D:
 			var gi := c as GeometryInstance3D
 			var size := gi.get_aabb().size.length()
 			if size < 4.0:
-				gi.visibility_range_end = 140.0
+				gi.visibility_range_end = ranges[0]
 			elif size < 15.0:
-				gi.visibility_range_end = 280.0
+				gi.visibility_range_end = ranges[1]
 		elif c is Light3D:
 			var l := c as Light3D
 			l.distance_fade_enabled = true
-			l.distance_fade_begin = 150.0
+			l.distance_fade_begin = ranges[2]
 			l.distance_fade_length = 40.0
-		_apply_lod(c)
+		elif c is GPUParticles3D and ranges[0] < 200.0:
+			c.queue_free()  # Grafik niedrig: kein Gully-Dampf
+			continue
+		apply_lod(c, ranges)
 
 
 ## SurfaceTool (mit Dreiecken) als MeshInstance ablegen

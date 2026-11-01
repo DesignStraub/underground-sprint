@@ -123,7 +123,7 @@ func setup(car_id: String, cfg: Dictionary) -> void:
 	add_child(area)
 
 	cam = Camera3D.new()
-	cam.far = 650.0 if OS.has_feature("web") else 1200.0  # dahinter verschluckt ohnehin der Nebel fast alles
+	cam.far = GameState.q()["far"]  # dahinter verschluckt ohnehin der Nebel fast alles
 	cam.near = 0.05
 	add_child(cam)
 	cam.make_current()

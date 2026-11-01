@@ -6,7 +6,7 @@ extends RefCounted
 
 const CARS := {
 	"kaizen": {
-		"name": "Kaizen Rally S", "unlock": {}, "drift": 0.35,
+		"name": "Kaizen Rally S", "style": "hatch", "unlock": {}, "drift": 0.35,
 		"length": 4.0, "width": 1.75, "height": 0.6, "cabin_len": 2.1, "cabin_off": 0.25, "cabin_h": 0.5,
 		"accel": 9.5, "top_speed": 58.0, "grip": 26.0, "steer": 2.3,
 		"desc": "Kompakter Fronttriebler. Leicht, wendig, verzeiht viel.",
@@ -14,7 +14,7 @@ const CARS := {
 		"sound": {"cyl": 4, "harm": [1.0, 0.45, 0.2, 0.08], "sub": 0.3, "turbo": 0.0, "rough": 0.2},
 	},
 	"mirai": {
-		"name": "Mirai 240R", "unlock": {"race": 2, "drift": 1}, "drift": 0.65,
+		"name": "Mirai 240R", "style": "coupe", "unlock": {"race": 2, "drift": 1}, "drift": 0.65,
 		"length": 4.45, "width": 1.78, "height": 0.52, "cabin_len": 1.8, "cabin_off": 0.45, "cabin_h": 0.44,
 		"accel": 11.0, "top_speed": 66.0, "grip": 22.0, "steer": 2.2,
 		"desc": "Heckantrieb-Coupé. Liebt Drifts.",
@@ -22,7 +22,7 @@ const CARS := {
 		"sound": {"cyl": 4, "harm": [1.0, 0.6, 0.3, 0.1], "sub": 0.55, "turbo": 0.7, "rough": 0.35},
 	},
 	"vortex": {
-		"name": "Vortex GT-R", "unlock": {"race": 5}, "drift": 0.3,
+		"name": "Vortex GT-R", "style": "sedan", "unlock": {"race": 5}, "drift": 0.3,
 		"length": 4.6, "width": 1.85, "height": 0.55, "cabin_len": 1.9, "cabin_off": 0.35, "cabin_h": 0.46,
 		"accel": 12.5, "top_speed": 74.0, "grip": 28.0, "steer": 2.05,
 		"desc": "Allrad-Monster. Brutal auf der Geraden.",
@@ -30,7 +30,7 @@ const CARS := {
 		"sound": {"cyl": 6, "harm": [1.0, 0.5, 0.3, 0.15], "sub": 0.12, "turbo": 1.0, "rough": 0.12},
 	},
 	"sakura": {
-		"name": "Sakura D2", "unlock": {"drift": 1}, "drift": 0.9,
+		"name": "Sakura D2", "style": "hatch", "unlock": {"drift": 1}, "drift": 0.9,
 		"length": 4.2, "width": 1.7, "height": 0.55, "cabin_len": 1.95, "cabin_off": 0.3, "cabin_h": 0.48,
 		"accel": 10.2, "top_speed": 60.0, "grip": 21.0, "steer": 2.5,
 		"desc": "Leichter Hecktriebler. Gebaut zum Querfahren.",
@@ -38,7 +38,7 @@ const CARS := {
 		"sound": {"cyl": 4, "harm": [1.0, 0.55, 0.28, 0.12], "sub": 0.4, "turbo": 0.5, "rough": 0.28},
 	},
 	"ronin": {
-		"name": "Ronin DR", "unlock": {"drift": 3}, "drift": 1.0,
+		"name": "Ronin DR", "style": "coupe", "unlock": {"drift": 3}, "drift": 1.0,
 		"length": 4.6, "width": 1.86, "height": 0.5, "cabin_len": 1.85, "cabin_off": 0.5, "cabin_h": 0.42,
 		"accel": 12.2, "top_speed": 69.0, "grip": 20.0, "steer": 2.45,
 		"desc": "Drift-Monster mit V8-Swap. Steht quer, wann immer du willst.",
@@ -169,8 +169,8 @@ const RACES := [
 ]
 
 const EVENT_TYPES := {
-	"sprint": {"label": "Sprint", "desc": "Von A nach B gegen 3 Gegner. Gabelungen und Abkürzungen: du entscheidest."},
-	"circuit": {"label": "Rundkurs", "desc": "2 Runden gegen 3 Gegner. Wer die beste Linie findet, gewinnt."},
+	"sprint": {"label": "Sprint", "desc": "Von A nach B gegen 3 Gegner. Gabelungen und Abkürzungen: du entscheidest. * ohne Verkehr, ** wenig, *** voll."},
+	"circuit": {"label": "Rundkurs", "desc": "2 Runden gegen 3 Gegner. Wer die beste Linie findet, gewinnt. * ohne Verkehr, ** wenig, *** voll."},
 	"drift": {"label": "Drift", "desc": "Allein auf der Strecke. Querfahren gibt Punkte, Ketten geben Multiplikator, Crash kostet die Kette."},
 }
 const TYPE_ORDER := ["sprint", "circuit", "drift"]

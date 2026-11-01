@@ -68,7 +68,12 @@ Motorsound, Reifen, Nitro und Crashs werden im Spiel erzeugt. Zug, Glocke, Landu
 sind synthetisch erzeugte WAVs in `assets/sfx/` (`python3 tools/make_sfx.py`).
 
 ## Grafik
-Pixel-Look in der Garage einstellbar: Stark / Mittel / Leicht (Standard) / Aus.
+Garage → Einstellungen (wird gespeichert):
+- **Grafik Niedrig / Mittel / Hoch:** 3D-Auflösung höchstens 720/900/1080 Zeilen (auf 4K-Bildschirmen wird
+  hochskaliert – spart sehr viel), Kantenglättung, Spiegelungen auf nasser Straße (ab Mittel), Schatten in Ecken
+  (Hoch), Sichtweite und Detailstufen. Gemessen bei 2560×1440: Niedrig ~140, Mittel/Hoch ~95 fps.
+- **Pixel-Look An/Aus**, **V-Sync**, **FPS-Limit**, **Vollbild**.
+- Verkehr nach Schwierigkeit: 1 Stern ohne, 2 Sterne wenig, 3 Sterne voller Verkehr.
 
 ## Export
 Vorlagen für Windows, macOS, Linux und Web stehen in `export_presets.cfg` (Godot-Exportvorlagen 4.7.1 nötig).
