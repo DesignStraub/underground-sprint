@@ -45,6 +45,12 @@ var drifting := false
 var drift_angle := 0.0  # Grad zwischen Fahrtrichtung und Fahrzeugachse
 var drift_k := 0.3  # 0..1: wie willig das Auto quer geht (aus dem Katalog)
 var crashes := 0  # zählt harte Einschläge (Drift-Kette geht verloren)
+var wall_hits := 0  # zählt jede Berührung mit Wand/Bande (Drift-Modus: Kette weg)
+## Drift-Modus (Drift-Events): ist das Auto erst quer, hält Gas das Heck draußen, Lenken steuert den Winkel,
+## die Fahrtrichtung folgt dem Auto nur langsam. Ohne Gas richtet es sich wieder auf.
+var drift_mode := false
+var _sliding := false
+var _slide_out := 0.0
 ## Rundkurs: abgeschlossene Runden und Gesamtfortschritt (Runden * Länge + Position)
 var lap := 0
 var total := 0.0
@@ -258,43 +264,53 @@ func _physics_process(dt: float) -> void:
 	steer = move_toward(steer, steer_in, dt * steer_speed)
 	var low_speed := clampf(spd / 7.0, 0.0, 1.0)
 	var high_speed := lerpf(1.0, 0.42, clampf(spd / top_speed, 0.0, 1.0))
-	var yaw := 0.0
-	if not airborne:
-		yaw = -steer * steer_rate * low_speed * high_speed * signf(speed_fwd + 0.001)
-		if hb:
-			yaw *= 1.5
-		if drifting:
-			yaw *= 1.12 + 0.2 * drift_k  # Gegenlenken/Eindrehen im Drift, Driftautos drehen williger
-	_spin = move_toward(_spin, 0.0, dt * 2.0)
-	rotate_y((yaw + _spin) * dt)
-
-	# Neue Fahrzeugachse; Geschwindigkeit bleibt zunächst in Weltrichtung -> Querschlupf entsteht
-	var new_fwd := -global_basis.z
-	new_fwd.y = 0
-	new_fwd = new_fwd.normalized()
-	var new_right := Vector3(-new_fwd.z, 0, new_fwd.x)
-	var v := fwd * speed_fwd + right * speed_lat
-	var f2 := v.dot(new_fwd)
-	var l2 := v.dot(new_right)
-
-	# --- Grip: Querbewegung abbauen, einen Teil davon in Vortrieb umwandeln (Arcade)
-	if not airborne:
-		var gk := grip_k * (lerpf(0.16, 0.1, drift_k) if hb else 1.0) * (0.25 if stun > 0.0 else 1.0)
-		if drifting and not hb:
-			gk *= lerpf(0.55, 0.3, drift_k)  # Drift hält an, bei Driftautos deutlich länger
-		var l_new := l2 * exp(-gk * dt)
-		var removed := absf(l2) - absf(l_new)
-		f2 += removed * 0.55 * signf(f2)
-		f2 = minf(f2, maxf(eff_top, speed_fwd))  # Drift-Umwandlung darf nicht über Topspeed schieben
-		l2 = l_new
-		drifting = absf(l2) > 3.5 and spd > 10.0
-		drift_angle = rad_to_deg(atan2(absf(l2), maxf(absf(f2), 0.1))) if drifting else 0.0
+	var l2 := 0.0
+	if drift_mode and _sliding and not airborne:
+		l2 = _slide_physics(dt, fwd, right, thr, hb, a, eff_top, low_speed)
 	else:
-		drifting = false
-		drift_angle = 0.0
+		var yaw := 0.0
+		if not airborne:
+			yaw = -steer * steer_rate * low_speed * high_speed * signf(speed_fwd + 0.001)
+			if hb:
+				yaw *= 1.5
+			if drifting:
+				yaw *= 1.12 + 0.2 * drift_k  # Gegenlenken/Eindrehen im Drift, Driftautos drehen williger
+			if drift_mode and absf(steer) > 0.6 and thr > 0.6 and spd > 12.0:
+				yaw *= 1.3  # Drift-Modus: mit Gas und voll eingelenkt bricht das Heck aus
+		_spin = move_toward(_spin, 0.0, dt * 2.0)
+		rotate_y((yaw + _spin) * dt)
 
-	velocity = new_fwd * f2 + new_right * l2
-	velocity.y = 0.0
+		# Neue Fahrzeugachse; Geschwindigkeit bleibt zunächst in Weltrichtung -> Querschlupf entsteht
+		var new_fwd := -global_basis.z
+		new_fwd.y = 0
+		new_fwd = new_fwd.normalized()
+		var new_right := Vector3(-new_fwd.z, 0, new_fwd.x)
+		var v := fwd * speed_fwd + right * speed_lat
+		var f2 := v.dot(new_fwd)
+		l2 = v.dot(new_right)
+
+		# --- Grip: Querbewegung abbauen, einen Teil davon in Vortrieb umwandeln (Arcade)
+		if not airborne:
+			var gk := grip_k * (lerpf(0.16, 0.1, drift_k) if hb else 1.0) * (0.25 if stun > 0.0 else 1.0)
+			if drifting and not hb:
+				gk *= lerpf(0.55, 0.3, drift_k)  # Drift hält an, bei Driftautos deutlich länger
+			if drift_mode:
+				gk *= 0.55  # im Drift-Modus bricht das Heck leichter aus
+			var l_new := l2 * exp(-gk * dt)
+			var removed := absf(l2) - absf(l_new)
+			f2 += removed * 0.55 * signf(f2)
+			f2 = minf(f2, maxf(eff_top, speed_fwd))  # Drift-Umwandlung darf nicht über Topspeed schieben
+			l2 = l_new
+			drifting = absf(l2) > 3.5 and spd > 10.0
+			drift_angle = rad_to_deg(atan2(absf(l2), maxf(absf(f2), 0.1))) if drifting else 0.0
+			if drift_mode and spd > 10.0 and drift_angle > 9.0 and f2 > 0.0:
+				_sliding = true
+				_slide_out = 0.0
+		else:
+			drifting = false
+			drift_angle = 0.0
+		velocity = new_fwd * f2 + new_right * l2
+		velocity.y = 0.0
 	var pre := velocity
 	move_and_slide()
 	_handle_collisions(pre)
@@ -313,6 +329,43 @@ func _physics_process(dt: float) -> void:
 	audio.nitro = nitro_on
 	audio.slip = clampf((absf(l2) - 3.0) / 10.0, 0.0, 1.0) if spd > 5.0 and not airborne else 0.0
 	audio.speed = spd
+
+
+## Drift-Modus, Auto steht quer: Gas hält den Winkel, Lenken steuert ihn, die Fahrtrichtung dreht langsam nach.
+## Liefert die Quergeschwindigkeit (für Sound und Optik).
+func _slide_physics(dt: float, fwd: Vector3, right: Vector3, thr: float, hb: bool, a: float, eff_top: float, low_speed: float) -> float:
+	var vel := fwd * speed_fwd + right * speed_lat  # enthält schon den Antrieb entlang der Fahrzeugachse
+	var beta := atan2(speed_lat, maxf(speed_fwd, 0.5))  # > 0: Auto rutscht nach rechts weg (Linkskurve)
+	var yaw := -steer * steer_rate * 0.6 * (0.5 + 0.5 * low_speed)
+	yaw += signf(beta) * thr * (0.7 + 0.35 * drift_k) * clampf(absf(beta) / 0.3, 0.0, 1.0)
+	yaw -= beta * (1.1 + 0.9 * (1.0 - thr))  # ohne Gas richtet es sich auf
+	if hb:
+		yaw *= 1.3
+	_spin = move_toward(_spin, 0.0, dt * 2.0)
+	rotate_y((clampf(yaw, -3.2, 3.2) + _spin) * dt)
+	var nf := -global_basis.z
+	nf.y = 0.0
+	nf = nf.normalized()
+	var nr := Vector3(-nf.z, 0, nf.x)
+	var vs := vel.length()
+	var b2 := atan2(vel.dot(nr), vel.dot(nf))
+	# Seitenhalt im Rutschen: die Fahrtrichtung dreht mit begrenzter Rate zur Fahrzeugachse
+	var mu := lerpf(12.0, 9.0, drift_k) * (0.6 if hb else 1.0) * (0.3 if stun > 0.0 else 1.0)
+	var turn := signf(b2) * minf(absf(b2), mu / maxf(vs, 6.0) * dt)
+	vel = vel.rotated(Vector3.UP, turn)
+	b2 -= turn
+	vs = clampf(vs - lerpf(8.5, 5.5, drift_k) * absf(sin(b2)) * dt, 0.0, maxf(eff_top, 1.0))
+	velocity = vel.normalized() * vs if vel.length() > 0.01 else Vector3.ZERO
+	velocity.y = 0.0
+	drift_angle = rad_to_deg(absf(b2))
+	drifting = absf(b2) > deg_to_rad(8.0) and vs > 8.0
+	if absf(b2) < deg_to_rad(5.0) or vs < 6.0 or absf(b2) > deg_to_rad(100.0):
+		_slide_out += dt
+		if _slide_out > 0.15:
+			_sliding = false
+	else:
+		_slide_out = 0.0
+	return velocity.dot(nr)
 
 
 ## Höhe: Gehweg, Rampen, Absprung, Flug, Landung, Wasser
@@ -424,6 +477,9 @@ func _update_camera(dt: float, sf: float) -> void:
 	if cam_mode == 0:
 		# Verfolger: folgt mit leichter Verzögerung, im Drift dreht sie langsamer mit
 		var yaw := global_rotation.y
+		if drifting and velocity.length() > 5.0:
+			# Im Drift schaut die Kamera halb in Fahrtrichtung, so sieht man die Kurve und den Winkel
+			yaw = lerp_angle(yaw, atan2(-velocity.x, -velocity.z), 0.5)
 		var dist := 5.4 + sf * 1.3 + (0.9 if nitro_on else 0.0)
 		var height := 1.9 - sf * 0.3
 		if not _cam_init:
@@ -487,9 +543,12 @@ func _handle_collisions(pre: Vector3) -> void:
 				_shake = minf(_shake + impact * 0.03, 0.6)
 				audio.crash(clampf(impact / 25.0, 0.1, 0.5))
 		elif impact > 2.0:
-			# Wand/Hindernis: je frontaler, desto mehr Tempoverlust
+			# Wand/Hindernis: je frontaler, desto mehr Tempoverlust (im Drift-Modus an der Bande eher entlangrutschen)
 			var head_on := clampf(impact / maxf(pre.length(), 1.0), 0.0, 1.0)
-			velocity *= lerpf(0.9, 0.35, head_on)
+			wall_hits += 1
+			velocity *= lerpf(0.94, 0.55, head_on) if drift_mode else lerpf(0.9, 0.35, head_on)
+			if drift_mode:
+				_sliding = false
 			_shake = minf(_shake + impact * 0.04, 1.0)
 			if impact > 12.0 and _crash_cooldown <= 0.0:
 				crashes += 1

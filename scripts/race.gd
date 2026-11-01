@@ -33,6 +33,9 @@ var drift_chain_t := 0.0
 var drift_idle := 0.0
 var drift_targets: Array = []  # Punkte für Platz 3, 2, 1
 var _last_crashes := 0
+var _last_walls := 0
+var _wall_bonus := false
+var _near := {}  # Verkehrsautos, für die es schon einen Near Miss gab
 var _last_lap := 0
 var finish_order: Array = []  # "player" oder AI-Knoten in Zielreihenfolge
 
@@ -77,6 +80,8 @@ func _ready() -> void:
 	player.track = track
 	world.add_child(player)
 	player.setup(car_id, GameState.get_config(car_id))
+	player.drift_mode = event_type == "drift"
+	Music.next()  # jedes Rennen mit einem neuen Track
 	player.place(Track.xform_at(curve, track["start"], Track.LANES[2]))
 
 	# Gegner mit zufälligem Tuning; Stärke nach Schwierigkeit des Events, leicht steigend mit deinen Siegen
@@ -347,6 +352,7 @@ func _process(dt: float) -> void:
 			hud["center"].text = str(n) if n > 0 else "GO!"
 			if countdown <= 1.0 and not player.controls_enabled:
 				player.controls_enabled = true
+				_launch_check()
 				for ai in ais:
 					ai.running = true
 				state = State.RACING
@@ -378,6 +384,8 @@ func _process(dt: float) -> void:
 		t.player_path = player.path_id
 	if event_type == "drift":
 		_update_drift(dt)
+	elif state == State.RACING:
+		_check_near_miss()
 	if state == State.RACING and player_progress >= track["finish"]:
 		_on_player_finished()
 
@@ -445,22 +453,62 @@ func _drift_mult() -> int:
 func _update_drift(dt: float) -> void:
 	if state != State.RACING:
 		return
-	if player.crashes != _last_crashes:
+	if player.crashes != _last_crashes or player.wall_hits != _last_walls:
 		_last_crashes = player.crashes
+		_last_walls = player.wall_hits
 		if drift_chain > 0.0:
-			_flash("KETTE VERLOREN", Color(1.0, 0.3, 0.3))
+			_flash("BANDE! KETTE VERLOREN", Color(1.0, 0.3, 0.3))
 		drift_chain = 0.0
 		drift_chain_t = 0.0
-	var kmh := absf(player.speed_fwd) * 3.6
+	var kmh := player.velocity.length() * 3.6
 	if player.drifting and player.drift_angle >= 12.0 and kmh > 35.0 and not player.airborne:
 		var ang := clampf(player.drift_angle, 0.0, 60.0)
-		drift_chain += (ang - 10.0) * kmh / 100.0 * dt
+		# Wand-Bonus: nah an der Bande driften zählt mehr
+		var wall_dist := Track.hw(track, player.progress) + 0.1 - absf(player.lateral) - 1.0
+		var bonus := wall_dist < 2.0
+		if bonus and not _wall_bonus:
+			_flash("WAND-BONUS", Color(0.4, 0.9, 1.0))
+		_wall_bonus = bonus
+		drift_chain += (ang - 10.0) * kmh / 100.0 * dt * (1.6 if bonus else 1.0)
 		drift_chain_t += dt
 		drift_idle = 0.0
 	else:
 		drift_idle += dt
 		if drift_chain > 0.0 and drift_idle > 1.2:
 			_bank_drift()
+
+
+## Perfekter Start: wer bei GO die Drehzahl im grünen Bereich hält, schießt los. Zu viel Gas: Räder drehen durch.
+func _launch_check() -> void:
+	var fwd: Vector3 = -player.global_basis.z
+	if player.rpm > 5400.0 and player.rpm < 6900.0:
+		player.velocity += fwd * 9.0
+		player.nitro = minf(player.nitro + 0.15, 1.0)
+		_flash("PERFEKTER START", Color(0.4, 1.0, 0.5))
+	elif player.rpm >= 6900.0:
+		_flash("ZU VIEL GAS", Color(1.0, 0.5, 0.2))
+
+
+## Near Miss: knapp an Verkehr vorbei (seitlich 1,7–3,4 m) bei hohem Tempo gibt Nitro, wie in Underground
+func _check_near_miss() -> void:
+	var fwd: Vector3 = -player.global_basis.z
+	var right := Vector3(-fwd.z, 0, fwd.x)
+	var fast := player.velocity.length() > 25.0
+	for t in traffic:
+		if t.wrecked:
+			continue
+		var rel: Vector3 = t.global_position - player.global_position
+		var id: int = t.get_instance_id()
+		if rel.length() > 30.0:
+			_near.erase(id)
+			continue
+		var along := rel.dot(fwd)
+		var side := absf(rel.dot(right))
+		if fast and absf(along) < 2.5 and side > 1.7 and side < 3.4 and not _near.has(id):
+			_near[id] = true
+			player.nitro = minf(player.nitro + 0.12, 1.0)
+			_flash("NEAR MISS  +NOS", Color(1.0, 0.85, 0.2))
+			Sfx.play("whoosh", -12.0, randf_range(1.1, 1.3))
 
 
 func _bank_drift() -> void:
@@ -496,6 +544,8 @@ func _update_hud() -> void:
 	tacho.nitro_on = player.nitro_on
 	hud["progress"].size.x = 198.0 * clampf((player_progress - track["start"]) / (track["finish"] - track["start"]), 0.0, 1.0)
 	hud["drift"].text = "DRIFT  +NOS" if player.drifting else ("AIR" if player.airborne else "")
+	if state == State.COUNTDOWN:
+		hud["drift"].text = "Gas kurz vor GO = perfekter Start"
 	if event_type == "drift":
 		if drift_chain > 0.0:
 			hud["drift"].text = "x%d   %d" % [_drift_mult(), int(drift_chain)]

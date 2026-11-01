@@ -20,6 +20,7 @@ const LIGHT_SHADER := preload("res://shaders/traffic_light.gdshader")
 const TUNNEL_SHADER := preload("res://shaders/tunnel.gdshader")
 const PANEL_SHADER := preload("res://shaders/panel_wall.gdshader")
 const SCREEN_SHADER := preload("res://shaders/screen.gdshader")
+const CROWD_SHADER := preload("res://shaders/crowd.gdshader")
 const ElevatedRail := preload("res://scripts/elevated_rail.gd")
 const AmbientSound := preload("res://scripts/ambient_sound.gd")
 
@@ -132,6 +133,7 @@ static func build(race: Dictionary) -> Dictionary:
 		"blocks": [], "ramps": [], "lakes": [], "zones": [], "crossing": null, "crossing_d": -1.0,
 		"districts": [], "parks": [], "tunnels": [], "el": [], "posts": [], "stadium_d": -1.0, "medians": [],
 		"force_stadium": race.get("stadium", false),
+		"extra": 2.5 if type == "drift" else 0.0,  # Drift-Kurse: breitere Fahrbahn
 		"paths": [{"id": 0, "kind": "main", "curve": curve, "half_w": HALF_W, "length": length, "from": 0.0, "to": length}],
 	}
 	var weights: Dictionary = race.get("districts", {"downtown": 1.0})
@@ -149,11 +151,12 @@ static func build(race: Dictionary) -> Dictionary:
 	for b in gen["bulges"]:
 		_plan_shortcut(track, b, rng)
 	if type != "drift":
+		# Drift-Kurse sind abgesperrt: keine Seitenstraßen, Tunnel, Hochbahn, Mittelstreifen, Bahnübergang
 		_plan_crossing(track, rng)
-	_plan_spurs(track, rng)
-	_plan_tunnels(track, rng)
-	_plan_el(track, rng)
-	_plan_medians(track, rng)
+		_plan_spurs(track, rng)
+		_plan_tunnels(track, rng)
+		_plan_el(track, rng)
+		_plan_medians(track, rng)
 
 	_build_road(root, track)
 	for p in track["paths"]:
@@ -174,7 +177,10 @@ static func build(race: Dictionary) -> Dictionary:
 	occupied.append_array(_build_structures(root, track, rng))
 	_build_city(root, track, rng, occupied)
 	_build_lamps(root, track)
-	_build_props(root, track, rng)
+	if type == "drift":
+		_build_barriers(root, track, rng)
+	else:
+		_build_props(root, track, rng)
 	_build_steam(root, track, rng)
 	if loop:
 		_gate(root, curve, track["start"] + 12.0, "START · ZIEL", Color(0.2, 1.0, 0.4))
@@ -343,7 +349,7 @@ static func median_at(track: Dictionary, d: float) -> float:
 
 ## Halbe Fahrbahnbreite der Hauptstraße bei d (breiter, wo ein Mittelstreifen ist)
 static func hw(track: Dictionary, d: float) -> float:
-	return HALF_W + median_at(track, d)
+	return HALF_W + track["extra"] + median_at(track, d)
 
 
 ## Spur (-6.75..6.75, ohne Mittelstreifen gedacht) -> tatsächlicher Querversatz bei d
@@ -634,7 +640,7 @@ static func _build_road(root: Node3D, track: Dictionary) -> void:
 		var c: Vector3 = f["pos"]
 		var r: Vector3 = f["right"]
 		var m := median_at(track, d)
-		var h := HALF_W + m
+		var h: float = HALF_W + track["extra"] + m
 		var cur := {
 			"l": c - r * h, "r": c + r * h, "ml": c - r * m, "mr": c + r * m, "m": m,
 			"lw": c - r * (h + WALK + 0.3), "rw": c + r * (h + WALK + 0.3),
@@ -714,6 +720,129 @@ static func _median_shape(walls: StaticBody3D, a: Vector3, b: Vector3, width: fl
 	walls.add_child(cs)
 
 
+## Drift-Kurs: durchgehende Bande an beiden Rändern (rot-weiß, mit Sponsorentafeln), Reifenstapel außen in
+## den Kurven, dahinter jubelndes Publikum und Flutlicht. Man kann sich nicht verfahren, nur anecken.
+static func _build_barriers(root: Node3D, track: Dictionary, rng: RandomNumberGenerator) -> void:
+	var curve: Curve3D = track["curve"]
+	var length: float = track["length"]
+	var walls := StaticBody3D.new()
+	root.add_child(walls)
+	var concrete := Builder.mat(Color(0.55, 0.55, 0.56), 0.0, 0.8)
+	var red := Builder.mat(Color(0.75, 0.06, 0.05), 0.0, 0.6)
+	var white := Builder.mat(Color(0.88, 0.88, 0.88), 0.0, 0.6)
+	var tire := Builder.mat(Color(0.04, 0.04, 0.045), 0.0, 0.9)
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var caps := {"r": [], "w": []}
+	var tires := []
+	var people := []
+	var colors := []
+	var shirts := [Color(0.8, 0.1, 0.1), Color(0.1, 0.3, 0.8), Color(0.9, 0.8, 0.1), Color(0.95, 0.95, 0.95),
+		Color(0.1, 0.1, 0.1), Color(0.2, 0.7, 0.3), Color(0.9, 0.4, 0.1), Color(0.6, 0.2, 0.7)]
+	var bh := 1.1
+	var d := 0.0
+	var prev := {}
+	var k := 0
+	while d <= length:
+		var f := frame_at(curve, d)
+		var b := hw(track, d) + 0.4
+		var cur := {"l": f["pos"] - f["right"] * b, "r": f["pos"] + f["right"] * b, "d": d}
+		if not prev.is_empty():
+			for sd in ["l", "r"]:
+				_wall_uv(st, prev[sd], cur[sd], bh, 0.0, 0.0, sd == "l")
+				_wall_shape(walls, prev[sd], cur[sd])
+				var mid: Vector3 = (prev[sd] + cur[sd]) / 2.0
+				var bb := Basis.looking_at((cur[sd] - prev[sd]).normalized(), Vector3.UP)
+				caps["r" if k % 2 == 0 else "w"].append(Transform3D(bb, mid + Vector3(0, bh + 0.08, 0)))
+		# Kurvenaußenseite: Reifenstapel
+		var f2 := frame_at(curve, d + 12.0)
+		var bend := (f["fwd"] as Vector3).signed_angle_to(f2["fwd"], Vector3.UP)
+		if absf(bend) > 0.12:
+			var out := -1.0 if bend > 0.0 else 1.0  # Linkskurve: außen ist rechts
+			for j in 3:
+				tires.append(Transform3D(Basis(), f["pos"] + f["right"] * out * (b - 0.6) + Vector3(0, 0.2 + j * 0.38, 0)))
+		# Publikum hinter der Bande (gestaffelt, zwei Reihen)
+		for sd in [-1.0, 1.0]:
+			for row in 2:
+				if rng.randf() < 0.75:
+					var off := b + 1.8 + row * 1.1 + rng.randf_range(-0.2, 0.2)
+					var pp: Vector3 = f["pos"] + f["right"] * sd * off + f["fwd"] * rng.randf_range(-0.6, 0.6)
+					var hh := rng.randf_range(0.9, 1.1)
+					people.append(Transform3D(Basis.from_scale(Vector3(1, hh, 1)), pp + Vector3(0, CURB_H + 0.85 * hh + row * 0.35, 0)))
+					colors.append(shirts[rng.randi() % shirts.size()])
+		prev = cur
+		k += 1
+		d += 3.0
+	st.generate_normals()
+	var mi := MeshInstance3D.new()
+	mi.mesh = st.commit()
+	concrete.cull_mode = BaseMaterial3D.CULL_DISABLED
+	mi.material_override = concrete
+	root.add_child(mi)
+	_multi(root, Builder.box(Vector3(0.32, 0.16, 3.05)), red, caps["r"])
+	_multi(root, Builder.box(Vector3(0.32, 0.16, 3.05)), white, caps["w"])
+	var tm := CylinderMesh.new()
+	tm.top_radius = 0.42
+	tm.bottom_radius = 0.42
+	tm.height = 0.36
+	tm.radial_segments = 10
+	_multi(root, tm, tire, tires)
+	var body := CapsuleMesh.new()
+	body.radius = 0.24
+	body.height = 1.7
+	body.radial_segments = 6
+	body.rings = 2
+	var cm := ShaderMaterial.new()
+	cm.shader = CROWD_SHADER
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.use_colors = true
+	mm.mesh = body
+	mm.instance_count = people.size()
+	for i in people.size():
+		mm.set_instance_transform(i, people[i])
+		mm.set_instance_color(i, colors[i])
+	var mmi := MultiMeshInstance3D.new()
+	mmi.multimesh = mm
+	mmi.material_override = cm
+	root.add_child(mmi)
+	# Sponsorentafeln auf der Bande und Flutlicht
+	var brands := ["DRIFT KINGS", "NOS", "KAIZEN", "TURBO COLA", "SPEED FM", "ONE HUMANITY", "SAKURA", "RONIN"]
+	var dd := 20.0
+	var i := 0
+	while dd < length - 10.0:
+		var f := frame_at(curve, dd)
+		for sd in [-1.0, 1.0]:
+			var b := hw(track, dd) + 0.25
+			var n := Node3D.new()
+			n.transform = Transform3D(Basis.looking_at(f["right"] * sd, Vector3.UP), f["pos"] + f["right"] * sd * b)
+			root.add_child(n)
+			var col: Color = NEON[(i + int(sd)) % NEON.size()]
+			Builder._add(n, Builder.box(Vector3(5.0, 0.7, 0.06)), Builder.mat(Color(0.05, 0.05, 0.07), 0.2, 0.5, col, 0.35), Vector3(0, 0.55, 0))
+			var l := Label3D.new()
+			l.text = brands[(i * 3 + int(sd + 1.0)) % brands.size()]
+			l.font_size = 44
+			l.pixel_size = 0.012
+			l.modulate = Color(col.r * 2.2, col.g * 2.2, col.b * 2.2)
+			l.shaded = false
+			l.double_sided = false
+			l.position = Vector3(0, 0.55, 0.05)
+			n.add_child(l)
+		if i % 3 == 0:
+			var sd2 := 1.0 if i % 2 == 0 else -1.0
+			var fp: Vector3 = f["pos"] + f["right"] * sd2 * (hw(track, dd) + WALK + 1.5)
+			Builder._add(root, Builder.box(Vector3(0.5, 16.0, 0.5)), Builder.mat(Color(0.3, 0.3, 0.32), 0.6, 0.4), fp + Vector3(0, 8.0, 0))
+			Builder._add(root, Builder.box(Vector3(3.0, 1.6, 0.4)), Builder.mat(Color(1, 1, 1), 0.0, 0.3, Color(0.95, 0.97, 1.0), 8.0), fp + Vector3(0, 16.2, 0)).basis = Basis.looking_at(-f["right"] * sd2, Vector3.UP)
+			var light := OmniLight3D.new()
+			light.light_color = Color(0.9, 0.95, 1.0)
+			light.light_energy = 2.2
+			light.omni_range = 30.0
+			light.position = fp + Vector3(0, 14.0, 0) - f["right"] * sd2 * 4.0
+			root.add_child(light)
+		i += 1
+		dd += 32.0
+
+
 ## Doppel-Laternen auf dem Mittelstreifen, Warnpoller mit Blinklicht an beiden Spitzen
 static func _build_median_lamps(root: Node3D, track: Dictionary) -> void:
 	var curve: Curve3D = track["curve"]
@@ -727,13 +856,18 @@ static func _build_median_lamps(root: Node3D, track: Dictionary) -> void:
 	for r in track["medians"]:
 		for nd in [r["from"] + MED_TAPER * 0.45, r["to"] - MED_TAPER * 0.45]:
 			var nf := frame_at(curve, nd)
-			var p: Vector3 = nf["pos"] + Vector3(0, CURB_H, 0)
-			Builder._add(root, Builder.box(Vector3(0.5, 1.1, 0.5)), warn, p + Vector3(0, 0.55, 0))
-			Builder._add(root, Builder.box(Vector3(0.52, 0.18, 0.52)), stripe, p + Vector3(0, 0.75, 0))
+			var post := Knockable.new()
+			post.mass = 15.0
+			post.slowdown = 0.93
+			post.position = nf["pos"] + Vector3(0, CURB_H, 0)
+			root.add_child(post)
+			Builder._add(post, Builder.box(Vector3(0.5, 1.1, 0.5)), warn, Vector3(0, 0.55, 0))
+			Builder._add(post, Builder.box(Vector3(0.52, 0.18, 0.52)), stripe, Vector3(0, 0.75, 0))
 			var sm := SphereMesh.new()
 			sm.radius = 0.16
 			sm.height = 0.32
-			Builder._add(root, sm, bm, p + Vector3(0, 1.25, 0))
+			Builder._add(post, sm, bm, Vector3(0, 1.25, 0))
+			_knock_shape(post, Vector3(0.5, 1.3, 0.5), Vector3(0, 0.65, 0))
 		var d: float = r["from"] + 40.0
 		while d < r["to"] - 30.0:
 			if median_at(track, d) > MED * 0.9:
@@ -898,8 +1032,6 @@ static func _fork_details(root: Node3D, track: Dictionary, p: Dictionary, rng: R
 	var curb := Builder.mat(Color(0.35, 0.35, 0.36), 0.0, 0.85)
 	var bush := Builder.mat(Color(0.05, 0.22, 0.07), 0.0, 0.9)
 	var chev := Builder.mat(Color(1.0, 0.75, 0.05), 0.0, 0.5, Color(1.0, 0.6, 0.0), 1.5)
-	var body := StaticBody3D.new()
-	root.add_child(body)
 	var nose := false
 	var u := 3.0
 	while u < 110.0:
@@ -914,26 +1046,29 @@ static func _fork_details(root: Node3D, track: Dictionary, p: Dictionary, rng: R
 			var mid: Vector3 = mf["pos"] + off.normalized() * (hw(track, md) + gap / 2.0)
 			var b := Basis.looking_at(mf["fwd"], Vector3.UP)
 			var w := gap - 0.3
-			var xf := Transform3D(b, mid + Vector3(0, 0.25, 0))
-			Builder._add(root, Builder.box(Vector3(w, 0.5, 3.2)), curb, Vector3.ZERO).transform = xf
-			if w > 1.4:
-				var sm := SphereMesh.new()
-				sm.radius = minf(w * 0.4, 1.4)
-				sm.height = 1.4
-				sm.radial_segments = 8
-				sm.rings = 4
-				Builder._add(root, sm, bush, mid + Vector3(0, 0.9, 0))
-			var cs := CollisionShape3D.new()
-			var bs := BoxShape3D.new()
-			bs.size = Vector3(w, 1.6, 3.2)
-			cs.shape = bs
-			cs.transform = Transform3D(b, mid + Vector3(0, 0.8, 0))
-			body.add_child(cs)
+			var xf := Transform3D(b, mid + Vector3(0, 0.1, 0))
+			Builder._add(root, Builder.box(Vector3(w, 0.2, 3.2)), curb, Vector3.ZERO).transform = xf
+			# Büsche: wer reinfährt, verliert Tempo und Grünzeug fliegt
+			var kb := Knockable.new()
+			kb.mass = 70.0
+			kb.slowdown = 0.75
+			kb.transform = Transform3D(b, mid + Vector3(0, 0.2, 0))
+			root.add_child(kb)
+			var sm := SphereMesh.new()
+			sm.radius = clampf(w * 0.4, 0.5, 1.4)
+			sm.height = 1.4
+			sm.radial_segments = 8
+			sm.rings = 4
+			Builder._add(kb, sm, bush, Vector3(0, 0.7, 0))
+			_knock_shape(kb, Vector3(minf(w, 2.6), 1.4, 2.6), Vector3(0, 0.7, 0))
 			if not nose:
 				# Pfeilschild an der Spitze der Insel
 				nose = true
-				var sn := Node3D.new()
+				var sn := Knockable.new()
+				sn.mass = 20.0
+				sn.slowdown = 0.92
 				sn.transform = Transform3D(b, mid - mf["fwd"] * 1.2)
+				_knock_shape(sn, Vector3(1.2, 2.0, 0.4), Vector3(0, 1.0, 0))
 				root.add_child(sn)
 				Builder._add(sn, Builder.box(Vector3(0.1, 1.4, 0.1)), curb, Vector3(0, 0.7, 0))
 				Builder._add(sn, Builder.box(Vector3(1.2, 0.8, 0.08)), chev, Vector3(0, 1.6, 0.06))
@@ -1110,6 +1245,16 @@ static func _spur_details(root: Node3D, track: Dictionary, p: Dictionary, rng: R
 		fz["pos"] + fz["fwd"] * 8.0 + Vector3(0, h / 2.0, 0)), Vector3(0.12, 0.12, 0.14), 0.4, seed, float(rng.randi() % 5))
 
 
+## Kollisionsform für ein wegfliegendes Teil
+static func _knock_shape(k: Node3D, size: Vector3, pos: Vector3) -> void:
+	var cs := CollisionShape3D.new()
+	var bs := BoxShape3D.new()
+	bs.size = size
+	cs.shape = bs
+	cs.position = pos
+	k.add_child(cs)
+
+
 static func _solid(parent: Node3D, size: Vector3, pos: Vector3) -> void:
 	var sb := StaticBody3D.new()
 	sb.position = pos
@@ -1279,18 +1424,22 @@ static func _build_roadworks(root: Node3D, track: Dictionary, rng: RandomNumberG
 		while dd <= len:
 			var taper := clampf(dd / 8.0, 0.0, 1.0)
 			var lat := lane + signf(lane) * (1.8 - taper * 1.8) - signf(lane) * 2.0 * taper
-			var n := Node3D.new()
+			var n := Knockable.new()
+			n.mass = 45.0
+			n.slowdown = 0.82
 			n.transform = xform_at(curve, d0 + dd, lat)
 			root.add_child(n)
 			Builder._add(n, Builder.box(Vector3(0.5, 0.9, 2.6)), stripe if int(dd / 3.0) % 2 == 0 else white, Vector3(0, 0.45, 0))
 			Builder._add(n, Builder.box(Vector3(0.2, 0.2, 0.2)), warn, Vector3(0, 1.0, 0))
-			_solid(n, Vector3(0.5, 1.6, 2.6), Vector3(0, 0.8, 0))
+			_knock_shape(n, Vector3(0.5, 1.2, 2.6), Vector3(0, 0.6, 0))
 			dd += 3.0
-		var sign_n := Node3D.new()
+		var sign_n := Knockable.new()
+		sign_n.mass = 25.0
+		sign_n.slowdown = 0.9
 		sign_n.transform = xform_at(curve, d0 - 10.0, lane)
 		root.add_child(sign_n)
 		Builder._add(sign_n, Builder.box(Vector3(1.8, 1.4, 0.1)), warn, Vector3(0, 1.4, 0))
-		_solid(sign_n, Vector3(1.8, 2.0, 0.4), Vector3(0, 1.0, 0))
+		_knock_shape(sign_n, Vector3(1.8, 2.0, 0.4), Vector3(0, 1.0, 0))
 		var l := Label3D.new()
 		l.text = "BAUSTELLE"
 		l.font_size = 40
@@ -2076,8 +2225,13 @@ static func _build_props(root: Node3D, track: Dictionary, rng: RandomNumberGener
 				k.add_child(cs)
 				root.add_child(k)
 			else:
-				var s := Node3D.new()
+				# Schwere Sachen: fliegen auch weg, kosten aber deutlich mehr Tempo (kein abrupter Stopp)
+				var s := Knockable.new()
 				s.transform = xf
+				var heavy := {6: [90.0, 0.75], 7: [120.0, 0.7], 8: [150.0, 0.65], 9: [250.0, 0.55], 10: [160.0, 0.65],
+					14: [220.0, 0.6], 15: [300.0, 0.55]}
+				s.mass = heavy[kind][0]
+				s.slowdown = heavy[kind][1]
 				root.add_child(s)
 				match kind:
 					6:
@@ -2087,7 +2241,7 @@ static func _build_props(root: Node3D, track: Dictionary, rng: RandomNumberGener
 						c.height = 0.8
 						c.radial_segments = 8
 						Builder._add(s, c, red, Vector3(0, 0.4, 0))
-						_solid(s, Vector3(0.45, 1.0, 0.45), Vector3(0, 0.5, 0))
+						_knock_shape(s, Vector3(0.45, 1.0, 0.45), Vector3(0, 0.5, 0))
 					7:
 						for i in 3:
 							var c := CylinderMesh.new()
@@ -2096,7 +2250,7 @@ static func _build_props(root: Node3D, track: Dictionary, rng: RandomNumberGener
 							c.height = 0.9
 							c.radial_segments = 8
 							Builder._add(s, c, dark, Vector3(-1.5 + i * 1.5, 0.45, 0))
-							_solid(s, Vector3(0.3, 1.0, 0.3), Vector3(-1.5 + i * 1.5, 0.5, 0))
+							_knock_shape(s, Vector3(0.3, 1.0, 0.3), Vector3(-1.5 + i * 1.5, 0.5, 0))
 					8:
 						Builder._add(s, Builder.box(Vector3(1.4, 0.6, 1.4)), concrete, Vector3(0, 0.3, 0))
 						var sm := SphereMesh.new()
@@ -2105,14 +2259,14 @@ static func _build_props(root: Node3D, track: Dictionary, rng: RandomNumberGener
 						sm.radial_segments = 8
 						sm.rings = 4
 						Builder._add(s, sm, bush, Vector3(0, 1.0, 0))
-						_solid(s, Vector3(1.4, 1.2, 1.4), Vector3(0, 0.6, 0))
+						_knock_shape(s, Vector3(1.4, 1.2, 1.4), Vector3(0, 0.6, 0))
 					9:
 						s.transform.origin = Vector3(pos.x, CURB_H, pos.z) + f["right"] * side * (hwd + WALK - 1.1 - off)
 						Builder._add(s, Builder.box(Vector3(3.6, 0.12, 1.5)), dark, Vector3(0, 2.5, 0))
 						Builder._add(s, Builder.box(Vector3(3.6, 2.4, 0.06)), glass, Vector3(0, 1.25, 0.7))
 						Builder._add(s, Builder.box(Vector3(0.06, 2.4, 1.4)), ad, Vector3(1.75, 1.25, 0))
 						Builder._add(s, Builder.box(Vector3(2.4, 0.08, 0.4)), wood, Vector3(-0.3, 0.45, 0.45))
-						_solid(s, Vector3(3.6, 2.5, 1.5), Vector3(0, 1.25, 0))
+						_knock_shape(s, Vector3(3.6, 2.5, 1.5), Vector3(0, 1.25, 0))
 					10:
 						for cx in [-0.52, 0.52]:
 							for cz in [-0.52, 0.52]:
@@ -2122,16 +2276,16 @@ static func _build_props(root: Node3D, track: Dictionary, rng: RandomNumberGener
 						var tc: Color = NEON[rng.randi() % NEON.size()]
 						Builder._add(s, Builder.box(Vector3(1.1, 0.28, 1.1)), Builder.mat(tc, 0.0, 0.4, tc, 2.0), Vector3(0, 2.25, 0))
 						_label(s, "TELEFON", Color(0.05, 0.05, 0.05), 12, Vector3(0, 2.25, -0.57), 1.0)
-						_solid(s, Vector3(1.1, 2.5, 1.1), Vector3(0, 1.25, 0))
+						_knock_shape(s, Vector3(1.1, 2.5, 1.1), Vector3(0, 1.25, 0))
 					14:
 						s.transform.origin = Vector3(pos.x, CURB_H, pos.z) + f["right"] * side * (hwd + WALK - 1.0 - off)
 						var dc := Builder.mat(Color(0.05, 0.25, 0.12) if rng.randf() < 0.5 else Color(0.08, 0.15, 0.4), 0.4, 0.6)
 						Builder._add(s, Builder.box(Vector3(1.9, 1.2, 1.1)), dc, Vector3(0, 0.65, 0))
 						Builder._add(s, Builder.box(Vector3(1.96, 0.08, 1.16)), dark, Vector3(0, 1.3, 0.05)).rotation.x = 0.12
-						_solid(s, Vector3(2.0, 1.4, 1.2), Vector3(0, 0.7, 0))
+						_knock_shape(s, Vector3(2.0, 1.4, 1.2), Vector3(0, 0.7, 0))
 					15:
 						Builder._add(s, Builder.tapered_box(Vector2(3.6, 0.6), Vector2(3.6, 0.22), 0.85, 0.0), concrete, Vector3.ZERO)
-						_solid(s, Vector3(3.6, 1.0, 0.6), Vector3(0, 0.5, 0))
+						_knock_shape(s, Vector3(3.6, 1.0, 0.6), Vector3(0, 0.5, 0))
 			d += rng.randf_range(7.0, 15.0) * dist.get("prop_gap", 1.0)
 
 

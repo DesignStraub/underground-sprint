@@ -229,6 +229,16 @@ func _show_main() -> void:
 	_button("Rennen fahren", _show_races)
 	_button("Tuning", _show_tuning)
 	_button("Auto wechseln", _show_cars)
+	_button("Einstellungen", _show_settings)
+	if not OS.has_feature("web"):  # im Browser schließt man einfach den Tab
+		_button("Beenden", func(): get_tree().quit())
+	info.text = Catalog.CARS[preview_car]["desc"] + "\nF / F11: Vollbild"
+	_focus_first()
+
+
+## Grafik, Vollbild, Spielstand: nicht auf der Startseite, sondern gesammelt hier
+func _show_settings() -> void:
+	_clear_menu()
 	var gfx := _button("", func(): pass)
 	gfx.pressed.connect(func():
 		GameState.cycle_pixel_mode()
@@ -236,9 +246,8 @@ func _show_main() -> void:
 	gfx.text = "Pixel-Look: " + GameState.PIXEL_MODES[GameState.pixel_mode]["name"]
 	_button("Vollbild", GameState.toggle_fullscreen)
 	_button("Spielstand zurücksetzen", _confirm_reset)
-	if not OS.has_feature("web"):  # im Browser schließt man einfach den Tab
-		_button("Beenden", func(): get_tree().quit())
-	info.text = Catalog.CARS[preview_car]["desc"] + "\nF / F11: Vollbild"
+	_button("< Zurück", _show_main)
+	info.text = "Pixel-Look: wie grob die 3D-Welt gerendert wird. F / F11: Vollbild."
 	_focus_first()
 
 

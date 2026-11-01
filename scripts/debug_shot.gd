@@ -77,7 +77,27 @@ func _process(dt: float) -> void:
 		if not _placed and race.state == 1:
 			_placed = true
 			_place_at(race)
-	if drive and race and "curve" in race and race.player and not race.player.loc.is_empty():
+	# --slidetest: festes Drift-Manöver auf der Geraden (Fahrmodell prüfen): 0,25 s Handbremse + links, dann nur Gas
+	if OS.get_cmdline_user_args().has("--slidetest") and race and "curve" in race and race.player and race.state == 1:
+		var pl = race.player
+		if _drift_t < 0.0:
+			_drift_t = 0.0
+			pl.drift_mode = true
+			pl.velocity = -pl.global_basis.z * 25.0
+		_drift_t += dt
+		for a in ["steer_left", "steer_right", "handbrake", "accelerate"]:
+			Input.action_release(a)
+		Input.action_press("accelerate")
+		if _drift_t < 0.25:
+			Input.action_press("handbrake")
+			Input.action_press("steer_left")
+		elif _drift_t > 2.0 and _drift_t < 3.2:
+			Input.action_press("steer_right", 0.5)  # gegenlenken
+		elif _drift_t > 3.2:
+			Input.action_release("accelerate")  # Gas weg: aufrichten
+		if fmod(_drift_t, 0.2) < dt:
+			print("t=%.1f winkel=%.0f rutscht=%s tempo=%.1f wand=%d" % [_drift_t, pl.drift_angle, pl._sliding, pl.velocity.length(), pl.wall_hits])
+	elif drive and race and "curve" in race and race.player and not race.player.loc.is_empty():
 		var pl = race.player
 		var p: Dictionary = race.track["paths"][pl.path_id]
 		var on_main: bool = p["id"] == 0
@@ -149,6 +169,7 @@ func _process(dt: float) -> void:
 				near += " T(%.1f,%.1f)" % [t.progress - pl.progress, t.lateral()]
 		print("t=%.1f d=%.1f lat=%.2f v=%.1f path=%d fps=%d%s" % [_t, pl.progress, pl.lateral, pl.speed_fwd, pl.path_id, Engine.get_frames_per_second(), near])
 		print("   runde=%d gesamt=%.0f ziel=%.0f status=%d platz=%d drift=%d kette=%d" % [pl.lap, pl.total, race.track["finish"], race.state, race._place(), int(race.drift_score), int(race.drift_chain)])
+		print("   rutscht=%s winkel=%.0f tempo=%.1f lenk=%.2f wand=%d manoever=%.2f" % [pl._sliding, pl.drift_angle, pl.velocity.length(), pl.steer, pl.wall_hits, _drift_t])
 		for n in get_tree().get_nodes_in_group("ambient"):
 			if "_cars" in n:
 				print("   zug aktiv=%s d=%.0f (%.0f-%.0f) sichtbar=%s y=%.1f" % [n._active, n._d, n.d_from, n.d_to, n._cars[0].visible, n._cars[0].global_position.y])

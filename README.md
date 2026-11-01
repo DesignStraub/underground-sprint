@@ -27,8 +27,12 @@ Nitro lädt sich langsam von selbst auf und schneller beim Driften.
 Alles ist von Anfang an frei wählbar (Garage → Rennen fahren → Art → Event):
 - **Sprint** (5): von A nach B gegen 3 Gegner.
 - **Rundkurs** (3): 2 Runden gegen 3 Gegner.
-- **Drift** (3): allein auf der Strecke. Querfahren ab 12° gibt Punkte (Winkel × Tempo), verkettete Drifts
-  steigern den Multiplikator bis x5, ein Crash kostet die laufende Kette. Zielpunkte für Platz 3/2/1 stehen im HUD.
+- **Drift** (3): allein auf kleinen, rundum abgesperrten Kursen mit Publikum. Eigenes Fahrverhalten: ist das Auto
+  quer, hält Gas den Winkel, Lenken steuert ihn, Gas weg richtet es auf. Querfahren ab 12° gibt Punkte
+  (Winkel × Tempo, nah an der Bande ×1,6), verkettete Drifts steigern den Multiplikator bis x5,
+  jede Bandenberührung kostet die laufende Kette. Zielpunkte für Platz 3/2/1 stehen im HUD.
+- **Wie in Underground:** Near Miss am Verkehr gibt Nitro; wer kurz vor GO Gas gibt (Drehzahl im grünen
+  Bereich), schafft einen perfekten Start. Kleinteile am Straßenrand fliegen weg und kosten Tempo statt zu stoppen.
 
 **Freischalten:** Rennsiege (Sprint + Rundkurs) und Driftsiege werden getrennt gezählt. Driftautos (Sakura D2,
 Ronin DR) gibt es für Driftsiege, schnelle Autos für Rennsiege, Teile für Siege insgesamt.
