@@ -235,7 +235,8 @@ func _show_main() -> void:
 		gfx.text = "Pixel-Look: " + GameState.PIXEL_MODES[GameState.pixel_mode]["name"])
 	gfx.text = "Pixel-Look: " + GameState.PIXEL_MODES[GameState.pixel_mode]["name"]
 	_button("Spielstand zurücksetzen", _confirm_reset)
-	_button("Beenden", func(): get_tree().quit())
+	if not OS.has_feature("web"):  # im Browser schließt man einfach den Tab
+		_button("Beenden", func(): get_tree().quit())
 	info.text = Catalog.CARS[preview_car]["desc"] + "\nF11 / Alt+Enter: Vollbild"
 	_focus_first()
 

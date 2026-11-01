@@ -52,6 +52,8 @@ func _ready() -> void:
 	gen.buffer_length = 0.08
 	stream = gen
 	volume_db = -6.0
+	# Im Browser spielt Godot Sounds sonst als fertige Samples ab; ein Generator braucht den Stream-Modus
+	playback_type = AudioServer.PLAYBACK_TYPE_STREAM
 	play()
 	_pb = get_stream_playback()
 

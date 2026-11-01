@@ -103,12 +103,12 @@ func _cross_sign(pos: Vector3, facing: Vector3) -> void:
 		var m := ShaderMaterial.new()
 		m.shader = BLINK_SHADER
 		m.set_shader_parameter("rate", 1.2)
+		m.set_shader_parameter("phase", 0.5 * k)
+		m.set_shader_parameter("active", 0.0)
 		var sm := SphereMesh.new()
 		sm.radius = 0.14
 		sm.height = 0.28
 		var l := Builder._add(n, sm, m, Vector3(-0.3 + k * 0.6, 2.2, 0.14))
-		l.set_instance_shader_parameter("phase", 0.5 * k)
-		l.set_instance_shader_parameter("active", 0.0)
 		_lights.append(l)
 
 
@@ -225,7 +225,7 @@ func _process(dt: float) -> void:
 		var dist := player.global_position.distance_to(origin)
 		Sfx.play("horn", linear_to_db(clampf(1.0 - dist / 600.0, 0.15, 1.0)))
 	for l in _lights:
-		l.set_instance_shader_parameter("active", 1.0 if blocked else 0.0)
+		l.material_override.set_shader_parameter("active", 1.0 if blocked else 0.0)
 	var cd := player.global_position.distance_to(origin)
 	_set_volume(_bell, clampf(1.0 - cd / 220.0, 0.0, 1.0) if blocked else 0.0, -4.0)
 	# Schranken: runter in ~2 s, rauf etwas langsamer

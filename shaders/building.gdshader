@@ -1,15 +1,17 @@
 shader_type spatial;
 // Fassaden in mehreren Stilen, alles in Weltkoordinaten (beliebig skalierbar).
 // style: 0 Raster, 1 Bandfenster (Büro), 2 Halle/Industrie, 3 Glasturm, 4 Backstein-Wohnhaus
+// Die Häuser einer Gegend sind ein gemeinsames Mesh; die Werte je Haus stehen in den Vertexdaten
+// (COLOR = Farbton + Anteil beleuchteter Fenster, UV2 = Seed, Stil + 10 * Schaufenster).
 
-instance uniform float seed = 0.0;
-instance uniform vec3 tint = vec3(0.08, 0.08, 0.1);
-instance uniform float shop_glass = 1.0;
-instance uniform float window_light = 1.0;
-instance uniform float style = 0.0;
-instance uniform float lit_chance = 0.4;
+uniform float window_light = 1.0;
 varying vec3 wpos;
 varying vec3 wnorm;
+varying vec3 tint;
+varying float lit_chance;
+varying float seed;
+varying float style;
+varying float shop_glass;
 
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float noise(vec2 p) {
@@ -22,6 +24,11 @@ float noise(vec2 p) {
 void vertex() {
 	wpos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	wnorm = normalize((MODEL_MATRIX * vec4(NORMAL, 0.0)).xyz);
+	tint = COLOR.rgb;
+	lit_chance = COLOR.a;
+	seed = UV2.x;
+	shop_glass = floor(UV2.y / 10.0 + 0.01);
+	style = UV2.y - shop_glass * 10.0;
 }
 
 void fragment() {

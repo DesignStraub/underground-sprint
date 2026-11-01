@@ -2,8 +2,8 @@ shader_type spatial;
 render_mode unshaded;
 // Ampel: Zyklus grün 5 s, gelb 1.5 s, rot 5 s, rot-gelb 0.5 s. which: 0 rot, 1 gelb, 2 grün.
 
-instance uniform float which = 0.0;
-instance uniform float phase = 0.0;
+uniform float which = 0.0;
+uniform float phase = 0.0;
 
 void fragment() {
 	float t = mod(TIME + phase, 12.0);

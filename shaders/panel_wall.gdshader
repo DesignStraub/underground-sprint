@@ -3,7 +3,7 @@ render_mode cull_disabled;
 // Betonwand (Lärmschutzwand, Brücke, Tunnelportal) mit Fugen, Schmutzschlieren und Graffiti.
 // Alles in Weltkoordinaten, funktioniert auf beliebigen Meshes.
 
-instance uniform float graffiti = 0.6;
+uniform float graffiti = 0.6;
 varying vec3 wpos;
 varying vec3 wnorm;
 

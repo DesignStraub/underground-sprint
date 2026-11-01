@@ -1,5 +1,6 @@
 #!/bin/bash
-# Lädt die drei Builds per butler auf itch.io hoch (als Ordner, damit Updates nur Änderungen übertragen).
+# Lädt die Builds per butler auf itch.io hoch (als Ordner, damit Updates nur Änderungen übertragen).
+# Kanäle: windows, macos, linux und – falls builds/web existiert – html5 (im Browser spielbar).
 # Aufruf:  release/push_itch.sh <itch-benutzername> [version]
 # Voraussetzung: einmal `butler login`, Projektseite "underground-sprint" existiert.
 set -e
@@ -22,4 +23,8 @@ for channel in windows macos linux; do
 	echo "== $channel"
 	"$BUTLER" push "$STAGE/$channel" "$USER/underground-sprint:$channel" --userversion "$VERSION"
 done
+if [ -f "$ROOT/builds/web/index.html" ]; then
+	echo "== html5"
+	"$BUTLER" push "$ROOT/builds/web" "$USER/underground-sprint:html5" --userversion "$VERSION"
+fi
 "$BUTLER" status "$USER/underground-sprint"

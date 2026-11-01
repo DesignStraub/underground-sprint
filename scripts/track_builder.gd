@@ -80,6 +80,13 @@ const DISTRICTS := {
 		"setback": 10.0, "soundwall": true, "gantry": 1.0, "overpass": 1.0, "prop_gap": 3.0, "props": [2, 7, 15]},
 }
 const DISTRICT_LEN := 400.0
+const BATCH_CELL := 120.0  # Häuser werden in Zellen dieser Größe zu je einem Mesh zusammengefasst
+
+## Häuser-Batch während build(): Zelle -> SurfaceTool
+static var _bb := {}
+## Straßenmaterial je Straßentyp (keine Werte pro Objekt: im Browser gibt es dafür nur wenig Platz)
+static var _road_mats := {}
+static var _box_arrays: Array = []
 
 
 static func build(race: Dictionary) -> Dictionary:
@@ -87,6 +94,7 @@ static func build(race: Dictionary) -> Dictionary:
 	rng.seed = race["seed"]
 	var root := Node3D.new()
 	root.name = "Track"
+	_bb = {}
 
 	var gen := _centerline(race, rng)
 	var pts: Array = gen["pts"]
@@ -162,6 +170,9 @@ static func build(race: Dictionary) -> Dictionary:
 	gs.shape = WorldBoundaryShape3D.new()
 	gb.add_child(gs)
 	root.add_child(gb)
+	_bb_flush(root)
+	if OS.has_feature("web"):
+		_apply_lod(root)
 	return track
 
 
@@ -430,15 +441,46 @@ static func _road_mesh(root: Node3D, st: SurfaceTool, lanes: float, width: float
 	st.generate_normals()
 	var mi := MeshInstance3D.new()
 	mi.mesh = st.commit()
-	var m := ShaderMaterial.new()
-	m.shader = ROAD_SHADER
-	mi.material_override = m
-	mi.set_instance_shader_parameter("lanes", lanes)
-	mi.set_instance_shader_parameter("road_w", width)
-	mi.set_instance_shader_parameter("cobble", cobble)
+	var key := Vector3(lanes, width, cobble)
+	if not _road_mats.has(key):
+		var m := ShaderMaterial.new()
+		m.shader = ROAD_SHADER
+		m.set_shader_parameter("lanes", lanes)
+		m.set_shader_parameter("road_w", width)
+		m.set_shader_parameter("cobble", cobble)
+		_road_mats[key] = m
+	mi.material_override = _road_mats[key]
 	mi.position.y = y
 	root.add_child(mi)
 	return mi
+
+
+## Nur im Browser: kleine Dinge in der Ferne nicht zeichnen, entfernte Lampen ausblenden.
+## Dort ist jedes gezeichnete Objekt teuer; auf dem Desktop bleiben die langen Lampenreihen sichtbar.
+static func _apply_lod(n: Node) -> void:
+	for c in n.get_children():
+		if c is GeometryInstance3D:
+			var gi := c as GeometryInstance3D
+			var size := gi.get_aabb().size.length()
+			if size < 4.0:
+				gi.visibility_range_end = 140.0
+			elif size < 15.0:
+				gi.visibility_range_end = 280.0
+		elif c is Light3D:
+			var l := c as Light3D
+			l.distance_fade_enabled = true
+			l.distance_fade_begin = 150.0
+			l.distance_fade_length = 40.0
+		_apply_lod(c)
+
+
+## SurfaceTool (mit Dreiecken) als MeshInstance ablegen
+static func _flush(root: Node3D, st: SurfaceTool, m: Material) -> void:
+	st.generate_normals()
+	var mi := MeshInstance3D.new()
+	mi.mesh = st.commit()
+	mi.material_override = m
+	root.add_child(mi)
 
 
 static func _wall_shape(walls: StaticBody3D, a: Vector3, b: Vector3) -> void:
@@ -466,6 +508,8 @@ static func _build_road(root: Node3D, track: Dictionary) -> void:
 	var d := 0.0
 	var prev := {}
 	var outer := HALF_W + WALK
+	var walk_m := Builder.mat(Color(0.16, 0.16, 0.17), 0.0, 0.7)
+	var piece := 0
 	while d <= length:
 		var f := frame_at(curve, d)
 		var c: Vector3 = f["pos"]
@@ -489,15 +533,18 @@ static func _build_road(root: Node3D, track: Dictionary) -> void:
 			for side in ["lw", "rw"]:
 				if _branch_clearance(track, (prev[side] + cur[side]) / 2) > 1.0:
 					_wall_shape(walls, prev[side], cur[side])
+			piece += 1
 		prev = cur
 		d += step
-
-	_road_mesh(root, road, 4.0, HALF_W * 2.0, 0.0)
-	walk.generate_normals()
-	var walk_mi := MeshInstance3D.new()
-	walk_mi.mesh = walk.commit()
-	walk_mi.material_override = Builder.mat(Color(0.16, 0.16, 0.17), 0.0, 0.7)
-	root.add_child(walk_mi)
+		# In Stücken von 60 m ablegen: der Browser-Renderer beleuchtet jedes Objekt nur mit wenigen Lampen
+		if piece >= 20 or (d > length and piece > 0):
+			_road_mesh(root, road, 4.0, HALF_W * 2.0, 0.0)
+			_flush(root, walk, walk_m)
+			road = SurfaceTool.new()
+			road.begin(Mesh.PRIMITIVE_TRIANGLES)
+			walk = SurfaceTool.new()
+			walk.begin(Mesh.PRIMITIVE_TRIANGLES)
+			piece = 0
 
 
 ## Horizontaler Streifen; a/b = vorherige Kante links/rechts, c/d = aktuelle.
@@ -534,8 +581,6 @@ static func _build_branch(root: Node3D, track: Dictionary, p: Dictionary, rng: R
 	road.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var walls := StaticBody3D.new()
 	root.add_child(walls)
-	var brick := ShaderMaterial.new()
-	brick.shader = BUILDING_SHADER
 	var hedge := Builder.mat(Color(0.04, 0.16, 0.06), 0.0, 0.9)
 	var concrete := Builder.mat(Color(0.3, 0.3, 0.31), 0.0, 0.85)
 	var step := 2.0
@@ -559,15 +604,8 @@ static func _build_branch(root: Node3D, track: Dictionary, p: Dictionary, rng: R
 				var seg: Vector3 = cur[side] - prev[side]
 				var basis := Basis.looking_at(seg.normalized(), Vector3.UP)
 				if kind == "alley":
-					var bw := MeshInstance3D.new()
-					bw.mesh = Builder.box(Vector3(0.5, 4.5, seg.length() + 0.1))
-					bw.material_override = brick
-					bw.transform = Transform3D(basis, wm + Vector3(0, 2.25, 0))
-					bw.set_instance_shader_parameter("style", 4.0)
-					bw.set_instance_shader_parameter("tint", Vector3(0.24, 0.11, 0.07))
-					bw.set_instance_shader_parameter("shop_glass", 0.0)
-					bw.set_instance_shader_parameter("seed", float(p["id"]))
-					root.add_child(bw)
+					_bb_box(Transform3D(basis * Basis.from_scale(Vector3(0.5, 4.5, seg.length() + 0.1)), wm + Vector3(0, 2.25, 0)),
+						Vector3(0.24, 0.11, 0.07), 0.4, float(p["id"]), 4.0, 0.0)
 				elif kind == "lake":
 					var near_lake := _in_lake(track, wm, 2.0)
 					var hm := MeshInstance3D.new()
@@ -737,8 +775,6 @@ static func _spur_details(root: Node3D, track: Dictionary, p: Dictionary, rng: R
 	tl.add_child(arm)
 	var head_pos := Vector3(-3.0, 4.4, 0)
 	Builder._add(tl, Builder.box(Vector3(0.45, 1.3, 0.35)), dark, head_pos)
-	var lmat := ShaderMaterial.new()
-	lmat.shader = LIGHT_SHADER
 	var phase := rng.randf() * 12.0
 	for k in 3:
 		var sm := SphereMesh.new()
@@ -746,9 +782,11 @@ static func _spur_details(root: Node3D, track: Dictionary, p: Dictionary, rng: R
 		sm.height = 0.26
 		sm.radial_segments = 8
 		sm.rings = 4
-		var lm := Builder._add(tl, sm, lmat, head_pos + Vector3(0, 0.4 - k * 0.4, 0.18))
-		lm.set_instance_shader_parameter("which", float(k))
-		lm.set_instance_shader_parameter("phase", phase)
+		var lmat := ShaderMaterial.new()
+		lmat.shader = LIGHT_SHADER
+		lmat.set_shader_parameter("which", float(k))
+		lmat.set_shader_parameter("phase", phase)
+		Builder._add(tl, sm, lmat, head_pos + Vector3(0, 0.4 - k * 0.4, 0.18))
 	# Absperrung + Gebäude am Ende der Sackgasse
 	var fz := frame_at(c, len - 1.0)
 	var bar := Node3D.new()
@@ -758,18 +796,10 @@ static func _spur_details(root: Node3D, track: Dictionary, p: Dictionary, rng: R
 	for i in 5:
 		Builder._add(bar, Builder.box(Vector3(2.4, 0.9, 0.5)), stripe if i % 2 == 0 else white, Vector3(-SPUR_HALF + 1.2 + i * 2.4, 0.45, 0))
 	_solid(bar, Vector3(SPUR_HALF * 2.0 + 1.0, WALL_H, 0.6), Vector3(0, WALL_H / 2.0, 0))
-	var bmat := ShaderMaterial.new()
-	bmat.shader = BUILDING_SHADER
 	var h := rng.randf_range(14.0, 40.0)
-	var b := MeshInstance3D.new()
-	b.mesh = BoxMesh.new()
-	b.material_override = bmat
-	b.transform = Transform3D(Basis.looking_at(fz["fwd"], Vector3.UP) * Basis.from_scale(Vector3(SPUR_HALF * 2.0 + 16.0, h, 14.0)),
-		fz["pos"] + fz["fwd"] * 8.0 + Vector3(0, h / 2.0, 0))
-	b.set_instance_shader_parameter("seed", rng.randf() * 100.0)
-	b.set_instance_shader_parameter("style", float(rng.randi() % 5))
-	b.set_instance_shader_parameter("tint", Vector3(0.12, 0.12, 0.14))
-	root.add_child(b)
+	var seed := rng.randf() * 100.0
+	_bb_box(Transform3D(Basis.looking_at(fz["fwd"], Vector3.UP) * Basis.from_scale(Vector3(SPUR_HALF * 2.0 + 16.0, h, 14.0)),
+		fz["pos"] + fz["fwd"] * 8.0 + Vector3(0, h / 2.0, 0)), Vector3(0.12, 0.12, 0.14), 0.4, seed, float(rng.randi() % 5))
 
 
 static func _solid(parent: Node3D, size: Vector3, pos: Vector3) -> void:
@@ -1090,18 +1120,7 @@ static func _church(n: Node3D) -> void:
 
 
 static func _hospital(n: Node3D) -> void:
-	var bmat := ShaderMaterial.new()
-	bmat.shader = BUILDING_SHADER
-	var b := MeshInstance3D.new()
-	b.mesh = BoxMesh.new()
-	b.material_override = bmat
-	b.transform = Transform3D(Basis.from_scale(Vector3(44, 24, 18)), Vector3(0, 12, 6))
-	b.set_instance_shader_parameter("seed", 3.0)
-	b.set_instance_shader_parameter("tint", Vector3(0.55, 0.57, 0.6))
-	b.set_instance_shader_parameter("shop_glass", 0.0)
-	b.set_instance_shader_parameter("style", 1.0)
-	b.set_instance_shader_parameter("lit_chance", 0.6)
-	n.add_child(b)
+	_bb_box(n.transform * Transform3D(Basis.from_scale(Vector3(44, 24, 18)), Vector3(0, 12, 6)), Vector3(0.55, 0.57, 0.6), 0.6, 3.0, 1.0, 0.0)
 	var red := Builder.mat(Color(1, 0.05, 0.05), 0, 0.4, Color(1, 0.05, 0.05), 5.0)
 	var white := Builder.mat(Color(0.9, 0.9, 0.92), 0.1, 0.5)
 	Builder._add(n, Builder.box(Vector3(6, 6, 0.6)), white, Vector3(0, 27.5, -2.6))
@@ -1177,15 +1196,7 @@ static func _gas_station(n: Node3D) -> void:
 		l.omni_range = 16.0
 		l.light_color = Color(0.92, 0.96, 1.0)
 		n.add_child(l)
-	var bmat := ShaderMaterial.new()
-	bmat.shader = BUILDING_SHADER
-	var b := MeshInstance3D.new()
-	b.mesh = BoxMesh.new()
-	b.material_override = bmat
-	b.transform = Transform3D(Basis.from_scale(Vector3(14, 4.5, 8)), Vector3(0, 2.25, 6))
-	b.set_instance_shader_parameter("seed", 9.0)
-	b.set_instance_shader_parameter("tint", Vector3(0.3, 0.3, 0.32))
-	n.add_child(b)
+	_bb_box(n.transform * Transform3D(Basis.from_scale(Vector3(14, 4.5, 8)), Vector3(0, 2.25, 6)), Vector3(0.3, 0.3, 0.32), 0.4, 9.0)
 	_label(n, "24/7 SHOP", Color(1, 0.3, 0.3), 70, Vector3(0, 3.8, 1.9))
 	Builder._add(n, Builder.box(Vector3(0.5, 9, 0.5)), white, Vector3(11, 4.5, -10))
 	Builder._add(n, Builder.box(Vector3(3.4, 3.4, 0.4)), Builder.mat(Color(0.05, 0.05, 0.08), 0, 0.5), Vector3(11, 9.5, -10))
@@ -1204,8 +1215,6 @@ static func _district_at(track: Dictionary, d: float) -> Dictionary:
 
 
 static func _build_city(root: Node3D, track: Dictionary, rng: RandomNumberGenerator, occupied: Array) -> void:
-	var bmat := ShaderMaterial.new()
-	bmat.shader = BUILDING_SHADER
 	var placed := []  # [{pos, r}]
 	# Häuserzeilen: an der Hauptstraße beidseitig, an den Abkürzungen ebenfalls
 	var frontages := []
@@ -1257,13 +1266,13 @@ static func _build_city(root: Node3D, track: Dictionary, rng: RandomNumberGenera
 			elif ok:
 				var basis := Basis.looking_at(f["fwd"], Vector3.UP)
 				var face_dir: Vector3 = -f["right"] * side  # zeigt zur Straße
-				_building(root, bmat, center, basis, w, depth, h, tall, shop, dist, face_dir, f["right"] * side, rng)
+				_building(root, center, basis, w, depth, h, tall, shop, dist, face_dir, f["right"] * side, rng)
 				placed.append({"pos": center, "r": radius * 0.8})
 			d += w + rng.randf_range(0.5, 3.5)
 
 
 ## Ein Gebäude mit Fassade, ggf. Sockel + Turm + Krone, Dachaufbauten, Werbung, Laden
-static func _building(root: Node3D, bmat: ShaderMaterial, center: Vector3, basis: Basis, w: float, depth: float, h: float,
+static func _building(root: Node3D, center: Vector3, basis: Basis, w: float, depth: float, h: float,
 		tall: bool, shop: bool, dist: Dictionary, face_dir: Vector3, away: Vector3, rng: RandomNumberGenerator) -> void:
 	var styles: Array = dist["styles"]
 	var tints: Array = dist["tints"]
@@ -1280,17 +1289,17 @@ static func _building(root: Node3D, bmat: ShaderMaterial, center: Vector3, basis
 	if tall and h > 26.0 and rng.randf() < 0.55:
 		# Sockelbau + zurückgesetzter Turm
 		var ph := rng.randf_range(6.0, 9.0)
-		_box_building(root, bmat, center, basis, w, depth, ph, 0.0, tv * 0.9, seed + 1.0, 1.0, lit)
+		_box_building(root, center, basis, w, depth, ph, 0.0, tv * 0.9, seed + 1.0, 1.0, lit)
 		top_w = w * 0.7
 		top_d = depth * 0.7
 		top_center = center + away * depth * 0.1
-		_box_building(root, bmat, top_center, basis, top_w, top_d, h, style, tv, seed, 0.0, lit)
+		_box_building(root, top_center, basis, top_w, top_d, h, style, tv, seed, 0.0, lit)
 	else:
-		_box_building(root, bmat, center, basis, w, depth, h, style, tv, seed, 1.0 if not tall or rng.randf() < 0.7 else 0.0, lit)
+		_box_building(root, center, basis, w, depth, h, style, tv, seed, 1.0 if not tall or rng.randf() < 0.7 else 0.0, lit)
 	if tall and h > 45.0 and rng.randf() < 0.45:
 		# Krone
 		var ch := rng.randf_range(5.0, 12.0)
-		_box_building(root, bmat, top_center, basis, top_w * 0.55, top_d * 0.55, ch, style, tv * 1.1, seed + 2.0, 0.0, lit, top_h)
+		_box_building(root, top_center, basis, top_w * 0.55, top_d * 0.55, ch, style, tv * 1.1, seed + 2.0, 0.0, lit, top_h)
 		top_h += ch
 		top_w *= 0.55
 		top_d *= 0.55
@@ -1318,7 +1327,6 @@ static func _building(root: Node3D, bmat: ShaderMaterial, center: Vector3, basis
 		var sy := rng.randf_range(14.0, top_h - sh - 4.0)
 		var scr := Builder._add(root, q, sm, top_center + face_dir * (top_d * 0.5 + 0.12) + Vector3(0, sy, 0))
 		scr.basis = Basis.looking_at(-face_dir, Vector3.UP)
-		scr.set_instance_shader_parameter("seed", rng.randf() * 50.0)
 	for i in (0 if eaves else rng.randi_range(0, 3)):
 		var off := basis * Vector3(rng.randf_range(-top_d, top_d) * 0.3, 0, rng.randf_range(-top_w, top_w) * 0.3)
 		Builder._add(root, Builder.box(Vector3(1.6, 1.0, 1.2)), grey, top_center + off + Vector3(0, roof_y + 0.5, 0)).basis = basis
@@ -1354,7 +1362,7 @@ static func _building(root: Node3D, bmat: ShaderMaterial, center: Vector3, basis
 		var sbl := SphereMesh.new()
 		sbl.radius = 0.3
 		sbl.height = 0.6
-		Builder._add(root, sbl, sbm, sp + Vector3(0, y0 + 0.3, 0)).set_instance_shader_parameter("phase", rng.randf())
+		Builder._add(root, sbl, sbm, sp + Vector3(0, y0 + 0.3, 0))
 	if tall and rng.randf() < 0.6:
 		# Antenne mit rotem Blinklicht
 		var ah := rng.randf_range(5.0, 14.0)
@@ -1365,8 +1373,7 @@ static func _building(root: Node3D, bmat: ShaderMaterial, center: Vector3, basis
 		var sm := SphereMesh.new()
 		sm.radius = 0.3
 		sm.height = 0.6
-		var light := Builder._add(root, sm, bm, top_center + Vector3(0, roof_y + ah, 0))
-		light.set_instance_shader_parameter("phase", rng.randf())
+		Builder._add(root, sm, bm, top_center + Vector3(0, roof_y + ah, 0))
 	if rng.randf() < dist["billboard"] and h < 40.0 and top_center == center:
 		_billboard(root, center + face_dir * (depth * 0.5 - 1.5), face_dir, roof_y, rng)
 	if rng.randf() < dist["neon_edge"]:
@@ -1453,18 +1460,44 @@ static func _building(root: Node3D, bmat: ShaderMaterial, center: Vector3, basis
 			Builder._add(root, Builder.box(Vector3(2.4, 0.9, 0.05)), bc, face_pos + off + face_dir * 1.0 + Vector3(0, 4.65 + k * 3.2, 0)).basis = face_basis
 
 
-static func _box_building(root: Node3D, bmat: ShaderMaterial, center: Vector3, basis: Basis, w: float, depth: float, h: float,
+static func _box_building(root: Node3D, center: Vector3, basis: Basis, w: float, depth: float, h: float,
 		style: float, tint: Vector3, seed: float, shop_glass: float, lit: float, base_y := 0.0) -> void:
-	var b := MeshInstance3D.new()
-	b.mesh = BoxMesh.new()
-	b.material_override = bmat
-	b.transform = Transform3D(basis * Basis.from_scale(Vector3(depth, h, w)), center + Vector3(0, base_y + h / 2, 0))
-	b.set_instance_shader_parameter("seed", seed)
-	b.set_instance_shader_parameter("tint", tint)
-	b.set_instance_shader_parameter("style", style)
-	b.set_instance_shader_parameter("shop_glass", shop_glass)
-	b.set_instance_shader_parameter("lit_chance", lit)
-	root.add_child(b)
+	_bb_box(Transform3D(basis * Basis.from_scale(Vector3(depth, h, w)), center + Vector3(0, base_y + h / 2, 0)),
+		tint, lit, seed, style, shop_glass)
+
+
+## Quader mit Fassaden-Shader in den Häuser-Batch legen (xf skaliert einen Einheitswürfel)
+static func _bb_box(xf: Transform3D, tint := Vector3(0.08, 0.08, 0.1), lit := 0.4, seed := 0.0, style := 0.0, shop_glass := 1.0) -> void:
+	if _box_arrays.is_empty():
+		_box_arrays = BoxMesh.new().get_mesh_arrays()
+	var verts: PackedVector3Array = _box_arrays[Mesh.ARRAY_VERTEX]
+	var norms: PackedVector3Array = _box_arrays[Mesh.ARRAY_NORMAL]
+	var idx: PackedInt32Array = _box_arrays[Mesh.ARRAY_INDEX]
+	var key := Vector2i(floori(xf.origin.x / BATCH_CELL), floori(xf.origin.z / BATCH_CELL))
+	if not _bb.has(key):
+		var nst := SurfaceTool.new()
+		nst.begin(Mesh.PRIMITIVE_TRIANGLES)
+		_bb[key] = nst
+	var st: SurfaceTool = _bb[key]
+	var nb := xf.basis.inverse().transposed()
+	var col := Color(tint.x, tint.y, tint.z, lit)
+	var u2 := Vector2(seed, style + 10.0 * shop_glass)
+	for i in idx:
+		st.set_normal((nb * norms[i]).normalized())
+		st.set_color(col)
+		st.set_uv2(u2)
+		st.add_vertex(xf * verts[i])
+
+
+static func _bb_flush(root: Node3D) -> void:
+	var m := ShaderMaterial.new()
+	m.shader = BUILDING_SHADER
+	for key in _bb:
+		var mi := MeshInstance3D.new()
+		mi.mesh = (_bb[key] as SurfaceTool).commit()
+		mi.material_override = m
+		root.add_child(mi)
+	_bb = {}
 
 
 ## Leuchtende Werbetafel auf dem Dach, zur Straße gedreht
@@ -2033,8 +2066,6 @@ static func _build_tunnels(root: Node3D, track: Dictionary, rng: RandomNumberGen
 	panel.shader = PANEL_SHADER
 	var warn := Builder.mat(Color(0.9, 0.62, 0.05), 0.0, 0.5)
 	var exit_m := Builder.mat(Color(0.1, 0.9, 0.3), 0.0, 0.4, Color(0.1, 1.0, 0.35), 3.0)
-	var bmat := ShaderMaterial.new()
-	bmat.shader = BUILDING_SHADER
 	var walls := StaticBody3D.new()
 	root.add_child(walls)
 	for t in track["tunnels"]:
@@ -2065,14 +2096,14 @@ static func _build_tunnels(root: Node3D, track: Dictionary, rng: RandomNumberGen
 					sc.add_vertex(v)
 				_wall_shape(walls, prev["l"] - prev["dir"] * 0.3, cur["l"] - r * 0.3)
 				_wall_shape(walls, prev["r"] + prev["dir"] * 0.3, cur["r"] + r * 0.3)
+				if i % 10 == 0 or i == n:  # 30-m-Stücke, damit jedes Stück seine Tunnellampen abbekommt
+					_flush(root, st, tile)
+					_flush(root, sc, ceil_m)
+					st = SurfaceTool.new()
+					st.begin(Mesh.PRIMITIVE_TRIANGLES)
+					sc = SurfaceTool.new()
+					sc.begin(Mesh.PRIMITIVE_TRIANGLES)
 			prev = cur
-		for pair in [[st, tile], [sc, ceil_m]]:
-			var s: SurfaceTool = pair[0]
-			s.generate_normals()
-			var mi := MeshInstance3D.new()
-			mi.mesh = s.commit()
-			mi.material_override = pair[1]
-			root.add_child(mi)
 
 		# Lichtbänder an der Decke (der Rhythmus beim Durchfahren macht Tempo spürbar)
 		var strips := []
@@ -2184,7 +2215,7 @@ static func _build_tunnels(root: Node3D, track: Dictionary, rng: RandomNumberGen
 			var f := frame_at(curve, (a + b) / 2.0)
 			var tint: Color = tints[rng.randi() % tints.size()]
 			var h := rng.randf_range(20.0, 48.0) if i % 3 == 1 else rng.randf_range(5.0, 22.0)
-			_box_building(root, bmat, f["pos"], Basis.looking_at(f["fwd"], Vector3.UP), b - a + 1.5, (HALF_W + WALK) * 2.0 + 1.0,
+			_box_building(root, f["pos"], Basis.looking_at(f["fwd"], Vector3.UP), b - a + 1.5, (HALF_W + WALK) * 2.0 + 1.0,
 				h, styles[rng.randi() % styles.size()], Vector3(tint.r, tint.g, tint.b), rng.randf() * 100.0, 0.0, dist["lit"], TUN_H)
 
 
@@ -2202,8 +2233,6 @@ static func _build_el(root: Node3D, track: Dictionary, rng: RandomNumberGenerato
 	var roof_m := Builder.mat(Color(0.2, 0.22, 0.24), 0.5, 0.5)
 	var light_m := Builder.mat(Color(1, 0.75, 0.45), 0.0, 0.3, Color(1, 0.7, 0.4), 5.0)
 	var sta_m := Builder.mat(Color(0.9, 0.95, 1.0), 0.0, 0.3, Color(0.85, 0.95, 1.0), 5.0)
-	var bmat := ShaderMaterial.new()
-	bmat.shader = BUILDING_SHADER
 	for e in track["el"]:
 		var side: float = e["side"]
 		var a_lat := side * (HALF_W - 3.2)  # Innenkante über der Außenspur
@@ -2228,12 +2257,11 @@ static func _build_el(root: Node3D, track: Dictionary, rng: RandomNumberGenerato
 				_strip(st, prev["a"] + y1, prev["b"] + y1, cur["a"] + y1, cur["b"] + y1, 0.0, 0.0)
 				_strip_v(st, prev["a"] + y0, cur["a"] + y0, 1.5, true)
 				_strip_v(st, prev["b"] + y0, cur["b"] + y0, 1.5, false)
+				if i % 12 == 0 or i == n:
+					_flush(root, st, steel)
+					st = SurfaceTool.new()
+					st.begin(Mesh.PRIMITIVE_TRIANGLES)
 			prev = cur
-		st.generate_normals()
-		var deck := MeshInstance3D.new()
-		deck.mesh = st.commit()
-		deck.material_override = steel
-		root.add_child(deck)
 
 		# Querrippen, Stützen, Lampen
 		var ribs := []
@@ -2269,7 +2297,7 @@ static func _build_el(root: Node3D, track: Dictionary, rng: RandomNumberGenerato
 			var hi := HALF_W + WALK + 9.0
 			var dist := _district_at(track, d)
 			var tint: Color = dist["tints"][rng.randi() % dist["tints"].size()]
-			_box_building(root, bmat, f["pos"] + f["right"] * side * (lo + hi) / 2.0, Basis.looking_at(f["fwd"], Vector3.UP), 14.0,
+			_box_building(root, f["pos"] + f["right"] * side * (lo + hi) / 2.0, Basis.looking_at(f["fwd"], Vector3.UP), 14.0,
 				hi - lo, rng.randf_range(9.0, 16.0), dist["styles"][0], Vector3(tint.r, tint.g, tint.b), rng.randf() * 100.0, 0.0,
 				dist["lit"], EL_H - 0.6)
 			for k in [-4.5, 4.5]:
@@ -2326,9 +2354,6 @@ static func _build_structures(root: Node3D, track: Dictionary, rng: RandomNumber
 	var arr: Array = track["districts"]
 	var occupied := []
 	var strings := {"lantern": [], "gold": [], "bulb": [], "cable": [], "lights": []}
-	var wall := SurfaceTool.new()
-	wall.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var has_wall := false
 	for i in arr.size():
 		var d0 := i * DISTRICT_LEN
 		var d1 := minf(d0 + DISTRICT_LEN, length)
@@ -2355,8 +2380,7 @@ static func _build_structures(root: Node3D, track: Dictionary, rng: RandomNumber
 					_string_lights(track, d, strings, "bulb")
 				d += 32.0
 		if dist.has("soundwall"):
-			_sound_walls(track, wall, d0, d1)
-			has_wall = true
+			_sound_walls(root, track, d0, d1)
 		if rng.randf() < dist.get("gantry", 0.0):
 			var count := 2 if key == "highway" else 1
 			for c in count:
@@ -2397,14 +2421,6 @@ static func _build_structures(root: Node3D, track: Dictionary, rng: RandomNumber
 		light.omni_range = 14.0
 		light.position = lp
 		root.add_child(light)
-	if has_wall:
-		wall.generate_normals()
-		var mi := MeshInstance3D.new()
-		mi.mesh = wall.commit()
-		var pm := ShaderMaterial.new()
-		pm.shader = PANEL_SHADER
-		mi.material_override = pm
-		root.add_child(mi)
 	return occupied
 
 
@@ -2590,10 +2606,15 @@ static func _overpass(root: Node3D, track: Dictionary, d: float, rng: RandomNumb
 	return occ
 
 
-## Lärmschutzwand mit Graffiti am Rand der Schnellstraße
-static func _sound_walls(track: Dictionary, st: SurfaceTool, d0: float, d1: float) -> void:
+## Lärmschutzwand mit Graffiti am Rand der Schnellstraße (in 60-m-Stücken)
+static func _sound_walls(root: Node3D, track: Dictionary, d0: float, d1: float) -> void:
 	var curve: Curve3D = track["curve"]
+	var pm := ShaderMaterial.new()
+	pm.shader = PANEL_SHADER
 	var lat := HALF_W + WALK + 0.35
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var quads := 0
 	var d := d0
 	while d < d1:
 		var e := minf(d + 3.0, d1)
@@ -2606,7 +2627,13 @@ static func _sound_walls(track: Dictionary, st: SurfaceTool, d0: float, d1: floa
 				var m := (a + b) / 2.0
 				if _branch_clearance(track, m) > 1.0 and _rail_clearance(track, m) > 2.0 and not _in_lake(track, m, 2.0):
 					_wall_uv(st, a, b, 4.5, d, e, s < 0.0)
+					quads += 1
 		d = e
+		if quads >= 40 or (d >= d1 and quads > 0):
+			_flush(root, st, pm)
+			st = SurfaceTool.new()
+			st.begin(Mesh.PRIMITIVE_TRIANGLES)
+			quads = 0
 
 
 # --- Stadion, Kräne, Feuertreppen --------------------------------------------------
@@ -2726,8 +2753,7 @@ static func _crane(root: Node3D, center: Vector3, face_dir: Vector3, rng: Random
 	sm.radius = 0.35
 	sm.height = 0.7
 	for p in [Vector3(0, 31.2, -41.5), Vector3(0, 41.3, 5.0)]:
-		var light := Builder._add(root, sm, bm, xf * p)
-		light.set_instance_shader_parameter("phase", rng.randf())
+		Builder._add(root, sm, bm, xf * p)
 
 
 ## Feuertreppe an einer Backsteinfassade (ein Mesh). fb: +Z zeigt zur Straße.

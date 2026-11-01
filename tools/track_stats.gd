@@ -15,6 +15,9 @@ func _ready() -> void:
 				kinds.append("%s(%.0fm, spart %.0fm)" % [p["kind"], p["length"], (p["to"] - p["from"]) - p["length"]])
 		print("%s: %.0f m, Kreuzung bei %.0f, %d Knoten, %d ms" % [r["name"], t["length"], t["crossing_d"],
 			_count(t["node"]), Time.get_ticks_msec() - t0])
+		var shaders := {}
+		_shaders(t["node"], shaders)
+		print("   Shader-Nutzer: ", shaders)
 		print("   ", ", ".join(kinds))
 		var tun := []
 		for x in t["tunnels"]:
@@ -33,3 +36,14 @@ func _count(n: Node) -> int:
 	for ch in n.get_children():
 		c += _count(ch)
 	return c
+
+
+## Wie viele Objekte nutzen welchen Shader (Browser-Limit für Instanzwerte)
+func _shaders(n: Node, out: Dictionary) -> void:
+	if n is GeometryInstance3D:
+		var m = (n as GeometryInstance3D).material_override
+		if m is ShaderMaterial and m.shader:
+			var k: String = m.shader.resource_path.get_file()
+			out[k] = out.get(k, 0) + 1
+	for c in n.get_children():
+		_shaders(c, out)

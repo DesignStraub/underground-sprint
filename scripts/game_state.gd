@@ -13,7 +13,7 @@ const PIXEL_MODES := [
 
 signal graphics_changed
 
-var pixel_mode := 2
+var pixel_mode := 1 if OS.has_feature("web") else 2  # im Browser ohne Kantenglättung (spart viel)
 
 var wins := 0
 var current_car := "kaizen"
@@ -55,7 +55,7 @@ func _setup_input() -> void:
 
 ## Startet im Fenster, ca. 75 % der Bildschirmgröße in 16:9, zentriert.
 func _init_window() -> void:
-	if DisplayServer.get_name() == "headless" or Engine.get_write_movie_path() != "":
+	if DisplayServer.get_name() == "headless" or Engine.get_write_movie_path() != "" or OS.has_feature("web"):
 		return
 	var scr := DisplayServer.screen_get_usable_rect()
 	var w := int(scr.size.x * 0.75)
@@ -176,7 +176,7 @@ func load_game() -> void:
 		current_car = "kaizen"
 	race_index = clampi(int(data.get("race_index", 0)), 0, Catalog.RACES.size() - 1)
 	best_times = data.get("best_times", {})
-	pixel_mode = clampi(int(data.get("pixel_mode_v2", 2)), 0, PIXEL_MODES.size() - 1)
+	pixel_mode = clampi(int(data.get("pixel_mode_v2", pixel_mode)), 0, PIXEL_MODES.size() - 1)
 	car_configs = {}
 	var cc: Dictionary = data.get("car_configs", {})
 	for car_id in cc:

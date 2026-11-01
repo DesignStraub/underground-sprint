@@ -54,7 +54,13 @@ sind synthetisch erzeugte WAVs in `assets/sfx/` (`python3 tools/make_sfx.py`).
 Pixel-Look in der Garage einstellbar: Stark / Mittel / Leicht (Standard) / Aus.
 
 ## Export
-Vorlagen für Windows, macOS und Linux stehen in `export_presets.cfg` (Godot-Exportvorlagen 4.7.1 nötig).
+Vorlagen für Windows, macOS, Linux und Web stehen in `export_presets.cfg` (Godot-Exportvorlagen 4.7.1 nötig).
+
+**Im Browser:** Die Web-Version (`builds/web`, ohne Threads, läuft auf itch.io ohne Sondereinstellungen) nutzt den
+einfacheren WebGL-Renderer: keine Spiegelungen auf der Straße, entfernte Kleinteile werden ausgeblendet,
+Pixel-Look startet auf „Mittel“. Deshalb gibt es keine Shader-Werte pro Objekt (Häuser sind zu Meshes je
+Stadtzelle zusammengefasst, ihre Werte stehen in den Vertexdaten). Lokal testen:
+`python3 -m http.server 8060 --directory builds/web`.
 Texte, Cover und Screenshots für die itch.io-Seite: `release/`.
 
 ## Aufbau

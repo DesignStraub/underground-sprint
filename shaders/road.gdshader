@@ -2,9 +2,9 @@ shader_type spatial;
 // Nasser Asphalt (oder Kopfsteinpflaster) mit Markierungen, Gullydeckeln und Flickstellen.
 // UV.x = quer (0..1), UV.y = Meter in Fahrtrichtung.
 
-instance uniform float lanes = 4.0;  // 4 Hauptstraße, 2 Seitenstraße, 0 ohne Markierung
-instance uniform float road_w = 18.0;
-instance uniform float cobble = 0.0;
+uniform float lanes = 4.0;  // 4 Hauptstraße, 2 Seitenstraße, 0 ohne Markierung
+uniform float road_w = 18.0;
+uniform float cobble = 0.0;
 
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float noise(vec2 p) {
@@ -53,8 +53,14 @@ void fragment() {
 	col = mix(col, vec3(0.85), clamp(white, 0.0, 1.0));
 	col = mix(col, vec3(0.9, 0.65, 0.1), clamp(yellow, 0.0, 1.0));
 	col *= mix(1.0, 0.6, puddle);
+	float wet_rough = 0.04;
+#if CURRENT_RENDERER == RENDERER_COMPATIBILITY
+	// Browser: keine Bildschirm-Spiegelungen, also etwas heller und breitere Lichtreflexe der Laternen
+	col *= 1.7;
+	wet_rough = 0.22;
+#endif
 	ALBEDO = col;
-	ROUGHNESS = mix(0.5, 0.04, puddle) * (1.0 - manhole * 0.3);
+	ROUGHNESS = mix(0.5, wet_rough, puddle) * (1.0 - manhole * 0.3);
 	METALLIC = 0.15 + manhole * 0.4;
 	SPECULAR = 0.7;
 }

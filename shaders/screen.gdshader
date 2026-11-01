@@ -1,14 +1,13 @@
 shader_type spatial;
 // Große LED-Videowand an Hochhäusern: wechselt alle paar Sekunden das Motiv, sichtbares Pixelraster.
 
-instance uniform float seed = 0.0;
-
 float hash(float n) { return fract(sin(n * 12.9898) * 43758.5453); }
 vec3 pal(float t) { return 0.5 + 0.5 * cos(6.2831 * (t + vec3(0.0, 0.33, 0.67))); }
 
 void fragment() {
 	vec2 grid = vec2(48.0, 27.0);
 	vec2 px = (floor(UV * grid) + 0.5) / grid;
+	float seed = fract(sin(dot(NODE_POSITION_WORLD.xz, vec2(12.9898, 78.233))) * 43758.5453) * 50.0;
 	float t = TIME + seed * 17.0;
 	float scene = floor(t / 5.0);
 	float k = hash(scene + seed * 3.1);
