@@ -1,6 +1,6 @@
 extends Node
 ## Werkzeug: rendert die Text-Overlays (1080x1920, transparent) und die Endkarte für das Release-Short.
-## Aufruf: Godot --path . res://tools/short_overlays.tscn -- --out=/pfad
+## Aufruf: Godot --path . res://tools/short_overlays.tscn -- --out=/pfad [--lang=en]
 
 const LOGO := preload("res://assets/one_humanity_logo.svg")
 const GLOW := preload("res://shaders/logo_glow.gdshader")
@@ -11,6 +11,20 @@ const PINK := Color(1.0, 0.25, 0.7)
 const GREEN := Color(0.4, 1.0, 0.5)
 
 var out := "."
+var lang := "de"
+
+const TEXT := {
+	"de": {
+		"shots": [["UNDERGROUND\nSPRINT", "NEU", "Street-Racing bei Nacht"], ["TUNE DEIN\nAUTO", "", "Teile freischalten durch Siege"],
+			["SPRINTS DURCH\nDIE STADT", "", "3 Gegner · Verkehr · Baustellen"], ["NITRO.\nDRIFT. SPEED.", "", "Ein Crash kostet dich das Rennen"]],
+		"free": "JETZT KOSTENLOS", "on": "auf itch.io",
+	},
+	"en": {
+		"shots": [["UNDERGROUND\nSPRINT", "NEW", "Street racing after dark"], ["TUNE YOUR\nRIDE", "", "Unlock parts by winning races"],
+			["CITY\nSPRINTS", "", "3 rivals · traffic · roadworks"], ["NITRO.\nDRIFT. SPEED.", "", "One crash can cost you the race"]],
+		"free": "OUT NOW · FREE", "on": "on itch.io",
+	},
+}
 var heavy: SystemFont
 var light: SystemFont
 
@@ -19,20 +33,18 @@ func _ready() -> void:
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--out="):
 			out = a.substr(6)
+		elif a.begins_with("--lang="):
+			lang = a.substr(7)
 	heavy = SystemFont.new()
 	heavy.font_names = PackedStringArray(["Impact", "Arial Black"])
 	light = SystemFont.new()
 	light.font_names = PackedStringArray(["Avenir Next", "Helvetica Neue"])
 	light.font_weight = 600
 
-	var shots := [
-		["o1", "UNDERGROUND\nSPRINT", CYAN, "NEU", "Street-Racing bei Nacht"],
-		["o2", "TUNE DEIN\nAUTO", PINK, "", "Teile freischalten durch Siege"],
-		["o3", "SPRINTS DURCH\nDIE STADT", CYAN, "", "3 Gegner · Verkehr · Baustellen"],
-		["o4", "NITRO.\nDRIFT. SPEED.", PINK, "", "Ein Crash kostet dich das Rennen"],
-	]
-	for s in shots:
-		await _render(_overlay(s[1], s[2], s[3], s[4]), s[0], true)
+	var shots: Array = TEXT[lang]["shots"]
+	var cols := [CYAN, PINK, CYAN, PINK]
+	for i in shots.size():
+		await _render(_overlay(shots[i][0], cols[i], shots[i][1], shots[i][2]), "o%d" % (i + 1), true)
 	await _render(_end_card(), "end", false)
 	get_tree().quit()
 
@@ -109,8 +121,8 @@ func _end_card() -> Control:
 	logo.material = m
 	root.add_child(logo)
 	_label(root, "UNDERGROUND SPRINT", heavy, 96, Color.WHITE, 880).label_settings.shadow_color = Color(CYAN.r, CYAN.g, CYAN.b, 0.8)
-	_label(root, "JETZT KOSTENLOS", heavy, 120, GREEN, 1080)
-	_label(root, "auf itch.io", light, 84, Color.WHITE, 1240)
+	_label(root, TEXT[lang]["free"], heavy, 120, GREEN, 1080)
+	_label(root, TEXT[lang]["on"], light, 84, Color.WHITE, 1240)
 	_label(root, "Windows · Mac · Linux", light, 48, Color(0.7, 0.75, 0.85), 1380, 6)
 	_label(root, "ONE HUMANITY", light, 44, CYAN, 1700, 6)
 	return root
