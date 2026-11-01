@@ -46,7 +46,7 @@ func _setup_input() -> void:
 	_add_action("reset_car", [KEY_R], [JOY_BUTTON_BACK], [])
 	_add_action("pause", [KEY_ESCAPE, KEY_P], [JOY_BUTTON_START], [])
 	_add_action("next_track", [KEY_M], [], [])
-	_add_action("fullscreen", [KEY_F11], [], [])
+	_add_action("fullscreen", [KEY_F11, KEY_F], [], [])  # F: auf dem Mac ist F11 "Schreibtisch anzeigen"
 	var alt_enter := InputEventKey.new()
 	alt_enter.physical_keycode = KEY_ENTER
 	alt_enter.alt_pressed = true
@@ -70,9 +70,28 @@ func _init_window() -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("fullscreen"):
-		var fs := DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN
-		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED if fs else DisplayServer.WINDOW_MODE_FULLSCREEN)
+		toggle_fullscreen()
 		get_viewport().set_input_as_handled()
+
+
+## Vollbild an/aus. Muss aus einer Eingabe heraus aufgerufen werden (Taste, Knopf), sonst blockiert der Browser.
+func toggle_fullscreen() -> void:
+	if OS.has_feature("web"):
+		# Direkt über die Seite: funktioniert auch in Safari (mit webkit-Präfix) und schluckt Ablehnungen
+		JavaScriptBridge.eval("""(function () {
+			try {
+				var d = document, e = d.documentElement;
+				if (d.fullscreenElement || d.webkitFullscreenElement) {
+					(d.exitFullscreen || d.webkitExitFullscreen).call(d);
+				} else {
+					var r = (e.requestFullscreen || e.webkitRequestFullscreen).call(e);
+					if (r && r.catch) r.catch(function () {});
+				}
+			} catch (x) {}
+		})()""", true)
+		return
+	var fs := DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN
+	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED if fs else DisplayServer.WINDOW_MODE_FULLSCREEN)
 
 
 func cycle_pixel_mode() -> void:

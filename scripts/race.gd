@@ -249,7 +249,7 @@ func _build_hud() -> void:
 	hud["help"].set_anchors_preset(Control.PRESET_TOP_RIGHT)
 	hud["help"].position = Vector2(-250, 6)
 	hud["help"].size = Vector2(240, 60)
-	hud["help"].text = "W/S Gas/Bremse  A/D Lenken\nLeertaste Handbremse  Shift Nitro\nC Kamera  R Zurücksetzen  M Musik  Esc Pause"
+	hud["help"].text = "W/S Gas/Bremse  A/D Lenken\nLeertaste Handbremse  Shift Nitro\nC Kamera  R Zurücksetzen  M Musik\nF Vollbild  Esc Pause"
 	hud["help"].modulate.a = 0.7
 
 	# Drehzahlmesser unten rechts
@@ -495,7 +495,8 @@ func _build_pause(root: Control) -> void:
 	root.add_child(pause_panel)
 	var title := _label(pause_panel, 20, HORIZONTAL_ALIGNMENT_CENTER)
 	title.text = "PAUSE"
-	for entry in [["Weiter", _toggle_pause], ["Neustart", func(): _unpause(); get_tree().reload_current_scene()],
+	for entry in [["Weiter", _toggle_pause], ["Vollbild", GameState.toggle_fullscreen],
+			["Neustart", func(): _unpause(); get_tree().reload_current_scene()],
 			["Garage", func(): _unpause(); get_tree().change_scene_to_file("res://scenes/garage.tscn")]]:
 		var b := Button.new()
 		b.text = entry[0]
