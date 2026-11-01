@@ -180,6 +180,11 @@ func total_wins() -> int:
 	return wins + drift_wins
 
 
+## Tempo-Stufe: am Anfang fahren alle langsamer (72 %), mit jedem Sieg etwas schneller, ab 20 Siegen volles Tempo
+func pace() -> float:
+	return 0.72 + 0.28 * clampf(total_wins() / 20.0, 0.0, 1.0)
+
+
 func is_car_unlocked(car_id: String, race_w := -1, drift_w := -1) -> bool:
 	var req: Dictionary = Catalog.CARS[car_id]["unlock"]
 	if req.is_empty():

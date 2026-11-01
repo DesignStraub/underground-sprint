@@ -175,7 +175,9 @@ static func build(race: Dictionary) -> Dictionary:
 		_build_roadworks(root, track, rng)
 	var occupied := _build_landmarks(root, track, rng)
 	occupied.append_array(_build_structures(root, track, rng))
-	_build_city(root, track, rng, occupied)
+	var buildings := _build_city(root, track, rng, occupied)
+	if type != "drift":
+		_build_fences(root, track, buildings + occupied)
 	_build_lamps(root, track)
 	if type == "drift":
 		_build_barriers(root, track, rng)
@@ -659,7 +661,7 @@ static func _build_road(root: Node3D, track: Dictionary) -> void:
 				_strip_v(walk, prev["mr"], cur["mr"], CURB_H, true)
 				n_carr += 1
 				var mm: float = minf(cur["m"], prev["m"])
-				if mm > 1.2:  # an der flachen Spitze kann man noch über den Bordstein rutschen
+				if mm > 2.0:  # erst wo die Büsche schon stehen; an der flachen Spitze rutscht man über den Bordstein
 					_median_shape(walls, (prev["ml"] + prev["mr"]) / 2.0, (cur["ml"] + cur["mr"]) / 2.0, mm * 2.0)
 				if mm > 1.2:
 					var mid: Vector3 = (prev["ml"] + prev["mr"] + cur["ml"] + cur["mr"]) / 4.0 + up
@@ -874,7 +876,7 @@ static func _build_median_lamps(root: Node3D, track: Dictionary) -> void:
 			if median_at(track, d) > MED * 0.9:
 				var dist := _district_at(track, d)
 				var lc: Color = dist["lamp"]
-				var head := Builder.mat(lc, 0.0, 0.3, lc, 5.0)
+				var head := Builder.mat(lc, 0.0, 0.3, lc, 3.0)
 				var f := frame_at(curve, d)
 				var n := Node3D.new()
 				n.transform = Transform3D(Basis.looking_at(f["fwd"], Vector3.UP), f["pos"] + Vector3(0, CURB_H, 0))
@@ -1244,6 +1246,55 @@ static func _spur_details(root: Node3D, track: Dictionary, p: Dictionary, rng: R
 	var seed := rng.randf() * 100.0
 	_bb_box(Transform3D(Basis.looking_at(fz["fwd"], Vector3.UP) * Basis.from_scale(Vector3(SPUR_HALF * 2.0 + 16.0, h, 14.0)),
 		fz["pos"] + fz["fwd"] * 8.0 + Vector3(0, h / 2.0, 0)), Vector3(0.12, 0.12, 0.14), 0.4, seed, float(rng.randi() % 5))
+
+
+## Sichtbare Begrenzung: überall, wo die (sonst unsichtbare) Randwand nicht von einem Haus verdeckt wird,
+## steht ein Zaun genau auf ihrer Linie. So gibt es keine unsichtbaren Hindernisse.
+static func _build_fences(root: Node3D, track: Dictionary, blockers: Array) -> void:
+	var posts := []
+	var rails := []
+	var mesh_panels := []
+	var lines := []  # [Weg, Querabstand-Funktion, Bedingung]
+	for p in track["paths"]:
+		if p["id"] == 0 or p["kind"] == "fork" or p["kind"] == "spur":
+			lines.append(p)
+	for p in lines:
+		var c: Curve3D = p["curve"]
+		var len: float = p["length"]
+		var main: bool = p["id"] == 0
+		var d := 1.5
+		while d < len - 1.5:
+			var f := frame_at(c, d)
+			for side in [-1.0, 1.0]:
+				var lat: float = (hw(track, d) + WALK + 0.3) if main else (p["half_w"] + (3.3 if p["kind"] == "fork" else 0.3))
+				var pos: Vector3 = f["pos"] + f["right"] * side * lat
+				if main:
+					if _branch_clearance(track, pos) <= 1.0 or not tunnel_at(track, d, 3.0).is_empty() \
+							or _district_at(track, d).has("soundwall"):
+						continue
+				elif _main_clearance(track, pos) < WALK + 0.4:
+					continue
+				var hidden := false
+				for b in blockers:
+					if _flat(pos - b["pos"]).length() < b["r"] * 0.85 + 1.5:
+						hidden = true
+						break
+				if hidden:
+					continue
+				var bf := Basis.looking_at(f["fwd"], Vector3.UP)
+				var base := Vector3(pos.x, CURB_H, pos.z)
+				posts.append(Transform3D(bf, base + Vector3(0, 0.6, 0)))
+				for ry in [0.45, 1.05]:
+					rails.append(Transform3D(bf, base + Vector3(0, ry, 0)))
+				mesh_panels.append(Transform3D(bf, base + Vector3(0, 0.6, 0)))
+			d += 3.0
+	var metal := Builder.mat(Color(0.25, 0.26, 0.28), 0.7, 0.4)
+	var mesh_m := Builder.mat(Color(0.3, 0.32, 0.34, 0.35), 0.6, 0.5)
+	mesh_m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mesh_m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	_multi(root, Builder.box(Vector3(0.07, 1.2, 0.07)), metal, posts)
+	_multi(root, Builder.box(Vector3(0.05, 0.05, 3.05)), metal, rails)
+	_multi(root, Builder.box(Vector3(0.01, 1.05, 3.0)), mesh_m, mesh_panels)
 
 
 ## Kollisionsform für ein wegfliegendes Teil
@@ -1674,7 +1725,7 @@ static func _district_at(track: Dictionary, d: float) -> Dictionary:
 	return DISTRICTS[arr[i]]
 
 
-static func _build_city(root: Node3D, track: Dictionary, rng: RandomNumberGenerator, occupied: Array) -> void:
+static func _build_city(root: Node3D, track: Dictionary, rng: RandomNumberGenerator, occupied: Array) -> Array:
 	var placed := []  # [{pos, r}]
 	# Häuserzeilen: an der Hauptstraße beidseitig, an den Abkürzungen ebenfalls
 	var frontages := []
@@ -1729,6 +1780,7 @@ static func _build_city(root: Node3D, track: Dictionary, rng: RandomNumberGenera
 				_building(root, center, basis, w, depth, h, tall, shop, dist, face_dir, f["right"] * side, rng)
 				placed.append({"pos": center, "r": radius * 0.8})
 			d += w + rng.randf_range(0.5, 3.5)
+	return placed
 
 
 ## Ein Gebäude mit Fassade, ggf. Sockel + Turm + Krone, Dachaufbauten, Werbung, Laden
@@ -1838,7 +1890,7 @@ static func _building(root: Node3D, center: Vector3, basis: Basis, w: float, dep
 		_billboard(root, center + face_dir * (depth * 0.5 - 1.5), face_dir, roof_y, rng)
 	if rng.randf() < dist["neon_edge"]:
 		var nc: Color = NEON[rng.randi() % NEON.size()]
-		var nm := Builder.mat(nc, 0.0, 0.4, nc, 5.0)
+		var nm := Builder.mat(nc, 0.0, 0.4, nc, 2.5)
 		var along := basis.z
 		for s in [-1.0, 1.0]:
 			var corner: Vector3 = top_center + face_dir * (top_d * 0.5 + 0.08) + along * s * (top_w * 0.5 + 0.08)
@@ -1864,7 +1916,7 @@ static func _building(root: Node3D, center: Vector3, basis: Basis, w: float, dep
 	var names: Array = dist.get("names", SHOPS)
 	if shop and dist.has("lanterns"):
 		# Zwei Lampions vor dem Laden
-		var lm := Builder.mat(Color(0.9, 0.1, 0.05), 0.0, 0.5, Color(1.0, 0.15, 0.05), 3.0)
+		var lm := Builder.mat(Color(0.9, 0.1, 0.05), 0.0, 0.5, Color(1.0, 0.15, 0.05), 1.8)
 		var ls := SphereMesh.new()
 		ls.radius = 0.32
 		ls.height = 0.8
@@ -1890,7 +1942,7 @@ static func _building(root: Node3D, center: Vector3, basis: Basis, w: float, dep
 				bl.font_size = 40
 				bl.pixel_size = 0.018
 				bl.line_spacing = -6.0
-				bl.modulate = Color(bc.r * 3.0, bc.g * 3.0, bc.b * 3.0)
+				bl.modulate = Color(bc.r * 1.8, bc.g * 1.8, bc.b * 1.8)
 				bl.shaded = false
 				bl.double_sided = false
 				bl.transform = Transform3D(basis if s > 0.0 else basis.rotated(Vector3.UP, PI), bp + basis.z * s * 0.14)
@@ -1901,7 +1953,7 @@ static func _building(root: Node3D, center: Vector3, basis: Basis, w: float, dep
 		lbl.text = names[rng.randi() % names.size()] if (shop or dist.has("names")) else SIGNS[rng.randi() % SIGNS.size()]
 		lbl.font_size = 64 if shop else 96
 		lbl.pixel_size = 0.02
-		lbl.modulate = Color(col.r * 3.0, col.g * 3.0, col.b * 3.0)
+		lbl.modulate = Color(col.r * 1.8, col.g * 1.8, col.b * 1.8)
 		lbl.shaded = false
 		lbl.double_sided = false
 		var y := 4.6 if shop else rng.randf_range(6.0, minf(h - 2.0, 14.0))
@@ -2027,7 +2079,7 @@ static func _lamp(root: Node3D, dist: Dictionary, f: Dictionary, side: float, ba
 	var key := kind + str(lc)
 	if not mats.has(key):
 		var pole_c := Color(0.45, 0.05, 0.04) if kind == "lantern" else (Color(0.08, 0.12, 0.1) if kind == "classic" else Color(0.2, 0.2, 0.22))
-		mats[key] = {"head": Builder.mat(lc, 0.0, 0.3, lc, 5.0), "pole": Builder.mat(pole_c, 0.6, 0.4)}
+		mats[key] = {"head": Builder.mat(lc, 0.0, 0.3, lc, 3.0), "pole": Builder.mat(pole_c, 0.6, 0.4)}
 	var m: Dictionary = mats[key]
 	var h := 8.0
 	var arm := 2.4
@@ -2091,7 +2143,7 @@ static func _lamp(root: Node3D, dist: Dictionary, f: Dictionary, side: float, ba
 	lamp.add_child(cs)
 	var light := OmniLight3D.new()
 	light.light_color = lc
-	light.light_energy = energy
+	light.light_energy = energy * 0.8
 	light.omni_range = reach
 	light.omni_attenuation = 1.2
 	light.position = light_pos
@@ -2921,9 +2973,9 @@ static func _build_structures(root: Node3D, track: Dictionary, rng: RandomNumber
 					occupied.append_array(_overpass(root, track, od, rng))
 					break
 
-	var red_m := Builder.mat(Color(0.9, 0.1, 0.05), 0.0, 0.5, Color(1.0, 0.15, 0.05), 3.0)
-	var gold_m := Builder.mat(Color(1.0, 0.7, 0.2), 0.0, 0.5, Color(1.0, 0.6, 0.12), 3.0)
-	var bulb_m := Builder.mat(Color(1.0, 0.85, 0.6), 0.0, 0.4, Color(1.0, 0.8, 0.5), 5.0)
+	var red_m := Builder.mat(Color(0.9, 0.1, 0.05), 0.0, 0.5, Color(1.0, 0.15, 0.05), 1.8)
+	var gold_m := Builder.mat(Color(1.0, 0.7, 0.2), 0.0, 0.5, Color(1.0, 0.6, 0.12), 1.8)
+	var bulb_m := Builder.mat(Color(1.0, 0.85, 0.6), 0.0, 0.4, Color(1.0, 0.8, 0.5), 3.0)
 	var cable_m := Builder.mat(Color(0.03, 0.03, 0.03), 0.0, 0.8)
 	var lantern := SphereMesh.new()
 	lantern.radius = 0.42
@@ -3002,7 +3054,7 @@ static func _china_gate(root: Node3D, track: Dictionary, d: float) -> void:
 	var green := Builder.mat(Color(0.05, 0.26, 0.14), 0.2, 0.5)
 	var gold := Builder.mat(Color(0.9, 0.62, 0.18), 0.7, 0.3, Color(1.0, 0.55, 0.1), 0.8)
 	var stone := Builder.mat(Color(0.35, 0.34, 0.33), 0.0, 0.9)
-	var glow := Builder.mat(Color(0.9, 0.1, 0.05), 0.0, 0.5, Color(1.0, 0.15, 0.05), 3.0)
+	var glow := Builder.mat(Color(0.9, 0.1, 0.05), 0.0, 0.5, Color(1.0, 0.15, 0.05), 1.8)
 	var px := hw(track, d) + 1.3
 	var g := {}
 	for s in [-1.0, 1.0]:

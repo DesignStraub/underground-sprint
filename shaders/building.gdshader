@@ -25,7 +25,7 @@ void vertex() {
 	wpos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	wnorm = normalize((MODEL_MATRIX * vec4(NORMAL, 0.0)).xyz);
 	tint = COLOR.rgb;
-	lit_chance = COLOR.a;
+	lit_chance = COLOR.a * 0.7;  // weniger erleuchtete Fenster: dunklere Nacht
 	seed = UV2.x;
 	shop_glass = floor(UV2.y / 10.0 + 0.01);
 	style = UV2.y - shop_glass * 10.0;
@@ -102,5 +102,6 @@ void fragment() {
 	ALBEDO = col;
 	ROUGHNESS = mix(0.85, st == 3 ? 0.05 : 0.12, glass);
 	METALLIC = glass * 0.5 + metal * glass;
-	EMISSION = wcol * win * lit * 1.8 * window_light + scol * shop * shop_lit * (0.55 + 0.35 * shelf);
+	// zurückhaltend: Nachtstadt wie in Underground, Fenster glimmen statt zu strahlen
+	EMISSION = wcol * win * lit * 0.95 * window_light + scol * shop * shop_lit * (0.3 + 0.2 * shelf);
 }

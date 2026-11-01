@@ -1,5 +1,6 @@
 extends CharacterBody3D
-## Arcade-Fahrphysik: Gänge mit Drehzahl, Grip, der die Fahrtrichtung zur Fahrzeugachse zieht,
+## Arcade-Fahrphysik mit Heckantrieb: Gänge mit Drehmomentkurve, Grip, der die Fahrtrichtung zur Fahrzeugachse zieht,
+## mit viel Gas und Lenkeinschlag bricht das Heck aus; im Drift dreht das Auto um die Vorderachse (Heck schwenkt).
 ## Handbremse für Drifts, Nitro, Sprünge über Rampen (in der Luft keine Lenkung, Nitro schiebt weiter).
 ## Kamera: Verfolger (Standard), Stoßstange, Motorhaube – Taste C schaltet durch.
 
@@ -51,6 +52,7 @@ var wall_hits := 0  # zählt jede Berührung mit Wand/Bande (Drift-Modus: Kette 
 var drift_mode := false
 var _sliding := false
 var _slide_out := 0.0
+var _thr_s := 0.0  # Gas weich nachgeführt (kein Sprung von 0 auf volle Kraft)
 ## Rundkurs: abgeschlossene Runden und Gesamtfortschritt (Runden * Länge + Position)
 var lap := 0
 var total := 0.0
@@ -232,7 +234,9 @@ func _physics_process(dt: float) -> void:
 	else:
 		nitro = minf(nitro + dt * (0.015 + (0.13 if drifting else 0.0)) / nitro_cap, 1.0)
 
-	# --- Längsbeschleunigung
+	# --- Längsbeschleunigung (Drehmoment über die Drehzahl, unten herum Traktionsgrenze)
+	_thr_s = move_toward(_thr_s, thr, dt * (4.0 if thr > _thr_s else 8.0))
+	var tq := 0.78 + 0.22 * sin(clampf((rpm - 1000.0) / 6200.0, 0.0, 1.0) * PI)
 	var a := 0.0
 	var eff_top := top_speed * (1.0 + 0.22 * nitro_power if nitro_on else 1.0)
 	var drag_k := accel * GEAR_PULL[6] / (top_speed * top_speed)
@@ -242,7 +246,9 @@ func _physics_process(dt: float) -> void:
 		a -= drag_k * 0.5 * speed_fwd * absf(speed_fwd)
 	else:
 		if _shift_timer <= 0.0:
-			a += accel * thr * GEAR_PULL[gear]
+			a += accel * _thr_s * GEAR_PULL[gear] * tq
+			if spd < 6.0:
+				a *= 0.7 + 0.3 * spd / 6.0  # Räder drehen beim Anfahren etwas durch
 		a -= drag_k * speed_fwd * absf(speed_fwd)
 		if thr < 0.05:
 			a -= signf(speed_fwd) * 1.6  # Motorbremse
@@ -277,8 +283,10 @@ func _physics_process(dt: float) -> void:
 				yaw *= 1.12 + 0.2 * drift_k  # Gegenlenken/Eindrehen im Drift, Driftautos drehen williger
 			if drift_mode and absf(steer) > 0.6 and thr > 0.6 and spd > 12.0:
 				yaw *= 1.3  # Drift-Modus: mit Gas und voll eingelenkt bricht das Heck aus
+			elif thr > 0.8 and absf(steer) > 0.5 and spd > 8.0 and spd < top_speed * 0.6:
+				yaw *= 1.1  # Heckantrieb: Gas in der Kurve drückt das Heck raus
 		_spin = move_toward(_spin, 0.0, dt * 2.0)
-		rotate_y((yaw + _spin) * dt)
+		_rotate_front((yaw + _spin) * dt, 0.6 if (hb or drifting) else 0.0)
 
 		# Neue Fahrzeugachse; Geschwindigkeit bleibt zunächst in Weltrichtung -> Querschlupf entsteht
 		var new_fwd := -global_basis.z
@@ -296,6 +304,8 @@ func _physics_process(dt: float) -> void:
 				gk *= lerpf(0.55, 0.3, drift_k)  # Drift hält an, bei Driftautos deutlich länger
 			if drift_mode:
 				gk *= 0.55  # im Drift-Modus bricht das Heck leichter aus
+			elif thr > 0.8 and absf(steer) > 0.5 and spd > 8.0 and spd < top_speed * 0.6:
+				gk *= 0.72  # Heckantrieb: Leistungsübersteuern
 			var l_new := l2 * exp(-gk * dt)
 			var removed := absf(l2) - absf(l_new)
 			f2 += removed * 0.55 * signf(f2)
@@ -331,6 +341,21 @@ func _physics_process(dt: float) -> void:
 	audio.speed = spd
 
 
+## Drehung um die Hochachse; k = 0 dreht um die Wagenmitte, k = 1 um die Vorderachse (das Heck schwenkt aus,
+## wie bei einem Hecktriebler im Drift).
+func _rotate_front(angle: float, k: float) -> void:
+	if k <= 0.0:
+		rotate_y(angle)
+		return
+	var pivot := Vector3(0, 0, -(_length / 2.0 - 0.78))
+	var before := global_transform * pivot
+	rotate_y(angle)
+	var after := global_transform * pivot
+	var shift := (before - after) * k
+	shift.y = 0.0
+	global_position += shift
+
+
 ## Drift-Modus, Auto steht quer: Gas hält den Winkel, Lenken steuert ihn, die Fahrtrichtung dreht langsam nach.
 ## Liefert die Quergeschwindigkeit (für Sound und Optik).
 func _slide_physics(dt: float, fwd: Vector3, right: Vector3, thr: float, hb: bool, a: float, eff_top: float, low_speed: float) -> float:
@@ -342,7 +367,7 @@ func _slide_physics(dt: float, fwd: Vector3, right: Vector3, thr: float, hb: boo
 	if hb:
 		yaw *= 1.3
 	_spin = move_toward(_spin, 0.0, dt * 2.0)
-	rotate_y((clampf(yaw, -3.2, 3.2) + _spin) * dt)
+	_rotate_front((clampf(yaw, -3.2, 3.2) + _spin) * dt, 0.85)
 	var nf := -global_basis.z
 	nf.y = 0.0
 	nf = nf.normalized()

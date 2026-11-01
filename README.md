@@ -74,6 +74,11 @@ Garage → Einstellungen (wird gespeichert):
   (Hoch), Sichtweite und Detailstufen. Gemessen bei 2560×1440: Niedrig ~140, Mittel/Hoch ~95 fps.
 - **Pixel-Look An/Aus**, **V-Sync**, **FPS-Limit**, **Vollbild**.
 - Verkehr nach Schwierigkeit: 1 Stern ohne, 2 Sterne wenig, 3 Sterne voller Verkehr.
+- **Tempo-Stufe:** am Anfang fahren alle (auch Gegner) mit 72 % Höchsttempo, mit jedem Sieg mehr, ab 20 Siegen volles Tempo.
+- **Fahrgefühl:** alle Autos mit Heckantrieb; mit Gas in der Kurve schiebt das Heck raus, im Drift dreht das Auto
+  um die Vorderachse. Gas setzt weich ein, Drehmoment folgt der Drehzahl.
+- **Autos** bestehen aus Karosserie mit Radkästen plus Anbauteilen (Stoßstangen, Schweller, Spiegel, Fugen),
+  Lichter eingelassen und je Auto eigen. Wo kein Haus die Streckenbegrenzung verdeckt, steht ein Zaun.
 
 ## Export
 Vorlagen für Windows, macOS, Linux und Web stehen in `export_presets.cfg` (Godot-Exportvorlagen 4.7.1 nötig).

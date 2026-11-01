@@ -52,24 +52,61 @@ static func build(car_id: String, cfg: Dictionary, headlights := true) -> Node3D
 		# Fließheck: Heckscheibe läuft bis fast ans Ende, Hutze auf der Haube
 		_add(body, tapered_box(Vector2(0.5, 0.35), Vector2(0.36, 0.22), 0.06, 0.04), dark, Vector3(0, body_top - 0.035, cf - 0.35))
 
-	# Lichter (vorn schmale Streifen, hinten je nach Stil; Vortex mit runden Doppel-Rückleuchten)
+	# Anbauteile (später einzeln tauschbar): Stoßstangen, Schweller, Spiegel, Fugen an Haube und Türen
+	var zf := -L / 2.0
+	var zr := L / 2.0
+	var seam := mat(Color(0.02, 0.02, 0.025), 0.2, 0.7)
+	var fb := _add(body, box(Vector3(W - 0.06, H * 0.42, 0.2)), paint, Vector3(0, CLEARANCE + H * 0.21 + 0.02, zf + 0.08))
+	fb.name = "FrontBumper"
+	_add(fb, box(Vector3(W - 0.08, 0.014, 0.014)), seam, Vector3(0, H * 0.21, -0.098))
+	_add(fb, box(Vector3(W * 0.5, 0.1, 0.02)), dark, Vector3(0, H * 0.06, -0.1))  # Kühlergrill
+	_add(fb, box(Vector3(W * 0.62, 0.06, 0.02)), dark, Vector3(0, -H * 0.13, -0.1))  # untere Luftöffnung
+	var rb := _add(body, box(Vector3(W - 0.06, H * 0.4, 0.18)), paint, Vector3(0, CLEARANCE + H * 0.2 + 0.02, zr - 0.07))
+	rb.name = "RearBumper"
+	_add(rb, box(Vector3(W - 0.08, 0.014, 0.014)), seam, Vector3(0, H * 0.2, 0.088))
+	_add(rb, box(Vector3(W * 0.6, 0.06, 0.1)), dark, Vector3(0, -H * 0.16, 0.05))  # Diffusor
+	for s in [-1, 1]:
+		var sk := _add(body, box(Vector3(0.06, 0.1, L - 1.95)), paint, Vector3(s * (W / 2.0 - 0.01), CLEARANCE + 0.06, 0))
+		sk.name = "SideSkirt"
+		# Türfugen und Spiegel
+		for z in [cf + 0.05, cr - 0.12 if style != "hatch" else cf + 1.05]:
+			_add(body, box(Vector3(0.012, H - 0.16, 0.012)), seam, Vector3(s * (W / 2.0 + 0.002), CLEARANCE + 0.08 + (H - 0.16) / 2.0, z))
+		_add(body, box(Vector3(0.1, 0.06, 0.13)), paint, Vector3(s * (W / 2.0 + 0.05), body_top + 0.06, cf + 0.18))
+		# Haubenfugen
+		var hood_l := cf - (zf + 0.3)
+		var hf := _add(body, box(Vector3(0.012, 0.012, hood_l)), seam, Vector3(s * (W / 2.0 - 0.2), body_top - 0.035, (cf + zf + 0.3) / 2.0))
+		hf.rotation.x = -atan2(0.06, hood_l)
+
+	# Lichter: in die Karosserie eingelassen, je Auto eigene Form
 	var head_m := mat(Color(1, 1, 0.95), 0, 0.3, Color(1, 1, 0.9), 3.0)
 	var tail_m := mat(Color(0.6, 0, 0), 0, 0.3, Color(1, 0.05, 0.02), 2.5)
+	var amber := mat(Color(1, 0.55, 0.05), 0, 0.3, Color(1, 0.5, 0.0), 1.5)
 	var hy: float = prof["head_y"]
 	var ty: float = prof["tail_y"]
 	for s in [-1, 1]:
-		_add(body, box(Vector3(0.42, 0.09, 0.05)), head_m, Vector3(s * (W / 2 - 0.3), hy, -L / 2 - 0.006))
-		if style == "sedan":
-			for k in 2:
-				var tl := CylinderMesh.new()
-				tl.top_radius = 0.075
-				tl.bottom_radius = 0.075
-				tl.height = 0.04
-				tl.radial_segments = 12
-				_add(body, tl, tail_m, Vector3(s * (W / 2 - 0.2 - k * 0.2), ty, L / 2 + 0.006)).rotation_degrees.x = 90
-		else:
-			_add(body, box(Vector3(0.48, 0.09, 0.05)), tail_m, Vector3(s * (W / 2 - 0.3), ty, L / 2 + 0.006))
-	_add(body, box(Vector3(W * 0.5, 0.11, 0.04)), dark, Vector3(0, CLEARANCE + H * 0.38, -L / 2 - 0.006))  # Kühlergrill
+		var hx: float = s * (W / 2.0 - 0.3)
+		match car_id:
+			"ronin":  # runde Doppelscheinwerfer, große runde Rückleuchten
+				for k in 2:
+					_add(body, _disc(0.065, 0.03), head_m, Vector3(s * (W / 2.0 - 0.22 - k * 0.17), hy, zf + 0.012)).rotation_degrees.x = 90
+				_add(body, _disc(0.1, 0.03), tail_m, Vector3(s * (W / 2.0 - 0.24), ty, zr + 0.004)).rotation_degrees.x = 90
+			"vortex":  # kantig mit dunklem Rahmen, runde Doppel-Rückleuchten
+				_add(body, box(Vector3(0.43, 0.13, 0.02)), dark, Vector3(hx, hy, zf + 0.004))
+				_add(body, box(Vector3(0.38, 0.09, 0.03)), head_m, Vector3(hx, hy, zf + 0.008))
+				for k in 2:
+					_add(body, _disc(0.075, 0.03), tail_m, Vector3(s * (W / 2.0 - 0.2 - k * 0.2), ty, zr + 0.004)).rotation_degrees.x = 90
+			"mirai":  # schmal und lang gezogen, Rückleuchten als Band
+				_add(body, box(Vector3(0.46, 0.065, 0.03)), head_m, Vector3(hx, hy + 0.02, zf + 0.012))
+				_add(body, box(Vector3(0.52, 0.075, 0.03)), tail_m, Vector3(s * (W / 2.0 - 0.32), ty, zr + 0.004))
+			"sakura":  # flach und tief mit orangem Blinker, durchgehendes Rücklicht-Band
+				_add(body, box(Vector3(0.34, 0.065, 0.03)), head_m, Vector3(hx + s * 0.02, hy - 0.04, zf + 0.012))
+				_add(body, box(Vector3(0.08, 0.065, 0.03)), amber, Vector3(s * (W / 2.0 - 0.08), hy - 0.04, zf + 0.02))
+			_:  # Kaizen: rechteckig, runde Nebelscheinwerfer, senkrechte Rückleuchten an den Ecken
+				_add(body, box(Vector3(0.34, 0.12, 0.03)), head_m, Vector3(hx, hy, zf + 0.012))
+				_add(body, _disc(0.05, 0.03), head_m, Vector3(s * (W / 2.0 - 0.25), CLEARANCE + 0.13, zf - 0.015)).rotation_degrees.x = 90
+				_add(body, box(Vector3(0.13, 0.2, 0.03)), tail_m, Vector3(s * (W / 2.0 - 0.13), ty - 0.04, zr + 0.004))
+	if car_id == "sakura":
+		_add(body, box(Vector3(W - 0.3, 0.07, 0.03)), tail_m, Vector3(0, ty, zr + 0.004))
 	if headlights:
 		var spot := SpotLight3D.new()
 		spot.position = Vector3(0, hy, -L / 2 - 0.1)
@@ -169,7 +206,7 @@ static func build(car_id: String, cfg: Dictionary, headlights := true) -> Node3D
 		pipe.top_radius = 0.05
 		pipe.bottom_radius = 0.05
 		pipe.height = 0.15
-		var p := _add(body, pipe, mat(Color(0.6, 0.6, 0.6), 0.9, 0.2), Vector3(s * 0.35, CLEARANCE + 0.08, L / 2))
+		var p := _add(body, pipe, mat(Color(0.6, 0.6, 0.6), 0.9, 0.2), Vector3(s * 0.35, CLEARANCE + 0.08, L / 2 + 0.03))
 		p.rotation_degrees.x = 90
 		var cone := CylinderMesh.new()
 		cone.top_radius = 0.0
@@ -318,6 +355,16 @@ static func mat(c: Color, metal := 0.0, rough := 0.5, emit := Color.BLACK, emit_
 		m.emission = emit
 		m.emission_energy_multiplier = emit_e
 	return m
+
+
+## Flache Scheibe (runde Lampe)
+static func _disc(r: float, h: float) -> CylinderMesh:
+	var c := CylinderMesh.new()
+	c.top_radius = r
+	c.bottom_radius = r
+	c.height = h
+	c.radial_segments = 12
+	return c
 
 
 static func box(size: Vector3) -> BoxMesh:

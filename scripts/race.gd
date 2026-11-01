@@ -82,6 +82,9 @@ func _ready() -> void:
 	world.add_child(player)
 	player.setup(car_id, GameState.get_config(car_id))
 	player.drift_mode = event_type == "drift"
+	# Tempo-Stufe gilt für alle gleich (Spieler und Gegner)
+	player.top_speed *= GameState.pace()
+	player.accel *= 0.8 + 0.2 * GameState.pace()
 	Music.next()  # jedes Rennen mit einem neuen Track
 	player.place(Track.xform_at(curve, track["start"], Track.LANES[2]))
 
@@ -106,8 +109,9 @@ func _ready() -> void:
 		ai.traffic = traffic
 		ai.crossing = track["crossing"]
 		world.add_child(ai)
-		var top: float = Catalog.CARS[id]["top_speed"] * (0.95 + 0.03 * i)
+		var top: float = Catalog.CARS[id]["top_speed"] * (0.95 + 0.03 * i) * GameState.pace()
 		ai.setup(track, id, cfg, track["start"] + (i - 1) * 4.0, lanes[i], top, difficulty + rng.randf_range(-0.03, 0.03))
+		ai.accel *= 0.8 + 0.2 * GameState.pace()
 		ais.append(ai)
 
 	if track["crossing"]:
@@ -212,12 +216,14 @@ func _setup_environment() -> void:
 	env.sky = sky
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	env.ambient_light_color = Color(0.25, 0.25, 0.4)
-	env.ambient_light_energy = 0.35
+	env.ambient_light_energy = 0.26
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+	env.tonemap_exposure = 0.88
 	env.glow_enabled = true
-	env.glow_intensity = 0.9
-	env.glow_bloom = 0.08
-	env.glow_hdr_threshold = 0.9
+	# Glühen nur für wirklich helle Lichter, kein Weichzeichner über der ganzen Stadt
+	env.glow_intensity = 0.6
+	env.glow_bloom = 0.02
+	env.glow_hdr_threshold = 1.15
 	env.fog_enabled = true
 	env.fog_light_color = Color(0.09, 0.07, 0.16)
 	env.fog_density = 0.0045
@@ -414,7 +420,7 @@ func _update_world(dt: float) -> void:
 		if inside:
 			_show_area(tun["name"])
 	_tunnel_k = move_toward(_tunnel_k, 1.0 if inside else 0.0, dt * 2.5)
-	env.ambient_light_energy = lerpf(0.35, 0.1, _tunnel_k)
+	env.ambient_light_energy = lerpf(0.26, 0.08, _tunnel_k)
 	moon.light_energy = lerpf(0.25, 0.0, _tunnel_k)
 	if _reverb:
 		_reverb.wet = lerpf(0.0, 0.3, _tunnel_k)

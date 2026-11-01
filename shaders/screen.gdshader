@@ -29,5 +29,5 @@ void fragment() {
 	float led = smoothstep(0.55, 0.3, length(g - 0.5));
 	ALBEDO = vec3(0.0);
 	ROUGHNESS = 0.3;
-	EMISSION = c * (0.3 + 0.7 * led) * 2.4;
+	EMISSION = c * (0.3 + 0.7 * led) * 1.3;
 }

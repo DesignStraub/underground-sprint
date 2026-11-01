@@ -274,7 +274,7 @@ func _show_races() -> void:
 		var b := _button("%s  (%d)" % [Catalog.EVENT_TYPES[type]["label"], n], func(): _show_events(t))
 		b.focus_entered.connect(func(): info.text = Catalog.EVENT_TYPES[t]["desc"])
 	_button("< Zurück", _show_main)
-	info.text = "Fahr, worauf du Lust hast. Rennsiege schalten schnelle Autos frei, Driftsiege die Driftautos."
+	info.text = "Fahr, worauf du Lust hast. Rennsiege schalten schnelle Autos frei, Driftsiege die Driftautos.\nTempo-Stufe: %d %% (steigt mit jedem Sieg)" % int(GameState.pace() * 100.0)
 	_focus_first()
 
 
