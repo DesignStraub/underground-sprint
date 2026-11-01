@@ -1,5 +1,6 @@
 extends Node3D
-## Sprintrennen: Strecke bauen, Spieler + 3 Gegner aufstellen, Countdown, HUD, Zieleinlauf, Ergebnis.
+## Events: Sprint und Rundkurs gegen 3 Gegner im Verkehr, Drift allein auf leerer Strecke mit Punkten.
+## Strecke bauen, aufstellen, Countdown, HUD, Zieleinlauf, Ergebnis.
 
 const Catalog := preload("res://scripts/catalog.gd")
 const Track := preload("res://scripts/track_builder.gd")
@@ -23,7 +24,16 @@ var world: SubViewport
 var state := State.COUNTDOWN
 var countdown := 3.99
 var race_time := 0.0
-var player_progress := 0.0
+var player_progress := 0.0  # Gesamtfortschritt des Spielers (bei Rundkursen über alle Runden)
+var event_type := "sprint"
+## Drift-Wertung: gesicherte Punkte, laufende Kette, Dauer der Kette, Zeit seit dem letzten Querfahren
+var drift_score := 0.0
+var drift_chain := 0.0
+var drift_chain_t := 0.0
+var drift_idle := 0.0
+var drift_targets: Array = []  # Punkte für Platz 3, 2, 1
+var _last_crashes := 0
+var _last_lap := 0
 var finish_order: Array = []  # "player" oder AI-Knoten in Zielreihenfolge
 
 var fx_mat: ShaderMaterial
@@ -46,6 +56,7 @@ func _ready() -> void:
 	# Die Szene selbst läuft immer (Pausemenü, Esc), Autos und Strecke sind pausierbar.
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	race = Catalog.RACES[GameState.race_index]
+	event_type = race.get("type", "sprint")
 	# 3D-Welt rendert in eine eigene (pixelige) Auflösung, die Oberfläche bleibt scharf
 	var view_layer := CanvasLayer.new()
 	view_layer.layer = -1
@@ -68,12 +79,16 @@ func _ready() -> void:
 	player.setup(car_id, GameState.get_config(car_id))
 	player.place(Track.xform_at(curve, track["start"], Track.LANES[2]))
 
-	# Gegner mit zufälligem Tuning, Stärke wächst mit deinen Siegen
+	# Gegner mit zufälligem Tuning; Stärke nach Schwierigkeit des Events, leicht steigend mit deinen Siegen
 	var rng := RandomNumberGenerator.new()
 	rng.seed = race["seed"] * 31 + GameState.wins
 	var lanes := [Track.LANES[0], Track.LANES[1], Track.LANES[3]]
-	var difficulty := 0.86 + minf(GameState.wins, 8) * 0.018
-	for i in 3:
+	var difficulty: float = 0.84 + race.get("tier", 1) * 0.035 + minf(GameState.total_wins(), 10) * 0.006
+	if event_type == "drift":
+		# Drift: allein, Zielpunkte je nach Schwierigkeit und Zahl der Kurven (Erstabstimmung, nach Spielgefühl anpassen)
+		var k: float = [1.0, 1.0, 1.35, 1.7][race.get("tier", 1)] * track["laps"] * race.get("corners", 12) / 24.0
+		drift_targets = [int(700 * k / 10.0) * 10, int(1500 * k / 10.0) * 10, int(2600 * k / 10.0) * 10]
+	for i in (0 if event_type == "drift" else 3):
 		var id: String = Catalog.CAR_ORDER[rng.randi() % Catalog.CAR_ORDER.size()]
 		var cfg := {}
 		for cat in Catalog.PART_ORDER:
@@ -95,7 +110,8 @@ func _ready() -> void:
 	player.audio.bus = "Hall"
 	for n in get_tree().get_nodes_in_group("ambient"):
 		n.target = player
-	_spawn_traffic()
+	if event_type != "drift":
+		_spawn_traffic()
 	_build_hud()
 
 
@@ -121,11 +137,33 @@ func _spawn_traffic() -> void:
 			t.base_speed = rng.randf_range(10.0, 16.0)
 			t.speed = t.base_speed
 			t.track_length = track["length"]
+			t.track = track
 			t.crossing = track["crossing"]
 			world.add_child(t)
 			t.setup(Traffic.KINDS[rng.randi() % Traffic.KINDS.size()], rng)
 			traffic.append(t)
 		d += rng.randf_range(45.0, 95.0)
+	# Gabelungen: zweispurig mit Gegenverkehr (deshalb dort kürzer, aber riskant)
+	for p in track["paths"]:
+		if p["kind"] != "fork":
+			continue
+		var fd := 25.0
+		while fd < p["length"] - 25.0:
+			var t := Traffic.new()
+			t.process_mode = Node.PROCESS_MODE_PAUSABLE
+			t.curve = p["curve"]
+			t.track = track
+			t.path_id = p["id"]
+			t.progress = fd
+			t.lane = 2.4 if rng.randf() < 0.45 else -2.4
+			t.dir = 1.0 if t.lane > 0.0 else -1.0
+			t.base_speed = rng.randf_range(9.0, 13.0)
+			t.speed = t.base_speed
+			t.track_length = p["length"]
+			world.add_child(t)
+			t.setup(Traffic.KINDS[rng.randi() % 6], rng)
+			traffic.append(t)
+			fd += rng.randf_range(30.0, 50.0)
 
 
 ## Bus mit Hall für Motor und Effekte; im Tunnel wird der Hall aufgedreht
@@ -321,18 +359,25 @@ func _process(dt: float) -> void:
 		State.FINISHED:
 			pass
 
-	player_progress = player.progress
+	player_progress = player.total
+	# Für Gegner und Verkehr: Position auf dem eigenen Weg, Querlage ohne Mittelstreifen
+	var on_main: bool = player.path_id == 0
+	var p_lat: float = Track.logical_lat(track, player.progress, player.lateral) if on_main else player.lateral
+	var p_d: float = player.progress if on_main else (player.loc["d"] if not player.loc.is_empty() else 0.0)
 	for ai in ais:
-		ai.player_progress = player_progress
-		ai.player_lateral = player.lateral
+		ai.player_progress = player.progress
+		ai.player_total = player_progress
+		ai.player_lateral = p_lat
 		ai.player_path = player.path_id
-		if ai.progress >= track["finish"] and ai.finish_time < 0.0:
+		if ai.total >= track["finish"] and ai.finish_time < 0.0:
 			ai.finish_time = race_time
 			finish_order.append(ai)
 	for t in traffic:
-		t.player_progress = player_progress
-		t.player_lateral = player.lateral
+		t.player_progress = p_d
+		t.player_lateral = p_lat
 		t.player_path = player.path_id
+	if event_type == "drift":
+		_update_drift(dt)
 	if state == State.RACING and player_progress >= track["finish"]:
 		_on_player_finished()
 
@@ -342,7 +387,7 @@ func _process(dt: float) -> void:
 
 ## Tunnel: dunkler, Hall an, Wusch beim Reinfahren. Viertel: Name einblenden.
 func _update_world(dt: float) -> void:
-	var tun := Track.tunnel_at(track, player_progress) if player.path_id == 0 else {}
+	var tun := Track.tunnel_at(track, player.progress) if player.path_id == 0 else {}
 	var inside := not tun.is_empty()
 	if inside != _in_tunnel:
 		_in_tunnel = inside
@@ -357,7 +402,7 @@ func _update_world(dt: float) -> void:
 	if _reverb:
 		_reverb.wet = lerpf(0.0, 0.3, _tunnel_k)
 	var arr: Array = track["districts"]
-	var di := clampi(int(player_progress / Track.DISTRICT_LEN), 0, arr.size() - 1)
+	var di := clampi(int(player.progress / Track.DISTRICT_LEN), 0, arr.size() - 1)
 	if di != _district_i:
 		if _district_i < 0 or arr[di] != arr[_district_i]:
 			_show_area(Track.DISTRICTS[arr[di]]["name"])
@@ -373,13 +418,58 @@ func _show_area(text: String) -> void:
 
 
 func _place() -> int:
+	if event_type == "drift":
+		var pts := drift_score + drift_chain * _drift_mult()
+		var place := 4
+		for tgt in drift_targets:
+			if pts >= tgt:
+				place -= 1
+		return place
 	if state == State.FINISHED:
 		return finish_order.find("player") + 1
 	var place := 1
 	for ai in ais:
-		if ai.finish_time >= 0.0 or ai.progress > player_progress:
+		if ai.finish_time >= 0.0 or ai.total > player_progress:
 			place += 1
 	return place
+
+
+# --- Drift-Wertung -----------------------------------------------------------------
+
+func _drift_mult() -> int:
+	return mini(1 + int(drift_chain_t / 2.0), 5)
+
+
+## Querfahren füllt die Kette: (Winkel - 10°) x Tempo, erst ab 12° zählt es als Drift (leichtes Rutschen nicht).
+## Nach 1,2 s ohne Drift wird die Kette mal Multiplikator gutgeschrieben; ein harter Einschlag kostet sie ganz.
+func _update_drift(dt: float) -> void:
+	if state != State.RACING:
+		return
+	if player.crashes != _last_crashes:
+		_last_crashes = player.crashes
+		if drift_chain > 0.0:
+			_flash("KETTE VERLOREN", Color(1.0, 0.3, 0.3))
+		drift_chain = 0.0
+		drift_chain_t = 0.0
+	var kmh := absf(player.speed_fwd) * 3.6
+	if player.drifting and player.drift_angle >= 12.0 and kmh > 35.0 and not player.airborne:
+		var ang := clampf(player.drift_angle, 0.0, 60.0)
+		drift_chain += (ang - 10.0) * kmh / 100.0 * dt
+		drift_chain_t += dt
+		drift_idle = 0.0
+	else:
+		drift_idle += dt
+		if drift_chain > 0.0 and drift_idle > 1.2:
+			_bank_drift()
+
+
+func _bank_drift() -> void:
+	var pts := drift_chain * _drift_mult()
+	drift_score += pts
+	if pts >= 50.0:
+		_flash("+%d" % int(pts), Color(1.0, 0.85, 0.2))
+	drift_chain = 0.0
+	drift_chain_t = 0.0
 
 
 func _update_hud() -> void:
@@ -389,6 +479,14 @@ func _update_hud() -> void:
 	fx_mat.set_shader_parameter("nitro", 1.0 if player.nitro_on else 0.0)
 
 	hud["pos"].text = "%d/4" % _place()
+	if event_type == "drift":
+		hud["pos"].text = "%d" % int(drift_score)
+	if track["loop"]:
+		var lap := clampi(player.lap + 1, 1, track["laps"])
+		hud["race"].text = "%s   RUNDE %d/%d" % [race["name"].to_upper(), lap, track["laps"]]
+		if player.lap != _last_lap and player.lap > 0 and player.lap < track["laps"]:
+			_flash("LETZTE RUNDE" if player.lap == track["laps"] - 1 else "RUNDE %d" % (player.lap + 1), Color(0.4, 1.0, 0.5))
+		_last_lap = player.lap
 	hud["time"].text = _fmt(race_time)
 	var tacho = hud["tacho"]
 	tacho.rpm = player.rpm
@@ -398,11 +496,23 @@ func _update_hud() -> void:
 	tacho.nitro_on = player.nitro_on
 	hud["progress"].size.x = 198.0 * clampf((player_progress - track["start"]) / (track["finish"] - track["start"]), 0.0, 1.0)
 	hud["drift"].text = "DRIFT  +NOS" if player.drifting else ("AIR" if player.airborne else "")
+	if event_type == "drift":
+		if drift_chain > 0.0:
+			hud["drift"].text = "x%d   %d" % [_drift_mult(), int(drift_chain)]
+		else:
+			var next := ""
+			for i in drift_targets.size():
+				if drift_score < drift_targets[i]:
+					next = "Platz %d: %d" % [3 - i, drift_targets[i]]
+					break
+			hud["drift"].text = next
 	# Kurze Einblendungen: Abkürzung, Sprungweite, Kamera
 	if player.path_id != _last_path:
 		var kind: String = track["paths"][player.path_id]["kind"]
 		if kind == "alley" or kind == "lake":
 			_flash("ABKÜRZUNG!", Color(1.0, 0.6, 0.1))
+		elif kind == "fork":
+			_flash("ALTSTADT · GEGENVERKEHR!", Color(1.0, 0.75, 0.2))
 		_last_path = player.path_id
 	if player.landings != _last_landings:
 		_last_landings = player.landings
@@ -433,14 +543,23 @@ func _on_player_finished() -> void:
 	player.controls_enabled = false
 	player.finished = true
 	var place := finish_order.find("player") + 1
+	if event_type == "drift":
+		_bank_drift()
+		place = _place()
 	var unlocked := []
 	if place == 1:
-		unlocked = GameState.register_win()
+		unlocked = GameState.register_win(event_type)
 	var key: String = race["name"]
 	var best: float = GameState.best_times.get(key, 0.0)
-	var new_best := best <= 0.0 or race_time < best
-	if new_best:
-		GameState.best_times[key] = race_time
+	var new_best: bool
+	if event_type == "drift":
+		new_best = drift_score > best  # Drift: Bestwert sind Punkte
+		if new_best:
+			GameState.best_times[key] = drift_score
+	else:
+		new_best = best <= 0.0 or race_time < best
+		if new_best:
+			GameState.best_times[key] = race_time
 	GameState.save_game()
 	hud["center"].text = "SIEG!" if place == 1 else "%d. PLATZ" % place
 	_show_result(place, new_best, unlocked)
@@ -462,9 +581,13 @@ func _show_result(place: int, new_best: bool, unlocked: Array) -> void:
 	panel.add_child(vb)
 	var t := _label(vb, 14, HORIZONTAL_ALIGNMENT_CENTER)
 	t.text = "Zeit  %s%s" % [_fmt(race_time), "   NEUE BESTZEIT" if new_best else ""]
+	if event_type == "drift":
+		t.text = "Punkte  %d%s" % [int(drift_score), "   NEUER REKORD" if new_best else ""]
+		var tg := _label(vb, 10, HORIZONTAL_ALIGNMENT_CENTER)
+		tg.text = "Platz 3: %d   Platz 2: %d   Platz 1: %d" % drift_targets
 	if place == 1:
 		var w := _label(vb, 11, HORIZONTAL_ALIGNMENT_CENTER)
-		w.text = "Siege gesamt: %d" % GameState.wins
+		w.text = ("Driftsiege gesamt: %d" % GameState.drift_wins) if event_type == "drift" else ("Rennsiege gesamt: %d" % GameState.wins)
 		if unlocked.size() > 0:
 			var u := _label(vb, 11, HORIZONTAL_ALIGNMENT_CENTER)
 			u.text = "FREIGESCHALTET:\n" + "\n".join(unlocked)

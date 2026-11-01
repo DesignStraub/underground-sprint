@@ -183,7 +183,7 @@ func _process(dt: float) -> void:
 	var target := Vector3(-1.6, 0.55, 0)
 	cam.position = Vector3(4.6 + sin(_t * 0.2) * 0.2, 1.7 + sin(_t * 0.3) * 0.08, 5.6)
 	cam.look_at(target)
-	status.text = "Siege: %d    Auto: %s" % [GameState.wins, Catalog.CARS[GameState.current_car]["name"]]
+	status.text = "Rennsiege: %d   Driftsiege: %d   Auto: %s" % [GameState.wins, GameState.drift_wins, Catalog.CARS[GameState.current_car]["name"]]
 	_music_label.text = ("Musik: " + Music.current_title) if Music.current_title != "" else "Keine Musik: mp3/ogg in music/ legen"
 
 
@@ -242,21 +242,40 @@ func _show_main() -> void:
 	_focus_first()
 
 
+## Erst die Art wählen, dann das Event. Alles ist frei wählbar; Drift-Siege schalten Driftautos frei.
 func _show_races() -> void:
+	_clear_menu()
+	for type in Catalog.TYPE_ORDER:
+		var n := 0
+		for r in Catalog.RACES:
+			if r["type"] == type:
+				n += 1
+		var t: String = type
+		var b := _button("%s  (%d)" % [Catalog.EVENT_TYPES[type]["label"], n], func(): _show_events(t))
+		b.focus_entered.connect(func(): info.text = Catalog.EVENT_TYPES[t]["desc"])
+	_button("< Zurück", _show_main)
+	info.text = "Fahr, worauf du Lust hast. Rennsiege schalten schnelle Autos frei, Driftsiege die Driftautos."
+	_focus_first()
+
+
+func _show_events(type: String) -> void:
 	_clear_menu()
 	for i in Catalog.RACES.size():
 		var r: Dictionary = Catalog.RACES[i]
-		var unlocked := GameState.is_race_unlocked(i)
-		var txt: String = r["name"]
-		if not unlocked:
-			txt += "  [%d Siege]" % r["wins"]
-		elif GameState.best_times.has(r["name"]):
-			var t: float = GameState.best_times[r["name"]]
-			txt += "  %d:%05.2f" % [int(t) / 60, fmod(t, 60.0)]
+		if r["type"] != type:
+			continue
+		var txt: String = "%s  %s" % [r["name"], "*".repeat(r["tier"])]
+		if GameState.best_times.has(r["name"]):
+			var best: float = GameState.best_times[r["name"]]
+			txt += "   " + ("%d Pkt" % int(best) if type == "drift" else "%d:%05.2f" % [int(best) / 60, fmod(best, 60.0)])
 		var idx := i
-		_button(txt, func(): _start_race(idx), not unlocked)
-	_button("< Zurück", _show_main)
-	info.text = "Sprint gegen 3 Gegner. Nur Platz 1 zählt als Sieg und schaltet Teile frei."
+		var b := _button(txt, func(): _start_race(idx))
+		var extra := ""
+		if r.has("laps") and type != "sprint":
+			extra = "%d Runden. " % r["laps"]
+		b.focus_entered.connect(func(): info.text = extra + Catalog.EVENT_TYPES[type]["desc"])
+	_button("< Zurück", _show_races)
+	info.text = Catalog.EVENT_TYPES[type]["desc"]
 	_focus_first()
 
 
@@ -305,7 +324,7 @@ func _part_info(cat: String) -> void:
 	if GameState.is_part_unlocked(cat, idx):
 		info.text = "%s: %s\nLinks/Rechts zum Wechseln." % [Catalog.PARTS[cat]["label"], opt["name"]]
 	else:
-		var missing: int = opt["wins"] - GameState.wins
+		var missing: int = opt["wins"] - GameState.total_wins()
 		info.text = "%s ist gesperrt.\nNoch %d Sieg%s nötig. (Nur Vorschau)" % [opt["name"], missing, "" if missing == 1 else "e"]
 
 
@@ -335,10 +354,10 @@ func _refresh_car() -> void:
 	menu.get_child(1).disabled = not unlocked
 	var stats := "Beschl. %s\nTopspeed %s  (%d km/h)\nGrip %s" % [
 		_stars(spec["accel"], 9.0, 13.0), _stars(spec["top_speed"], 55.0, 75.0), int(spec["top_speed"] * 3.6),
-		_stars(spec["grip"], 20.0, 29.0)]
+		_stars(spec["grip"], 20.0, 29.0)] + "\nDrift %s" % _stars(spec["drift"], 0.0, 1.0)
 	info.text = spec["desc"] + "\n" + stats
 	if not unlocked:
-		info.text += "\nFreischalten: %d Siege" % spec["wins"]
+		info.text += "\nFreischalten: " + GameState.unlock_text(preview_car)
 
 
 func _stars(v: float, lo: float, hi: float) -> String:

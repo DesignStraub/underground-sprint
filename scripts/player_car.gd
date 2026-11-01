@@ -42,6 +42,12 @@ var steer := 0.0
 var gear := 1
 var rpm := 900.0
 var drifting := false
+var drift_angle := 0.0  # Grad zwischen Fahrtrichtung und Fahrzeugachse
+var drift_k := 0.3  # 0..1: wie willig das Auto quer geht (aus dem Katalog)
+var crashes := 0  # zählt harte Einschläge (Drift-Kette geht verloren)
+## Rundkurs: abgeschlossene Runden und Gesamtfortschritt (Runden * Länge + Position)
+var lap := 0
+var total := 0.0
 ## Position auf der Strecke: Rennfortschritt (Meter Hauptstraße), Querlage, aktueller Weg
 var progress := 0.0
 var lateral := 0.0
@@ -68,6 +74,7 @@ var _cam_yaw := 0.0
 var _cam_pos := Vector3.ZERO
 var _cam_init := false
 var _respawn_xf := Transform3D.IDENTITY
+var _last_prog := 0.0
 
 
 func setup(car_id: String, cfg: Dictionary) -> void:
@@ -78,6 +85,7 @@ func setup(car_id: String, cfg: Dictionary) -> void:
 	top_speed = _spec["top_speed"] * eng["top"]
 	grip_k = _spec["grip"] * 0.32
 	steer_rate = _spec["steer"]
+	drift_k = _spec.get("drift", 0.3)
 	nitro_power = nos["power"]
 	nitro_cap = nos["capacity"]
 
@@ -256,7 +264,7 @@ func _physics_process(dt: float) -> void:
 		if hb:
 			yaw *= 1.5
 		if drifting:
-			yaw *= 1.2  # Gegenlenken/Eindrehen im Drift
+			yaw *= 1.12 + 0.2 * drift_k  # Gegenlenken/Eindrehen im Drift, Driftautos drehen williger
 	_spin = move_toward(_spin, 0.0, dt * 2.0)
 	rotate_y((yaw + _spin) * dt)
 
@@ -271,17 +279,19 @@ func _physics_process(dt: float) -> void:
 
 	# --- Grip: Querbewegung abbauen, einen Teil davon in Vortrieb umwandeln (Arcade)
 	if not airborne:
-		var gk := grip_k * (0.13 if hb else 1.0) * (0.25 if stun > 0.0 else 1.0)
+		var gk := grip_k * (lerpf(0.16, 0.1, drift_k) if hb else 1.0) * (0.25 if stun > 0.0 else 1.0)
 		if drifting and not hb:
-			gk *= 0.45  # Drift hält etwas an
+			gk *= lerpf(0.55, 0.3, drift_k)  # Drift hält an, bei Driftautos deutlich länger
 		var l_new := l2 * exp(-gk * dt)
 		var removed := absf(l2) - absf(l_new)
 		f2 += removed * 0.55 * signf(f2)
 		f2 = minf(f2, maxf(eff_top, speed_fwd))  # Drift-Umwandlung darf nicht über Topspeed schieben
 		l2 = l_new
 		drifting = absf(l2) > 3.5 and spd > 10.0
+		drift_angle = rad_to_deg(atan2(absf(l2), maxf(absf(f2), 0.1))) if drifting else 0.0
 	else:
 		drifting = false
+		drift_angle = 0.0
 
 	velocity = new_fwd * f2 + new_right * l2
 	velocity.y = 0.0
@@ -314,6 +324,14 @@ func _update_vertical(dt: float) -> void:
 	path_id = loc["path"]["id"]
 	progress = Track.race_progress(loc)
 	lateral = loc["lat"]
+	if track["loop"]:
+		var L: float = track["length"]
+		if progress < L * 0.25 and _last_prog > L * 0.75:
+			lap += 1
+		elif progress > L * 0.75 and _last_prog < L * 0.25:
+			lap -= 1
+		_last_prog = progress
+	total = lap * track["length"] + progress
 	var g := Track.ground(track, loc, global_position)
 	var gh: float = g["h"]
 	if airborne:
@@ -460,6 +478,7 @@ func _handle_collisions(pre: Vector3) -> void:
 				stun = 0.9
 				_shake = 1.0
 				_crash_cooldown = 0.6
+				crashes += 1
 				audio.crash(1.0)
 		elif other is Node and other.is_in_group("racer"):
 			other.bump(pre, n)
@@ -473,6 +492,7 @@ func _handle_collisions(pre: Vector3) -> void:
 			velocity *= lerpf(0.9, 0.35, head_on)
 			_shake = minf(_shake + impact * 0.04, 1.0)
 			if impact > 12.0 and _crash_cooldown <= 0.0:
+				crashes += 1
 				stun = 0.4 + head_on * 0.4
 				_crash_cooldown = 0.5
 				_spin = signf(velocity.dot(global_basis.x) + 0.01) * head_on * 1.2

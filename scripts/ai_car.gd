@@ -2,6 +2,7 @@ extends CharacterBody3D
 ## Gegner: fährt Wege (Hauptstraße oder Abkürzung) mit Spurversatz ab, bremst vor Kurven, sucht Lücken im Verkehr,
 ## weicht Baustellen und dem Spieler aus, nimmt manchmal Abkürzungen, springt über Rampen.
 ## Am Bahnübergang hält er, wenn der Zug kommt – oder nimmt Anlauf über die Rampe.
+## Auf Boulevards bleibt er auf seiner Seite des Mittelstreifens; in Gabelungen fährt er rechts und bremst hinter Verkehr.
 
 const Builder := preload("res://scripts/car_builder.gd")
 const Track := preload("res://scripts/track_builder.gd")
@@ -11,11 +12,14 @@ const MAX_LAUNCH_VY := 10.0  # kurze, knackige Sprünge statt Weitflug
 var track: Dictionary
 var path: Dictionary
 var d := 0.0  # Position auf dem aktuellen Weg
-var progress := 0.0  # Rennfortschritt in Metern der Hauptstraße
+var progress := 0.0  # Rennfortschritt in Metern der Hauptstraße (innerhalb der Runde)
+var lap := 0
+var total := 0.0  # Runden * Länge + progress
 var player: Node3D
 var traffic: Array = []
 var crossing: Node
-var player_progress := 0.0
+var player_progress := 0.0  # Spieler auf der Hauptstraße (innerhalb der Runde)
+var player_total := 0.0  # Spieler-Gesamtfortschritt (für das Gummiband)
 var player_lateral := 0.0
 var player_path := 0
 var finish := 0.0
@@ -60,6 +64,7 @@ func setup(track_: Dictionary, car_id: String, cfg: Dictionary, start_progress: 
 	add_child(col)
 	d = start_progress
 	progress = d
+	total = d
 	lane = start_lane
 	lane_target = start_lane
 	top = top_speed
@@ -73,6 +78,8 @@ func setup(track_: Dictionary, car_id: String, cfg: Dictionary, start_progress: 
 ## Ist die Spur bei `lat` zwischen d+from und d+to frei? (nur Hauptstraße)
 func _lane_free(lat: float, from: float, to: float) -> bool:
 	for t in traffic:
+		if t.path_id != 0:
+			continue
 		var tl: float = t.lateral()
 		if absf(tl - lat) > 2.6:
 			continue
@@ -100,12 +107,12 @@ func _physics_process(dt: float) -> void:
 	var on_main: bool = path["id"] == 0
 	var target := 0.0
 	stun = maxf(stun - dt, 0.0)
-	if running and progress < finish and stun <= 0.0:
+	if running and total < finish and stun <= 0.0:
 		var f0 := Track.frame_at(c, d)
 		var f1 := Track.frame_at(c, d + 15.0 + speed * 1.3)
 		var bend := (f0["fwd"] as Vector3).angle_to(f1["fwd"])
 		target = top * skill * lerpf(1.0, 0.5, clampf(bend / 1.1, 0.0, 1.0))
-		var gap := player_progress - progress
+		var gap := player_total - total
 		target *= clampf(1.0 + gap * 0.0025, 0.88, 1.15)
 		if on_main:
 			# Ein paar Mal pro Sekunde: Spur wählen
@@ -116,7 +123,11 @@ func _physics_process(dt: float) -> void:
 				if not _lane_free(lane_target, -2.0, ahead) or _player_blocks(lane_target):
 					var best := lane_target
 					var best_cost := 1e9
+					# Mittelstreifen in der Nähe: nur Spuren auf der eigenen Seite
+					var split := Track.median_at(track, d) > 0.3 or Track.median_at(track, d + ahead) > 0.3
 					for l in Track.LANES:
+						if split and signf(l) != signf(lane):
+							continue
 						if _lane_free(l, -3.0, ahead) and not _player_blocks(l):
 							var cost := absf(l - lane)
 							if cost < best_cost:
@@ -138,6 +149,15 @@ func _physics_process(dt: float) -> void:
 			lane_target = 0.0
 			if path["kind"] == "lake":
 				target = maxf(target, 36.0)  # Anlauf für die Schanze
+			elif path["kind"] == "fork":
+				# Gabelung: rechte Spur, hinter Verkehr in gleicher Richtung abbremsen
+				lane_target = 2.4
+				target = minf(target, 36.0)
+				for t in traffic:
+					if t.path_id == path["id"] and t.dir > 0.0 and not t.wrecked:
+						var t_gap: float = t.progress - d
+						if t_gap > 0.0 and t_gap < 16.0 + speed * 0.4:
+							target = minf(target, t.speed * 0.9)
 			else:
 				target = minf(target, 30.0)  # enge Gasse
 	speed = move_toward(speed, target, dt * (accel if target > speed else 22.0))
@@ -147,11 +167,11 @@ func _physics_process(dt: float) -> void:
 	# Abkürzung nehmen?
 	if on_main:
 		for p in track["paths"]:
-			if p["kind"] != "alley" and p["kind"] != "lake":
+			if p["kind"] != "alley" and p["kind"] != "lake" and p["kind"] != "fork":
 				continue
 			if prev_d < p["from"] and d >= p["from"] and not _decided.has(p["id"]):
 				_decided[p["id"]] = true
-				if randf() < shortcut_rate:
+				if randf() < (0.5 if p["kind"] == "fork" else shortcut_rate):
 					path = p
 					d = d - p["from"]
 					lane = clampf(lane, -p["half_w"] + 1.5, p["half_w"] - 1.5)
@@ -164,7 +184,12 @@ func _physics_process(dt: float) -> void:
 		lane_target = clampf(lane, Track.LANES[0], Track.LANES[3])
 	c = path["curve"]
 	on_main = path["id"] == 0
+	if on_main and track["loop"] and d >= track["length"]:
+		d -= track["length"]
+		lap += 1
+		_decided.clear()  # neue Runde, neue Entscheidungen
 	progress = d if on_main else lerpf(path["from"], path["to"], clampf(d / path["length"], 0.0, 1.0))
+	total = lap * track["length"] + progress
 
 	# Querbewegung: Spurwechsel + Rempel-Impulse
 	var half: float = path["half_w"]
@@ -173,11 +198,10 @@ func _physics_process(dt: float) -> void:
 	lane = move_toward(lane, lane_target, dt * 5.0)
 	lane = clampf(lane, -half + 1.0, half - 1.0)
 
-	if on_main:
-		_check_traffic_crash()
+	_check_traffic_crash()
 	_update_vertical(dt)
 
-	var xf := Track.xform_at(c, d, lane)
+	var xf := Track.xform_at(c, d, Track.lane_lat(track, d, lane) if on_main else lane)
 	xf.origin.y = y
 	global_transform = xf
 	var yaw_rate := wrapf(rotation.y - _last_yaw, -PI, PI) / maxf(dt, 0.0001)
@@ -211,6 +235,8 @@ func _update_vertical(dt: float) -> void:
 
 func _check_traffic_crash() -> void:
 	for t in traffic:
+		if t.path_id != path["id"]:
+			continue
 		if absf(t.lateral() - lane) < 2.0 and absf(t.progress - d) < (t.length + length) / 2.0 and not airborne:
 			if stun <= 0.0:
 				var fwd := -global_basis.z

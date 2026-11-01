@@ -4,7 +4,7 @@ extends Node
 ##   -- --shot=/pfad/pre   speichert Screenshots
 ##   -- --quit=40          beendet nach 40 Sekunden
 ##   -- --demo             klickt sich nach dem Intro durchs Menü (Tuning zeigen, Rennen starten)
-##   -- --at=lake|crossing|alley|tunnel|el|stadium|<viertel>   setzt das Auto nach dem Start direkt vor die Stelle
+##   -- --at=lake|crossing|alley|tunnel|el|stadium|<viertel>|d:<meter>   setzt das Auto nach dem Start direkt vor die Stelle
 ##   -- --race=2           wählt die Strecke (Index in Catalog.RACES)
 ##   -- --times=1.5,4,8    Zeitpunkte für Screenshots
 
@@ -26,6 +26,8 @@ const DEMO_STEPS := [[5.4, "ui_down"], [6.0, "ui_accept"], [6.9, "ui_right"], [7
 	[8.3, "ui_down"], [8.8, "ui_right"], [9.5, "ui_right"], [10.2, "ui_down"], [10.7, "ui_right"],
 	[11.4, "ui_right"], [12.4, "ui_cancel"], [13.2, "ui_accept"], [14.0, "ui_accept"]]
 var _step := 0
+var _drift_t := -1.0  # laufendes Drift-Manöver (--drifty)
+var _drift_dir := 0.0
 
 
 func _ready() -> void:
@@ -83,14 +85,17 @@ func _process(dt: float) -> void:
 		if on_main and not lock_lane and not _lane_free(race, _lane, -3.0, look):
 			var best: float = _lane
 			var cost := 1e9
+			var split := Track.median_at(race.track, pl.progress) > 0.3 or Track.median_at(race.track, pl.progress + look) > 0.3
 			for l in Track.LANES:
+				if split and signf(l) != signf(_lane):
+					continue
 				if _lane_free(race, l, -4.0, look) and absf(l - pl.lateral) < cost:
 					cost = absf(l - pl.lateral)
 					best = l
 			_lane = best
 		var dl: float = pl.loc["d"] + 14.0 + absf(pl.speed_fwd) * 0.3
 		var f := Track.frame_at(p["curve"], dl)
-		var tgt: Vector3 = f["pos"] + f["right"] * (_lane if on_main else 0.0)
+		var tgt: Vector3 = f["pos"] + f["right"] * (Track.lane_lat(race.track, dl, _lane) if on_main else (2.4 if p["kind"] == "fork" else 0.0))
 		var side: float = (tgt - pl.global_position).dot(pl.global_basis.x)
 		Input.action_release("steer_left")
 		Input.action_release("steer_right")
@@ -104,6 +109,25 @@ func _process(dt: float) -> void:
 		if p["kind"] == "lake":
 			limit = 40.0
 			bend = 0.0
+		# --drifty: vor Kurven ein Drift-Manöver wie ein Mensch (Handbremse, voll einlenken, mit Gas quer halten)
+		if OS.get_cmdline_user_args().has("--drifty"):
+			if _drift_t < 0.0 and bend > 0.3 and pl.speed_fwd > 18.0:
+				_drift_t = 0.0
+				_drift_dir = signf((f1["fwd"] as Vector3).cross(f0["fwd"]).y)
+			if _drift_t >= 0.0:
+				_drift_t += dt
+				Input.action_release("steer_left")
+				Input.action_release("steer_right")
+				var hard := 1.0 if _drift_t < 0.35 else 0.55
+				Input.action_press("steer_left" if _drift_dir > 0.0 else "steer_right", hard)
+				if _drift_t < 0.35:
+					Input.action_press("handbrake")
+				else:
+					Input.action_release("handbrake")
+				Input.action_press("accelerate")
+				if _drift_t > 1.3:
+					_drift_t = -1.0
+				return
 		if bend > 0.5 and pl.speed_fwd > limit:
 			Input.action_release("accelerate")
 		else:
@@ -124,6 +148,7 @@ func _process(dt: float) -> void:
 			if absf(t.progress - pl.progress) < 12.0:
 				near += " T(%.1f,%.1f)" % [t.progress - pl.progress, t.lateral()]
 		print("t=%.1f d=%.1f lat=%.2f v=%.1f path=%d fps=%d%s" % [_t, pl.progress, pl.lateral, pl.speed_fwd, pl.path_id, Engine.get_frames_per_second(), near])
+		print("   runde=%d gesamt=%.0f ziel=%.0f status=%d platz=%d drift=%d kette=%d" % [pl.lap, pl.total, race.track["finish"], race.state, race._place(), int(race.drift_score), int(race.drift_chain)])
 		for n in get_tree().get_nodes_in_group("ambient"):
 			if "_cars" in n:
 				print("   zug aktiv=%s d=%.0f (%.0f-%.0f) sichtbar=%s y=%.1f" % [n._active, n._d, n.d_from, n.d_to, n._cars[0].visible, n._cars[0].global_position.y])
@@ -174,6 +199,9 @@ func _place_at(race) -> void:
 					pl.velocity = -pl.global_basis.z * (38.0 if at == "lake" else 22.0)
 					break
 		_:
+			if at.begins_with("d:"):
+				_drop(race, float(at.substr(2)))
+				return
 			var arr: Array = tr["districts"]
 			var i := arr.find(at)
 			if i >= 0:

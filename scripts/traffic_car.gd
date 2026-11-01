@@ -1,6 +1,7 @@
 extends CharacterBody3D
 ## Ziviler Verkehr: fährt langsam auf seiner Spur (rechts mit, links Gegenverkehr),
 ## weicht Baustellen aus, bremst für den Spieler und hält am Bahnübergang. Bei einem Crash wird er weggeschleudert.
+## Fährt auf der Hauptstraße (mit Mittelstreifen-Versatz) oder in einer Gabelung (path_id).
 
 const Builder := preload("res://scripts/car_builder.gd")
 const Track := preload("res://scripts/track_builder.gd")
@@ -10,6 +11,8 @@ const COLORS := [Color(0.5, 0.5, 0.52), Color(0.15, 0.15, 0.17), Color(0.25, 0.3
 	Color(0.7, 0.7, 0.68), Color(0.2, 0.3, 0.2), Color(0.35, 0.3, 0.25)]
 
 var curve: Curve3D
+var track: Dictionary
+var path_id := 0  # 0 = Hauptstraße, sonst Gabelung
 var blocks: Array = []
 var progress := 0.0
 var lane := 2.25
@@ -19,7 +22,7 @@ var base_speed := 13.0
 var length := 4.5
 var track_length := 0.0
 var wrecked := false
-var player_progress := 0.0
+var player_progress := 0.0  # Spieler auf seinem Weg (Meter ab Wegbeginn)
 var player_lateral := 100.0
 var player_path := 0
 var crossing: Node
@@ -103,21 +106,30 @@ func _physics_process(dt: float) -> void:
 	# Spieler direkt vor mir? Bremsen.
 	var target := base_speed
 	var ahead := (player_progress - progress) * dir
-	if player_path == 0 and absf(player_lateral - _lane_cur) < 2.6 and ahead > 0.0 and ahead < length / 2.0 + 12.0:
+	if player_path == path_id and absf(player_lateral - _lane_cur) < 2.6 and ahead > 0.0 and ahead < length / 2.0 + 12.0:
 		target = 0.0
 	# Schranken unten? Vor der Haltelinie stehen bleiben.
-	if crossing and crossing.is_blocked():
+	if crossing and path_id == 0 and crossing.is_blocked():
 		var stop: float = (crossing.d_cross - 12.0 - progress) if dir > 0.0 else (progress - crossing.d_cross - 12.0)
 		if stop > -2.0 and stop < 140.0:
 			target = minf(target, sqrt(2.0 * 7.0 * maxf(stop, 0.0)))
 	speed = move_toward(speed, target, dt * (4.0 if target > speed else 10.0))
 	progress += speed * dt * dir
-	# Am Streckenende neu einsetzen (außer Sicht)
-	if progress > track_length - 10.0:
+	if path_id == 0 and track.get("loop", false):
+		progress = fposmod(progress, track_length)  # Rundkurs: einfach weiterfahren
+	elif path_id != 0:
+		# Gabelung: am Ende wieder am Anfang einsetzen
+		if progress > track_length - 4.0:
+			progress = 6.0
+		elif progress < 4.0:
+			progress = track_length - 6.0
+	elif progress > track_length - 10.0:
+		# Am Streckenende neu einsetzen (außer Sicht)
 		progress = 40.0
 	elif progress < 40.0:
 		progress = track_length - 10.0
-	var xf := Track.xform_at(curve, progress, _lane_cur)
+	var lat := Track.lane_lat(track, progress, _lane_cur) if path_id == 0 else _lane_cur
+	var xf := Track.xform_at(curve, progress, lat)
 	if dir < 0.0:
 		xf.basis = xf.basis.rotated(Vector3.UP, PI)
 	var fwd := -xf.basis.z

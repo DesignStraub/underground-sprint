@@ -27,6 +27,10 @@ func _ready() -> void:
 			el.append("%.0f-%.0f" % [x["from"], x["to"]])
 		print("   Viertel: ", " > ".join(t["districts"]))
 		print("   Tunnel: ", tun, "  Hochbahn: ", el, "  Stadion: %.0f  Masten: %d" % [t["stadium_d"], t["posts"].size()])
+		var med := []
+		for m in t["medians"]:
+			med.append("%.0f-%.0f" % [m["from"], m["to"]])
+		print("   Boulevards: ", med, "  Typ: %s, %d Runde(n)" % [t["type"], t["laps"]])
 		t["node"].free()
 	get_tree().quit()
 

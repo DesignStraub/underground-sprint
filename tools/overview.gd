@@ -67,6 +67,16 @@ func _ready() -> void:
 	for k in t["posts"].size():
 		var pd: float = t["posts"][k]
 		shots.append(["post%d" % k, at.call(pd - 45.0, 2.0, 3.0), at.call(pd, 0.0, 6.0)])
+	# Draufsicht auf die ganze Strecke
+	var lo := Vector3(1e9, 0, 1e9)
+	var hi := Vector3(-1e9, 0, -1e9)
+	for i in 64:
+		var q := c.sample_baked(t["length"] * i / 64.0)
+		lo = Vector3(minf(lo.x, q.x), 0, minf(lo.z, q.z))
+		hi = Vector3(maxf(hi.x, q.x), 0, maxf(hi.z, q.z))
+	var mid := (lo + hi) / 2.0
+	var ext := maxf(hi.x - lo.x, hi.z - lo.z)
+	shots.append(["karte", mid + Vector3(0, ext * 1.25, 0.01), mid])
 	var seen := {}
 	var arr: Array = t["districts"]
 	for i in arr.size():

@@ -15,7 +15,8 @@ signal graphics_changed
 
 var pixel_mode := 1 if OS.has_feature("web") else 2  # im Browser ohne Kantenglättung (spart viel)
 
-var wins := 0
+var wins := 0  # Rennsiege (Sprint + Rundkurs)
+var drift_wins := 0
 var current_car := "kaizen"
 var race_index := 0
 var best_times := {}  # Rennname -> Sekunden
@@ -121,16 +122,32 @@ func _add_action(action: String, keys: Array, buttons: Array, axis: Array) -> vo
 
 # --- Freischalten ---------------------------------------------------------
 
-func is_car_unlocked(car_id: String) -> bool:
-	return wins >= Catalog.CARS[car_id]["wins"]
+func total_wins() -> int:
+	return wins + drift_wins
+
+
+func is_car_unlocked(car_id: String, race_w := -1, drift_w := -1) -> bool:
+	var req: Dictionary = Catalog.CARS[car_id]["unlock"]
+	if req.is_empty():
+		return true
+	var rw := wins if race_w < 0 else race_w
+	var dw := drift_wins if drift_w < 0 else drift_w
+	return (req.has("race") and rw >= req["race"]) or (req.has("drift") and dw >= req["drift"])
+
+
+## "2 Rennsiege oder 1 Driftsieg"
+func unlock_text(car_id: String) -> String:
+	var req: Dictionary = Catalog.CARS[car_id]["unlock"]
+	var parts := []
+	if req.has("race"):
+		parts.append("%d Rennsieg%s" % [req["race"], "" if req["race"] == 1 else "e"])
+	if req.has("drift"):
+		parts.append("%d Driftsieg%s" % [req["drift"], "" if req["drift"] == 1 else "e"])
+	return " oder ".join(parts)
 
 
 func is_part_unlocked(category: String, index: int) -> bool:
-	return wins >= Catalog.PARTS[category]["options"][index]["wins"]
-
-
-func is_race_unlocked(index: int) -> bool:
-	return wins >= Catalog.RACES[index]["wins"]
+	return total_wins() >= Catalog.PARTS[category]["options"][index]["wins"]
 
 
 func get_config(car_id: String) -> Dictionary:
@@ -150,22 +167,23 @@ func part(car_id: String, category: String) -> Dictionary:
 	return Catalog.PARTS[category]["options"][get_config(car_id)[category]]
 
 
-## Liefert eine Liste von Texten, was durch den neuen Sieg freigeschaltet wurde.
-func register_win() -> Array:
-	var before := wins
-	wins += 1
+## Sieg zählen (Drift-Events als Driftsieg, sonst Rennsieg).
+## Liefert eine Liste von Texten, was dadurch freigeschaltet wurde.
+func register_win(event_type: String) -> Array:
+	var rw0 := wins
+	var dw0 := drift_wins
+	var before := total_wins()
+	if event_type == "drift":
+		drift_wins += 1
+	else:
+		wins += 1
 	var unlocked := []
 	for car_id in Catalog.CAR_ORDER:
-		var w: int = Catalog.CARS[car_id]["wins"]
-		if w > before and w <= wins:
+		if not is_car_unlocked(car_id, rw0, dw0) and is_car_unlocked(car_id):
 			unlocked.append("Auto: " + Catalog.CARS[car_id]["name"])
-	for i in Catalog.RACES.size():
-		var w: int = Catalog.RACES[i]["wins"]
-		if w > before and w <= wins:
-			unlocked.append("Rennen: " + Catalog.RACES[i]["name"])
 	for cat in Catalog.PART_ORDER:
 		for opt in Catalog.PARTS[cat]["options"]:
-			if opt["wins"] > before and opt["wins"] <= wins:
+			if opt["wins"] > before and opt["wins"] <= total_wins():
 				unlocked.append(Catalog.PARTS[cat]["label"] + ": " + opt["name"])
 	save_game()
 	return unlocked
@@ -178,7 +196,7 @@ func save_game() -> void:
 	if f == null:
 		return
 	f.store_string(JSON.stringify({
-		"wins": wins, "current_car": current_car, "race_index": race_index,
+		"wins": wins, "drift_wins": drift_wins, "current_car": current_car, "race_index": race_index,
 		"best_times": best_times, "car_configs": car_configs, "pixel_mode_v2": pixel_mode,
 	}, "\t"))
 
@@ -190,6 +208,7 @@ func load_game() -> void:
 	if typeof(data) != TYPE_DICTIONARY:
 		return
 	wins = int(data.get("wins", 0))
+	drift_wins = int(data.get("drift_wins", 0))
 	current_car = str(data.get("current_car", "kaizen"))
 	if not Catalog.CARS.has(current_car):
 		current_car = "kaizen"
@@ -210,6 +229,7 @@ func load_game() -> void:
 
 func reset_progress() -> void:
 	wins = 0
+	drift_wins = 0
 	current_car = "kaizen"
 	race_index = 0
 	best_times = {}

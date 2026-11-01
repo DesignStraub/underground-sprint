@@ -23,6 +23,16 @@ Ordner in Godot 4.7 öffnen (Import), dann F5. Das Spiel startet mit dem ONE-HUM
 
 Nitro lädt sich langsam von selbst auf und schneller beim Driften.
 
+## Events
+Alles ist von Anfang an frei wählbar (Garage → Rennen fahren → Art → Event):
+- **Sprint** (5): von A nach B gegen 3 Gegner.
+- **Rundkurs** (3): 2 Runden gegen 3 Gegner.
+- **Drift** (3): allein auf der Strecke. Querfahren ab 12° gibt Punkte (Winkel × Tempo), verkettete Drifts
+  steigern den Multiplikator bis x5, ein Crash kostet die laufende Kette. Zielpunkte für Platz 3/2/1 stehen im HUD.
+
+**Freischalten:** Rennsiege (Sprint + Rundkurs) und Driftsiege werden getrennt gezählt. Driftautos (Sakura D2,
+Ronin DR) gibt es für Driftsiege, schnelle Autos für Rennsiege, Teile für Siege insgesamt.
+
 ## Strecken
 - Jede Strecke führt durch mehrere Stadtviertel mit eigenem Stil (Name wird beim Reinfahren eingeblendet):
   - **Downtown:** Glastürme, LED-Videowände, Schilderbrücken
@@ -36,6 +46,9 @@ Nitro lädt sich langsam von selbst auf und schneller beim Driften.
 - **Abkürzungen:** kurvige Gassen (Kopfsteinpflaster, Lichterketten) und ein Seesprung über eine Schanze. Sie sparen 100–150 m, sind aber enger bzw. brauchen Tempo (ab ca. 120 km/h über den See, sonst Platsch).
 - **Bahnübergang:** Kommt der Zug, gehen Schranken runter. Wer drauf zufährt, crasht. Auf der rechten Außenspur steht eine Rampe, mit genug Tempo springt man über den Zug.
 - **Sprünge:** In der Luft kann man nicht lenken, Nitro schiebt aber weiter.
+- **Gabelungen:** Vor der Teilung zeigt ein Wegweiser beide Wege. Die Altstadt-Route ist kürzer, aber zweispurig
+  mit Gegenverkehr; außen herum geht ein breiter Boulevard. Wer sich nicht entscheidet, landet auf der Verkehrsinsel.
+- **Boulevards:** breite Straßen mit bepflanztem Mittelstreifen (auf der Schnellstraße mit Betonleitwand).
 - Kreuzungen mit Ampeln, Baustellen, Verkehr in beide Richtungen. Laternen, Mülltonnen, Zeitungsboxen, Parkuhren
   und Schilder fliegen weg; Hydranten, Poller, Telefonzellen, Container und Betonleitwände nicht.
 
