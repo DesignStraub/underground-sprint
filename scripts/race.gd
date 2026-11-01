@@ -33,6 +33,13 @@ var _last_path := 0
 var _last_landings := 0
 var _flash_t := 0.0
 var pause_panel: Control
+var env: Environment
+var moon: DirectionalLight3D
+var _reverb: AudioEffectReverb
+var _tunnel_k := 0.0
+var _in_tunnel := false
+var _district_i := -1
+var _area_t := 0.0
 
 
 func _ready() -> void:
@@ -84,6 +91,10 @@ func _ready() -> void:
 
 	if track["crossing"]:
 		track["crossing"].player = player
+	_setup_hall()
+	player.audio.bus = "Hall"
+	for n in get_tree().get_nodes_in_group("ambient"):
+		n.target = player
 	_spawn_traffic()
 	_build_hud()
 
@@ -117,8 +128,35 @@ func _spawn_traffic() -> void:
 		d += rng.randf_range(45.0, 95.0)
 
 
+## Bus mit Hall für Motor und Effekte; im Tunnel wird der Hall aufgedreht
+func _setup_hall() -> void:
+	var idx := AudioServer.get_bus_index("Hall")
+	if idx < 0:
+		AudioServer.add_bus()
+		idx = AudioServer.bus_count - 1
+		AudioServer.set_bus_name(idx, "Hall")
+		AudioServer.set_bus_send(idx, "Master")
+		var rv := AudioEffectReverb.new()
+		rv.room_size = 0.55
+		rv.damping = 0.35
+		rv.spread = 0.8
+		rv.hipass = 0.15
+		rv.predelay_msec = 35.0
+		rv.predelay_feedback = 0.3
+		rv.dry = 1.0
+		rv.wet = 0.0
+		AudioServer.add_bus_effect(idx, rv)
+	_reverb = AudioServer.get_bus_effect(idx, 0)
+	_reverb.wet = 0.0
+
+
+func _exit_tree() -> void:
+	if _reverb:
+		_reverb.wet = 0.0
+
+
 func _setup_environment() -> void:
-	var env := Environment.new()
+	env = Environment.new()
 	var sky_mat := ShaderMaterial.new()
 	sky_mat.shader = SKY_SHADER
 	var sky := Sky.new()
@@ -145,7 +183,7 @@ func _setup_environment() -> void:
 	var we := WorldEnvironment.new()
 	we.environment = env
 	world.add_child(we)
-	var moon := DirectionalLight3D.new()
+	moon = DirectionalLight3D.new()
 	moon.light_color = Color(0.55, 0.6, 1.0)
 	moon.light_energy = 0.25
 	moon.rotation_degrees = Vector3(-50, 30, 0)
@@ -247,6 +285,16 @@ func _build_hud() -> void:
 	hud["flash"].offset_right = 180
 	hud["flash"].offset_top = 44
 	hud["flash"].offset_bottom = 74
+	# Ortsname (Viertel, Tunnel) oben mittig
+	hud["area"] = _label(root, 13, HORIZONTAL_ALIGNMENT_CENTER)
+	hud["area"].anchor_left = 0.5
+	hud["area"].anchor_right = 0.5
+	hud["area"].offset_left = -160
+	hud["area"].offset_right = 160
+	hud["area"].offset_top = 20
+	hud["area"].offset_bottom = 38
+	hud["area"].label_settings.font_color = Color(0.85, 0.9, 1.0)
+	hud["area"].modulate.a = 0.0
 
 	_build_pause(root)
 
@@ -288,7 +336,40 @@ func _process(dt: float) -> void:
 	if state == State.RACING and player_progress >= track["finish"]:
 		_on_player_finished()
 
+	_update_world(dt)
 	_update_hud()
+
+
+## Tunnel: dunkler, Hall an, Wusch beim Reinfahren. Viertel: Name einblenden.
+func _update_world(dt: float) -> void:
+	var tun := Track.tunnel_at(track, player_progress) if player.path_id == 0 else {}
+	var inside := not tun.is_empty()
+	if inside != _in_tunnel:
+		_in_tunnel = inside
+		var v := absf(player.speed_fwd)
+		if v > 15.0:
+			Sfx.play("tunnel", -16.0 + minf(v / 6.0, 10.0), 0.9 if inside else 1.15)
+		if inside:
+			_show_area(tun["name"])
+	_tunnel_k = move_toward(_tunnel_k, 1.0 if inside else 0.0, dt * 2.5)
+	env.ambient_light_energy = lerpf(0.35, 0.1, _tunnel_k)
+	moon.light_energy = lerpf(0.25, 0.0, _tunnel_k)
+	if _reverb:
+		_reverb.wet = lerpf(0.0, 0.3, _tunnel_k)
+	var arr: Array = track["districts"]
+	var di := clampi(int(player_progress / Track.DISTRICT_LEN), 0, arr.size() - 1)
+	if di != _district_i:
+		if _district_i < 0 or arr[di] != arr[_district_i]:
+			_show_area(Track.DISTRICTS[arr[di]]["name"])
+		_district_i = di
+	if _area_t > 0.0:
+		_area_t -= dt
+		hud["area"].modulate.a = clampf(_area_t / 0.6, 0.0, 1.0) * clampf((3.0 - _area_t) / 0.3, 0.0, 1.0)
+
+
+func _show_area(text: String) -> void:
+	hud["area"].text = text
+	_area_t = 3.0
 
 
 func _place() -> int:

@@ -24,11 +24,20 @@ Ordner in Godot 4.7 öffnen (Import), dann F5. Das Spiel startet mit dem ONE-HUM
 Nitro lädt sich langsam von selbst auf und schneller beim Driften.
 
 ## Strecken
-- Jede Strecke führt durch mehrere Stadtviertel (Downtown, Läden, Wohnviertel, Industrie) mit eigenem Baustil.
+- Jede Strecke führt durch mehrere Stadtviertel mit eigenem Stil (Name wird beim Reinfahren eingeblendet):
+  - **Downtown:** Glastürme, LED-Videowände, Schilderbrücken
+  - **Marktviertel:** Läden, Markisen, Lichterketten über der Straße, Hochbahn
+  - **Altstadt:** Backstein, Feuertreppen, Bäume, alte Laternen
+  - **Docks:** Hallen, Containerkräne über der Straße, Schornsteine, Natriumdampf-Licht
+  - **Chinatown:** Tor, Lampionketten, geschwungene Dächer, senkrechte Leuchtschilder
+  - **Schnellstraße:** Lärmschutzwände mit Graffiti, Wegweiser-Brücken, Straßenbrücken
+- **Tunnel** unter Häuserblocks (Kacheln, Lichtbänder, Hall im Sound), **Hochbahn** mit Zug über der Außenspur,
+  **Stadion** mit Flutlicht und Publikum.
 - **Abkürzungen:** kurvige Gassen (Kopfsteinpflaster, Lichterketten) und ein Seesprung über eine Schanze. Sie sparen 100–150 m, sind aber enger bzw. brauchen Tempo (ab ca. 120 km/h über den See, sonst Platsch).
 - **Bahnübergang:** Kommt der Zug, gehen Schranken runter. Wer drauf zufährt, crasht. Auf der rechten Außenspur steht eine Rampe, mit genug Tempo springt man über den Zug.
 - **Sprünge:** In der Luft kann man nicht lenken, Nitro schiebt aber weiter.
-- Kreuzungen mit Ampeln, Baustellen, Verkehr in beide Richtungen, Laternen und Mülltonnen, die wegfliegen.
+- Kreuzungen mit Ampeln, Baustellen, Verkehr in beide Richtungen. Laternen, Mülltonnen, Zeitungsboxen, Parkuhren
+  und Schilder fliegen weg; Hydranten, Poller, Telefonzellen, Container und Betonleitwände nicht.
 
 ## Fortschritt
 Kein Geld: Jeder 1. Platz zählt als Sieg. Siege schalten Autos, Strecken und Tuningteile frei
@@ -38,7 +47,7 @@ Kein Geld: Jeder 1. Platz zählt als Sieg. Siege schalten Autos, Strecken und Tu
 Musik (`music/`) und Intro-Sound (`assets/intro_sound.mp3`) sind lizenzfreie Tracks von Pixabay.
 Weitere mp3/ogg-Dateien in `music/` laufen automatisch mit, in zufälliger Reihenfolge.
 
-Motorsound, Reifen, Nitro und Crashs werden im Spiel erzeugt. Zug, Glocke, Landung, Platschen usw.
+Motorsound, Reifen, Nitro und Crashs werden im Spiel erzeugt. Zug, Glocke, Landung, Platschen, Tunnel, Stadion usw.
 sind synthetisch erzeugte WAVs in `assets/sfx/` (`python3 tools/make_sfx.py`).
 
 ## Grafik
@@ -58,6 +67,8 @@ Texte, Cover und Screenshots für die itch.io-Seite: `release/`.
 - `scripts/intro.gd` – Studio-Intro
 - `scripts/traffic_car.gd` – Verkehr
 - `scripts/rail_crossing.gd` – Bahnübergang mit Zug
+- `scripts/elevated_rail.gd` – Hochbahn-Zug, `scripts/ambient_sound.gd` – ortsfeste Geräusche (Stadion)
 - `tools/track_stats.tscn` – baut alle Strecken und zeigt Kennzahlen
-- `scripts/debug_shot.gd` – nur für Tests/Videos (`-- --drive`, `--demo`, `--at=lake|crossing|alley`, `--shot=pfad`, `--times=…`, `--quit=s`)
+- `tools/overview.tscn` – Bilder aus erhöhter Sicht auf Tunnel, Hochbahn, Stadion, Viertel (`-- --race=1 --out=pfad`)
+- `scripts/debug_shot.gd` – nur für Tests/Videos (`-- --drive`, `--demo`, `--at=lake|crossing|alley|tunnel|el|stadium|<viertel>`, `--race=n`, `--trace`, `--shot=pfad`, `--times=…`, `--quit=s`)
 - `tools/short_overlays.gd` – rendert Texttafeln fürs Release-Short

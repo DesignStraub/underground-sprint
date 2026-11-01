@@ -4,7 +4,8 @@ extends Node
 ##   -- --shot=/pfad/pre   speichert Screenshots
 ##   -- --quit=40          beendet nach 40 Sekunden
 ##   -- --demo             klickt sich nach dem Intro durchs Menü (Tuning zeigen, Rennen starten)
-##   -- --at=lake|crossing|alley   setzt das Auto nach dem Start direkt vor die Stelle (Vollgas, keine Lenkung)
+##   -- --at=lake|crossing|alley|tunnel|el|stadium|<viertel>   setzt das Auto nach dem Start direkt vor die Stelle
+##   -- --race=2           wählt die Strecke (Index in Catalog.RACES)
 ##   -- --times=1.5,4,8    Zeitpunkte für Screenshots
 
 const Track := preload("res://scripts/track_builder.gd")
@@ -116,6 +117,16 @@ func _process(dt: float) -> void:
 		var rel: float = pl.progress - race.track["crossing_d"]
 		if rel > -30.0 and rel < 30.0:
 			print("rel=%.1f lat=%.1f y=%.2f vy=%.1f v=%.1f air=%s path=%d train=%s" % [rel, pl.lateral, pl.position.y, pl.vy, pl.speed_fwd, pl.airborne, pl.path_id, race.track["crossing"].train.global_position])
+	if OS.get_cmdline_user_args().has("--trace") and race and "curve" in race and race.player and fmod(_t, 0.1) < dt:
+		var pl = race.player
+		var near := ""
+		for t in race.traffic:
+			if absf(t.progress - pl.progress) < 12.0:
+				near += " T(%.1f,%.1f)" % [t.progress - pl.progress, t.lateral()]
+		print("t=%.1f d=%.1f lat=%.2f v=%.1f path=%d fps=%d%s" % [_t, pl.progress, pl.lateral, pl.speed_fwd, pl.path_id, Engine.get_frames_per_second(), near])
+		for n in get_tree().get_nodes_in_group("ambient"):
+			if "_cars" in n:
+				print("   zug aktiv=%s d=%.0f (%.0f-%.0f) sichtbar=%s y=%.1f" % [n._active, n._d, n.d_from, n.d_to, n._cars[0].visible, n._cars[0].global_position.y])
 	if prefix != "" and _i < times.size() and _t >= times[_i]:
 		get_viewport().get_texture().get_image().save_png("%s_%d.png" % [prefix, _i])
 		_i += 1
@@ -142,6 +153,16 @@ func _place_at(race) -> void:
 			rc._triggered = true
 			rc._t_arrive = rc._clock + 150.0 / 46.0 + 0.15
 			rc._dir = 1.0
+		"tunnel", "el", "stadium":
+			var d := 0.0
+			match at:
+				"tunnel":
+					d = tr["tunnels"][0]["from"] - 90.0
+				"el":
+					d = tr["el"][0]["from"] - 220.0
+				"stadium":
+					d = tr["stadium_d"] - 160.0
+			_drop(race, d)
 		"lake", "alley":
 			for p in tr["paths"]:
 				if p["kind"] == at:
@@ -152,3 +173,20 @@ func _place_at(race) -> void:
 					pl.place(Track.xform_at(p["curve"], d, 0.0))
 					pl.velocity = -pl.global_basis.z * (38.0 if at == "lake" else 22.0)
 					break
+		_:
+			var arr: Array = tr["districts"]
+			var i := arr.find(at)
+			if i >= 0:
+				_drop(race, i * Track.DISTRICT_LEN + 15.0)
+
+
+## Auto bei d auf die Hauptstraße setzen und Verkehr direkt davor wegräumen
+func _drop(race, d: float) -> void:
+	var tr: Dictionary = race.track
+	var pl = race.player
+	_lane = Track.LANES[2]
+	pl.place(Track.xform_at(tr["curve"], d, _lane))
+	pl.velocity = -pl.global_basis.z * 30.0
+	for t in race.traffic:
+		if t.progress > d - 30.0 and t.progress < d + 90.0:
+			t.progress = tr["length"] - 30.0

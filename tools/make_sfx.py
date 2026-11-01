@@ -167,6 +167,65 @@ def clang():
     return x
 
 
+def bandpass(x, fc, q):
+    """Zweipoliger Bandpass (RBJ-Biquad)."""
+    w = 2 * math.pi * fc / SR
+    alpha = math.sin(w) / (2 * q)
+    b0, b2 = alpha, -alpha
+    a0, a1, a2 = 1 + alpha, -2 * math.cos(w), 1 - alpha
+    x1 = x2 = y1 = y2 = 0.0
+    out = []
+    for s in x:
+        y = (b0 * s + b2 * x2 - a1 * y1 - a2 * y2) / a0
+        x2, x1 = x1, s
+        y2, y1 = y1, y
+        out.append(y)
+    return out
+
+
+def tunnel():
+    """Tunnel-Einfahrt: dumpfer Druckstoß + Luftrauschen, das schnell abklingt."""
+    n = secs(1.0)
+    nz = noise(n)
+    fcs = [300 + 1500 * math.exp(-i / SR * 5.0) for i in range(n)]
+    air = lp_var(nz, fcs)
+    low = lp(nz, 90)
+    x = []
+    ph = 0.0
+    for i in range(n):
+        t = i / SR
+        f = 70 - 35 * min(1.0, t / 0.4)
+        ph += 2 * math.pi * f / SR
+        env = min(1.0, t / 0.03) * math.exp(-t * 5.0)
+        s = math.sin(ph) * env * 0.9
+        s += air[i] * 2.2 * min(1.0, t / 0.06) * math.exp(-t * 3.5)
+        s += low[i] * 6.0 * env
+        x.append(s)
+    return x
+
+
+def crowd_loop():
+    """Stadion: Menge aus Vokal-Formanten auf Rauschen, langsam wogend, mit Jubel-Wellen. 4 s nahtlos."""
+    n = secs(4.0)
+    pad = secs(0.3)
+    nz = noise(n + pad)
+    voice = [a + b * 0.7 + c * 0.4 for a, b, c in zip(bandpass(nz, 650, 1.2), bandpass(nz, 1150, 1.6), bandpass(nz, 2500, 2.5))]
+    voice = voice[pad:]
+    murmur = lp(noise(n + pad), 400)[pad:]
+    x = []
+    for i in range(n):
+        t = i / SR
+        # Schwankungen mit Perioden, die in 4 s aufgehen -> nahtlos
+        w = 0.7 + 0.15 * math.sin(2 * math.pi * 0.5 * t) + 0.1 * math.sin(2 * math.pi * 1.25 * t + 1.0)
+        cheer = math.exp(-((t - 1.3) ** 2) / 0.12) * 0.6 + math.exp(-((t - 3.1) ** 2) / 0.2) * 0.4
+        x.append(voice[i] * (w + cheer) + murmur[i] * 2.0)
+    f = secs(0.08)
+    for i in range(f):
+        a = i / f
+        x[i] = x[i] * a + x[n - f + i] * (1 - a)
+    return x[: n - f]
+
+
 if __name__ == "__main__":
     write("horn", horn())
     write("bell", bell_loop(), 0.7)
@@ -175,3 +234,5 @@ if __name__ == "__main__":
     write("whoosh", whoosh(), 0.7)
     write("splash", splash())
     write("clang", clang(), 0.75)
+    write("tunnel", tunnel(), 0.8)
+    write("crowd", crowd_loop(), 0.6)

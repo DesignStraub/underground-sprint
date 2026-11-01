@@ -115,11 +115,11 @@ const PART_ORDER := ["paint", "rims", "spoiler", "bodykit", "vinyl", "neon", "en
 const RACES := [
 	{"name": "Downtown Sprint", "wins": 0, "seed": 11, "segments": 18, "max_turn": 50.0,
 		"bulges": {4: "alley", 11: "lake"},
-		"districts": {"downtown": 0.45, "shops": 0.35, "residential": 0.2}},
+		"districts": {"downtown": 0.35, "chinatown": 0.25, "shops": 0.25, "residential": 0.15}},
 	{"name": "Harbor Run", "wins": 1, "seed": 42, "segments": 24, "max_turn": 65.0,
 		"bulges": {5: "lake", 13: "alley", 19: "alley"},
-		"districts": {"industrial": 0.5, "shops": 0.25, "residential": 0.25}},
+		"districts": {"industrial": 0.45, "chinatown": 0.15, "shops": 0.2, "residential": 0.2}},
 	{"name": "Highway Rush", "wins": 3, "seed": 7, "segments": 30, "max_turn": 30.0,
 		"bulges": {7: "alley", 17: "lake", 24: "alley"},
-		"districts": {"downtown": 0.3, "industrial": 0.3, "residential": 0.4}},
+		"districts": {"highway": 0.4, "downtown": 0.25, "industrial": 0.2, "residential": 0.15}},
 ]

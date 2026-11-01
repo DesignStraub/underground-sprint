@@ -27,6 +27,9 @@ func _ready() -> void:
 	load_game()
 	_init_window()
 	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--race="):
+			race_index = clampi(int(a.substr(7)), 0, Catalog.RACES.size() - 1)
+	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--shot=") or a.begins_with("--at=") or a.begins_with("--quit=") or a in ["--drive", "--demo"]:
 			add_child(preload("res://scripts/debug_shot.gd").new())
 			break
