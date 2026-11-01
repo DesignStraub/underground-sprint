@@ -16,7 +16,7 @@ Alles, was du auf https://itch.io/game/new eintragen musst.
 | Genre | Racing |
 | Tags | racing, street-racing, arcade, 3d, low-poly, retro, nitro, drift, tuning, night |
 | AI generation disclosure | Ja – Code mit KI-Unterstützung erstellt (itch.io fragt das ab) |
-| Cover image | `cover_630x500.png` |
+| Cover image | `cover_1260x1000.png` (oder `cover_630x500.png`) |
 | Screenshots | alle Bilder aus `screenshots/` |
 | Trailer | YouTube-Link zum Short oder Trailer (itch.io nimmt nur YouTube/Vimeo-Links) |
 
