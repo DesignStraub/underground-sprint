@@ -1,6 +1,7 @@
 extends Node
 ## Werkzeug: rendert die Text-Overlays (1080x1920, transparent) und die Endkarte für das Release-Short.
-## Aufruf: Godot --path . res://tools/short_overlays.tscn -- --out=/pfad [--lang=en]
+## Aufruf: Godot --path . res://tools/short_overlays.tscn -- --out=/pfad [--lang=en | --lang=update_en]
+## update_en: Short zum Update (Tunnel, Zug, Viertel) mit Hinweis auf die Browser-Version.
 
 const LOGO := preload("res://assets/one_humanity_logo.svg")
 const GLOW := preload("res://shaders/logo_glow.gdshader")
@@ -17,12 +18,19 @@ const TEXT := {
 	"de": {
 		"shots": [["UNDERGROUND\nSPRINT", "NEU", "Street-Racing bei Nacht"], ["TUNE DEIN\nAUTO", "", "Teile freischalten durch Siege"],
 			["SPRINTS DURCH\nDIE STADT", "", "3 Gegner · Verkehr · Baustellen"], ["NITRO.\nDRIFT. SPEED.", "", "Ein Crash kostet dich das Rennen"]],
-		"free": "JETZT KOSTENLOS", "on": "auf itch.io",
+		"free": "JETZT KOSTENLOS", "on": "auf itch.io", "platforms": "Windows · Mac · Linux",
 	},
 	"en": {
 		"shots": [["UNDERGROUND\nSPRINT", "NEW", "Street racing after dark"], ["TUNE YOUR\nRIDE", "", "Unlock parts by winning races"],
 			["CITY\nSPRINTS", "", "3 rivals · traffic · roadworks"], ["NITRO.\nDRIFT. SPEED.", "", "One crash can cost you the race"]],
-		"free": "OUT NOW · FREE", "on": "on itch.io",
+		"free": "OUT NOW · FREE", "on": "on itch.io", "platforms": "Windows · Mac · Linux",
+	},
+	"update_en": {
+		"shots": [["UNDERGROUND\nSPRINT", "UPDATE", "Street racing after dark"], ["NEON\nTUNNELS", "", "Blast right under the city"],
+			["JUMP THE\nTRAIN", "", "Gates down? Hit the ramp"], ["UNDER THE\nRAILS", "", "Trains thunder overhead"],
+			["6 DISTRICTS", "", "Chinatown · Docks · Highway\nDowntown · Market · Old Town"]],
+		"free": "PLAY FREE", "on": "right in your browser", "url": "onehumanity.itch.io",
+		"platforms": "also on Windows · Mac · Linux",
 	},
 }
 var heavy: SystemFont
@@ -42,9 +50,8 @@ func _ready() -> void:
 	light.font_weight = 600
 
 	var shots: Array = TEXT[lang]["shots"]
-	var cols := [CYAN, PINK, CYAN, PINK]
 	for i in shots.size():
-		await _render(_overlay(shots[i][0], cols[i], shots[i][1], shots[i][2]), "o%d" % (i + 1), true)
+		await _render(_overlay(shots[i][0], CYAN if i % 2 == 0 else PINK, shots[i][1], shots[i][2]), "o%d" % (i + 1), true)
 	await _render(_end_card(), "end", false)
 	get_tree().quit()
 
@@ -78,8 +85,9 @@ func _overlay(title: String, col: Color, tag: String, sub: String) -> Control:
 		sb.bg_color = GREEN
 		sb.set_corner_radius_all(14)
 		pill.add_theme_stylebox_override("panel", sb)
-		pill.position = Vector2(SIZE.x / 2.0 - 80, 230)
-		pill.size = Vector2(160, 66)
+		var pw := maxf(160.0, 40.0 + tag.length() * 34.0)
+		pill.position = Vector2(SIZE.x / 2.0 - pw / 2.0, 230)
+		pill.size = Vector2(pw, 66)
 		root.add_child(pill)
 		var t := _label(root, tag, heavy, 52, Color(0.02, 0.05, 0.02), 232, 0)
 		t.label_settings.shadow_size = 0
@@ -122,8 +130,12 @@ func _end_card() -> Control:
 	root.add_child(logo)
 	_label(root, "UNDERGROUND SPRINT", heavy, 96, Color.WHITE, 880).label_settings.shadow_color = Color(CYAN.r, CYAN.g, CYAN.b, 0.8)
 	_label(root, TEXT[lang]["free"], heavy, 120, GREEN, 1080)
-	_label(root, TEXT[lang]["on"], light, 84, Color.WHITE, 1240)
-	_label(root, "Windows · Mac · Linux", light, 48, Color(0.7, 0.75, 0.85), 1380, 6)
+	_label(root, TEXT[lang]["on"], light, 84 if not TEXT[lang].has("url") else 68, Color.WHITE, 1240)
+	var py := 1380.0
+	if TEXT[lang].has("url"):
+		_label(root, TEXT[lang]["url"], heavy, 76, CYAN, 1360, 8)
+		py = 1500.0
+	_label(root, TEXT[lang]["platforms"], light, 48, Color(0.7, 0.75, 0.85), py, 6)
 	_label(root, "ONE HUMANITY", light, 44, CYAN, 1700, 6)
 	return root
 
