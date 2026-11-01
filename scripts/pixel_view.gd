@@ -31,3 +31,6 @@ func _resize() -> void:
 	var target: float = GameState.PIXEL_MODES[GameState.pixel_mode]["height"]
 	var shrink := maxf(1.0, roundf(px.y / target))
 	world.size = Vector2i(maxi(int(px.x / shrink), 16), maxi(int(px.y / shrink), 16))
+	# Ab "Leicht" Kantenglättung, damit Linien und Kanten scharf statt flimmernd sind
+	world.msaa_3d = Viewport.MSAA_4X if GameState.pixel_mode >= 2 else Viewport.MSAA_DISABLED
+	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST if shrink > 1.0 else CanvasItem.TEXTURE_FILTER_LINEAR

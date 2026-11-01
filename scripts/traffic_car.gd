@@ -1,6 +1,6 @@
 extends CharacterBody3D
 ## Ziviler Verkehr: fährt langsam auf seiner Spur (rechts mit, links Gegenverkehr),
-## weicht Baustellen aus, bremst für den Spieler. Bei einem Crash wird er weggeschleudert.
+## weicht Baustellen aus, bremst für den Spieler und hält am Bahnübergang. Bei einem Crash wird er weggeschleudert.
 
 const Builder := preload("res://scripts/car_builder.gd")
 const Track := preload("res://scripts/track_builder.gd")
@@ -21,6 +21,8 @@ var track_length := 0.0
 var wrecked := false
 var player_progress := 0.0
 var player_lateral := 100.0
+var player_path := 0
+var crossing: Node
 var _lane_cur := 2.25
 var _wreck_vel := Vector3.ZERO
 var _wreck_spin := 0.0
@@ -101,8 +103,13 @@ func _physics_process(dt: float) -> void:
 	# Spieler direkt vor mir? Bremsen.
 	var target := base_speed
 	var ahead := (player_progress - progress) * dir
-	if absf(player_lateral - _lane_cur) < 2.6 and ahead > 0.0 and ahead < length / 2.0 + 12.0:
+	if player_path == 0 and absf(player_lateral - _lane_cur) < 2.6 and ahead > 0.0 and ahead < length / 2.0 + 12.0:
 		target = 0.0
+	# Schranken unten? Vor der Haltelinie stehen bleiben.
+	if crossing and crossing.is_blocked():
+		var stop: float = (crossing.d_cross - 12.0 - progress) if dir > 0.0 else (progress - crossing.d_cross - 12.0)
+		if stop > -2.0 and stop < 140.0:
+			target = minf(target, sqrt(2.0 * 7.0 * maxf(stop, 0.0)))
 	speed = move_toward(speed, target, dt * (4.0 if target > speed else 10.0))
 	progress += speed * dt * dir
 	# Am Streckenende neu einsetzen (außer Sicht)

@@ -6,13 +6,14 @@ const SAVE_PATH := "user://save.json"
 ## Pixel-Look: Höhe der 3D-Auflösung, auf die heruntergerechnet wird
 const PIXEL_MODES := [
 	{"name": "Stark", "height": 360.0},
-	{"name": "Leicht", "height": 540.0},
+	{"name": "Mittel", "height": 540.0},
+	{"name": "Leicht", "height": 720.0},
 	{"name": "Aus", "height": 100000.0},
 ]
 
 signal graphics_changed
 
-var pixel_mode := 1
+var pixel_mode := 2
 
 var wins := 0
 var current_car := "kaizen"
@@ -26,7 +27,7 @@ func _ready() -> void:
 	load_game()
 	_init_window()
 	for a in OS.get_cmdline_user_args():
-		if a.begins_with("--shot=") or a in ["--drive", "--demo"]:
+		if a.begins_with("--shot=") or a.begins_with("--at=") or a.begins_with("--quit=") or a in ["--drive", "--demo"]:
 			add_child(preload("res://scripts/debug_shot.gd").new())
 			break
 
@@ -156,7 +157,7 @@ func save_game() -> void:
 		return
 	f.store_string(JSON.stringify({
 		"wins": wins, "current_car": current_car, "race_index": race_index,
-		"best_times": best_times, "car_configs": car_configs, "pixel_mode": pixel_mode,
+		"best_times": best_times, "car_configs": car_configs, "pixel_mode_v2": pixel_mode,
 	}, "\t"))
 
 
@@ -172,7 +173,7 @@ func load_game() -> void:
 		current_car = "kaizen"
 	race_index = clampi(int(data.get("race_index", 0)), 0, Catalog.RACES.size() - 1)
 	best_times = data.get("best_times", {})
-	pixel_mode = clampi(int(data.get("pixel_mode", 1)), 0, PIXEL_MODES.size() - 1)
+	pixel_mode = clampi(int(data.get("pixel_mode_v2", 2)), 0, PIXEL_MODES.size() - 1)
 	car_configs = {}
 	var cc: Dictionary = data.get("car_configs", {})
 	for car_id in cc:

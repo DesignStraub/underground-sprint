@@ -9,6 +9,7 @@ const SPEED_FX := preload("res://shaders/speed_fx.gdshader")
 const TACHO := preload("res://scripts/tacho.gd")
 const PixelView := preload("res://scripts/pixel_view.gd")
 const Traffic := preload("res://scripts/traffic_car.gd")
+const SKY_SHADER := preload("res://shaders/night_sky.gdshader")
 
 enum State { COUNTDOWN, RACING, FINISHED }
 
@@ -28,6 +29,9 @@ var finish_order: Array = []  # "player" oder AI-Knoten in Zielreihenfolge
 var fx_mat: ShaderMaterial
 var hud := {}
 var result_panel: Control
+var _last_path := 0
+var _last_landings := 0
+var _flash_t := 0.0
 var pause_panel: Control
 
 
@@ -52,7 +56,7 @@ func _ready() -> void:
 	var car_id := GameState.current_car
 	player = PlayerCar.new()
 	player.process_mode = Node.PROCESS_MODE_PAUSABLE
-	player.curve = curve
+	player.track = track
 	world.add_child(player)
 	player.setup(car_id, GameState.get_config(car_id))
 	player.place(Track.xform_at(curve, track["start"], Track.LANES[2]))
@@ -69,16 +73,17 @@ func _ready() -> void:
 			cfg[cat] = rng.randi() % Catalog.PARTS[cat]["options"].size()
 		var ai := AICar.new()
 		ai.process_mode = Node.PROCESS_MODE_PAUSABLE
-		ai.curve = curve
 		ai.player = player
 		ai.finish = track["finish"]
 		ai.traffic = traffic
-		ai.blocks = track["blocks"]
+		ai.crossing = track["crossing"]
 		world.add_child(ai)
 		var top: float = Catalog.CARS[id]["top_speed"] * (0.95 + 0.03 * i)
-		ai.setup(id, cfg, track["start"] + (i - 1) * 4.0, lanes[i], top, difficulty + rng.randf_range(-0.03, 0.03))
+		ai.setup(track, id, cfg, track["start"] + (i - 1) * 4.0, lanes[i], top, difficulty + rng.randf_range(-0.03, 0.03))
 		ais.append(ai)
 
+	if track["crossing"]:
+		track["crossing"].player = player
 	_spawn_traffic()
 	_build_hud()
 
@@ -90,7 +95,7 @@ func _spawn_traffic() -> void:
 	var d: float = track["start"] + 160.0
 	while d < track["length"] - 30.0:
 		var lane: float = Track.LANES[rng.randi() % 4]
-		var blocked := false
+		var blocked: bool = track["crossing_d"] > 0.0 and absf(d - track["crossing_d"]) < 40.0
 		for b in track["blocks"]:
 			if absf(b["lane"] - lane) < 1.0 and d > b["from"] - 20.0 and d < b["to"] + 20.0:
 				blocked = true
@@ -105,6 +110,7 @@ func _spawn_traffic() -> void:
 			t.base_speed = rng.randf_range(10.0, 16.0)
 			t.speed = t.base_speed
 			t.track_length = track["length"]
+			t.crossing = track["crossing"]
 			world.add_child(t)
 			t.setup(Traffic.KINDS[rng.randi() % Traffic.KINDS.size()], rng)
 			traffic.append(t)
@@ -113,8 +119,12 @@ func _spawn_traffic() -> void:
 
 func _setup_environment() -> void:
 	var env := Environment.new()
-	env.background_mode = Environment.BG_COLOR
-	env.background_color = Color(0.02, 0.02, 0.05)
+	var sky_mat := ShaderMaterial.new()
+	sky_mat.shader = SKY_SHADER
+	var sky := Sky.new()
+	sky.sky_material = sky_mat
+	env.background_mode = Environment.BG_SKY
+	env.sky = sky
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	env.ambient_light_color = Color(0.25, 0.25, 0.4)
 	env.ambient_light_energy = 0.35
@@ -125,9 +135,13 @@ func _setup_environment() -> void:
 	env.glow_hdr_threshold = 0.9
 	env.fog_enabled = true
 	env.fog_light_color = Color(0.09, 0.07, 0.16)
-	env.fog_density = 0.0055
+	env.fog_density = 0.0045
+	env.fog_sky_affect = 0.15
 	env.ssr_enabled = true
 	env.ssr_max_steps = 48
+	env.ssao_enabled = true
+	env.ssao_radius = 1.5
+	env.ssao_intensity = 1.6
 	var we := WorldEnvironment.new()
 	we.environment = env
 	world.add_child(we)
@@ -214,13 +228,25 @@ func _build_hud() -> void:
 	hud["progress"] = _bar(root, Vector2(220, 10), Vector2(200, 6), Color(0.9, 0.9, 1.0))
 
 	hud["center"] = _label(root, 64, HORIZONTAL_ALIGNMENT_CENTER)
-	hud["center"].set_anchors_preset(Control.PRESET_CENTER)
-	hud["center"].position = Vector2(-200, -80)
-	hud["center"].size = Vector2(400, 90)
+	hud["center"].anchor_left = 0.5
+	hud["center"].anchor_right = 0.5
+	hud["center"].anchor_top = 0.5
+	hud["center"].anchor_bottom = 0.5
+	hud["center"].offset_left = -200
+	hud["center"].offset_right = 200
+	hud["center"].offset_top = -90
+	hud["center"].offset_bottom = 0
 
 	hud["drift"] = _label(root, 14, HORIZONTAL_ALIGNMENT_CENTER)
 	hud["drift"].position = Vector2(220, 300)
 	hud["drift"].size = Vector2(200, 20)
+	hud["flash"] = _label(root, 22, HORIZONTAL_ALIGNMENT_CENTER)
+	hud["flash"].anchor_left = 0.5
+	hud["flash"].anchor_right = 0.5
+	hud["flash"].offset_left = -180
+	hud["flash"].offset_right = 180
+	hud["flash"].offset_top = 44
+	hud["flash"].offset_bottom = 74
 
 	_build_pause(root)
 
@@ -251,12 +277,14 @@ func _process(dt: float) -> void:
 	for ai in ais:
 		ai.player_progress = player_progress
 		ai.player_lateral = player.lateral
+		ai.player_path = player.path_id
 		if ai.progress >= track["finish"] and ai.finish_time < 0.0:
 			ai.finish_time = race_time
 			finish_order.append(ai)
 	for t in traffic:
 		t.player_progress = player_progress
 		t.player_lateral = player.lateral
+		t.player_path = player.path_id
 	if state == State.RACING and player_progress >= track["finish"]:
 		_on_player_finished()
 
@@ -288,18 +316,32 @@ func _update_hud() -> void:
 	tacho.nitro = player.nitro
 	tacho.nitro_on = player.nitro_on
 	hud["progress"].size.x = 198.0 * clampf((player_progress - track["start"]) / (track["finish"] - track["start"]), 0.0, 1.0)
-	hud["drift"].text = "DRIFT  +NOS" if player.drifting else ""
+	hud["drift"].text = "DRIFT  +NOS" if player.drifting else ("AIR" if player.airborne else "")
+	# Kurze Einblendungen: Abkürzung, Sprungweite, Kamera
+	if player.path_id != _last_path:
+		var kind: String = track["paths"][player.path_id]["kind"]
+		if kind == "alley" or kind == "lake":
+			_flash("ABKÜRZUNG!", Color(1.0, 0.6, 0.1))
+		_last_path = player.path_id
+	if player.landings != _last_landings:
+		_last_landings = player.landings
+		if player.last_air > 0.5:
+			_flash("AIR  %.1f s" % player.last_air, Color(0.4, 0.85, 1.0))
+	if _flash_t > 0.0:
+		_flash_t -= get_process_delta_time()
+		hud["flash"].modulate.a = clampf(_flash_t / 0.4, 0.0, 1.0)
 	hud["music"].text = ("Musik: " + Music.current_title) if Music.current_title != "" else "Keine Musik: mp3/ogg in den Ordner music/ legen"
 
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("camera"):
 		player.toggle_camera()
+		_flash("Kamera: " + player.CAM_NAMES[player.cam_mode], Color(0.85, 0.9, 1.0))
 	elif event.is_action_pressed("reset_car") and state == State.RACING:
-		var d := curve.get_closest_offset(player.global_position)
-		var f := Track.frame_at(curve, d)
-		var lat: float = (player.global_position - f["pos"]).dot(f["right"])
-		player.place(Track.xform_at(curve, d, clampf(lat, -6.0, 6.0)))
+		var loc := Track.locate(track, player.global_position)
+		var p: Dictionary = loc["path"]
+		var half: float = p["half_w"] - 2.0
+		player.place(Track.xform_at(p["curve"], loc["d"], clampf(loc["lat"], -half, half)))
 	elif event.is_action_pressed("pause") and state != State.FINISHED:
 		_toggle_pause()
 
@@ -395,3 +437,10 @@ func _unpause() -> void:
 func _fmt(t: float) -> String:
 	return "%d:%05.2f" % [int(t) / 60, fmod(t, 60.0)]
 
+
+
+func _flash(text: String, col: Color) -> void:
+	hud["flash"].text = text
+	hud["flash"].label_settings.font_color = col
+	hud["flash"].modulate.a = 1.0
+	_flash_t = 1.6

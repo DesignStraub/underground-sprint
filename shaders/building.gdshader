@@ -1,14 +1,23 @@
 shader_type spatial;
-// Hochhaus mit zufällig beleuchteten Fenstern (Weltkoordinaten, daher beliebig skalierbar).
+// Fassaden in mehreren Stilen, alles in Weltkoordinaten (beliebig skalierbar).
+// style: 0 Raster, 1 Bandfenster (Büro), 2 Halle/Industrie, 3 Glasturm, 4 Backstein-Wohnhaus
 
 instance uniform float seed = 0.0;
 instance uniform vec3 tint = vec3(0.08, 0.08, 0.1);
 instance uniform float shop_glass = 1.0;
 instance uniform float window_light = 1.0;
+instance uniform float style = 0.0;
+instance uniform float lit_chance = 0.4;
 varying vec3 wpos;
 varying vec3 wnorm;
 
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float noise(vec2 p) {
+	vec2 i = floor(p);
+	vec2 f = fract(p);
+	f = f * f * (3.0 - 2.0 * f);
+	return mix(mix(hash(i), hash(i + vec2(1, 0)), f.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), f.x), f.y);
+}
 
 void vertex() {
 	wpos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
@@ -18,13 +27,56 @@ void vertex() {
 void fragment() {
 	float u = abs(wnorm.x) > abs(wnorm.z) ? wpos.z : wpos.x;
 	float wall = 1.0 - step(0.9, abs(wnorm.y));
-	// Obergeschosse: Fensterraster ab 4,2 m
-	vec2 cell = vec2(u / 3.2, (wpos.y - 4.2) / 3.6);
-	vec2 f = fract(cell);
-	float win = step(0.18, f.x) * step(f.x, 0.82) * step(0.25, f.y) * step(f.y, 0.8);
-	win *= wall * step(0.0, cell.y);
-	float lit = step(0.6, hash(floor(cell) + seed * 13.7));
-	vec3 wcol = mix(vec3(1.0, 0.72, 0.38), vec3(0.55, 0.75, 1.0), step(0.6, hash(floor(cell) * 1.31 + seed)));
+	float y = wpos.y - 4.2;
+	int st = int(style + 0.5);
+	float win = 0.0;
+	float lit = 0.0;
+	vec2 cid = vec2(0.0);
+	vec3 albedo = tint;
+	float metal = 0.0;
+	if (st == 1) {
+		float fy = fract(y / 3.4);
+		win = step(0.28, fy) * step(fy, 0.82) * step(0.07, fract(u / 1.6));
+		cid = vec2(floor(u / 6.4), floor(y / 3.4));
+		lit = step(1.0 - lit_chance, hash(cid + seed));
+	} else if (st == 2) {
+		vec2 f = fract(vec2(u / 6.0, y / 4.5));
+		win = step(0.32, f.x) * step(f.x, 0.68) * step(0.55, f.y) * step(f.y, 0.82);
+		cid = floor(vec2(u / 6.0, y / 4.5));
+		lit = step(1.0 - lit_chance * 0.6, hash(cid + seed));
+		albedo *= 0.8 + 0.2 * step(0.5, fract(u * 1.3));
+	} else if (st == 3) {
+		float fy = fract(y / 3.6);
+		win = step(0.06, fract(u / 1.5)) * step(0.1, fy);
+		cid = vec2(floor(u / 9.0), floor(y / 3.6));
+		lit = step(1.0 - lit_chance * 0.8, hash(cid + seed));
+		metal = 0.6;
+	} else if (st == 4) {
+		vec2 f = fract(vec2(u / 3.0, y / 3.2));
+		win = step(0.3, f.x) * step(f.x, 0.7) * step(0.22, f.y) * step(f.y, 0.75);
+		cid = floor(vec2(u / 3.0, y / 3.2));
+		lit = step(1.0 - lit_chance * 1.2, hash(cid + seed));
+		vec2 b = vec2(u * 4.0 + step(0.5, fract(wpos.y * 2.5)) * 0.5, wpos.y * 2.5);
+		float mortar = clamp(step(0.92, fract(b.x)) + step(0.86, fract(b.y)), 0.0, 1.0);
+		albedo = mix(tint * (0.85 + 0.3 * hash(floor(b) + seed)), tint * 0.45, mortar);
+		// Fensterbänke
+		float sill = step(0.18, f.y) * step(f.y, 0.22) * step(0.27, f.x) * step(f.x, 0.73);
+		albedo = mix(albedo, vec3(0.35), sill * wall);
+	} else {
+		vec2 f = fract(vec2(u / 3.2, y / 3.6));
+		win = step(0.18, f.x) * step(f.x, 0.82) * step(0.25, f.y) * step(f.y, 0.8);
+		cid = floor(vec2(u / 3.2, y / 3.6));
+		lit = step(1.0 - lit_chance, hash(cid + seed));
+	}
+	win *= wall * step(0.0, y);
+	// Fassade nicht ganz gleichmäßig (Flecken, Alterung), Geschossdecken leicht abgesetzt
+	albedo *= 0.75 + 0.5 * noise(vec2(u * 0.12, wpos.y * 0.08) + seed);
+	if (st == 0 || st == 4) {
+		albedo *= 1.0 - 0.25 * step(0.95, fract(y / 3.6)) * wall * step(0.0, y);
+	}
+
+	vec3 wcol = mix(vec3(1.0, 0.72, 0.38), vec3(0.55, 0.75, 1.0), step(0.62, hash(cid * 1.31 + seed)));
+	wcol *= 0.55 + 0.7 * hash(cid * 2.7 + seed);
 	// Erdgeschoss: große Schaufenster, meist beleuchtet, bunt
 	float shop_cell = floor(u / 6.0);
 	float sf = fract(u / 6.0);
@@ -32,9 +84,16 @@ void fragment() {
 	float shop_lit = step(0.2, hash(vec2(shop_cell, seed)));
 	float hue = hash(vec2(shop_cell * 3.1, seed + 1.0));
 	vec3 scol = hue < 0.5 ? vec3(1.0, 0.85, 0.6) : (hue < 0.7 ? vec3(0.6, 0.9, 1.0) : (hue < 0.85 ? vec3(1.0, 0.4, 0.7) : vec3(0.6, 1.0, 0.6)));
+	// Auslage: dunkle Regale im Schaufenster
+	float shelf = step(0.5, fract(wpos.y * 1.6)) * step(0.3, fract(u * 0.9));
 	float glass = max(win, shop);
-	ALBEDO = mix(tint, vec3(0.02, 0.025, 0.03), glass);
-	ROUGHNESS = mix(0.85, 0.1, glass);
-	METALLIC = glass * 0.5;
-	EMISSION = wcol * win * lit * 1.8 * window_light + scol * shop * shop_lit * 0.8;
+	vec3 glass_col = st == 3 ? vec3(0.02, 0.04, 0.07) : vec3(0.02, 0.025, 0.03);
+	vec3 col = mix(albedo, glass_col, glass);
+	// Dach: dunkler Kies
+	float roof = 1.0 - wall;
+	col = mix(col, vec3(0.05) * (0.6 + 0.8 * noise(wpos.xz * 0.6)), roof);
+	ALBEDO = col;
+	ROUGHNESS = mix(0.85, st == 3 ? 0.05 : 0.12, glass);
+	METALLIC = glass * 0.5 + metal * glass;
+	EMISSION = wcol * win * lit * 1.8 * window_light + scol * shop * shop_lit * (0.55 + 0.35 * shelf);
 }

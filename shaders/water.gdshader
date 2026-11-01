@@ -1,0 +1,22 @@
+shader_type spatial;
+// See bei Nacht: dunkel, spiegelnd, leichte Wellen.
+
+uniform vec3 deep : source_color = vec3(0.01, 0.025, 0.04);
+varying vec3 wpos;
+
+void vertex() {
+	wpos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+}
+
+void fragment() {
+	vec2 p = wpos.xz;
+	float t = TIME;
+	vec2 n = vec2(sin(p.x * 0.9 + t * 1.3) + 0.6 * sin(p.y * 1.7 - t * 0.9 + p.x * 0.3),
+		cos(p.y * 0.8 + t * 1.1) + 0.5 * cos(p.x * 1.9 + t * 0.7)) * 0.05;
+	vec3 wn = normalize(vec3(n.x, 1.0, n.y));
+	NORMAL = normalize((VIEW_MATRIX * vec4(wn, 0.0)).xyz);
+	ALBEDO = deep;
+	ROUGHNESS = 0.03;
+	METALLIC = 0.1;
+	SPECULAR = 0.9;
+}

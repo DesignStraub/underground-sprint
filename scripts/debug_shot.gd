@@ -4,6 +4,8 @@ extends Node
 ##   -- --shot=/pfad/pre   speichert Screenshots
 ##   -- --quit=40          beendet nach 40 Sekunden
 ##   -- --demo             klickt sich nach dem Intro durchs Menü (Tuning zeigen, Rennen starten)
+##   -- --at=lake|crossing|alley   setzt das Auto nach dem Start direkt vor die Stelle (Vollgas, keine Lenkung)
+##   -- --times=1.5,4,8    Zeitpunkte für Screenshots
 
 const Track := preload("res://scripts/track_builder.gd")
 
@@ -15,6 +17,9 @@ var _t := 0.0
 var _i := 0
 var _lane := Track.LANES[2]
 var demo := false
+var at := ""
+var lock_lane := false
+var _placed := false
 ## Zeitpunkt (Sekunden seit Start) -> Menü-Eingabe
 const DEMO_STEPS := [[5.4, "ui_down"], [6.0, "ui_accept"], [6.9, "ui_right"], [7.6, "ui_right"],
 	[8.3, "ui_down"], [8.8, "ui_right"], [9.5, "ui_right"], [10.2, "ui_down"], [10.7, "ui_right"],
@@ -34,6 +39,13 @@ func _ready() -> void:
 			drive = true
 		elif a.begins_with("--quit="):
 			quit_after = float(a.substr(7))
+		elif a.begins_with("--at="):
+			at = a.substr(5)
+			drive = true
+		elif a.begins_with("--times="):
+			times = []
+			for t in a.substr(8).split(","):
+				times.append(float(t))
 
 
 func _lane_free(race, lat: float, from: float, to: float) -> bool:
@@ -58,10 +70,16 @@ func _process(dt: float) -> void:
 			Input.parse_input_event(ev)
 		_step += 1
 	var race = get_tree().current_scene
-	if drive and race and "curve" in race and race.player:
+	if at != "" and race and "curve" in race and race.player:
+		if not _placed and race.state == 1:
+			_placed = true
+			_place_at(race)
+	if drive and race and "curve" in race and race.player and not race.player.loc.is_empty():
 		var pl = race.player
+		var p: Dictionary = race.track["paths"][pl.path_id]
+		var on_main: bool = p["id"] == 0
 		var look: float = 25.0 + absf(pl.speed_fwd) * 1.6
-		if not _lane_free(race, _lane, -3.0, look):
+		if on_main and not lock_lane and not _lane_free(race, _lane, -3.0, look):
 			var best: float = _lane
 			var cost := 1e9
 			for l in Track.LANES:
@@ -69,27 +87,35 @@ func _process(dt: float) -> void:
 					cost = absf(l - pl.lateral)
 					best = l
 			_lane = best
-		var d: float = pl.progress + 18.0 + absf(pl.speed_fwd) * 0.35
-		var f := Track.frame_at(race.curve, d)
-		var tgt: Vector3 = f["pos"] + f["right"] * _lane
+		var dl: float = pl.loc["d"] + 14.0 + absf(pl.speed_fwd) * 0.3
+		var f := Track.frame_at(p["curve"], dl)
+		var tgt: Vector3 = f["pos"] + f["right"] * (_lane if on_main else 0.0)
 		var side: float = (tgt - pl.global_position).dot(pl.global_basis.x)
 		Input.action_release("steer_left")
 		Input.action_release("steer_right")
-		if absf(side) > 0.3:
-			Input.action_press("steer_right" if side > 0.0 else "steer_left", clampf(absf(side) / 3.0, 0.0, 1.0))
+		if absf(side) > 0.2:
+			Input.action_press("steer_right" if side > 0.0 else "steer_left", clampf(absf(side) / 2.5, 0.0, 1.0))
 		# Vor engen Kurven vom Gas
-		var f0 := Track.frame_at(race.curve, pl.progress)
-		var f1 := Track.frame_at(race.curve, pl.progress + 30.0 + absf(pl.speed_fwd))
+		var f0 := Track.frame_at(p["curve"], pl.loc["d"])
+		var f1 := Track.frame_at(p["curve"], pl.loc["d"] + 30.0 + absf(pl.speed_fwd))
 		var bend: float = (f0["fwd"] as Vector3).angle_to(f1["fwd"])
-		var too_fast: bool = bend > 0.5 and pl.speed_fwd > 38.0
-		if too_fast:
+		var limit := 38.0 if on_main else 30.0
+		if p["kind"] == "lake":
+			limit = 40.0
+			bend = 0.0
+		if bend > 0.5 and pl.speed_fwd > limit:
 			Input.action_release("accelerate")
 		else:
 			Input.action_press("accelerate")
-		if bend < 0.15 and pl.nitro > 0.3 and pl.speed_fwd > 20.0 and _lane_free(race, _lane, 0.0, 80.0):
+		if bend < 0.15 and pl.nitro > 0.3 and pl.speed_fwd > 20.0 and (not on_main or _lane_free(race, _lane, 0.0, 80.0)):
 			Input.action_press("nitro")
 		else:
 			Input.action_release("nitro")
+	if OS.get_cmdline_user_args().has("--log") and race and "curve" in race and race.player and race.track["crossing_d"] > 0.0:
+		var pl = race.player
+		var rel: float = pl.progress - race.track["crossing_d"]
+		if rel > -30.0 and rel < 30.0:
+			print("rel=%.1f lat=%.1f y=%.2f vy=%.1f v=%.1f air=%s path=%d train=%s" % [rel, pl.lateral, pl.position.y, pl.vy, pl.speed_fwd, pl.airborne, pl.path_id, race.track["crossing"].train.global_position])
 	if prefix != "" and _i < times.size() and _t >= times[_i]:
 		get_viewport().get_texture().get_image().save_png("%s_%d.png" % [prefix, _i])
 		_i += 1
@@ -97,3 +123,32 @@ func _process(dt: float) -> void:
 			get_tree().quit()
 	if quit_after > 0.0 and _t >= quit_after:
 		get_tree().quit()
+
+
+func _place_at(race) -> void:
+	var tr: Dictionary = race.track
+	var pl = race.player
+	match at:
+		"crossing":
+			var d: float = tr["crossing_d"] - 150.0
+			_lane = Track.LANES[3]
+			lock_lane = true
+			pl.place(Track.xform_at(tr["curve"], d, Track.LANES[3]))
+			pl.velocity = -pl.global_basis.z * 44.0
+			for t in race.traffic:
+				if absf(t.progress - tr["crossing_d"]) < 400.0:
+					t.progress = tr["length"] - 30.0
+			var rc = tr["crossing"]
+			rc._triggered = true
+			rc._t_arrive = rc._clock + 150.0 / 46.0 + 0.15
+			rc._dir = 1.0
+		"lake", "alley":
+			for p in tr["paths"]:
+				if p["kind"] == at:
+					var d := 30.0
+					for r in tr["ramps"]:
+						if r["path"] == p["id"]:
+							d = r["d0"] - 12.0
+					pl.place(Track.xform_at(p["curve"], d, 0.0))
+					pl.velocity = -pl.global_basis.z * (38.0 if at == "lake" else 22.0)
+					break

@@ -1,5 +1,10 @@
 shader_type spatial;
-// Nasser Asphalt mit Fahrbahnmarkierung. UV.x = quer (0..1), UV.y = Meter in Fahrtrichtung.
+// Nasser Asphalt (oder Kopfsteinpflaster) mit Markierungen, Gullydeckeln und Flickstellen.
+// UV.x = quer (0..1), UV.y = Meter in Fahrtrichtung.
+
+instance uniform float lanes = 4.0;  // 4 Hauptstraße, 2 Seitenstraße, 0 ohne Markierung
+instance uniform float road_w = 18.0;
+instance uniform float cobble = 0.0;
 
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float noise(vec2 p) {
@@ -12,19 +17,44 @@ float noise(vec2 p) {
 void fragment() {
 	float x = UV.x;
 	float y = UV.y;
-	float lw = 0.007;
-	float white = step(abs(x - 0.03), lw) + step(abs(x - 0.97), lw);
-	float dash = step(fract(y / 9.0), 0.45);
-	white += (step(abs(x - 0.25), lw) + step(abs(x - 0.75), lw)) * dash;
-	float yellow = step(abs(x - 0.488), lw * 0.7) + step(abs(x - 0.512), lw * 0.7);
-	float n = noise(vec2(x * 40.0, y * 0.5)) * 0.5 + noise(vec2(x * 120.0, y * 2.0)) * 0.5;
-	float puddle = smoothstep(0.55, 0.72, noise(vec2(x * 7.0, y * 0.12)));
+	float xm = x * road_w;  // quer in Metern
+	float lw = 0.14 / road_w;
+	float white = 0.0;
+	float yellow = 0.0;
+	if (lanes > 3.0) {
+		white = step(abs(x - 0.03), lw) + step(abs(x - 0.97), lw);
+		float dash = step(fract(y / 9.0), 0.45);
+		white += (step(abs(x - 0.25), lw) + step(abs(x - 0.75), lw)) * dash;
+		yellow = step(abs(x - 0.488), lw * 0.7) + step(abs(x - 0.512), lw * 0.7);
+	} else if (lanes > 1.0) {
+		white = step(abs(x - 0.05), lw) + step(abs(x - 0.95), lw);
+		white += step(abs(x - 0.5), lw) * step(fract(y / 6.0), 0.5);
+	}
+	float n = noise(vec2(xm * 2.2, y * 0.5)) * 0.5 + noise(vec2(xm * 6.6, y * 2.0)) * 0.5;
+	float puddle = smoothstep(0.55, 0.72, noise(vec2(xm * 0.39, y * 0.12)));
 	vec3 col = vec3(0.055, 0.055, 0.065) * (0.7 + 0.6 * n);
+	// Flickstellen
+	vec2 pc = vec2(floor(y / 14.0), floor(xm / 4.5));
+	float patch = step(0.82, hash(pc + 3.1)) * step(0.1, fract(y / 14.0)) * step(fract(y / 14.0), 0.6);
+	col *= mix(1.0, 0.7, patch);
+	// Gullydeckel
+	float mc = floor(y / 31.0);
+	vec2 mpos = vec2(2.0 + hash(vec2(mc, 1.0)) * (road_w - 4.0), mc * 31.0 + 10.0);
+	float md = length(vec2(xm, y) - mpos);
+	float manhole = 1.0 - step(0.45, md);
+	float ring = manhole * (step(0.36, md) + step(0.5, fract((xm + y) * 4.0)) * 0.4);
+	col = mix(col, vec3(0.09, 0.085, 0.08) * (0.8 + ring), manhole);
+	if (cobble > 0.5) {
+		vec2 b = vec2(xm * 3.2 + step(0.5, fract(y * 2.2)) * 0.5, y * 2.2);
+		float grout = clamp(step(0.88, fract(b.x)) + step(0.84, fract(b.y)), 0.0, 1.0);
+		col = mix(vec3(0.09, 0.085, 0.08) * (0.7 + 0.6 * hash(floor(b))), vec3(0.025), grout);
+		puddle *= 0.6;
+	}
 	col = mix(col, vec3(0.85), clamp(white, 0.0, 1.0));
 	col = mix(col, vec3(0.9, 0.65, 0.1), clamp(yellow, 0.0, 1.0));
 	col *= mix(1.0, 0.6, puddle);
 	ALBEDO = col;
-	ROUGHNESS = mix(0.5, 0.04, puddle);
-	METALLIC = 0.15;
+	ROUGHNESS = mix(0.5, 0.04, puddle) * (1.0 - manhole * 0.3);
+	METALLIC = 0.15 + manhole * 0.4;
 	SPECULAR = 0.7;
 }

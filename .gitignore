@@ -6,3 +6,4 @@ override.cfg
 builds/
 release/*.zip
 *.mp4
+.DS_Store
