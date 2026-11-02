@@ -16,6 +16,9 @@ void fragment() {
 	vec3 wn = normalize(vec3(n.x, 1.0, n.y));
 	NORMAL = normalize((VIEW_MATRIX * vec4(wn, 0.0)).xyz);
 	ALBEDO = deep;
+	// Mondglitzern und gespiegelte Lichter: kleine, wandernde Funken (Fluss und See sind nachts sonst nur schwarz)
+	float g = sin(p.x * 3.1 + t * 2.3 + sin(p.y * 1.7 + t)) * sin(p.y * 2.7 - t * 1.9 + cos(p.x * 1.3));
+	EMISSION = vec3(0.55, 0.62, 0.8) * pow(max(g, 0.0), 12.0) * 0.9 + vec3(0.01, 0.02, 0.035);
 	ROUGHNESS = 0.03;
 	METALLIC = 0.1;
 	SPECULAR = 0.9;

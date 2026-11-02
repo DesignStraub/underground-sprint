@@ -1,6 +1,7 @@
 shader_type spatial;
 // Fassaden in mehreren Stilen, alles in Weltkoordinaten (beliebig skalierbar).
-// style: 0 Raster, 1 Bandfenster (Büro), 2 Halle/Industrie, 3 Glasturm, 4 Backstein-Wohnhaus
+// style: 0 Raster, 1 Bandfenster (Büro), 2 Halle/Industrie, 3 Glasturm, 4 Backstein-Wohnhaus,
+// 5 Fachwerk, 6 Putzfassade (Altbau, Barock), 7 Ziegeldach (geneigte Dachflächen, keine Fenster)
 // Die Häuser einer Gegend sind ein gemeinsames Mesh; die Werte je Haus stehen in den Vertexdaten
 // (COLOR = Farbton + Anteil beleuchteter Fenster, UV2 = Seed, Stil + 10 * Schaufenster).
 
@@ -69,6 +70,41 @@ void fragment() {
 		// Fensterbänke
 		float sill = step(0.18, f.y) * step(f.y, 0.22) * step(0.27, f.x) * step(f.x, 0.73);
 		albedo = mix(albedo, vec3(0.35), sill * wall);
+	} else if (st == 5) {
+		// Fachwerk: dunkle Balken auf hellem Putz, Erdgeschoss aus Sandstein
+		float fl = 3.0;
+		vec2 f = fract(vec2(u / 1.5, wpos.y / fl));
+		vec2 c = floor(vec2(u / 1.5, wpos.y / fl));
+		float h1 = hash(c + seed);
+		float upper = step(3.0, wpos.y);
+		float beam = step(f.x, 0.11) + step(f.y, 0.07) + step(0.93, f.y) + step(0.44, f.y) * step(f.y, 0.5);
+		bool window = h1 > 0.45;
+		float diag = h1 < 0.3 ? step(abs(f.x - f.y), 0.07) : (h1 < 0.45 ? step(abs(1.0 - f.x - f.y), 0.07) : 0.0);
+		beam = clamp(beam + diag, 0.0, 1.0) * upper;
+		win = window ? step(0.25, f.x) * step(f.x, 0.8) * step(0.52, f.y) * step(f.y, 0.88) * upper : 0.0;
+		beam *= 1.0 - win;
+		cid = c;
+		lit = step(1.0 - lit_chance * 1.3, hash(cid + seed * 1.7));
+		vec3 stone = vec3(0.32, 0.26, 0.2) * (0.85 + 0.3 * hash(floor(vec2(u * 2.0, wpos.y * 3.0)) + seed));
+		albedo = mix(stone, mix(tint, vec3(0.09, 0.05, 0.03), beam), upper);
+	} else if (st == 6) {
+		// Putzfassade mit Fenstergewänden, Gesimsen und gequadertem Sockel
+		vec2 f = fract(vec2(u / 2.8, y / 3.5));
+		cid = floor(vec2(u / 2.8, y / 3.5));
+		win = step(0.3, f.x) * step(f.x, 0.7) * step(0.2, f.y) * step(f.y, 0.78);
+		float frame = step(0.25, f.x) * step(f.x, 0.75) * step(0.14, f.y) * step(f.y, 0.84) * (1.0 - win);
+		lit = step(1.0 - lit_chance * 1.2, hash(cid + seed));
+		albedo = mix(tint, tint * 1.35 + vec3(0.04), frame);
+		float cornice = step(0.95, fract(y / 3.5)) * step(0.0, y);
+		albedo = mix(albedo, tint * 0.6, cornice);
+		float socle = 1.0 - step(0.0, y);
+		float block = step(0.9, fract(wpos.y * 1.5)) + step(0.96, fract(u * 0.7));
+		albedo = mix(albedo, mix(tint * 0.8, tint * 0.5, clamp(block, 0.0, 1.0)), socle);
+	} else if (st == 7) {
+		// Dachziegel: Reihen quer zum Gefälle, leicht unregelmäßig; Giebelflächen bekommen eigene Vertexdaten
+		float row = fract(wpos.y * 3.2);
+		vec2 tc = floor(vec2(u * 3.0 + floor(wpos.y * 3.2) * 0.5, wpos.y * 3.2));
+		albedo = tint * (0.7 + 0.45 * hash(tc + seed)) * (0.75 + 0.25 * smoothstep(0.0, 0.25, row));
 	} else {
 		vec2 f = fract(vec2(u / 3.2, y / 3.6));
 		win = step(0.18, f.x) * step(f.x, 0.82) * step(0.25, f.y) * step(f.y, 0.8);
@@ -78,7 +114,7 @@ void fragment() {
 	win *= wall * step(0.0, y);
 	// Fassade nicht ganz gleichmäßig (Flecken, Alterung), Geschossdecken leicht abgesetzt
 	albedo *= 0.75 + 0.5 * noise(vec2(u * 0.12, wpos.y * 0.08) + seed);
-	if (st == 0 || st == 4) {
+	if (st == 0 || st == 4 || st == 6) {
 		albedo *= 1.0 - 0.25 * step(0.95, fract(y / 3.6)) * wall * step(0.0, y);
 	}
 
@@ -96,8 +132,8 @@ void fragment() {
 	float glass = max(win, shop);
 	vec3 glass_col = st == 3 ? vec3(0.02, 0.04, 0.07) : vec3(0.02, 0.025, 0.03);
 	vec3 col = mix(albedo, glass_col, glass);
-	// Dach: dunkler Kies
-	float roof = 1.0 - wall;
+	// Dach: dunkler Kies (Ziegeldächer bleiben Ziegel)
+	float roof = (1.0 - wall) * (st == 7 ? 0.0 : 1.0);
 	col = mix(col, vec3(0.05) * (0.6 + 0.8 * noise(wpos.xz * 0.6)), roof);
 	ALBEDO = col;
 	ROUGHNESS = mix(0.85, st == 3 ? 0.05 : 0.12, glass);

@@ -20,8 +20,11 @@ const LIGHT_SHADER := preload("res://shaders/traffic_light.gdshader")
 const TUNNEL_SHADER := preload("res://shaders/tunnel.gdshader")
 const PANEL_SHADER := preload("res://shaders/panel_wall.gdshader")
 const SCREEN_SHADER := preload("res://shaders/screen.gdshader")
+const HILL_SHADER := preload("res://shaders/hill.gdshader")
 const ElevatedRail := preload("res://scripts/elevated_rail.gd")
 const AmbientSound := preload("res://scripts/ambient_sound.gd")
+const CityData := preload("res://scripts/city_data.gd")
+const City := preload("res://scripts/city_builder.gd")
 
 const HALF_W := 9.0  # 4 Spuren à 4,5 m
 const LANES := [-6.75, -2.25, 2.25, 6.75]
@@ -58,6 +61,10 @@ const BRANDS := ["KAIZEN MOTORS", "VORTEX GT-R", "NOS", "MIRAI 240R", "TURBO COL
 const CHINA_SHOPS := ["NOODLES", "DIM SUM", "TEEHAUS", "KARAOKE", "MAHJONG", "JADE", "LUCKY 8", "DRAGON", "WOK",
 	"RAMEN", "PHO", "GOLDEN", "LOTUS", "TOFU", "BOBA", "ASIA MARKT", "HOT POT", "PANDA"]
 const NEON := [Color(1, 0.1, 0.6), Color(0.1, 0.8, 1), Color(0.7, 0.2, 1), Color(1, 0.5, 0.1), Color(0.2, 1, 0.4), Color(1, 0.9, 0.3)]
+const GERMAN_SHOPS := ["BÄCKEREI", "METZGEREI", "APOTHEKE", "WEINSTUBE", "EISCAFÉ", "DÖNER", "BUCHHANDLUNG", "OPTIKER",
+	"FRISEUR", "BIERGARTEN", "KIOSK", "BLUMEN", "GASTHAUS", "SCHUHHAUS", "CAFÉ", "PIZZERIA", "BRAUHAUS", "WEINHANDEL",
+	"DROGERIE", "KONDITOREI", "GOLDSCHMIED", "REISEBÜRO", "STEHCAFÉ", "SPÄTKAUF", "BANK", "POST"]
+const RIVER_Y := -2.2  # Wasserspiegel der Flüsse (Ufermauer bis Straßenniveau)
 
 ## Stadtviertel: Bebauung, Fassadenstile (siehe building.gdshader), Farben, Laternen, Ausstattung.
 ## props: welche Gehweg-Möbel vorkommen (Nummern siehe _build_props).
@@ -90,6 +97,32 @@ const DISTRICTS := {
 		"tints": [Color(0.1, 0.11, 0.13), Color(0.15, 0.15, 0.16), Color(0.08, 0.1, 0.12)], "lit": 0.35,
 		"trees": 0.0, "billboard": 0.5, "neon_edge": 0.05, "lamp": Color(1.0, 0.6, 0.28), "lamp_kind": "sodium",
 		"setback": 10.0, "soundwall": true, "gantry": 1.0, "overpass": 1.0, "prop_gap": 3.0, "props": [2, 7, 15], "median": 0.6},
+	# --- deutsche Städte (Orts-Strecken): Fachwerk, Putz, Ziegeldächer. roof = Anteil Satteldächer,
+	# gable = Anteil mit Giebel zur Straße, roof_tints = Dachfarben
+	"altstadt_de": {"name": "ALTSTADT", "shop": 0.55, "low": [9.0, 14.0], "tall": [14.0, 18.0], "tall_p": 0.15, "styles": [5, 5, 6],
+		"tints": [Color(0.5, 0.46, 0.38), Color(0.54, 0.5, 0.42), Color(0.5, 0.42, 0.3), Color(0.46, 0.44, 0.4)], "lit": 0.6,
+		"trees": 0.12, "billboard": 0.0, "neon_edge": 0.0, "lamp": Color(1.0, 0.72, 0.42), "lamp_kind": "classic",
+		"roof": 1.0, "gable": 0.6, "roof_tints": [Color(0.36, 0.13, 0.08), Color(0.3, 0.12, 0.08), Color(0.25, 0.1, 0.07)],
+		"names": GERMAN_SHOPS, "de": true, "props": [0, 4, 5, 6, 8, 13]},
+	"innenstadt_de": {"name": "INNENSTADT", "shop": 0.55, "low": [12.0, 17.0], "tall": [17.0, 23.0], "tall_p": 0.25, "styles": [6, 6, 6, 4],
+		"tints": [Color(0.44, 0.38, 0.3), Color(0.38, 0.36, 0.33), Color(0.46, 0.36, 0.28), Color(0.34, 0.37, 0.38)], "lit": 0.55,
+		"trees": 0.35, "billboard": 0.05, "neon_edge": 0.0, "lamp": Color(1.0, 0.78, 0.5), "lamp_kind": "classic",
+		"roof": 0.75, "gable": 0.1, "roof_tints": [Color(0.14, 0.15, 0.17), Color(0.32, 0.13, 0.09)],
+		"names": GERMAN_SHOPS, "de": true, "bulbs": true, "props": [0, 1, 4, 5, 8, 9, 11, 12]},
+	"kurviertel_de": {"name": "KURVIERTEL", "shop": 0.25, "low": [10.0, 15.0], "tall": [15.0, 19.0], "tall_p": 0.2, "styles": [6],
+		"tints": [Color(0.56, 0.48, 0.32), Color(0.54, 0.52, 0.44), Color(0.5, 0.45, 0.36)], "lit": 0.6,
+		"trees": 0.85, "billboard": 0.0, "neon_edge": 0.0, "lamp": Color(1.0, 0.8, 0.55), "lamp_kind": "classic",
+		"roof": 0.8, "gable": 0.0, "roof_tints": [Color(0.14, 0.15, 0.17), Color(0.2, 0.36, 0.3)],
+		"names": GERMAN_SHOPS, "de": true, "props": [0, 4, 5, 8, 13]},
+	"campus_de": {"name": "CAMPUS", "shop": 0.1, "low": [10.0, 16.0], "tall": [18.0, 32.0], "tall_p": 0.4, "styles": [1, 3, 0],
+		"tints": [Color(0.16, 0.17, 0.19), Color(0.22, 0.22, 0.24), Color(0.12, 0.14, 0.16)], "lit": 0.6,
+		"trees": 0.4, "billboard": 0.0, "neon_edge": 0.0, "lamp": Color(0.85, 0.92, 1.0), "lamp_kind": "modern",
+		"names": GERMAN_SHOPS, "de": true, "props": [0, 3, 8, 9, 13]},
+	"vorstadt_de": {"name": "VORSTADT", "shop": 0.15, "low": [7.0, 11.0], "tall": [11.0, 15.0], "tall_p": 0.15, "styles": [6, 6, 4, 5],
+		"tints": [Color(0.46, 0.42, 0.36), Color(0.42, 0.4, 0.38), Color(0.48, 0.4, 0.3), Color(0.38, 0.36, 0.34)], "lit": 0.45,
+		"trees": 0.65, "billboard": 0.0, "neon_edge": 0.0, "lamp": Color(1.0, 0.7, 0.4), "lamp_kind": "classic",
+		"roof": 1.0, "gable": 0.3, "roof_tints": [Color(0.34, 0.13, 0.08), Color(0.16, 0.16, 0.18), Color(0.28, 0.12, 0.08)],
+		"names": GERMAN_SHOPS, "de": true, "props": [0, 4, 5, 6, 13]},
 }
 const DISTRICT_LEN := 400.0
 const BATCH_CELL := 120.0  # Häuser werden in Zellen dieser Größe zu je einem Mesh zusammengefasst
@@ -98,6 +131,8 @@ const BATCH_CELL := 120.0  # Häuser werden in Zellen dieser Größe zu je einem
 static var _bb := {}
 ## Straßenmaterial je Straßentyp (keine Werte pro Objekt: im Browser gibt es dafür nur wenig Platz)
 static var _road_mats := {}
+## Orts-Strecken: Ladennamen der Stadt (vor den allgemeinen deutschen), leer = Namen des Viertels
+static var _city_names: Array = []
 static var _box_arrays: Array = []
 
 
@@ -110,7 +145,10 @@ static func build(race: Dictionary) -> Dictionary:
 
 	var type: String = race.get("type", "sprint")
 	var loop := type == "circuit" or type == "drift"
-	var gen := _loop_centerline(race, rng) if loop else _centerline(race, rng)
+	# Orts-Strecken: Mittellinie aus echten Straßen (OpenStreetMap), siehe tools/osm_city.py
+	var city: Dictionary = CityData.CITIES.get(race.get("city", ""), {})
+	_city_names = race.get("shops", [])
+	var gen := _city_centerline(city) if not city.is_empty() else (_loop_centerline(race, rng) if loop else _centerline(race, rng))
 	var pts: Array = gen["pts"]
 	var curve := Curve3D.new()
 	curve.bake_interval = 1.0
@@ -135,7 +173,7 @@ static func build(race: Dictionary) -> Dictionary:
 		"finish": laps * length + 37.0 if loop else length - 80.0,
 		"blocks": [], "ramps": [], "lakes": [], "zones": [], "crossing": null, "crossing_d": -1.0,
 		"districts": [], "parks": [], "tunnels": [], "el": [], "posts": [], "stadium_d": -1.0, "medians": [], "elev0": [],
-		"force_stadium": race.get("stadium", false),
+		"force_stadium": race.get("stadium", false), "city": city, "rivers": [], "bridges": [], "hills": [],
 		"extra": 2.5 if type == "drift" else 0.0,  # Drift-Kurse: breitere Fahrbahn
 		"paths": [{"id": 0, "kind": "main", "curve": curve, "half_w": HALF_W, "length": length, "from": 0.0, "to": length}],
 	}
@@ -153,7 +191,14 @@ static func build(race: Dictionary) -> Dictionary:
 
 	for b in gen["bulges"]:
 		_plan_shortcut(track, b, rng)
-	if type == "drag":
+	if not city.is_empty():
+		# echte Stadt: Flüsse mit Brücken, Hügel, Bahnübergang nur wo die Gleise wirklich kreuzen; keine Tunnel/Hochbahn
+		_plan_rivers(track)
+		_plan_hills(track)
+		_plan_city_crossing(track, race)
+		_plan_spurs(track, rng)
+		_plan_medians(track, rng)
+	elif type == "drag":
 		# Drag: vier freie Spuren geradeaus (kein Bahnübergang, keine Hochbahnstützen, kein Mittelstreifen)
 		_plan_tunnels(track, rng)
 		_plan_spurs(track, rng)
@@ -177,15 +222,20 @@ static func build(race: Dictionary) -> Dictionary:
 		var rc := RailCrossing.new()
 		root.add_child(rc)
 		rc.setup(frame_at(curve, track["crossing_d"]), track["crossing_d"], HALF_W, WALK,
-			STATIONS[int(track["crossing_d"]) % STATIONS.size()])
+			race.get("station", STATIONS[int(track["crossing_d"]) % STATIONS.size()]))
 		track["crossing"] = rc
 	_build_tunnels(root, track, rng)
 	_build_el(root, track, rng)
 	if type != "drift" and type != "drag":
 		_build_roadworks(root, track, rng)
-	var occupied := _build_landmarks(root, track, rng)
+	if not city.is_empty():
+		_build_rivers(root, track)
+		_build_hills(root, track, rng)
+	var occupied := _build_city_landmarks(root, track) if not city.is_empty() else _build_landmarks(root, track, rng)
 	occupied.append_array(_build_structures(root, track, rng))
 	var buildings := _build_city(root, track, rng, occupied)
+	if not city.is_empty():
+		buildings.append_array(_build_osm_buildings(root, track, rng, occupied + buildings))
 	if type != "drift":
 		_build_fences(root, track, buildings + occupied)
 	_build_lamps(root, track)
@@ -196,6 +246,8 @@ static func build(race: Dictionary) -> Dictionary:
 	_build_steam(root, track, rng)
 	if type == "drag":
 		_drag_boards(root, track)
+	if not city.is_empty():
+		_build_city_signs(root, track, race)
 	if loop:
 		_gate(root, track, track["start"] + 12.0, "START · ZIEL", Color(0.2, 1.0, 0.4))
 	else:
@@ -220,13 +272,26 @@ static func build(race: Dictionary) -> Dictionary:
 ## selbst nichts (sonst läge die Bodenfläche wie ein Deckel über der abgesenkten Fahrbahn).
 static func _build_ground(root: Node3D, track: Dictionary) -> void:
 	var curve: Curve3D = track["curve"]
-	var holes := PackedVector2Array()
+	var holes := PackedVector3Array()  # x, z, Radius
 	for t in track["tunnels"]:
 		for span in [[t["r0"], t["from"] + 1.0], [t["to"] - 1.0, t["r1"]]]:
 			var d: float = span[0]
 			while d <= span[1]:
-				holes.append(_flat(curve.sample_baked(d)))
+				var q := curve.sample_baked(d)
+				holes.append(Vector3(q.x, q.z, TUN_W + 1.6))
 				d += 1.0
+	# Flussbett: Löcher entlang der Mittellinie, Radius = halbe Wasserbreite an dieser Stelle
+	for rv in track["rivers"]:
+		var pts: PackedVector2Array = rv["pts"]
+		var hws: PackedFloat32Array = rv["hw"]
+		for i in pts.size() - 1:
+			var steps := maxi(int(pts[i].distance_to(pts[i + 1]) / 4.0), 1)
+			for k in steps:
+				var t := float(k) / steps
+				var hr := lerpf(hws[i], hws[i + 1], t)
+				if hr > 1.5:
+					var q := pts[i].lerp(pts[i + 1], t)
+					holes.append(Vector3(q.x, q.y, hr))
 	var lo := Vector2(1e9, 1e9)
 	var hi := Vector2(-1e9, -1e9)
 	for p in track["paths"]:
@@ -238,7 +303,7 @@ static func _build_ground(root: Node3D, track: Dictionary) -> void:
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	st.set_normal(Vector3.UP)
-	_ground_cell(st, lo, maxf(hi.x - lo.x, hi.y - lo.y), holes, TUN_W + 1.6)
+	_ground_cell(st, lo, maxf(hi.x - lo.x, hi.y - lo.y), holes)
 	var mi := MeshInstance3D.new()
 	mi.mesh = st.commit()
 	mi.material_override = Builder.mat(Color(0.03, 0.03, 0.035), 0.0, 0.9)
@@ -246,21 +311,21 @@ static func _build_ground(root: Node3D, track: Dictionary) -> void:
 	root.add_child(mi)
 
 
-static func _ground_cell(st: SurfaceTool, o: Vector2, s: float, holes: PackedVector2Array, r: float) -> void:
+static func _ground_cell(st: SurfaceTool, o: Vector2, s: float, holes: PackedVector3Array) -> void:
 	var c := o + Vector2(s, s) * 0.5
-	var reach := s * 0.7072 + r
-	var near := PackedVector2Array()
-	for p in holes:
-		if p.distance_squared_to(c) < reach * reach:
-			near.append(p)
+	var near := PackedVector3Array()
+	for h in holes:
+		var reach := s * 0.7072 + h.z
+		if Vector2(h.x, h.y).distance_squared_to(c) < reach * reach:
+			near.append(h)
 	if not near.is_empty():
 		if s > 2.0:
-			var h := s * 0.5
+			var hs := s * 0.5
 			for k in 4:
-				_ground_cell(st, o + Vector2(k % 2, k / 2) * h, h, near, r)
+				_ground_cell(st, o + Vector2(k % 2, k / 2) * hs, hs, near)
 			return
-		for p in near:
-			if p.distance_squared_to(c) < r * r:
+		for h in near:
+			if Vector2(h.x, h.y).distance_squared_to(c) < h.z * h.z:
 				return
 	# im Uhrzeigersinn von oben gesehen
 	for v in [Vector2(0, 0), Vector2(s, 0), Vector2(s, s), Vector2(0, 0), Vector2(s, s), Vector2(0, s)]:
@@ -619,11 +684,15 @@ static func _plan_crossing(track: Dictionary, rng: RandomNumberGenerator) -> voi
 		var f1 := frame_at(curve, d + 80.0)
 		if (f0["fwd"] as Vector3).angle_to(f1["fwd"]) > 0.12 or _in_zone(track, d + 80.0, 30.0):
 			continue
-		track["crossing_d"] = d
-		track["zones"].append({"from": d - 80.0, "to": d + 30.0})
-		track["ramps"].append({"path": 0, "d0": d - 23.0, "d1": d - 9.5, "lat0": 4.6, "lat1": HALF_W - 0.1, "h": RAIL_RAMP_H})
-		track["blocks"].append({"from": d - 70.0, "to": d + 5.0, "lane": LANES[3]})
+		_set_crossing(track, d)
 		return
+
+
+static func _set_crossing(track: Dictionary, d: float) -> void:
+	track["crossing_d"] = d
+	track["zones"].append({"from": d - 80.0, "to": d + 30.0})
+	track["ramps"].append({"path": 0, "d0": d - 23.0, "d1": d - 9.5, "lat0": 4.6, "lat1": HALF_W - 0.1, "h": RAIL_RAMP_H})
+	track["blocks"].append({"from": d - 70.0, "to": d + 5.0, "lane": LANES[3]})
 
 
 ## Kreuzungen: kurze Seitenstraßen nach links und rechts (Sackgassen) mit Ampeln und Zebrastreifen
@@ -641,6 +710,12 @@ static func _plan_spurs(track: Dictionary, rng: RandomNumberGenerator) -> void:
 			if (f0["fwd"] as Vector3).angle_to(f1["fwd"]) > 0.15:
 				continue
 			var f := frame_at(curve, d)
+			var wet := false
+			for side in [-1.0, 1.0]:
+				for kk in [0.4, 1.0]:
+					wet = wet or _in_river(track, f["pos"] + f["right"] * side * (HALF_W + WALK + 34.0) * kk, 10.0)
+			if wet:
+				continue
 			for side in [-1.0, 1.0]:
 				var sc := Curve3D.new()
 				sc.bake_interval = 1.0
@@ -1445,6 +1520,8 @@ static func _build_fences(root: Node3D, track: Dictionary, blockers: Array) -> v
 				var lat: float = (hw(track, d) + WALK + 0.3) if main else (p["half_w"] + (3.3 if p["kind"] == "fork" else 0.3))
 				var pos: Vector3 = f["pos"] + f["right"] * side * lat
 				if main:
+					if not bridge_at(track, d).is_empty():
+						continue
 					if _branch_clearance(track, pos) <= 1.0 or not tunnel_at(track, d, 3.0).is_empty() \
 							or _district_at(track, d).has("soundwall") or _rail_clearance(track, pos) < 1.0:
 						continue
@@ -1894,6 +1971,528 @@ static func _gas_station(n: Node3D) -> void:
 	Builder._add(n, Builder.tapered_box(Vector2(1.6, 2.2), Vector2(1.3, 1.4), 0.5, 0.1), Builder.mat(Color(0.02, 0.03, 0.05), 0.7, 0.1), Vector3(-6.5, 0.9, -3.8))
 
 
+# --- Orts-Strecken (echte Städte aus OpenStreetMap) ----------------------------
+
+## Mittellinie aus den Kartendaten (flache Liste x, z); Rundkurse schließen mit dem ersten Punkt
+static func _city_centerline(city: Dictionary) -> Dictionary:
+	var flat: Array = city["points"]
+	var pts := []
+	for i in range(0, flat.size(), 2):
+		pts.append(Vector3(flat[i], 0, flat[i + 1]))
+	if city["loop"]:
+		pts.append(pts[0])
+	return {"pts": pts, "bulges": []}
+
+
+static func _flat_pts(flat: Array) -> PackedVector2Array:
+	var out := PackedVector2Array()
+	for i in range(0, flat.size(), 2):
+		out.append(Vector2(flat[i], flat[i + 1]))
+	return out
+
+
+## Flüsse: nur der Abschnitt in Sichtweite der Strecke. Die Wasserbreite schrumpft dort, wo die Straße am Ufer
+## entlangführt (Fahrbahn und Gehweg bleiben trocken). Wo die Hauptstraße den Fluss quert, entsteht eine Brücke.
+static func _plan_rivers(track: Dictionary) -> void:
+	var curve: Curve3D = track["curve"]
+	var length: float = track["length"]
+	var edge := HALF_W + WALK + 2.5
+	for rv in track["city"]["rivers"]:
+		var raw := _flat_pts(rv["pts"])
+		var half: float = rv["width"] / 2.0
+		var first := -1
+		var last := -1
+		for i in raw.size():
+			var q := curve.get_closest_point(Vector3(raw[i].x, 0, raw[i].y))
+			if Vector2(q.x, q.z).distance_to(raw[i]) < 1100.0:
+				if first < 0:
+					first = i
+				last = i
+		if first < 0 or last - first < 2:
+			continue
+		var pts := raw.slice(maxi(first - 2, 0), mini(last + 3, raw.size()))
+		var lat := PackedFloat32Array()
+		var offs := PackedFloat32Array()
+		for p in pts:
+			var off := curve.get_closest_offset(Vector3(p.x, 0, p.y))
+			var f := frame_at(curve, off)
+			lat.append((Vector3(p.x, 0, p.y) - f["pos"]).dot(f["right"]))
+			offs.append(off)
+		var hws := PackedFloat32Array()
+		for i in pts.size():
+			hws.append(clampf(absf(lat[i]) - edge, 0.0, half))
+		# Querungen: Seitenwechsel zwischen zwei Flusspunkten nahe der Straße
+		for i in pts.size() - 1:
+			if signf(lat[i]) == signf(lat[i + 1]) or minf(absf(lat[i]), absf(lat[i + 1])) > pts[i].distance_to(pts[i + 1]) + 20.0:
+				continue
+			var t := absf(lat[i]) / maxf(absf(lat[i]) + absf(lat[i + 1]), 0.001)
+			var dc := lerpf(offs[i], offs[i + 1], t)
+			if not track["loop"] and (dc < 5.0 or dc > length - 5.0):
+				continue
+			var f := frame_at(curve, dc)
+			var rdir := (pts[i + 1] - pts[i]).normalized()
+			var sn := absf(rdir.dot(Vector2(f["right"].x, f["right"].z)))  # 1 = rechtwinklig gequert
+			sn = maxf(sn, 0.35)
+			var reach := (half + 12.0) / sn
+			track["bridges"].append({"d": dc, "d0": dc - reach, "d1": dc + reach, "half": half})
+			track["zones"].append({"from": dc - reach - 15.0, "to": dc + reach + 15.0})
+			var cp := pts[i].lerp(pts[i + 1], t)
+			# unter der Brücke volle Breite
+			for k in pts.size():
+				if pts[k].distance_to(cp) < (half + edge + 10.0) / sn:
+					hws[k] = half
+		track["rivers"].append({"name": rv["name"], "pts": pts, "hw": hws, "half": half})
+
+
+## Abstand von pos zum Wasser (negativ = im Wasser), 1e9 ohne Fluss
+static func _river_clearance(track: Dictionary, pos: Vector3) -> float:
+	var best := 1e9
+	var p := Vector2(pos.x, pos.z)
+	for rv in track["rivers"]:
+		var pts: PackedVector2Array = rv["pts"]
+		var hws: PackedFloat32Array = rv["hw"]
+		for i in pts.size() - 1:
+			var a := pts[i]
+			var b := pts[i + 1]
+			var ab := b - a
+			var t := clampf((p - a).dot(ab) / maxf(ab.length_squared(), 0.001), 0.0, 1.0)
+			var hr := lerpf(hws[i], hws[i + 1], t)
+			if hr < 1.5:
+				continue
+			best = minf(best, p.distance_to(a + ab * t) - hr)
+	return best
+
+
+static func _in_river(track: Dictionary, pos: Vector3, margin: float) -> bool:
+	return not track["rivers"].is_empty() and _river_clearance(track, pos) < margin
+
+
+static func bridge_at(track: Dictionary, d: float) -> Dictionary:
+	if track["loop"]:
+		d = fposmod(d, track["length"])
+	for b in track["bridges"]:
+		if d > b["d0"] and d < b["d1"]:
+			return b
+	return {}
+
+
+## Vieleck (Fächer) mit Normale n; Godot erwartet Dreiecke im Uhrzeigersinn von vorn gesehen
+static func _poly(st: SurfaceTool, v: Array, nrm: Vector3) -> void:
+	if (v[1] - v[0]).cross(v[2] - v[0]).dot(nrm) > 0.0:
+		v = v.duplicate()
+		v.reverse()
+	for i in range(1, v.size() - 1):
+		for q in [v[0], v[i], v[i + 1]]:
+			st.set_normal(nrm)
+			st.add_vertex(q)
+
+
+static func _build_rivers(root: Node3D, track: Dictionary) -> void:
+	var wm := ShaderMaterial.new()
+	wm.shader = WATER_SHADER
+	var quay_m := Builder.mat(Color(0.26, 0.24, 0.21), 0.0, 0.9)
+	var top_m := Builder.mat(Color(0.4, 0.38, 0.35), 0.0, 0.85)
+	for rv in track["rivers"]:
+		var pts: PackedVector2Array = rv["pts"]
+		var hws: PackedFloat32Array = rv["hw"]
+		var nrm := []
+		for i in pts.size():
+			var t := (pts[mini(i + 1, pts.size() - 1)] - pts[maxi(i - 1, 0)]).normalized()
+			nrm.append(Vector2(-t.y, t.x))
+		var water := SurfaceTool.new()
+		water.begin(Mesh.PRIMITIVE_TRIANGLES)
+		var wall := SurfaceTool.new()
+		wall.begin(Mesh.PRIMITIVE_TRIANGLES)
+		var top := SurfaceTool.new()
+		top.begin(Mesh.PRIMITIVE_TRIANGLES)
+		var y := RIVER_Y
+		for i in pts.size() - 1:
+			if hws[i] < 1.5 or hws[i + 1] < 1.5:
+				continue
+			var e := []
+			for k in [i, i + 1]:
+				var c: Vector2 = pts[k]
+				var nv: Vector2 = nrm[k]
+				e.append([c + nv * hws[k], c - nv * hws[k], nv])
+			var la: Vector2 = e[0][0]
+			var ra: Vector2 = e[0][1]
+			var lb: Vector2 = e[1][0]
+			var rb: Vector2 = e[1][1]
+			_poly(water, [Vector3(la.x, y, la.y), Vector3(lb.x, y, lb.y), Vector3(rb.x, y, rb.y), Vector3(ra.x, y, ra.y)], Vector3.UP)
+			for s in [0, 1]:
+				var a: Vector2 = e[0][s]
+				var b: Vector2 = e[1][s]
+				var out: Vector2 = e[0][2] * (1.0 if s == 0 else -1.0)
+				# Ufermauer zeigt zum Wasser
+				_poly(wall, [Vector3(a.x, y - 0.5, a.y), Vector3(b.x, y - 0.5, b.y), Vector3(b.x, 0.0, b.y), Vector3(a.x, 0.0, a.y)], Vector3(-out.x, 0, -out.y))
+				var ob: Vector2 = e[1][2] * (1.0 if s == 0 else -1.0)
+				_poly(top, [Vector3(a.x, 0.03, a.y), Vector3(b.x, 0.03, b.y), Vector3(b.x + ob.x * 2.2, 0.03, b.y + ob.y * 2.2),
+					Vector3(a.x + out.x * 2.2, 0.03, a.y + out.y * 2.2)], Vector3.UP)
+		for pair in [[water, wm], [wall, quay_m], [top, top_m]]:
+			var mi := MeshInstance3D.new()
+			mi.mesh = (pair[0] as SurfaceTool).commit()
+			mi.material_override = pair[1]
+			root.add_child(mi)
+	for b in track["bridges"]:
+		_road_bridge(root, track, b)
+
+
+## Straßenbrücke: Fahrbahnplatte mit Gesims, Pfeiler im Wasser, Steinbrüstung mit Laternen
+static func _road_bridge(root: Node3D, track: Dictionary, b: Dictionary) -> void:
+	var curve: Curve3D = track["curve"]
+	var groups := {}
+	var stone := Builder.mat(Color(0.42, 0.38, 0.32), 0.0, 0.85, Color(0.42, 0.38, 0.32), 0.12)
+	var dark := Builder.mat(Color(0.05, 0.05, 0.055), 0.0, 0.9)
+	var lamp := Builder.mat(Color(1.0, 0.85, 0.6), 0.0, 0.4, Color(1.0, 0.8, 0.5), 3.5)
+	var iron := Builder.mat(Color(0.08, 0.08, 0.09), 0.6, 0.5)
+	var d: float = b["d0"]
+	var k := 0
+	while d < b["d1"]:
+		var f := frame_at(curve, d + 1.5)
+		var bf := Basis.looking_at(f["fwd"], Vector3.UP)
+		var c: Vector3 = f["pos"]
+		var wdt: float = (hw(track, d) + WALK + 0.5) * 2.0
+		var in_water := _river_clearance(track, c) < -4.0
+		_part(groups, stone, Builder.box(Vector3(wdt, 1.4, 3.05)), Transform3D(bf, c + Vector3(0, -0.75, 0)))
+		for s in [-1.0, 1.0]:
+			var side: Vector3 = c + f["right"] * s * (wdt / 2.0 - 0.3)
+			_part(groups, stone, Builder.box(Vector3(0.6, 1.1, 3.05)), Transform3D(bf, side + Vector3(0, CURB_H + 0.55, 0)))
+			if in_water:
+				_part(groups, dark, Builder.box(Vector3(0.1, 2.0, 3.05)), Transform3D(bf, c + f["right"] * s * (wdt / 2.0 + 0.02) + Vector3(0, -1.6, 0)))
+			if k % 6 == 3:
+				_part(groups, iron, Builder.box(Vector3(0.18, 3.6, 0.18)), Transform3D(bf, side + Vector3(0, CURB_H + 1.8, 0)))
+				_part(groups, lamp, Builder.box(Vector3(0.45, 0.6, 0.45)), Transform3D(bf, side + Vector3(0, CURB_H + 3.8, 0)))
+		if in_water and k % 8 == 0:
+			_part(groups, stone, Builder.box(Vector3(wdt + 1.0, 4.0, 4.0)), Transform3D(bf, c + Vector3(0, RIVER_Y - 0.3, 0)))
+		d += 3.0
+		k += 1
+	_bake(root, groups)
+	var mid := frame_at(curve, b["d"])
+	for s in [-1.0, 1.0]:
+		var l := OmniLight3D.new()
+		l.position = mid["pos"] + mid["right"] * s * (hw(track, b["d"]) + WALK) + Vector3(0, 4.5, 0)
+		l.light_color = Color(1.0, 0.8, 0.5)
+		l.light_energy = 2.0
+		l.omni_range = 26.0
+		root.add_child(l)
+
+
+static func _plan_hills(track: Dictionary) -> void:
+	for h in track["city"]["hills"]:
+		track["hills"].append({"c": Vector2(h["x"], h["z"]), "r": h["r"], "h": h["h"], "kind": h["kind"]})
+
+
+## Höhe der Hügel an pos: oben ein flaches Plateau, zur Straße und zum Fluss hin läuft der Hang aus
+static func hill_h(track: Dictionary, pos: Vector3) -> float:
+	var y := 0.0
+	for h in track["hills"]:
+		var k: float = Vector2(pos.x, pos.z).distance_to(h["c"]) / h["r"]
+		if k < 1.0:
+			var kk := clampf((k - 0.22) / 0.78, 0.0, 1.0)
+			y = maxf(y, h["h"] * (0.5 + 0.5 * cos(PI * kk)))
+	if y <= 0.0:
+		return 0.0
+	y *= smoothstep(6.0, 80.0, _main_clearance(track, pos) - WALK)
+	if not track["rivers"].is_empty():
+		y *= smoothstep(3.0, 45.0, _river_clearance(track, pos))
+	return y
+
+
+## Hügel als Höhengitter: Weinberg (Rebzeilen), Wald (Bäume), Park
+static func _build_hills(root: Node3D, track: Dictionary, rng: RandomNumberGenerator) -> void:
+	var trees := []
+	var lights := []
+	for h in track["hills"]:
+		var c: Vector2 = h["c"]
+		var r: float = h["r"]
+		var cells := clampi(int(r * 2.0 / 10.0), 24, 70)
+		var cs := r * 2.0 / cells
+		var o := c - Vector2(r, r)
+		var hgt := []
+		for j in cells + 1:
+			var row := PackedFloat32Array()
+			for i in cells + 1:
+				row.append(hill_h(track, Vector3(o.x + i * cs, 0, o.y + j * cs)))
+			hgt.append(row)
+		var st := SurfaceTool.new()
+		st.begin(Mesh.PRIMITIVE_TRIANGLES)
+		for j in cells:
+			for i in cells:
+				var y00: float = hgt[j][i]
+				var y10: float = hgt[j][i + 1]
+				var y01: float = hgt[j + 1][i]
+				var y11: float = hgt[j + 1][i + 1]
+				if maxf(maxf(y00, y10), maxf(y01, y11)) < 0.05:
+					continue
+				var p00 := Vector3(o.x + i * cs, y00 - 0.06, o.y + j * cs)
+				var p10 := Vector3(o.x + (i + 1) * cs, y10 - 0.06, o.y + j * cs)
+				var p01 := Vector3(o.x + i * cs, y01 - 0.06, o.y + (j + 1) * cs)
+				var p11 := Vector3(o.x + (i + 1) * cs, y11 - 0.06, o.y + (j + 1) * cs)
+				for v in [p00, p10, p11, p00, p11, p01]:
+					st.add_vertex(v)
+		st.generate_normals()
+		var mi := MeshInstance3D.new()
+		mi.mesh = st.commit()
+		var hm := ShaderMaterial.new()
+		hm.shader = HILL_SHADER
+		hm.set_shader_parameter("kind", ["vineyard", "forest", "park"].find(h["kind"]))
+		mi.material_override = hm
+		root.add_child(mi)
+		for t in int(r * r / (900.0 if h["kind"] != "vineyard" else 9000.0)):
+			var p := c + Vector2(rng.randf_range(-r, r), rng.randf_range(-r, r))
+			var y := hill_h(track, Vector3(p.x, 0, p.y))
+			if y < 2.0:
+				continue
+			var s := rng.randf_range(0.8, 1.4)
+			trees.append(Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(s, s, s)), Vector3(p.x, y, p.y)))
+		for t in int(r / 14.0):
+			var p := c + Vector2(rng.randf_range(-r, r), rng.randf_range(-r, r))
+			var y := hill_h(track, Vector3(p.x, 0, p.y))
+			if y > 4.0:
+				lights.append(Transform3D(Basis.IDENTITY, Vector3(p.x, y + 1.5, p.y)))
+	var cone := CylinderMesh.new()
+	cone.top_radius = 0.0
+	cone.bottom_radius = 2.6
+	cone.height = 8.0
+	cone.radial_segments = 6
+	cone.rings = 1
+	var tm := ArrayMesh.new()
+	var cst := SurfaceTool.new()
+	cst.begin(Mesh.PRIMITIVE_TRIANGLES)
+	cst.append_from(cone, 0, Transform3D(Basis.IDENTITY, Vector3(0, 5.5, 0)))
+	tm = cst.commit()
+	_multi(root, tm, Builder.mat(Color(0.02, 0.07, 0.035), 0.0, 0.95), trees)
+	var bulb := SphereMesh.new()
+	bulb.radius = 0.35
+	bulb.height = 0.7
+	bulb.radial_segments = 6
+	bulb.rings = 3
+	_multi(root, bulb, Builder.mat(Color(1.0, 0.8, 0.5), 0.0, 0.4, Color(1.0, 0.75, 0.4), 4.0), lights)
+
+
+## Wahrzeichen an ihren echten Positionen. Liegt eins unter der (breiten) Spielstraße, rückt es zur Seite.
+## Lange Bauten liegen parallel zur Straße, die Schauseite zeigt zur Straße.
+static func _build_city_landmarks(root: Node3D, track: Dictionary) -> Array:
+	var curve: Curve3D = track["curve"]
+	var occupied := []
+	for lm in track["city"]["landmarks"]:
+		var kind: String = lm["kind"]
+		var info: Dictionary = City.INFO.get(kind, {"hd": 10.0, "hl": 10.0})
+		var hd: float = info["hd"]
+		var hl: float = info["hl"]
+		var pos := Vector3(lm["x"], 0, lm["z"])
+		var extra := {}
+		var basis := Basis.IDENTITY
+		if kind == "mainbruecke":
+			# quer über den Fluss an der echten Stelle, Ufer bis Ufer
+			var best := {}
+			var bd := 1e9
+			for rv in track["rivers"]:
+				var pts: PackedVector2Array = rv["pts"]
+				for i in pts.size() - 1:
+					var dd := pts[i].distance_to(Vector2(pos.x, pos.z))
+					if dd < bd:
+						bd = dd
+						best = {"p": pts[i], "dir": (pts[i + 1] - pts[i]).normalized(), "hw": rv["hw"][i]}
+			if best.is_empty() or bd > 120.0:
+				continue
+			var bp: Vector2 = best["p"]
+			pos = Vector3(bp.x, 0, bp.y)
+			extra["len"] = best["hw"] * 2.0 + 3.0
+			basis = Basis.looking_at(Vector3(best["dir"].x, 0, best["dir"].y), Vector3.UP)
+			hl = extra["len"] / 2.0
+		else:
+			for it in 80:
+				var q := curve.get_closest_point(pos)
+				var away := Vector2(pos.x - q.x, pos.z - q.z)
+				if away.length() < 0.5:
+					var fr := frame_at(curve, curve.get_closest_offset(pos))
+					away = Vector2(fr["right"].x, fr["right"].z)
+				away = away.normalized()
+				basis = Basis.looking_at(Vector3(-away.x, 0, -away.y), Vector3.UP)
+				var ok := _main_clearance(track, pos) - WALK > hd + 3.0 and _branch_clearance(track, pos) > hd + 2.0
+				for s in [-1.0, 1.0]:
+					var e: Vector3 = pos + basis.x * s * hl * 0.9 - basis.z * 0.0
+					ok = ok and _main_clearance(track, e) - WALK > hd * 0.4 + 2.0
+				if kind != "alter_kranen":
+					ok = ok and not _in_river(track, pos, hd * 0.7)
+				if ok:
+					break
+				pos += Vector3(away.x, 0, away.y) * 3.0
+				if _in_river(track, pos, hd * 0.7) and kind != "alter_kranen":
+					pos -= Vector3(away.x, 0, away.y) * 1.5
+		var y := hill_h(track, pos) if info.get("hill", false) else 0.0
+		var n := Node3D.new()
+		n.name = kind
+		n.transform = Transform3D(basis, Vector3(pos.x, y, pos.z))
+		root.add_child(n)
+		City.new(n).make(kind, extra)
+		if kind == "saaleck":
+			n.scale = Vector3.ONE * 1.4
+		if not info.get("hill", false):
+			# Platz bzw. Sichtschneise zwischen Straße und Wahrzeichen: dort keine Häuser
+			var q := curve.get_closest_point(pos)
+			var to := Vector3(pos.x - q.x, 0, pos.z - q.z)
+			var dist_road := to.length()
+			to = to.normalized()
+			var near := dist_road < 160.0
+			var half_w := minf(hl, 45.0) if near else 14.0
+			var reach := dist_road - hd if near else HALF_W + WALK + 45.0
+			var sd := HALF_W + WALK + 4.0
+			while sd < reach:
+				var x := -half_w
+				while x <= half_w:
+					var c := q + to * sd + basis.x * x
+					occupied.append({"pos": Vector3(c.x, 0, c.z), "r": 8.0})
+					x += 12.0
+				sd += 10.0
+		var steps := maxi(int(ceil(hl / maxf(hd, 6.0))), 1)
+		for i in range(-steps, steps + 1):
+			var cp: Vector3 = pos + basis.x * (hl * float(i) / steps)
+			occupied.append({"pos": Vector3(cp.x, 0, cp.z), "r": hd + 6.0})
+	return occupied
+
+
+## Echte Gebäude (Grundrisse aus OpenStreetMap, als Quader) hinter der Straßenfront, mit Satteldach im Stil des Viertels
+static func _build_osm_buildings(root: Node3D, track: Dictionary, rng: RandomNumberGenerator, blockers: Array) -> Array:
+	var curve: Curve3D = track["curve"]
+	var data: Array = track["city"].get("buildings", [])
+	var placed := []
+	var grid := {}
+	for o in blockers:
+		var key := Vector2i(floori(o["pos"].x / 50.0), floori(o["pos"].z / 50.0))
+		if not grid.has(key):
+			grid[key] = []
+		grid[key].append(o)
+	for i in range(0, data.size(), 6):
+		var pos := Vector3(data[i], 0, data[i + 1])
+		var L: float = data[i + 2]
+		var W: float = data[i + 3]
+		var ang: float = data[i + 4]
+		var h: float = data[i + 5]
+		var r := Vector2(L, W).length() * 0.5
+		if _main_clearance(track, pos) < WALK + 14.0 + W * 0.5 or _branch_clearance(track, pos) < r * 0.7 + 2.0:
+			continue
+		if _in_river(track, pos, r * 0.5) or (not track["hills"].is_empty() and hill_h(track, pos) > 0.5):
+			continue
+		var blocked := false
+		var gk := Vector2i(floori(pos.x / 50.0), floori(pos.z / 50.0))
+		for gx in range(gk.x - 2, gk.x + 3):
+			for gz in range(gk.y - 2, gk.y + 3):
+				for o in grid.get(Vector2i(gx, gz), []):
+					if _flat(pos - o["pos"]).length() < o["r"] + r * 0.6:
+						blocked = true
+						break
+		if blocked:
+			continue
+		var dist := _district_at(track, curve.get_closest_offset(pos))
+		var along := Vector3(cos(ang), 0, sin(ang))
+		var basis := Basis(Vector3.UP.cross(along), Vector3.UP, along)
+		var styles: Array = dist["styles"]
+		var tints: Array = dist["tints"]
+		var style: float = styles[rng.randi() % styles.size()]
+		var tint: Color = tints[rng.randi() % tints.size()]
+		var v := rng.randf_range(0.75, 1.15)
+		var tv := Vector3(tint.r * v, tint.g * v, tint.b * v)
+		var seed := rng.randf() * 100.0
+		var lit: float = dist["lit"] * rng.randf_range(0.6, 1.2)
+		_bb_box(Transform3D(basis * Basis.from_scale(Vector3(W, h, L)), pos + Vector3(0, h / 2.0, 0)), tv, lit, seed, style,
+			1.0 if rng.randf() < dist["shop"] * 0.4 else 0.0)
+		if dist.has("roof") and L * W < 2500.0 and h < 30.0 and rng.randf() < dist["roof"]:
+			var rt: Array = dist["roof_tints"]
+			var rc: Color = rt[rng.randi() % rt.size()]
+			var rk := rng.randf_range(0.8, 1.15)
+			_bb_roof(pos, basis, L, W, h, false, Vector3(rc.r * rk, rc.g * rk, rc.b * rk), tv, style, seed, lit)
+		placed.append({"pos": pos, "r": r * 0.8})
+	return placed
+
+
+## Gelbes Ortsschild hinter dem Start, Straßenschilder an jedem Straßenwechsel
+static func _build_city_signs(root: Node3D, track: Dictionary, race: Dictionary) -> void:
+	var curve: Curve3D = track["curve"]
+	var city: Dictionary = track["city"]
+	var groups := {}
+	var post := Builder.mat(Color(0.5, 0.52, 0.55), 0.6, 0.4)
+	var yellow := Builder.mat(Color(1.0, 0.8, 0.05), 0.0, 0.5, Color(1.0, 0.8, 0.05), 0.25)
+	var black := Builder.mat(Color(0.02, 0.02, 0.02), 0.0, 0.6)
+	var white := Builder.mat(Color(0.92, 0.92, 0.9), 0.0, 0.5, Color(0.92, 0.92, 0.9), 0.2)
+	var town: String = race.get("town", city["label"])
+	var region: String = city.get("region", "")
+	var d0: float = track["start"] + 55.0
+	var f := frame_at(curve, d0)
+	var bf := Basis.looking_at(f["fwd"], Vector3.UP)
+	var base: Vector3 = f["pos"] + f["right"] * (hw(track, d0) + WALK - 1.2)
+	var pw := maxf(2.2, town.length() * 0.24 + 0.6)
+	for s in [-1.0, 1.0]:
+		_part(groups, post, Builder.box(Vector3(0.08, 2.9, 0.08)), Transform3D(bf, base + bf.x * s * (pw * 0.35) + Vector3(0, CURB_H + 1.45, 0)))
+	_part(groups, black, Builder.box(Vector3(pw + 0.12, 1.32, 0.05)), Transform3D(bf, base + Vector3(0, CURB_H + 2.35, 0.04)))
+	_part(groups, yellow, Builder.box(Vector3(pw, 1.2, 0.06)), Transform3D(bf, base + Vector3(0, CURB_H + 2.35, 0)))
+	for txt in [[town, 0.2, 96], [region, -0.32, 34]]:
+		if txt[0] == "":
+			continue
+		var l := Label3D.new()
+		l.text = txt[0]
+		l.font_size = txt[2]
+		l.pixel_size = 0.0042
+		l.modulate = Color(0.02, 0.02, 0.02)
+		l.outline_size = 0
+		l.shaded = true
+		l.double_sided = false
+		l.transform = Transform3D(bf, base + Vector3(0, CURB_H + 2.35 + txt[1], 0) + bf.z * 0.04)
+		root.add_child(l)
+	var sl := OmniLight3D.new()
+	sl.position = base + Vector3(0, 4.5, 0) - f["fwd"] * 3.0
+	sl.light_color = Color(1.0, 0.85, 0.6)
+	sl.light_energy = 1.5
+	sl.omni_range = 9.0
+	root.add_child(sl)
+	# Straßennamensschilder (weiß, schwarze Schrift) am rechten Gehweg, kurz nach jeder Einmündung
+	var last := -1e9
+	for stt in city["streets"]:
+		var d: float = stt[0] + 12.0
+		if d < 40.0 or d > track["length"] - 20.0 or d - last < 60.0 or not bridge_at(track, d).is_empty():
+			continue
+		var sf := frame_at(curve, d)
+		var sp: Vector3 = sf["pos"] + sf["right"] * (hw(track, d) + WALK - 0.6)
+		if _branch_clearance(track, sp) < 2.0:
+			continue
+		last = d
+		var name: String = stt[2]
+		var sb := Basis.looking_at(sf["fwd"], Vector3.UP)
+		var w := name.length() * 0.16 + 0.4
+		_part(groups, post, Builder.box(Vector3(0.07, 3.0, 0.07)), Transform3D(sb, sp + Vector3(0, CURB_H + 1.5, 0)))
+		_part(groups, black, Builder.box(Vector3(w + 0.06, 0.5, 0.04)), Transform3D(sb, sp + Vector3(0, CURB_H + 2.75, 0) - sb.x * w * 0.45))
+		_part(groups, white, Builder.box(Vector3(w, 0.44, 0.06)), Transform3D(sb, sp + Vector3(0, CURB_H + 2.75, 0) - sb.x * w * 0.45))
+		for side in [1.0, -1.0]:
+			var l := Label3D.new()
+			l.text = name
+			l.font_size = 64
+			l.pixel_size = 0.0045
+			l.modulate = Color(0.02, 0.02, 0.02)
+			l.outline_size = 0
+			l.shaded = true
+			l.double_sided = false
+			var lb := sb if side > 0.0 else sb.rotated(Vector3.UP, PI)
+			l.transform = Transform3D(lb, sp + Vector3(0, CURB_H + 2.75, 0) - sb.x * w * 0.45 + sb.z * side * 0.04)
+			root.add_child(l)
+	_bake(root, groups)
+
+
+## Bahnübergang nur dort, wo die echten Gleise die Strecke kreuzen (und die Straße dort gerade genug ist)
+static func _plan_city_crossing(track: Dictionary, race: Dictionary) -> void:
+	var curve: Curve3D = track["curve"]
+	var L: float = track["length"]
+	for d in track["city"].get("rail", []):
+		if d < 0.12 * L or d > 0.88 * L or _in_zone(track, d, 120.0):
+			continue
+		var f0 := frame_at(curve, d - 45.0)
+		var f1 := frame_at(curve, d + 80.0)
+		if (f0["fwd"] as Vector3).angle_to(f1["fwd"]) > 0.2:
+			continue
+		_set_crossing(track, d)
+		return
+
+
 # --- Bebauung --------------------------------------------------------------
 
 static func _district_at(track: Dictionary, d: float) -> Dictionary:
@@ -1938,6 +2537,9 @@ static func _build_city(root: Node3D, track: Dictionary, rng: RandomNumberGenera
 			ok = ok and _branch_clearance(track, center) > 1.0 + radius * 0.7
 			ok = ok and not _in_lake(track, center, radius * 0.7)
 			ok = ok and _rail_clearance(track, center) > 5.0 + radius * 0.7
+			ok = ok and not _in_river(track, center, radius * 0.6)
+			# am Fuß eines Hügels (Festung, Weinberg) keine Häuser: der Hang soll von der Straße aus zu sehen sein
+			ok = ok and (track["hills"].is_empty() or hill_h(track, center + f["right"] * side * 50.0) < 6.0)
 			if ok:
 				for o in occupied + placed:
 					if _flat(center - o["pos"]).length() < o["r"] + radius * 0.65:
@@ -1998,6 +2600,13 @@ static func _building(root: Node3D, center: Vector3, basis: Basis, w: float, dep
 		top_w *= 0.55
 		top_d *= 0.55
 	var roof_y := top_h
+	var pitched: bool = dist.has("roof") and top_center == center and h < 26.0 and rng.randf() < dist["roof"]
+	if pitched:
+		var rt: Array = dist["roof_tints"]
+		var rc: Color = rt[rng.randi() % rt.size()]
+		var rk := rng.randf_range(0.85, 1.15)
+		_bb_roof(center, basis, w, depth, top_h, rng.randf() < dist.get("gable", 0.0), Vector3(rc.r * rk, rc.g * rk, rc.b * rk),
+			tv, style, seed, lit)
 	var grey := Builder.mat(Color(0.25, 0.25, 0.27), 0.5, 0.5)
 	var eaves: bool = not tall and h < 15.0 and rng.randf() < dist.get("eaves", 0.0)
 	if eaves:
@@ -2021,10 +2630,10 @@ static func _building(root: Node3D, center: Vector3, basis: Basis, w: float, dep
 		var sy := rng.randf_range(14.0, top_h - sh - 4.0)
 		var scr := Builder._add(root, q, sm, top_center + face_dir * (top_d * 0.5 + 0.12) + Vector3(0, sy, 0))
 		scr.basis = Basis.looking_at(-face_dir, Vector3.UP)
-	for i in (0 if eaves else rng.randi_range(0, 3)):
+	for i in (0 if eaves or pitched else rng.randi_range(0, 3)):
 		var off := basis * Vector3(rng.randf_range(-top_d, top_d) * 0.3, 0, rng.randf_range(-top_w, top_w) * 0.3)
 		Builder._add(root, Builder.box(Vector3(1.6, 1.0, 1.2)), grey, top_center + off + Vector3(0, roof_y + 0.5, 0)).basis = basis
-	if not tall and not eaves and rng.randf() < 0.35:
+	if not tall and not eaves and not pitched and rng.randf() < 0.35:
 		# Wassertank auf Stelzen
 		var tank := CylinderMesh.new()
 		tank.top_radius = 1.2
@@ -2096,6 +2705,8 @@ static func _building(root: Node3D, center: Vector3, basis: Basis, w: float, dep
 			open.transform = Transform3D(face_basis, face_pos + Vector3(0, 2.4, 0) + face_dir * 0.05 + basis.z * w * 0.25)
 			root.add_child(open)
 	var names: Array = dist.get("names", SHOPS)
+	if dist.has("de") and not _city_names.is_empty():
+		names = _city_names + _city_names + names
 	if shop and dist.has("lanterns"):
 		# Zwei Lampions vor dem Laden
 		var lm := Builder.mat(Color(0.9, 0.1, 0.05), 0.0, 0.5, Color(1.0, 0.15, 0.05), 1.8)
@@ -2181,6 +2792,55 @@ static func _bb_box(xf: Transform3D, tint := Vector3(0.08, 0.08, 0.1), lit := 0.
 		st.set_color(col)
 		st.set_uv2(u2)
 		st.add_vertex(xf * verts[i])
+
+
+static func _bb_st(pos: Vector3) -> SurfaceTool:
+	var key := Vector2i(floori(pos.x / BATCH_CELL), floori(pos.z / BATCH_CELL))
+	if not _bb.has(key):
+		var nst := SurfaceTool.new()
+		nst.begin(Mesh.PRIMITIVE_TRIANGLES)
+		_bb[key] = nst
+	return _bb[key]
+
+
+static func _bb_poly(st: SurfaceTool, v: Array, nrm: Vector3, col: Color, u2: Vector2) -> void:
+	if (v[1] - v[0]).cross(v[2] - v[0]).dot(nrm) > 0.0:
+		v = v.duplicate()
+		v.reverse()
+	for i in range(1, v.size() - 1):
+		for q in [v[0], v[i], v[i + 1]]:
+			st.set_normal(nrm)
+			st.set_color(col)
+			st.set_uv2(u2)
+			st.add_vertex(q)
+
+
+## Satteldach in den Häuser-Batch: Dachflächen als Ziegel (Stil 7), Giebeldreiecke im Fassadenstil des Hauses.
+## basis wie beim Haus: x quer zur Straße (Tiefe), z entlang (Breite). gable_front: First quer, Giebel zur Straße.
+static func _bb_roof(center: Vector3, basis: Basis, w: float, depth: float, h: float, gable_front: bool,
+		roof_tint: Vector3, wall_tint: Vector3, style: float, seed: float, lit: float) -> void:
+	var st := _bb_st(center)
+	var ax: Vector3 = (basis.z if gable_front else basis.x).normalized()
+	var bx: Vector3 = (basis.x if gable_front else basis.z).normalized()
+	var span := w if gable_front else depth
+	var len := depth if gable_front else w
+	var rh := clampf(span * 0.55, 2.5, 9.0)
+	var ov := 0.5
+	var drop := ov * rh / (span * 0.5)
+	var base := center + Vector3(0, h, 0)
+	var top := base + Vector3(0, rh, 0)
+	var hb := len * 0.5 + 0.3
+	var rcol := Color(roof_tint.x, roof_tint.y, roof_tint.z, 0.0)
+	var ru := Vector2(seed, 7.0)
+	for s in [-1.0, 1.0]:
+		var eave: Vector3 = base + ax * s * (span * 0.5 + ov) - Vector3(0, drop, 0)
+		var nrm: Vector3 = (ax * s * rh + Vector3(0, span * 0.5, 0)).normalized()
+		_bb_poly(st, [eave - bx * hb, eave + bx * hb, top + bx * hb, top - bx * hb], nrm, rcol, ru)
+	var wcol := Color(wall_tint.x, wall_tint.y, wall_tint.z, lit)
+	var wu := Vector2(seed, style)
+	for s in [-1.0, 1.0]:
+		var g0: Vector3 = base + bx * s * len * 0.5
+		_bb_poly(st, [g0 - ax * span * 0.5, g0 + ax * span * 0.5, top + bx * s * len * 0.5], bx * s, wcol, wu)
 
 
 static func _bb_flush(root: Node3D) -> void:

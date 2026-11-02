@@ -322,6 +322,8 @@ func _build_title() -> void:
 		"drag": "DRAG · E/Q SCHALTEN"}
 	var sub := _label(root, 11, HORIZONTAL_ALIGNMENT_CENTER)
 	sub.text = "%s   ·   %s   ·   Gas/Enter: los" % [kind.get(event_type, "SPRINT"), "ALLEIN" if event_type == "drift" else "4 FAHRER"]
+	if race.has("city"):
+		sub.text = "%s   ·   %s   ·   Karte © OpenStreetMap-Mitwirkende   ·   Gas/Enter: los" % [race.get("town", "").to_upper(), kind.get(event_type, "SPRINT")]
 	sub.modulate = Color(0.6, 0.85, 1.0)
 	sub.anchor_top = 1.0
 	sub.anchor_right = 1.0
@@ -527,12 +529,26 @@ func _update_world(dt: float) -> void:
 	moon.light_energy = lerpf(0.25, 0.0, _tunnel_k)
 	if _reverb:
 		_reverb.wet = lerpf(0.0, 0.3, _tunnel_k)
-	var arr: Array = track["districts"]
-	var di := clampi(int(player.progress / Track.DISTRICT_LEN), 0, arr.size() - 1)
-	if di != _district_i:
-		if _district_i < 0 or arr[di] != arr[_district_i]:
-			_show_area(Track.DISTRICTS[arr[di]]["name"])
-		_district_i = di
+	var city: Dictionary = track["city"]
+	if not city.is_empty():
+		# Orts-Strecke: echter Straßenname beim Abbiegen
+		var pd: float = fposmod(player.progress, track["length"]) if track["loop"] else player.progress
+		var si := -1
+		var streets: Array = city["streets"]
+		for i in streets.size():
+			if pd >= streets[i][0] - 5.0:
+				si = i
+		if si != _district_i and si >= 0 and player.path_id == 0:
+			if _district_i < 0 or streets[si][2] != streets[_district_i][2]:
+				_show_area(streets[si][2].to_upper())
+			_district_i = si
+	else:
+		var arr: Array = track["districts"]
+		var di := clampi(int(player.progress / Track.DISTRICT_LEN), 0, arr.size() - 1)
+		if di != _district_i:
+			if _district_i < 0 or arr[di] != arr[_district_i]:
+				_show_area(Track.DISTRICTS[arr[di]]["name"])
+			_district_i = di
 	if _area_t > 0.0:
 		_area_t -= dt
 		hud["area"].modulate.a = clampf(_area_t / 0.6, 0.0, 1.0) * clampf((3.0 - _area_t) / 0.3, 0.0, 1.0)

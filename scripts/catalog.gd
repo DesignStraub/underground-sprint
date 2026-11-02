@@ -219,6 +219,29 @@ const RACES := [
 	{"name": "Altstadt Ring", "type": "circuit", "tier": 2, "laps": 2, "seed": 131, "corners": 10, "radius": 290.0,
 		"bulges": {2: "fork", 6: "alley"},
 		"districts": {"residential": 0.5, "boulevard": 0.3, "downtown": 0.2}},
+	# --- Orts-Strecken: echte Straßenverläufe (OpenStreetMap, tools/osm_city.py), Wahrzeichen an ihrem Platz.
+	# city = Schlüssel in city_data.gd, town = Ortsschild, shops = Ladennamen der Stadt, station = Haltestelle am Bahnübergang
+	{"name": "Aachen Grabenring", "type": "circuit", "tier": 2, "laps": 2, "seed": 801, "city": "aachen", "town": "Aachen",
+		"shops": ["PRINTEN", "ÖCHER BRAUHAUS", "CAMPUS BAR", "DOMCAFÉ", "PONTSTRASSE", "THERMALBAD", "MENSA", "KAISERCAFÉ"],
+		"districts": {"altstadt_de": 0.35, "innenstadt_de": 0.45, "campus_de": 0.2},
+		"desc": "Über den Grabenring am SuperC der RWTH, am Elisenbrunnen und am Theater vorbei. In der Mitte Dom und Rathaus."},
+	{"name": "Würzburg Mainufer", "type": "sprint", "tier": 3, "seed": 802, "city": "wuerzburg", "town": "Würzburg",
+		"shops": ["BOCKSBEUTEL", "FRANKENWEIN", "BRÜCKENSCHOPPEN", "WEINHAUS", "KILIANI", "MAINFRANKEN", "SCHOPPEN"],
+		"districts": {"altstadt_de": 0.35, "innenstadt_de": 0.45, "vorstadt_de": 0.2},
+		"desc": "Rennweg an der Residenz, über die Ludwigsbrücke, unter der Festung Marienberg entlang, über die Friedensbrücke zum Alten Kranen."},
+	{"name": "Bad Kissingen Kurmeile", "type": "sprint", "tier": 1, "seed": 803, "city": "badkissingen", "town": "Bad Kissingen",
+		"shops": ["KURCAFÉ", "KURAPOTHEKE", "RAKOCZY", "TRINKHALLE", "KONZERTCAFÉ", "KURHAUS", "SALINE"],
+		"districts": {"kurviertel_de": 0.55, "innenstadt_de": 0.2, "vorstadt_de": 0.25},
+		"desc": "Vom Regentenbau am Kurgarten über die Saale, dann am Fluss entlang zum Gradierbau der Oberen Saline."},
+	{"name": "Tauberbischofsheim Altstadt", "type": "circuit", "tier": 1, "laps": 3, "seed": 804, "city": "tbb", "town": "Tauberbischofsheim",
+		"shops": ["FECHTCLUB", "TAUBERWEIN", "FECHTERSTADT", "TAUBERTAL", "LIOBA CAFÉ", "SCHLOSSCAFÉ"],
+		"districts": {"altstadt_de": 0.6, "vorstadt_de": 0.4},
+		"desc": "Rund um die Altstadt der Fechterstadt, Türmersturm, Rathaus und St. Martin immer im Blick."},
+	{"name": "Hammelburg Saaleck", "type": "sprint", "tier": 2, "seed": 805, "city": "hammelburg", "town": "Hammelburg",
+		"station": "HAMMELBURG",
+		"shops": ["WEINSTADT", "HÄCKERWIRTSCHAFT", "SAALETAL", "WEINFEST", "WINZERSTUBE", "STADTSCHÄNKE"],
+		"districts": {"altstadt_de": 0.5, "vorstadt_de": 0.5},
+		"desc": "Über die Bahnlinie in die Altstadt, am Rathaus mit Marktbrunnen vorbei, über die Saale hinauf zu Schloss Saaleck."},
 ]
 
 const EVENT_TYPES := {
@@ -228,3 +251,5 @@ const EVENT_TYPES := {
 	"drag": {"label": "Drag", "desc": "Geradeaus gegen 3 Gegner. A/D wechselt die Spur, E/Q schaltet: im grünen Bereich perfekt. Zu lange im Begrenzer: Motorschaden. Crash mit Verkehr: Totalschaden."},
 }
 const TYPE_ORDER := ["sprint", "circuit", "drag", "drift"]
+## Orts-Strecken stehen im Menü unter eigener Rubrik (nicht zusätzlich unter Sprint/Rundkurs)
+const CITY_EVENTS := {"label": "Städte", "desc": "Echte Straßen aus Aachen, Würzburg, Bad Kissingen, Tauberbischofsheim und Hammelburg, die Wahrzeichen stehen an ihrem Platz. Kartendaten © OpenStreetMap-Mitwirkende."}

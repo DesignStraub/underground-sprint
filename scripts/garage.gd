@@ -148,9 +148,16 @@ func _build_ui() -> void:
 	root.add_child(menu)
 
 	info = _label(root, 10)
-	info.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
-	info.position = Vector2(14, -70)
-	info.size = Vector2(210, 64)
+	# feste Anker statt position: vor dem ersten Layout kennt root seine Größe noch nicht (Text landete sonst oben außerhalb)
+	info.anchor_left = 0.0
+	info.anchor_right = 0.0
+	info.anchor_top = 1.0
+	info.anchor_bottom = 1.0
+	info.offset_left = 14.0
+	info.offset_right = 300.0
+	info.offset_top = -96.0
+	info.offset_bottom = -26.0
+	info.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	info.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
 	info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 
@@ -265,37 +272,47 @@ func _show_settings() -> void:
 ## Erst die Art wählen, dann das Event. Alles ist frei wählbar; Drift-Siege schalten Driftautos frei.
 func _show_races() -> void:
 	_clear_menu()
-	for type in Catalog.TYPE_ORDER:
+	for type in Catalog.TYPE_ORDER + ["city"]:
 		var n := 0
 		for r in Catalog.RACES:
-			if r["type"] == type:
+			if _in_list(r, type):
 				n += 1
 		var t: String = type
-		var b := _button("%s  (%d)" % [Catalog.EVENT_TYPES[type]["label"], n], func(): _show_events(t))
-		b.focus_entered.connect(func(): info.text = Catalog.EVENT_TYPES[t]["desc"])
+		var ty: Dictionary = Catalog.CITY_EVENTS if type == "city" else Catalog.EVENT_TYPES[type]
+		var b := _button("%s  (%d)" % [ty["label"], n], func(): _show_events(t))
+		b.focus_entered.connect(func(): info.text = ty["desc"])
 	_button("< Zurück", _show_main)
 	info.text = "Fahr, worauf du Lust hast. Rennsiege schalten schnelle Autos frei, Driftsiege die Driftautos.\nTempo-Stufe: %d %% (steigt mit jedem Sieg)" % int(GameState.pace() * 100.0)
 	_focus_first()
+
+
+## Orts-Strecken nur unter "Städte", nicht zusätzlich unter ihrer Art
+func _in_list(r: Dictionary, type: String) -> bool:
+	return r.has("city") if type == "city" else (r["type"] == type and not r.has("city"))
 
 
 func _show_events(type: String) -> void:
 	_clear_menu()
 	for i in Catalog.RACES.size():
 		var r: Dictionary = Catalog.RACES[i]
-		if r["type"] != type:
+		if not _in_list(r, type):
 			continue
+		var rt: String = r["type"]
 		var txt: String = "%s  %s" % [r["name"], "*".repeat(r["tier"])]
 		if GameState.best_times.has(r["name"]):
 			var best: float = GameState.best_times[r["name"]]
-			txt += "   " + ("%d Pkt" % int(best) if type == "drift" else "%d:%05.2f" % [int(best) / 60, fmod(best, 60.0)])
+			txt += "   " + ("%d Pkt" % int(best) if rt == "drift" else "%d:%05.2f" % [int(best) / 60, fmod(best, 60.0)])
 		var idx := i
 		var b := _button(txt, func(): _start_race(idx))
 		var extra := ""
-		if r.has("laps") and type != "sprint":
+		if r.has("laps") and rt != "sprint":
 			extra = "%d Runden. " % r["laps"]
-		b.focus_entered.connect(func(): info.text = extra + Catalog.EVENT_TYPES[type]["desc"])
+		var desc: String = r.get("desc", Catalog.EVENT_TYPES[rt]["desc"])
+		if r.has("city"):
+			extra = Catalog.EVENT_TYPES[rt]["label"] + ". " + extra
+		b.focus_entered.connect(func(): info.text = extra + desc)
 	_button("< Zurück", _show_races)
-	info.text = Catalog.EVENT_TYPES[type]["desc"]
+	info.text = Catalog.CITY_EVENTS["desc"] if type == "city" else Catalog.EVENT_TYPES[type]["desc"]
 	_focus_first()
 
 

@@ -27,6 +27,8 @@ const DEMO_STEPS := [[5.4, "ui_down"], [6.0, "ui_accept"], [6.9, "ui_right"], [7
 	[11.4, "ui_right"], [12.4, "ui_cancel"], [13.2, "ui_accept"], [14.0, "ui_accept"]]
 var _step := 0
 var view: PackedStringArray = []  # --view=pfad:d:quer:höhe:ziel_d:ziel_quer:ziel_höhe  feste Kamera (Weg 0 = Hauptstraße)
+var _menu_done := false
+var look: PackedStringArray = []  # --look=wahrzeichen:höhe:blickhöhe:abstand[:d]  Kamera von der Straße auf ein Wahrzeichen (Orts-Strecken)
 var _vcam: Camera3D
 var _drift_t := -1.0  # laufendes Drift-Manöver (--drifty)
 var _drift_dir := 0.0
@@ -49,6 +51,8 @@ func _ready() -> void:
 			drive = true
 		elif a.begins_with("--view="):
 			view = a.substr(7).split(":")
+		elif a.begins_with("--look="):
+			look = a.substr(7).split(":")
 		elif a.begins_with("--times="):
 			times = []
 			for t in a.substr(8).split(","):
@@ -77,6 +81,11 @@ func _process(dt: float) -> void:
 			Input.parse_input_event(ev)
 		_step += 1
 	var race = get_tree().current_scene
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--menu=") and race and race.has_method("_show_events") and _t > 0.8 and not _menu_done:
+			_menu_done = true  # Test: Garage direkt auf einer Event-Liste öffnen (z. B. --menu=city)
+			race._show_races()
+			race._show_events(a.substr(7))
 	if view.size() >= 7 and race and "curve" in race and race.world:
 		if _vcam == null:
 			_vcam = Camera3D.new()
@@ -92,6 +101,26 @@ func _process(dt: float) -> void:
 		_vcam.global_position = fa["pos"] + fa["right"] * float(view[2]) + Vector3(0, float(view[3]), 0)
 		_vcam.look_at(fb["pos"] + fb["right"] * float(view[5]) + Vector3(0, float(view[6]), 0), Vector3.UP)
 		_vcam.make_current()
+	if look.size() >= 4 and race and "curve" in race and race.world:
+		var lm: Node3D = race.track["node"].get_node_or_null(look[0])
+		if lm:
+			if _vcam == null:
+				_vcam = Camera3D.new()
+				_vcam.fov = 60.0
+				_vcam.far = 3000.0
+				race.world.add_child(_vcam)
+				for ch in race.get_children():
+					if ch is CanvasLayer and ch.layer >= 0:
+						ch.visible = false
+			var q: Vector3 = (race.track["curve"] as Curve3D).get_closest_point(lm.global_position)
+			if look.size() >= 5:
+				q = Track.frame_at(race.track["curve"], float(look[4]))["pos"]  # Kamera an Streckenmeter statt am nächsten Punkt
+			var to := lm.global_position - q
+			to.y = 0.0
+			to = to.normalized()
+			_vcam.global_position = q - to * float(look[3]) + Vector3(0, float(look[1]), 0)
+			_vcam.look_at(lm.global_position + Vector3(0, float(look[2]), 0), Vector3.UP)
+			_vcam.make_current()
 	if at != "" and race and "curve" in race and race.player:
 		if not _placed and race.state == 1:
 			_placed = true
@@ -202,6 +231,11 @@ func _process(dt: float) -> void:
 		for n in get_tree().get_nodes_in_group("ambient"):
 			if "_cars" in n:
 				print("   zug aktiv=%s d=%.0f (%.0f-%.0f) sichtbar=%s y=%.1f" % [n._active, n._d, n.d_from, n.d_to, n._cars[0].visible, n._cars[0].global_position.y])
+	if OS.get_cmdline_user_args().has("--racelog") and race and "curve" in race and race.player and fmod(_t, 3.0) < dt:
+		# kompakter Rennverlauf: eigenes Auto, Gegner (Gesamtfortschritt), Bildrate
+		var pl = race.player
+		print("rl t=%.0f gesamt=%.0f/%.0f platz=%d status=%d wand=%d fps=%d ki=%s" % [_t, pl.total, race.track["finish"], race._place(), race.state,
+			pl.wall_hits, Engine.get_frames_per_second(), race.ais.map(func(a): return int(a.total))])
 	if prefix != "" and _i < times.size() and _t >= times[_i]:
 		get_viewport().get_texture().get_image().save_png("%s_%d.png" % [prefix, _i])
 		_i += 1
