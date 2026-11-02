@@ -88,6 +88,12 @@ var _spin := 0.0
 var _on_walk := false
 var _crash_cooldown := 0.0
 var _ground_vy := 0.0
+var _curb_y := 0.0  # Bordstein-Anteil der Höhe (weich), die Fahrbahnhöhe selbst gilt sofort
+var _base_y := 0.0
+var _base_vy := 0.0
+var _base_ok := false
+var _slope_pitch := 0.0
+var _slope_roll := 0.0
 var _cam_yaw := 0.0
 var _cam_pos := Vector3.ZERO
 var _cam_init := false
@@ -217,7 +223,8 @@ func _physics_process(dt: float) -> void:
 			var lim := SHIFT_RPM - 300.0 + sin(Time.get_ticks_msec() * 0.025) * 150.0
 			rpm = move_toward(rpm, 900.0 + thr * (lim - 900.0), dt * (7000.0 if thr > 0.1 else 4000.0))
 		thr = 0.0
-		brk = 0.6 if finished else 0.0
+		# nach dem Ziel bremsen bis zum Stand (nicht weiter: Bremse im Stand wäre Rückwärtsgang)
+		brk = 1.0 if finished and speed_fwd > 0.3 else 0.0
 		steer_in = 0.0
 		hb = false
 		want_nitro = false
@@ -287,6 +294,8 @@ func _physics_process(dt: float) -> void:
 				a -= 9.0 * brk
 		if hb:
 			a -= signf(speed_fwd) * 4.0
+		# Bergauf etwas zäher, bergab etwas Schwung (abgeschwächt, damit es nicht frustriert)
+		a -= 6.0 * sin(_slope_pitch)
 	if speed_fwd > eff_top:
 		a = minf(a, -6.0)
 	speed_fwd += a * dt
@@ -373,6 +382,12 @@ func _physics_process(dt: float) -> void:
 	if airborne:
 		pitch = clampf(atan2(vy, maxf(spd, 1.0)) * 0.8, -0.35, 0.3)
 	Builder.animate(model, speed_fwd, steer, steer * sf * 0.045 - clampf(l2 * 0.003, -0.035, 0.035), pitch, nitro_on, dt)
+	# Ganzes Auto in die Steigung neigen (Trog, Bergstraße)
+	if not airborne:
+		model.rotation.x = lerp_angle(model.rotation.x, _slope_pitch, 1.0 - exp(-dt * 12.0))
+		model.rotation.z = lerp_angle(model.rotation.z, _slope_roll, 1.0 - exp(-dt * 12.0))
+	else:
+		model.rotation.z = lerp_angle(model.rotation.z, 0.0, 1.0 - exp(-dt * 3.0))
 	_update_camera(dt, sf)
 
 	audio.rpm = rpm
@@ -453,16 +468,30 @@ func _update_vertical(dt: float) -> void:
 	total = lap * track["length"] + progress
 	var g := Track.ground(track, loc, global_position)
 	var gh: float = g["h"]
+	var base: float = g["base"]
+	# Fahrbahnneigung in Fahrtrichtung des Autos
+	var pc: Curve3D = loc["path"]["curve"]
+	var sl := Track.slope_at(pc, loc["d"])
+	var tf: Vector3 = Track.frame_at(pc, loc["d"])["fwd"]
+	_slope_pitch = atan(sl * (-global_basis.z).dot(tf))
+	_slope_roll = atan(sl * global_basis.x.dot(tf))
+	var bvy := (base - _base_y) / maxf(dt, 0.0001)
+	var crest := _base_ok and absf(base - _base_y) < 2.0 and bvy < _base_vy - GRAVITY * dt * 1.1 and absf(speed_fwd) > 15.0
+	_base_ok = true
+	_base_vy = bvy
+	_base_y = base
 	if airborne:
 		vy -= GRAVITY * dt
 		position.y += vy * dt
 		air_time += dt
 		if position.y <= gh:
+			_curb_y = gh - base
+			vy -= bvy  # Aufprall relativ zur Fahrbahn (bergab landet es sich weicher)
 			_land(gh, g["water"])
 		return
 	var prev := position.y
-	if gh < prev - 0.35 and absf(speed_fwd) > 6.0:
-		# Rampenende: abheben
+	if gh - base < _curb_y - 0.35 and absf(speed_fwd) > 6.0 or crest:
+		# Rampenende oder Kuppe (die Straße fällt schneller weg, als die Schwerkraft das Auto mitnimmt): abheben
 		airborne = true
 		vy = minf(_ground_vy, MAX_LAUNCH_VY)
 		air_time = 0.0
@@ -481,9 +510,10 @@ func _update_vertical(dt: float) -> void:
 			velocity *= 0.97
 		model.get_meta("body").rotation.z += 0.04 * signf(lateral) * (1.0 if on_walk else -1.0)
 	if g["ramp"]:
-		position.y = gh
+		_curb_y = gh - base
 	else:
-		position.y = move_toward(prev, gh, dt * 3.0)
+		_curb_y = move_toward(_curb_y, gh - base, dt * 3.0)
+	position.y = base + _curb_y
 	_ground_vy = (position.y - prev) / maxf(dt, 0.0001)
 
 
@@ -584,6 +614,10 @@ func place(xform: Transform3D) -> void:
 	vy = 0.0
 	sinking = 0.0
 	_cam_init = false
+	_base_ok = false
+	_curb_y = 0.0
+	if model:
+		model.rotation = Vector3.ZERO
 
 
 ## Verkehr ist das Schlimmste (frontal oder Auffahren: Dreher, kurz keine Kontrolle; seitlich: abprallen),

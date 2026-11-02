@@ -211,6 +211,7 @@ func _physics_process(dt: float) -> void:
 	if airborne:
 		pitch = clampf(atan2(vy, maxf(speed, 1.0)) * 0.8, -0.35, 0.3)
 	Builder.animate(model, speed, _steer, _steer * 0.04, pitch, false, dt)
+	model.rotation.x = lerp_angle(model.rotation.x, 0.0 if airborne else atan(Track.slope_at(c, d)), 1.0 - exp(-dt * 12.0))
 
 
 func _update_vertical(dt: float) -> void:

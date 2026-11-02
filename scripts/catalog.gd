@@ -45,9 +45,41 @@ const CARS := {
 		# Tiefer, grollender V8
 		"sound": {"cyl": 8, "harm": [1.0, 0.7, 0.35, 0.15], "sub": 0.6, "turbo": 0.0, "rough": 0.4},
 	},
+	"hachi": {
+		"name": "Hachi Touge", "style": "hatch", "unlock": {"race": 1, "drift": 1}, "drift": 0.85,
+		"length": 4.2, "width": 1.66,
+		"accel": 9.0, "top_speed": 56.0, "grip": 22.0, "steer": 2.6,
+		"desc": "Leichtes 80er-Fließheck mit Heckantrieb. Wenig Leistung, viel Gefühl.",
+		# Kleiner, drehfreudiger Sauger-Vierzylinder
+		"sound": {"cyl": 4, "harm": [1.0, 0.5, 0.26, 0.12], "sub": 0.22, "turbo": 0.0, "rough": 0.3},
+	},
+	"tsubame": {
+		"name": "Tsubame Spyder", "style": "roadster", "unlock": {"race": 3}, "drift": 0.6,
+		"length": 4.1, "width": 1.75,
+		"accel": 10.6, "top_speed": 62.0, "grip": 25.0, "steer": 2.55,
+		"desc": "Offener Zweisitzer mit langer Haube. Flink und präzise.",
+		# Kreischender Hochdrehzahl-Sauger
+		"sound": {"cyl": 4, "harm": [1.0, 0.38, 0.3, 0.16], "sub": 0.12, "turbo": 0.0, "rough": 0.12},
+	},
+	"raijin": {
+		"name": "Raijin RS-4", "style": "sedan", "unlock": {"race": 7}, "drift": 0.25,
+		"length": 4.45, "width": 1.8,
+		"accel": 12.6, "top_speed": 70.0, "grip": 29.0, "steer": 2.15,
+		"desc": "Rallye-Limousine mit Allrad-Gefühl. Klebt auf der Straße.",
+		# Rauer Turbo-Vierzylinder mit Ladedruck-Zischen
+		"sound": {"cyl": 4, "harm": [1.0, 0.65, 0.4, 0.2], "sub": 0.6, "turbo": 0.9, "rough": 0.5},
+	},
+	"kaze": {
+		"name": "Kaze TT", "style": "coupe", "unlock": {"race": 9, "drift": 4}, "drift": 0.55,
+		"length": 4.5, "width": 1.81,
+		"accel": 12.8, "top_speed": 76.0, "grip": 25.0, "steer": 2.1,
+		"desc": "Langes Biturbo-Coupé mit Bügelflügel. Das schnellste Auto der Stadt.",
+		# Reihensechser mit zwei Turbos
+		"sound": {"cyl": 6, "harm": [1.0, 0.55, 0.32, 0.14], "sub": 0.2, "turbo": 1.0, "rough": 0.15},
+	},
 }
 
-const CAR_ORDER := ["kaizen", "mirai", "sakura", "vortex", "ronin"]
+const CAR_ORDER := ["kaizen", "hachi", "mirai", "sakura", "tsubame", "vortex", "raijin", "ronin", "kaze"]
 
 ## Jede Kategorie: Liste von Optionen {name, wins, ...}.
 const PARTS := {

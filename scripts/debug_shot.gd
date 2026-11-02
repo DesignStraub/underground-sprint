@@ -4,7 +4,7 @@ extends Node
 ##   -- --shot=/pfad/pre   speichert Screenshots
 ##   -- --quit=40          beendet nach 40 Sekunden
 ##   -- --demo             klickt sich nach dem Intro durchs Menü (Tuning zeigen, Rennen starten)
-##   -- --at=lake|crossing|alley|tunnel|el|stadium|<viertel>|d:<meter>   setzt das Auto nach dem Start direkt vor die Stelle
+##   -- --at=lake|crossing|alley|fork|tunnel|el|stadium|<viertel>|d:<meter>   setzt das Auto nach dem Start direkt vor die Stelle
 ##   -- --race=2           wählt die Strecke (Index in Catalog.RACES)
 ##   -- --times=1.5,4,8    Zeitpunkte für Screenshots
 
@@ -26,6 +26,8 @@ const DEMO_STEPS := [[5.4, "ui_down"], [6.0, "ui_accept"], [6.9, "ui_right"], [7
 	[8.3, "ui_down"], [8.8, "ui_right"], [9.5, "ui_right"], [10.2, "ui_down"], [10.7, "ui_right"],
 	[11.4, "ui_right"], [12.4, "ui_cancel"], [13.2, "ui_accept"], [14.0, "ui_accept"]]
 var _step := 0
+var view: PackedStringArray = []  # --view=pfad:d:quer:höhe:ziel_d:ziel_quer:ziel_höhe  feste Kamera (Weg 0 = Hauptstraße)
+var _vcam: Camera3D
 var _drift_t := -1.0  # laufendes Drift-Manöver (--drifty)
 var _drift_dir := 0.0
 
@@ -45,6 +47,8 @@ func _ready() -> void:
 		elif a.begins_with("--at="):
 			at = a.substr(5)
 			drive = true
+		elif a.begins_with("--view="):
+			view = a.substr(7).split(":")
 		elif a.begins_with("--times="):
 			times = []
 			for t in a.substr(8).split(","):
@@ -73,6 +77,21 @@ func _process(dt: float) -> void:
 			Input.parse_input_event(ev)
 		_step += 1
 	var race = get_tree().current_scene
+	if view.size() >= 7 and race and "curve" in race and race.world:
+		if _vcam == null:
+			_vcam = Camera3D.new()
+			_vcam.fov = 60.0
+			_vcam.far = 2000.0
+			race.world.add_child(_vcam)
+			for ch in race.get_children():
+				if ch is CanvasLayer and ch.layer >= 0:
+					ch.visible = false  # HUD aus, nur die Welt
+		var vc: Curve3D = race.track["paths"][int(view[0])]["curve"]
+		var fa := Track.frame_at(vc, float(view[1]))
+		var fb := Track.frame_at(vc, float(view[4]))
+		_vcam.global_position = fa["pos"] + fa["right"] * float(view[2]) + Vector3(0, float(view[3]), 0)
+		_vcam.look_at(fb["pos"] + fb["right"] * float(view[5]) + Vector3(0, float(view[6]), 0), Vector3.UP)
+		_vcam.make_current()
 	if at != "" and race and "curve" in race and race.player:
 		if not _placed and race.state == 1:
 			_placed = true
@@ -175,7 +194,7 @@ func _process(dt: float) -> void:
 		for t in race.traffic:
 			if absf(t.progress - pl.progress) < 12.0:
 				near += " T(%.1f,%.1f)" % [t.progress - pl.progress, t.lateral()]
-		print("t=%.1f d=%.1f lat=%.2f v=%.1f path=%d fps=%d%s" % [_t, pl.progress, pl.lateral, pl.speed_fwd, pl.path_id, Engine.get_frames_per_second(), near])
+		print("t=%.1f d=%.1f lat=%.2f v=%.1f path=%d y=%.2f luft=%s fps=%d%s" % [_t, pl.progress, pl.lateral, pl.speed_fwd, pl.path_id, pl.position.y, pl.airborne, Engine.get_frames_per_second(), near])
 		print("   runde=%d gesamt=%.0f ziel=%.0f status=%d platz=%d drift=%d kette=%d" % [pl.lap, pl.total, race.track["finish"], race.state, race._place(), int(race.drift_score), int(race.drift_chain)])
 		print("   rutscht=%s winkel=%.0f tempo=%.1f lenk=%.2f wand=%d manoever=%.2f" % [pl._sliding, pl.drift_angle, pl.velocity.length(), pl.steer, pl.wall_hits, _drift_t])
 		for n in get_tree().get_nodes_in_group("ambient"):
@@ -211,13 +230,13 @@ func _place_at(race) -> void:
 			var d := 0.0
 			match at:
 				"tunnel":
-					d = tr["tunnels"][0]["from"] - 90.0
+					d = tr["tunnels"][0]["r0"] - 50.0
 				"el":
 					d = tr["el"][0]["from"] - 220.0
 				"stadium":
 					d = tr["stadium_d"] - 160.0
 			_drop(race, d)
-		"lake", "alley":
+		"lake", "alley", "fork":
 			for p in tr["paths"]:
 				if p["kind"] == at:
 					var d := 30.0
@@ -225,7 +244,7 @@ func _place_at(race) -> void:
 						if r["path"] == p["id"]:
 							d = r["d0"] - 12.0
 					pl.place(Track.xform_at(p["curve"], d, 0.0))
-					pl.velocity = -pl.global_basis.z * (38.0 if at == "lake" else 22.0)
+					pl.velocity = -pl.global_basis.z * (38.0 if at != "alley" else 22.0)
 					break
 		_:
 			if at.begins_with("d:"):

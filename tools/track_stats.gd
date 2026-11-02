@@ -12,7 +12,7 @@ func _ready() -> void:
 		var kinds := []
 		for p in t["paths"]:
 			if p["id"] != 0:
-				kinds.append("%s(%.0fm, spart %.0fm)" % [p["kind"], p["length"], (p["to"] - p["from"]) - p["length"]])
+				kinds.append("%s#%d(%.0f-%.0f, %.0fm, spart %.0fm)" % [p["kind"], p["id"], p["from"], p["to"], p["length"], (p["to"] - p["from"]) - p["length"]])
 		print("%s: %.0f m, Kreuzung bei %.0f, %d Knoten, %d ms" % [r["name"], t["length"], t["crossing_d"],
 			_count(t["node"]), Time.get_ticks_msec() - t0])
 		var shaders := {}

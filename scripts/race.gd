@@ -11,8 +11,9 @@ const TACHO := preload("res://scripts/tacho.gd")
 const PixelView := preload("res://scripts/pixel_view.gd")
 const Traffic := preload("res://scripts/traffic_car.gd")
 const SKY_SHADER := preload("res://shaders/night_sky.gdshader")
+const RaceShow := preload("res://scripts/race_show.gd")
 
-enum State { COUNTDOWN, RACING, FINISHED }
+enum State { COUNTDOWN, RACING, FINISHED, INTRO }
 
 var race: Dictionary
 var track: Dictionary
@@ -53,6 +54,9 @@ var _tunnel_k := 0.0
 var _in_tunnel := false
 var _district_i := -1
 var _area_t := 0.0
+var show: Node3D  # Publikum, Starterin, Kameraflug, Zielszene
+var hud_layer: CanvasLayer
+var title_layer: CanvasLayer
 
 
 func _ready() -> void:
@@ -124,6 +128,19 @@ func _ready() -> void:
 	if event_type != "drift" and race.get("tier", 1) >= 2:
 		_spawn_traffic()
 	_build_hud()
+	show = RaceShow.new()
+	show.process_mode = Node.PROCESS_MODE_PAUSABLE
+	world.add_child(show)
+	show.setup(track, player, 0.0)
+	# Kameraflug übers Startfeld (bei Testläufen mit Kommandozeilen-Argumenten nur mit --intro)
+	var args := OS.get_cmdline_user_args()
+	if args.is_empty() or args.has("--intro"):
+		state = State.INTRO
+		hud_layer.visible = false
+		_build_title()
+		show.start_intro()
+	else:
+		show.ready_set()
 
 
 ## Verkehr: rechts in Fahrtrichtung, links Gegenverkehr. Erst ein Stück nach dem Start.
@@ -248,6 +265,40 @@ func _setup_environment() -> void:
 	world.add_child(moon)
 
 
+## Titel während des Kameraflugs: Eventname groß unten, darunter Art und Fahrerfeld
+func _build_title() -> void:
+	title_layer = CanvasLayer.new()
+	title_layer.layer = 2
+	add_child(title_layer)
+	var root := Control.new()
+	root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	title_layer.add_child(root)
+	var bar := ColorRect.new()
+	bar.color = Color(0, 0, 0, 0.55)
+	bar.anchor_top = 1.0
+	bar.anchor_right = 1.0
+	bar.anchor_bottom = 1.0
+	bar.offset_top = -64
+	root.add_child(bar)
+	var t := _label(root, 30, HORIZONTAL_ALIGNMENT_CENTER)
+	t.text = race["name"].to_upper()
+	t.anchor_top = 1.0
+	t.anchor_right = 1.0
+	t.anchor_bottom = 1.0
+	t.offset_top = -62
+	t.offset_bottom = -26
+	var kind := {"sprint": "SPRINT", "circuit": "RUNDKURS · %d RUNDEN" % track["laps"], "drift": "DRIFT · %d RUNDEN" % track["laps"]}
+	var sub := _label(root, 11, HORIZONTAL_ALIGNMENT_CENTER)
+	sub.text = "%s   ·   %s   ·   Gas/Enter: los" % [kind.get(event_type, "SPRINT"), "ALLEIN" if event_type == "drift" else "4 FAHRER"]
+	sub.modulate = Color(0.6, 0.85, 1.0)
+	sub.anchor_top = 1.0
+	sub.anchor_right = 1.0
+	sub.anchor_bottom = 1.0
+	sub.offset_top = -26
+	sub.offset_bottom = -8
+
+
 func _label(parent: Node, size: int, align := HORIZONTAL_ALIGNMENT_LEFT) -> Label:
 	var l := Label.new()
 	var ls := LabelSettings.new()
@@ -289,6 +340,7 @@ func _build_hud() -> void:
 	var layer := CanvasLayer.new()
 	layer.layer = 1
 	add_child(layer)
+	hud_layer = layer
 	var root := Control.new()
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -361,6 +413,13 @@ func _process(dt: float) -> void:
 	if get_tree().paused:
 		return
 	match state:
+		State.INTRO:
+			if show.intro_done():
+				state = State.COUNTDOWN
+				hud_layer.visible = true
+				title_layer.queue_free()
+				player.cam.make_current()
+				show.ready_set()
 		State.COUNTDOWN:
 			countdown -= dt
 			var n := int(ceil(countdown - 1.0))
@@ -370,6 +429,7 @@ func _process(dt: float) -> void:
 				_launch_check()
 				for ai in ais:
 					ai.running = true
+				show.go()
 				state = State.RACING
 		State.RACING:
 			race_time += dt
@@ -554,7 +614,7 @@ func _update_hud() -> void:
 	var tacho = hud["tacho"]
 	tacho.rpm = player.rpm
 	tacho.speed_kmh = int(absf(player.speed_fwd) * 3.6)
-	tacho.gear = "R" if player.speed_fwd < -0.5 else ("N" if state == State.COUNTDOWN else str(player.gear))
+	tacho.gear = "R" if player.speed_fwd < -0.5 else ("N" if state == State.COUNTDOWN or state == State.INTRO else str(player.gear))
 	tacho.nitro = player.nitro
 	tacho.nitro_on = player.nitro_on
 	hud["progress"].size.x = 198.0 * clampf((player_progress - track["start"]) / (track["finish"] - track["start"]), 0.0, 1.0)
@@ -590,6 +650,9 @@ func _update_hud() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if state == State.INTRO and (event.is_action_pressed("accelerate") or event.is_action_pressed("ui_accept")):
+		show.skip_intro()
+		return
 	if event.is_action_pressed("camera"):
 		player.toggle_camera()
 		_flash("Kamera: " + player.CAM_NAMES[player.cam_mode], Color(0.85, 0.9, 1.0))
@@ -627,7 +690,18 @@ func _on_player_finished() -> void:
 			GameState.best_times[key] = race_time
 	GameState.save_game()
 	hud["center"].text = "SIEG!" if place == 1 else "%d. PLATZ" % place
-	_show_result(place, new_best, unlocked)
+	# Zielszene: Verkehr in der Nähe verschwindet (sonst fährt er durch die Fans), Kamera kreist, Fans kommen
+	for t in traffic.duplicate():
+		if t.global_position.distance_to(player.global_position) < 180.0:
+			traffic.erase(t)
+			t.queue_free()
+	# Die Platzierung steht fest: Gegner verschwinden aus der Szene, statt durch die Fans zu fahren
+	for ai in ais:
+		ai.visible = false
+		ai.process_mode = Node.PROCESS_MODE_DISABLED
+		ai.collision_layer = 0
+	show.finish(place == 1)
+	get_tree().create_timer(4.5).timeout.connect(_show_result.bind(place, new_best, unlocked))
 
 
 func _show_result(place: int, new_best: bool, unlocked: Array) -> void:

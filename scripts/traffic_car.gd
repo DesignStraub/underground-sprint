@@ -129,9 +129,9 @@ func _physics_process(dt: float) -> void:
 	elif progress < 40.0:
 		progress = track_length - 10.0
 	var lat := Track.lane_lat(track, progress, _lane_cur) if path_id == 0 else _lane_cur
-	var xf := Track.xform_at(curve, progress, lat)
+	var xf := Track.xform_at(curve, progress, lat, true)
 	if dir < 0.0:
-		xf.basis = xf.basis.rotated(Vector3.UP, PI)
+		xf.basis = xf.basis * Basis(Vector3.UP, PI)  # um die eigene Hochachse: bergab bleibt bergab
 	var fwd := -xf.basis.z
 	velocity_vec = fwd * speed
 	global_transform = xf
