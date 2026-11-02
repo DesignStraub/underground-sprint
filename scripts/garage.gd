@@ -5,6 +5,22 @@ extends Node3D
 const Catalog := preload("res://scripts/catalog.gd")
 const Builder := preload("res://scripts/car_builder.gd")
 const PixelView := preload("res://scripts/pixel_view.gd")
+const UI := preload("res://scripts/ui_style.gd")
+
+## Ladetipps wie früher, nur ehrlicher
+const TIPS := [
+	"Lachgas ist kein Partygas. Shift drücken.",
+	"Im grünen Bereich schalten. Wie Mülltrennung: einfach richtig machen.",
+	"Blitzer gibt es hier keine. Glauben wir.",
+	"Gas kurz vor LOS, sonst qualmen nur die Reifen.",
+	"Knapp am Verkehr vorbei gibt Lachgas. Nicht zu knapp.",
+	"Auf Platz 4 gibt es eine Teilnahmeurkunde. Immerhin.",
+	"Handbremse plus Lenken gleich quer. Quer gleich Punkte.",
+	"Der TÜV kommt nächstes Jahr. Bis dahin: Vollgas.",
+	"In Würzburg nicht in den Main fahren. Der ist nass.",
+	"Abkürzungen sparen Zeit. Gegenverkehr kostet Nerven.",
+	"Baustellen sind hier Dauerzustand. Wie im echten Leben.",
+]
 
 var world: SubViewport
 var turntable: Node3D
@@ -14,6 +30,11 @@ var menu: VBoxContainer
 var title: Label
 var info: Label
 var status: Label
+var section: Label
+var stats: VBoxContainer
+var tip: Label
+var _tip_i := 0
+var _tip_t := 0.0
 var preview_car := ""
 var preview_cfg := {}
 var _t := 0.0
@@ -127,46 +148,153 @@ func _build_ui() -> void:
 	var root := Control.new()
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.theme = UI.theme()
 	layer.add_child(root)
-	var shade := ColorRect.new()
-	shade.color = Color(0, 0, 0, 0.45)
-	shade.position = Vector2(0, 0)
-	shade.size = Vector2(230, 2000)
-	root.add_child(shade)
+	# Abdunklung links (Menü) und unten (Tastenleiste), das Auto bleibt frei
+	var fade := UI.fade_rect(root, Color(0, 0, 0, 0.8))
+	fade.size = Vector2(330, 2000)
+	var bar := ColorRect.new()
+	bar.color = Color(0, 0, 0, 0.7)
+	bar.anchor_top = 1.0
+	bar.anchor_bottom = 1.0
+	bar.anchor_right = 1.0
+	bar.offset_top = -18.0
+	root.add_child(bar)
+	var bar_line := ColorRect.new()
+	bar_line.color = Color(UI.GREEN.r, UI.GREEN.g, UI.GREEN.b, 0.8)
+	bar_line.anchor_top = 1.0
+	bar_line.anchor_bottom = 1.0
+	bar_line.anchor_right = 1.0
+	bar_line.offset_top = -19.0
+	bar_line.offset_bottom = -18.0
+	root.add_child(bar_line)
 
-	title = _label(root, 22)
-	title.position = Vector2(14, 10)
-	title.text = "NEED FOR\nGESCHWINDIGKEIT"
-	title.label_settings.font_color = Color(0.4, 0.85, 1.0)
-	status = _label(root, 11)
-	status.position = Vector2(14, 72)
+	# Logo oben links
+	var small := _label(root, 9)
+	small.label_settings.font = UI.font("wide", 0.15)
+	small.text = "NEED FOR"
+	small.position = Vector2(14, 6)
+	title = _label(root, 17)
+	title.label_settings.font = UI.font("cond", 0.2)
+	title.text = "GESCHWINDIGKEIT"
+	title.label_settings.font_color = UI.CYAN
+	title.label_settings.shadow_color = Color(UI.PINK.r, UI.PINK.g, UI.PINK.b, 0.5)
+	title.label_settings.shadow_size = 4
+	title.label_settings.shadow_offset = Vector2.ZERO
+	title.position = Vector2(13, 15)
+	section = UI.section(root, Vector2(14, 38))
 
 	menu = VBoxContainer.new()
-	menu.position = Vector2(14, 96)
-	menu.custom_minimum_size = Vector2(200, 0)
+	menu.position = Vector2(14, 86)
+	menu.custom_minimum_size = Vector2(210, 0)
 	menu.add_theme_constant_override("separation", 3)
 	root.add_child(menu)
 
-	info = _label(root, 10)
-	# feste Anker statt position: vor dem ersten Layout kennt root seine Größe noch nicht (Text landete sonst oben außerhalb)
-	info.anchor_left = 0.0
-	info.anchor_right = 0.0
-	info.anchor_top = 1.0
-	info.anchor_bottom = 1.0
-	info.offset_left = 14.0
-	info.offset_right = 300.0
-	info.offset_top = -96.0
-	info.offset_bottom = -26.0
-	info.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	# oben rechts: Stand, Tipp, Leistung des Autos
+	status = _label(root, 10, HORIZONTAL_ALIGNMENT_RIGHT)
+	status.label_settings.font = UI.font("bold", 0.12)
+	status.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	status.offset_left = -330.0
+	status.offset_right = -12.0
+	status.offset_top = 8.0
+	tip = _label(root, 9, HORIZONTAL_ALIGNMENT_RIGHT)
+	tip.label_settings.font = UI.font("bold", 0.12)
+	tip.label_settings.font_color = UI.CYAN
+	tip.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	tip.offset_left = -330.0
+	tip.offset_right = -12.0
+	tip.offset_top = 22.0
+	tip.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	var sp := PanelContainer.new()
+	sp.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	sp.offset_left = -232.0
+	sp.offset_right = -12.0
+	sp.offset_top = 50.0
+	sp.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	root.add_child(sp)
+	stats = VBoxContainer.new()
+	stats.add_theme_constant_override("separation", 1)
+	sp.add_child(stats)
+
+	# Infotext in einer Glasfläche unten rechts
+	var panel := PanelContainer.new()
+	panel.anchor_left = 1.0
+	panel.anchor_right = 1.0
+	panel.anchor_top = 1.0
+	panel.anchor_bottom = 1.0
+	panel.offset_left = -300.0
+	panel.offset_right = -14.0
+	panel.offset_top = -92.0
+	panel.offset_bottom = -26.0
+	panel.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	root.add_child(panel)
+	info = _label(panel, 10)
+	info.label_settings.font = UI.font("bold", 0.0)
 	info.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
 	info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	info.custom_minimum_size = Vector2(250, 0)
 
-	var music := _label(root, 10, HORIZONTAL_ALIGNMENT_RIGHT)
-	music.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-	music.position = Vector2(-330, -22)
-	music.size = Vector2(320, 16)
+	var keys := _label(root, 9)
+	keys.label_settings.font = UI.font("bold", 0.12)
+	keys.text = "ENTER  Auswählen      ESC  Zurück      ←/→  Ändern      F11  Vollbild"
+	keys.anchor_top = 1.0
+	keys.anchor_bottom = 1.0
+	keys.offset_left = 14.0
+	keys.offset_top = -16.0
+	keys.offset_right = 400.0
+	var music := _label(root, 9, HORIZONTAL_ALIGNMENT_RIGHT)
+	music.label_settings.font = UI.font("bold", 0.12)
+	music.label_settings.font_color = Color(0.7, 0.75, 0.85)
+	music.anchor_left = 1.0
+	music.anchor_right = 1.0
+	music.anchor_top = 1.0
+	music.anchor_bottom = 1.0
+	music.offset_left = -330.0
+	music.offset_right = -12.0
+	music.offset_top = -16.0
 	music.set_meta("music", true)
 	_music_label = music
+	_tip_i = randi() % TIPS.size()
+	tip.text = "TIPP: " + TIPS[_tip_i]
+
+
+## Leistungsbalken wie im Autohaus (10 Segmente), Motor-Tuning eingerechnet
+func _show_stats(car_id: String, cfg: Dictionary) -> void:
+	for c in stats.get_children():
+		c.queue_free()
+	var spec: Dictionary = Catalog.CARS[car_id]
+	var eng: Dictionary = Catalog.PARTS["engine"]["options"][cfg.get("engine", 0)]
+	var head := _label(stats, 10, HORIZONTAL_ALIGNMENT_RIGHT)
+	head.label_settings.font = UI.font("cond", 0.2)
+	head.label_settings.font_color = UI.GREEN
+	head.text = "LEISTUNG"
+	for row in [["BESCHLEUNIGUNG", spec["accel"] * eng["accel"], 9.0, 14.5], ["TOPSPEED", spec["top_speed"] * eng["top"], 54.0, 82.0],
+			["GRIP", spec["grip"], 19.0, 30.0], ["DRIFT", spec.get("drift", 0.3), 0.0, 1.0]]:
+		var hb := HBoxContainer.new()
+		hb.add_theme_constant_override("separation", 2)
+		stats.add_child(hb)
+		var l := _label(hb, 8)
+		l.label_settings.font = UI.font("bold", 0.12)
+		l.text = row[0]
+		l.custom_minimum_size = Vector2(76, 0)
+		var n := int(round(clampf((row[1] - row[2]) / (row[3] - row[2]), 0.05, 1.0) * 10.0))
+		for k in 10:
+			var seg := ColorRect.new()
+			seg.custom_minimum_size = Vector2(11, 6)
+			seg.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+			seg.color = (UI.GREEN if k < n else Color(1, 1, 1, 0.12))
+			hb.add_child(seg)
+	var top := _label(stats, 8, HORIZONTAL_ALIGNMENT_RIGHT)
+	top.label_settings.font = UI.font("bold", 0.12)
+	top.label_settings.font_color = UI.CYAN
+	top.text = "%d KM/H" % int(spec["top_speed"] * eng["top"] * 3.6)
+
+
+func _set_section(text: String, with_stats := false) -> void:
+	section.text = text
+	stats.get_parent().visible = with_stats
+	if with_stats:
+		_show_stats(preview_car, preview_cfg)
 
 
 var _music_label: Label
@@ -186,11 +314,16 @@ func _label(parent: Node, size: int, align := HORIZONTAL_ALIGNMENT_LEFT) -> Labe
 
 func _process(dt: float) -> void:
 	_t += dt
+	_tip_t += dt
+	if _tip_t > 6.0:
+		_tip_t = 0.0
+		_tip_i = (_tip_i + 1) % TIPS.size()
+		tip.text = "TIPP: " + TIPS[_tip_i]
 	turntable.rotation.y += dt * 0.3
 	var target := Vector3(-1.6, 0.55, 0)
 	cam.position = Vector3(4.6 + sin(_t * 0.2) * 0.2, 1.7 + sin(_t * 0.3) * 0.08, 5.6)
 	cam.look_at(target)
-	status.text = "Rennsiege: %d   Driftsiege: %d   Auto: %s" % [GameState.wins, GameState.drift_wins, Catalog.CARS[GameState.current_car]["name"]]
+	status.text = "RENNSIEGE %d   ·   DRIFTSIEGE %d   ·   %s" % [GameState.wins, GameState.drift_wins, Catalog.CARS[GameState.current_car]["name"].to_upper()]
 	_music_label.text = ("Musik: " + Music.current_title) if Music.current_title != "" else "Keine Musik: mp3/ogg in music/ legen"
 
 
@@ -212,16 +345,23 @@ func _clear_menu() -> void:
 
 func _button(text: String, cb: Callable, disabled := false) -> Button:
 	var b := Button.new()
-	b.text = text
+	b.text = text.to_upper()
 	b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	b.disabled = disabled
-	b.add_theme_font_size_override("font_size", 12)
+	b.focus_entered.connect(func(): Sfx.play("whoosh", -26.0, 2.4))
 	b.pressed.connect(cb)
 	menu.add_child(b)
 	return b
 
 
 func _focus_first() -> void:
+	menu.modulate.a = 0.0
+	menu.position.x = -24.0
+	section.modulate.a = 0.0
+	var tw := create_tween().set_parallel().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	tw.tween_property(menu, "position:x", 14.0, 0.18)
+	tw.tween_property(menu, "modulate:a", 1.0, 0.18)
+	tw.tween_property(section, "modulate:a", 1.0, 0.25)
 	for c in menu.get_children():
 		if c is Button and not c.disabled:
 			c.grab_focus.call_deferred()
@@ -233,6 +373,7 @@ func _show_main() -> void:
 	preview_car = GameState.current_car
 	preview_cfg = GameState.get_config(preview_car).duplicate()
 	_show_car(preview_car, preview_cfg)
+	_set_section("GARAGE", true)
 	_button("Rennen fahren", _show_races)
 	_button("Tuning", _show_tuning)
 	_button("Auto wechseln", _show_cars)
@@ -246,6 +387,7 @@ func _show_main() -> void:
 ## Grafik, Vollbild, Spielstand: nicht auf der Startseite, sondern gesammelt hier
 func _show_settings() -> void:
 	_clear_menu()
+	_set_section("EINSTELLUNGEN")
 	var hints := {
 		"quality": "Niedrig: schnell, ohne Spiegelungen. Mittel: Spiegelungen auf nasser Straße. Hoch: alles, braucht eine starke Grafikkarte. Gilt ab dem nächsten Rennen.",
 		"pixel": "Pixel-Look: die 3D-Welt grob gerastert wie ein Retro-Spiel. Spart zusätzlich Leistung.",
@@ -272,6 +414,7 @@ func _show_settings() -> void:
 ## Erst die Art wählen, dann das Event. Alles ist frei wählbar; Drift-Siege schalten Driftautos frei.
 func _show_races() -> void:
 	_clear_menu()
+	_set_section("RENNEN")
 	for type in Catalog.TYPE_ORDER + ["city"]:
 		var n := 0
 		for r in Catalog.RACES:
@@ -293,6 +436,7 @@ func _in_list(r: Dictionary, type: String) -> bool:
 
 func _show_events(type: String) -> void:
 	_clear_menu()
+	_set_section(str(Catalog.CITY_EVENTS["label"] if type == "city" else Catalog.EVENT_TYPES[type]["label"]).to_upper())
 	for i in Catalog.RACES.size():
 		var r: Dictionary = Catalog.RACES[i]
 		if not _in_list(r, type):
@@ -324,6 +468,7 @@ func _start_race(i: int) -> void:
 
 func _show_tuning() -> void:
 	_clear_menu()
+	_set_section("TUNING", true)
 	for cat in Catalog.PART_ORDER:
 		var b := _button("", func(): _cycle_part(cat, 1))
 		b.set_meta("cat", cat)
@@ -341,7 +486,7 @@ func _refresh_tuning() -> void:
 		var cat: String = b.get_meta("cat")
 		var opt: Dictionary = Catalog.PARTS[cat]["options"][preview_cfg[cat]]
 		var lock := "" if GameState.is_part_unlocked(cat, preview_cfg[cat]) else "  [GESPERRT]"
-		b.text = "%s:  < %s >%s" % [Catalog.PARTS[cat]["label"], opt["name"], lock]
+		b.text = ("%s:  < %s >%s" % [Catalog.PARTS[cat]["label"], opt["name"], lock]).to_upper()
 
 
 func _cycle_part(cat: String, dir: int) -> void:
@@ -351,6 +496,7 @@ func _cycle_part(cat: String, dir: int) -> void:
 		GameState.get_config(preview_car)[cat] = preview_cfg[cat]
 		GameState.save_game()
 	_show_car(preview_car, preview_cfg)
+	_show_stats(preview_car, preview_cfg)
 	_refresh_tuning()
 	_part_info(cat)
 
@@ -367,6 +513,7 @@ func _part_info(cat: String) -> void:
 
 func _show_cars() -> void:
 	_clear_menu()
+	_set_section("AUTOHAUS", true)
 	var b := _button("", func(): _cycle_car(1))
 	b.set_meta("car", true)
 	b.gui_input.connect(func(ev): _lr_input(ev, _cycle_car))
@@ -387,12 +534,10 @@ func _cycle_car(dir: int) -> void:
 func _refresh_car() -> void:
 	var spec: Dictionary = Catalog.CARS[preview_car]
 	var unlocked := GameState.is_car_unlocked(preview_car)
-	menu.get_child(0).text = "< %s >%s" % [spec["name"], "" if unlocked else "  [GESPERRT]"]
+	menu.get_child(0).text = ("< %s >%s" % [spec["name"], "" if unlocked else "  [GESPERRT]"]).to_upper()
+	_show_stats(preview_car, preview_cfg)
 	menu.get_child(1).disabled = not unlocked
-	var stats := "Beschl. %s\nTopspeed %s  (%d km/h)\nGrip %s" % [
-		_stars(spec["accel"], 9.0, 13.0), _stars(spec["top_speed"], 55.0, 75.0), int(spec["top_speed"] * 3.6),
-		_stars(spec["grip"], 20.0, 29.0)] + "\nDrift %s" % _stars(spec["drift"], 0.0, 1.0)
-	info.text = spec["desc"] + "\n" + stats
+	info.text = spec["desc"] + "\nHöchstgeschwindigkeit ab Werk: %d km/h" % int(spec["top_speed"] * 3.6)
 	if not unlocked:
 		info.text += "\nFreischalten: " + GameState.unlock_text(preview_car)
 
@@ -411,6 +556,7 @@ func _choose_car() -> void:
 
 func _confirm_reset() -> void:
 	_clear_menu()
+	_set_section("ACHTUNG")
 	info.text = "Alle Siege und Tuningteile gehen verloren. Wie beim TÜV: weg ist weg."
 	_button("Ja, zurücksetzen", func(): GameState.reset_progress(); _show_main())
 	_button("Abbrechen", _show_main)

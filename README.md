@@ -117,6 +117,11 @@ Weitere mp3/ogg-Dateien in `music/` laufen automatisch mit, in zufälliger Reihe
 Motorsound, Reifen, Nitro und Crashs werden im Spiel erzeugt. Zug, Glocke, Landung, Platschen, Tunnel, Stadion usw.
 sind synthetisch erzeugte WAVs in `assets/sfx/` (`python3 tools/make_sfx.py`).
 
+## Menüs
+Im Stil von NFS Underground (`scripts/ui_style.gd`): schräge Leisten, Neongrün für die Auswahl, kursive
+DIN-Schmalschrift, große Abschnittstitel (GARAGE, RENNEN, TUNING, AUTOHAUS), Leistungsbalken des Autos (mit
+Motor-Tuning), Tastenleiste unten, wechselnde Tipps oben rechts. Pause und Ergebnis im gleichen Look.
+
 ## Schrift und Texte
 Alles auf Deutsch, mit Augenzwinkern (Lachgas statt NOS, Flugmodus bei Sprüngen, Teilnahmeurkunde für Platz 4,
 Dachwerbung wie „TÜV? NÄCHSTES JAHR.“). Schrift überall im Stil der deutschen Straßenschilder (DIN 1451):

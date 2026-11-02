@@ -83,10 +83,10 @@ func _process(dt: float) -> void:
 	var race = get_tree().current_scene
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--menu=") and race and race.has_method("_show_events") and _t > 0.8 and not _menu_done:
-			_menu_done = true  # Test: Garage direkt auf einer Event-Liste öffnen (z. B. --menu=city, --menu=tuning, --menu=main)
+			_menu_done = true  # Test: Garage direkt auf einer Event-Liste öffnen (z. B. --menu=city, --menu=tuning, --menu=cars, --menu=main)
 			var which := a.substr(7)
-			if which == "tuning":
-				race._show_tuning()
+			if race.has_method("_show_" + which):
+				race.call("_show_" + which)  # tuning, cars, settings, races
 			elif which != "main":
 				race._show_races()
 				race._show_events(which)

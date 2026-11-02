@@ -12,6 +12,7 @@ const PixelView := preload("res://scripts/pixel_view.gd")
 const Traffic := preload("res://scripts/traffic_car.gd")
 const SKY_SHADER := preload("res://shaders/night_sky.gdshader")
 const RaceShow := preload("res://scripts/race_show.gd")
+const UI := preload("res://scripts/ui_style.gd")
 
 enum State { COUNTDOWN, RACING, FINISHED, INTRO }
 
@@ -800,15 +801,10 @@ func _on_player_finished() -> void:
 
 func _show_result(place: int, new_best: bool, unlocked: Array, dnf := "") -> void:
 	var panel := PanelContainer.new()
+	panel.theme = UI.theme()
 	panel.set_anchors_preset(Control.PRESET_CENTER)
 	panel.position = Vector2(-150, 0)
 	panel.custom_minimum_size = Vector2(300, 0)
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(0.03, 0.03, 0.08, 0.88)
-	sb.border_color = Color(0.2, 0.7, 1.0)
-	sb.set_border_width_all(1)
-	sb.set_content_margin_all(10)
-	panel.add_theme_stylebox_override("panel", sb)
 	hud["center"].get_parent().add_child(panel)
 	var vb := VBoxContainer.new()
 	panel.add_child(vb)
@@ -834,11 +830,11 @@ func _show_result(place: int, new_best: bool, unlocked: Array, dnf := "") -> voi
 	hb.alignment = BoxContainer.ALIGNMENT_CENTER
 	vb.add_child(hb)
 	var again := Button.new()
-	again.text = "Nochmal"
+	again.text = "NOCHMAL"
 	again.pressed.connect(func(): get_tree().reload_current_scene())
 	hb.add_child(again)
 	var back := Button.new()
-	back.text = "Garage"
+	back.text = "GARAGE"
 	back.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/garage.tscn"))
 	hb.add_child(back)
 	back.grab_focus.call_deferred()
@@ -846,18 +842,23 @@ func _show_result(place: int, new_best: bool, unlocked: Array, dnf := "") -> voi
 
 func _build_pause(root: Control) -> void:
 	pause_panel = VBoxContainer.new()
+	pause_panel.theme = UI.theme()
 	pause_panel.set_anchors_preset(Control.PRESET_CENTER)
-	pause_panel.position = Vector2(-60, -40)
-	pause_panel.custom_minimum_size = Vector2(120, 0)
+	pause_panel.position = Vector2(-70, -50)
+	pause_panel.custom_minimum_size = Vector2(140, 0)
+	pause_panel.add_theme_constant_override("separation", 3)
 	pause_panel.visible = false
 	root.add_child(pause_panel)
-	var title := _label(pause_panel, 20, HORIZONTAL_ALIGNMENT_CENTER)
+	var title := _label(pause_panel, 28, HORIZONTAL_ALIGNMENT_CENTER)
+	title.label_settings.font = UI.font("cond", 0.22)
+	title.label_settings.font_color = UI.GREEN
 	title.text = "PAUSE"
 	for entry in [["Weiter", _toggle_pause], ["Vollbild", GameState.toggle_fullscreen],
 			["Neustart", func(): _unpause(); get_tree().reload_current_scene()],
 			["Garage", func(): _unpause(); get_tree().change_scene_to_file("res://scenes/garage.tscn")]]:
 		var b := Button.new()
-		b.text = entry[0]
+		b.text = entry[0].to_upper()
+		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		b.pressed.connect(entry[1])
 		pause_panel.add_child(b)
 
