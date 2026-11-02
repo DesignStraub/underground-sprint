@@ -37,6 +37,11 @@ void fragment() {
 	float wall = 1.0 - step(0.9, abs(wnorm.y));
 	float y = wpos.y - 4.2;
 	int st = int(style + 0.5);
+	// 8: Altbau wie 6, dazu Graffiti im Erdgeschoss (Kiez)
+	bool graffiti = st == 8;
+	if (graffiti) {
+		st = 6;
+	}
 	float win = 0.0;
 	float lit = 0.0;
 	vec2 cid = vec2(0.0);
@@ -110,6 +115,13 @@ void fragment() {
 		win = step(0.18, f.x) * step(f.x, 0.82) * step(0.25, f.y) * step(f.y, 0.8);
 		cid = floor(vec2(u / 3.2, y / 3.6));
 		lit = step(1.0 - lit_chance, hash(cid + seed));
+	}
+	if (graffiti) {
+		vec2 gp = vec2(u * 0.8, wpos.y * 1.4);
+		float tag = smoothstep(0.56, 0.62, noise(gp + seed * 3.0)) * step(0.25, hash(vec2(floor(u / 4.0), seed))) * (1.0 - step(3.3, wpos.y));
+		float hsel = hash(vec2(floor(u / 2.5), seed + 5.0));
+		vec3 tc = hsel < 0.2 ? vec3(0.9, 0.2, 0.55) : (hsel < 0.4 ? vec3(0.15, 0.7, 0.9) : (hsel < 0.6 ? vec3(0.95, 0.8, 0.15) : (hsel < 0.8 ? vec3(0.3, 0.85, 0.35) : vec3(0.85, 0.85, 0.85))));
+		albedo = mix(albedo, tc * 0.75, tag * wall);
 	}
 	win *= wall * step(0.0, y);
 	// Fassade nicht ganz gleichmäßig (Flecken, Alterung), Geschossdecken leicht abgesetzt

@@ -25,7 +25,12 @@ Ordner in Godot 4.7 öffnen (Import), dann F5. Das Spiel startet mit dem ONE-HUM
 Nitro lädt sich langsam von selbst auf und schneller beim Driften.
 
 ## Events
-Alles ist von Anfang an frei wählbar (Garage → Rennen fahren → Art → Event):
+**Karriere:** Garage → Rennen fahren zeigt alle 24 Events als Liste neben einer Deutschlandkarte. Jedes Event liegt in
+einer deutschen Stadt (die ausgedachten Strecken in Frankfurt, München, Hamburg, Köln, Leipzig …, die echten in ihren
+Orten). Freigeschaltet wird der Reihe nach: Wer ein Event gewinnt, öffnet das nächste. Auf der Karte sind gesperrte
+Städte grau, offene grün, gewonnene gold, die Route verbindet die offenen Städte, die gewählte pulsiert. Umriss: Natural
+Earth (gemeinfrei).
+
 - **Sprint** (7): von A nach B gegen 3 Gegner.
 - **Rundkurs** (5): 2–3 Runden gegen 3 Gegner.
 - **Drag** (3): geradeaus gegen 3 Gegner, wie in Underground. Gelenkt wird automatisch, A/D wechselt die Spur,
@@ -37,8 +42,8 @@ Alles ist von Anfang an frei wählbar (Garage → Rennen fahren → Art → Even
   quer, hält Gas den Winkel, Lenken steuert ihn, Gas weg richtet es auf. Querfahren ab 12° gibt Punkte
   (Winkel × Tempo, nah an der Bande ×1,6), verkettete Drifts steigern den Multiplikator bis x5,
   jede Bandenberührung kostet die laufende Kette. Zielpunkte für Platz 3/2/1 stehen im HUD.
-- **Städte** (5): echte Strecken durch Aachen, Würzburg, Bad Kissingen, Tauberbischofsheim und Hammelburg
-  (eigene Rubrik im Menü, siehe unten).
+- **Städte** (6): echte Strecken durch Aachen, Würzburg, Bad Kissingen, Tauberbischofsheim, Hammelburg und
+  Berlin-Kreuzberg (siehe unten).
 - **Wie in Underground:** Near Miss am Verkehr gibt Nitro; wer kurz vor GO Gas gibt (Drehzahl im grünen
   Bereich), schafft einen perfekten Start. Kleinteile am Straßenrand fliegen weg und kosten Tempo statt zu stoppen.
 
@@ -68,6 +73,11 @@ haben die echten Grundrisse. Kartendaten © OpenStreetMap-Mitwirkende (ODbL, ope
   kreuzt (in echt führt die Straße auf einer Brücke darüber, im Spiel kommt der Zug ebenerdig), am
   Renaissance-Rathaus mit Treppenturm und Marktbrunnen vorbei, über die Saale und den Schlossberg hinauf, oben auf dem
   Weinberg Schloss Saaleck.
+- **Berlin Kreuzberg** (Rundkurs, 2 Runden, 5,2 km): Skalitzer Straße unter der Hochbahn der U1 (Kottbusser Tor,
+  Schlesisches Tor), über die Oberbaumbrücke mit ihren Backsteintürmen, die Mühlenstraße an der East Side Gallery
+  entlang, über die Schillingbrücke, Köpenicker und Adalbertstraße zurück zum Kotti mit dem Neuen Kreuzberger Zentrum.
+  Altbauten mit Graffiti im Erdgeschoss, Spätis, Döner, Kiezkneipen, der Fernsehturm über den Dächern (näher gerückt
+  und kleiner, damit er in Sichtweite steht).
 
 Dazu: gelbes Ortsschild am Start, Straßenschilder, der echte Straßenname wird beim Abbiegen eingeblendet, Flüsse mit
 Ufermauern und Steinbrücken, Hügel mit Weinbergen, Fachwerk, Putzfassaden, Ziegel- und Schieferdächer, Läden der
@@ -107,8 +117,16 @@ Skript), schreibt `scripts/city_data.gd`.
   seitlich abprallen, frontal oder beim Auffahren Dreher und kurz keine Kontrolle. Mittelstreifen laufen spitz aus.
 
 ## Fortschritt
-Kein Geld: Jeder 1. Platz zählt als Sieg. Siege schalten Autos, Strecken und Tuningteile frei
-(Werte in `scripts/catalog.gd`). Gesperrte Teile kann man in der Garage als Vorschau ansehen.
+Kein Geld: Jeder 1. Platz zählt als Sieg. Ein Sieg öffnet das nächste Karriere-Event (`Catalog.CAREER`), Siege
+insgesamt schalten Autos und Tuningteile frei (Werte in `scripts/catalog.gd`). Gesperrte Teile kann man in der Garage
+als Vorschau ansehen. Alte Spielstände übernehmen ihre bisherigen Siege in die Karriere.
+
+## Stimmungen
+Jedes Event hat sein eigenes Licht (`scripts/moods.gd`), damit sich die Städte unterscheiden: **Neon** (lila Himmel,
+satte Farben), **Mitternacht** (tiefblau, Sterne, Mond), **Natrium** (orange Straßenlampen, dunstig), **Regen**
+(Tropfen vor der Kamera, nasse Fahrbahn mit Spiegelungen und Pfützen, im Tunnel trocken), **Nebel** (dichter, kühler
+Dunst), **Dämmerung** (oranger Horizont, letzte Helligkeit), **Kiez** (Magenta und Violett). Dazu Kopfsteinpflaster
+in den Altstädten und Graffiti an den Altbauten im Kiez.
 
 ## Musik und Sounds
 Musik (`music/`) und Intro-Sound (`assets/intro_sound.mp3`) sind lizenzfreie Tracks von Pixabay.
@@ -134,7 +152,8 @@ Frontlippe, Diffusor, Chrom-Endrohre (größer ab Motor+Turbo 2), Ladeluftkühle
 mit Motor Stufe 3.
 
 ## Handy und Tablet (Browser)
-Auf Touchgeräten erscheinen Knöpfe: links Lenken (Daumen kann rüberrutschen), rechts Gas, Bremse, Handbremse, Nitro,
+Auf Handy und Tablet erscheinen Knöpfe, am Rechner nicht (Einstellungen → Touch-Steuerung: Auto/An/Aus; Auto erkennt
+das Gerät am Browser, auch iPads im Desktop-Modus): links Lenken (Daumen kann rüberrutschen), rechts Gas, Bremse, Handbremse, Nitro,
 im Drag Hoch-/Runterschalten statt Bremse; Pause oben in der Mitte, Drehzahlmesser klein oben rechts. Hochkant kommt
 ein Hinweis zum Drehen. Auf Handys werden in den Städten nur die Häuser nahe der Strecke gebaut, Grafik startet
 niedrig. Zum Testen am Rechner: `-- --touch`.

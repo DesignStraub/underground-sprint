@@ -14,6 +14,7 @@ const SKY_SHADER := preload("res://shaders/night_sky.gdshader")
 const RaceShow := preload("res://scripts/race_show.gd")
 const UI := preload("res://scripts/ui_style.gd")
 const TOUCH := preload("res://scripts/touch_controls.gd")
+const Moods := preload("res://scripts/moods.gd")
 
 enum State { COUNTDOWN, RACING, FINISHED, INTRO }
 
@@ -94,6 +95,9 @@ func _ready() -> void:
 	player.accel *= 0.8 + 0.2 * GameState.pace()
 	Music.next()  # jedes Rennen mit einem neuen Track
 	player.place(Track.xform_at(curve, track["start"], Track.LANES[2]))
+	if mood["rain"]:
+		_rain = Moods.rain(220 if GameState.is_mobile() else 520)
+		player.cam.add_child(_rain)
 
 	# Gegner mit zufälligem Tuning; Stärke nach Schwierigkeit des Events, leicht steigend mit deinen Siegen
 	var rng := RandomNumberGenerator.new()
@@ -255,17 +259,26 @@ func _exit_tree() -> void:
 		_reverb.wet = 0.0
 
 
+var mood: Dictionary = {}
+var _rain: CPUParticles3D
+
+
 func _setup_environment() -> void:
+	mood = Moods.get_mood(race.get("mood", "neon"))
 	env = Environment.new()
 	var sky_mat := ShaderMaterial.new()
 	sky_mat.shader = SKY_SHADER
+	sky_mat.set_shader_parameter("top_col", mood["top"])
+	sky_mat.set_shader_parameter("hor_col", mood["hor"])
+	sky_mat.set_shader_parameter("glow_col", mood["glow"])
+	sky_mat.set_shader_parameter("stars", mood["stars"])
 	var sky := Sky.new()
 	sky.sky_material = sky_mat
 	env.background_mode = Environment.BG_SKY
 	env.sky = sky
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color(0.25, 0.25, 0.4)
-	env.ambient_light_energy = 0.26
+	env.ambient_light_color = mood["amb"]
+	env.ambient_light_energy = mood["amb_e"]
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	env.tonemap_exposure = 0.88
 	env.glow_enabled = true
@@ -274,8 +287,15 @@ func _setup_environment() -> void:
 	env.glow_bloom = 0.02
 	env.glow_hdr_threshold = 1.15
 	env.fog_enabled = true
-	env.fog_light_color = Color(0.09, 0.07, 0.16)
-	env.fog_density = 0.0045
+	env.fog_light_color = mood["fog"]
+	env.fog_density = mood["fog_d"]
+	# Farbfilter der Stimmung
+	env.adjustment_enabled = true
+	env.adjustment_saturation = mood["sat"]
+	env.adjustment_contrast = mood["con"]
+	env.adjustment_brightness = mood["bri"]
+	for m in Track._road_mats.values():
+		(m as ShaderMaterial).set_shader_parameter("wet", mood["wet"])
 	env.fog_sky_affect = 0.15
 	# Spiegelungen und Umgebungsverdeckung nur, wenn die Grafikstufe sie vorsieht (die teuersten Effekte)
 	var q: Dictionary = GameState.q()
@@ -291,8 +311,8 @@ func _setup_environment() -> void:
 	we.environment = env
 	world.add_child(we)
 	moon = DirectionalLight3D.new()
-	moon.light_color = Color(0.55, 0.6, 1.0)
-	moon.light_energy = 0.25
+	moon.light_color = mood["moon"]
+	moon.light_energy = mood["moon_e"]
 	moon.rotation_degrees = Vector3(-50, 30, 0)
 	world.add_child(moon)
 
@@ -544,8 +564,10 @@ func _update_world(dt: float) -> void:
 		if inside:
 			_show_area(tun["name"])
 	_tunnel_k = move_toward(_tunnel_k, 1.0 if inside else 0.0, dt * 2.5)
-	env.ambient_light_energy = lerpf(0.26, 0.08, _tunnel_k)
-	moon.light_energy = lerpf(0.25, 0.0, _tunnel_k)
+	if _rain:
+		_rain.emitting = not inside  # im Tunnel regnet es nicht
+	env.ambient_light_energy = lerpf(mood["amb_e"], 0.08, _tunnel_k)
+	moon.light_energy = lerpf(mood["moon_e"], 0.0, _tunnel_k)
 	if _reverb:
 		_reverb.wet = lerpf(0.0, 0.3, _tunnel_k)
 	var city: Dictionary = track["city"]
@@ -789,7 +811,13 @@ func _on_player_finished() -> void:
 		place = _place()
 	var unlocked := []
 	if place == 1:
+		var next_i: int = Catalog.CAREER.find(race["name"]) + 1
+		var opens_next := next_i > 0 and next_i < Catalog.CAREER.size() and not GameState.career_unlocked(next_i)
+		GameState.mark_won(race["name"])
 		unlocked = GameState.register_win(event_type)
+		if opens_next:
+			var nr: Dictionary = Catalog.RACES[Catalog.race_index(Catalog.CAREER[next_i])]
+			unlocked.push_front(tr("Nächstes Event: ") + nr.get("town", "") + " · " + tr(nr["name"]))
 	var key: String = race["name"]
 	var best: float = GameState.best_times.get(key, 0.0)
 	var new_best: bool

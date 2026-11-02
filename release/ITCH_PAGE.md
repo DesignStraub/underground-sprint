@@ -22,7 +22,7 @@ Alles, was du auf der neuen itch.io-Seite eintragen musst (das Spiel hieß früh
 
 ## Handy im Browser
 Edit game → Embed options: **Mobile friendly** anhaken, **Orientation: Landscape**, **Fullscreen button** an.
-Das Spiel zeigt auf Touchgeräten eigene Knöpfe (Lenken, Gas, Bremse, Handbremse, Nitro, Pause).
+Das Spiel zeigt auf Handy und Tablet eigene Knöpfe (Lenken, Gas, Bremse, Handbremse, Nitro, Pause), am Rechner nicht.
 
 ## Uploads
 
@@ -32,18 +32,20 @@ Per `release/push_itch.sh` (butler): Kanäle windows, mac, linux, html5.
 
 **Need for Geschwindigkeit** – Street-Racing bei Nacht, im Geist der frühen 2000er.
 
-Rase gegen drei Gegner durch nasse, neonbeleuchtete Straßen – durch eine ausgedachte Großstadt und durch echte
-deutsche Städte: Aachen, Würzburg, Bad Kissingen, Tauberbischofsheim und Hammelburg, mit Dom, Residenz, Festung,
-Gradierbau und Türmersturm an ihrem echten Platz.
+Fahr dich in der Karriere quer durch Deutschland: 24 Events von Hamburg bis München, jeder Sieg öffnet die nächste
+Stadt. Sechs Strecken folgen echten Straßen – Aachen, Würzburg, Bad Kissingen, Tauberbischofsheim, Hammelburg und
+Berlin-Kreuzberg, mit Dom, Residenz, Festung, Oberbaumbrücke und Hochbahn an ihrem echten Platz.
 
 **Features**
-- 23 Events: Sprint, Rundkurs, Drag mit Handschaltung, Drift – und fünf Strecken auf echten Straßen (OpenStreetMap)
+- Karriere mit Deutschlandkarte: 24 Events, eins nach dem anderen freischalten
+- Sprint, Rundkurs, Drag mit Handschaltung, Drift – sechs Strecken auf echten Straßen (OpenStreetMap)
+- Jede Stadt mit eigener Stimmung: Regen auf nasser Fahrbahn, Nebel, Natriumlicht, Dämmerung, Neon, Kiez
 - Tunnel, Hochbahn, Bahnübergang mit Zug, Brücken, Abkürzungen, Verkehr in beide Richtungen
-- 9 Autos und 8 Tuning-Kategorien: Lack, Felgen, Spoiler, Bodykit, Vinyl, Unterbodenneon, Motor, Nitro
+- 9 Autos, Tuning wie in NFS: Optik (Lack, Felgen, Spoiler, Bodykit, Folierung, Neon, Scheiben) und Leistung (Motor, Turbo, Nitro, Fahrwerk, Reifen)
 - Kein Geld, kein Grind: Siege schalten Teile und Autos frei
 - Start- und Zielszene wie damals: Starterin, jubelnde Fans, Kamerafahrt
 - Motorsound in Echtzeit erzeugt – jedes Auto klingt anders
-- Retro-Pixel-Look (einstellbar), läuft in jeder Auflösung bis 4K und im Browser
+- Englisch und Deutsch, Retro-Pixel-Look (einstellbar), läuft bis 4K und im Browser, auch auf Handy und Tablet
 
 **Steuerung**
 W/S Gas/Bremse · A/D Lenken · Leertaste Handbremse · Shift Nitro · E/Q Schalten (Drag) · C Kamera · R Zurücksetzen · M Musik · F11 Vollbild · Esc Pause
@@ -60,18 +62,20 @@ Musik: Tracks von Pixabay (Pixabay Content License). Kartendaten der Städte © 
 
 **Need for Geschwindigkeit** – illegal street racing at night, in the spirit of the early 2000s.
 
-Race three rivals through wet, neon-lit streets – through a fictional big city and through real German towns:
-Aachen, Würzburg, Bad Kissingen, Tauberbischofsheim and Hammelburg, with cathedral, palace, fortress, graduation
-tower and old town gates in their real places.
+Race your career across Germany: 24 events from Hamburg to Munich, every win unlocks the next city. Six tracks
+follow real streets – Aachen, Würzburg, Bad Kissingen, Tauberbischofsheim, Hammelburg and Berlin-Kreuzberg, with
+cathedral, palace, fortress, Oberbaum Bridge and elevated U-Bahn in their real places.
 
 **Features**
-- 23 events: sprint, circuit, drag with manual shifting, drift – plus five tracks on real streets (OpenStreetMap)
+- Career with a map of Germany: 24 events, unlocked one after another
+- Sprint, circuit, drag with manual shifting, drift – six tracks on real streets (OpenStreetMap)
+- Every city has its own mood: rain on wet asphalt, fog, sodium light, dusk, neon, Kiez
 - Tunnels, elevated railway, rail crossing with train, bridges, shortcuts, two-way traffic
-- 9 cars and 8 tuning categories: paint, rims, spoiler, body kit, vinyl, underglow, engine, nitro
+- 9 cars, NFS-style tuning: visual (paint, rims, spoiler, body kit, vinyl, underglow, tint) and performance (engine, turbo, nitro, suspension, tires)
 - No money, no grind: wins unlock parts and cars
 - Start and finish scenes like back in the day: flag girl, cheering crowd, camera fly-in
 - Real-time engine sound – every car sounds different
-- English and German (choose at first start), retro pixel look, runs up to 4K and in the browser
+- English and German (choose at first start), retro pixel look, runs up to 4K and in the browser, also on phones and tablets
 
 **Controls**
 W/S throttle/brake · A/D steer · Space handbrake · Shift nitro · E/Q shift (drag) · C camera · R reset · M music · F11 fullscreen · Esc pause

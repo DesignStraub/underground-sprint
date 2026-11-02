@@ -5,6 +5,7 @@ shader_type spatial;
 uniform float lanes = 4.0;  // 4 Hauptstraße, 2 Seitenstraße, 0 ohne Markierung
 uniform float road_w = 18.0;
 uniform float cobble = 0.0;
+uniform float wet = 0.0;  // Stimmung: 0 trocken bis 1 Regen (mehr und größere Pfützen, glänzender Asphalt)
 
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float noise(vec2 p) {
@@ -32,7 +33,7 @@ void fragment() {
 	}
 	float n = noise(vec2(xm * 2.2, y * 0.5)) * 0.5 + noise(vec2(xm * 6.6, y * 2.0)) * 0.5;
 	// Pfützen nur hier und da: seltene, klar umrissene Flecken
-	float puddle = smoothstep(0.69, 0.75, noise(vec2(xm * 0.33, y * 0.085))) * step(0.45, noise(vec2(y * 0.013, 7.3)));
+	float puddle = smoothstep(0.69 - wet * 0.2, 0.75 - wet * 0.18, noise(vec2(xm * 0.33, y * 0.085))) * step(0.45 - wet * 0.45, noise(vec2(y * 0.013, 7.3)));
 	vec3 col = vec3(0.055, 0.055, 0.065) * (0.7 + 0.6 * n);
 	// Flickstellen
 	vec2 pc = vec2(floor(y / 14.0), floor(xm / 4.5));
@@ -61,7 +62,7 @@ void fragment() {
 	wet_rough = 0.22;
 #endif
 	ALBEDO = col;
-	ROUGHNESS = mix(0.84, wet_rough, puddle) * (1.0 - manhole * 0.2);
+	ROUGHNESS = mix(mix(0.84, 0.45, wet), wet_rough, puddle) * (1.0 - manhole * 0.2);
 	METALLIC = manhole * 0.3;
 	SPECULAR = mix(0.3, 0.6, puddle);
 }

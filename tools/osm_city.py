@@ -83,6 +83,16 @@ CITIES = {
         "hills": [(50.1105, 9.8715, 300.0, 70.0, "vineyard")],
         "rivers": {"Fränkische Saale": 30.0},
     },
+    "kreuzberg": {
+        "label": "BERLIN", "region": "Bezirk Friedrichshain-Kreuzberg", "loop": True,
+        "via": [("Skalitzer Straße", 52.4990, 13.4195), ("Skalitzer Straße", 52.5006, 13.4330), ("Skalitzer Straße", 52.5010, 13.4400),
+                ("Oberbaumbrücke", 52.5020, 13.4458), ("Mühlenstraße", 52.50518, 13.4399), ("Mühlenstraße", 52.50773, 13.43595),
+                ("Schillingbrücke", 52.5092, 13.4292), ("Köpenicker Straße", 52.50742, 13.42809), ("Köpenicker Straße", 52.50901, 13.42397),
+                ("Adalbertstraße", 52.50664, 13.4231), ("Adalbertstraße", 52.50366, 13.42095)],
+        "landmarks": [("oberbaumbruecke", 52.50196, 13.44572), ("fernsehturm", 52.52082, 13.40940), ("nkz", 52.49930, 13.41760)],
+        "hills": [],
+        "rivers": {"Spree": 110.0, "Landwehrkanal": 22.0},
+    },
 }
 
 

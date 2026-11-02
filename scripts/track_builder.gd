@@ -120,6 +120,11 @@ const DISTRICTS := {
 		"tints": [Color(0.16, 0.17, 0.19), Color(0.22, 0.22, 0.24), Color(0.12, 0.14, 0.16)], "lit": 0.6,
 		"trees": 0.4, "billboard": 0.0, "neon_edge": 0.0, "lamp": Color(0.85, 0.92, 1.0), "lamp_kind": "modern",
 		"names": GERMAN_SHOPS, "de": true, "props": [0, 3, 8, 9, 13]},
+	"kiez_de": {"name": "KIEZ", "shop": 0.65, "low": [16.0, 21.0], "tall": [21.0, 38.0], "tall_p": 0.12, "styles": [8, 8, 8, 6, 0],
+		"tints": [Color(0.42, 0.36, 0.3), Color(0.36, 0.34, 0.33), Color(0.44, 0.33, 0.26), Color(0.3, 0.33, 0.36)], "lit": 0.65,
+		"trees": 0.35, "billboard": 0.08, "neon_edge": 0.06, "lamp": Color(1.0, 0.78, 0.5), "lamp_kind": "classic",
+		"roof": 0.35, "gable": 0.0, "roof_tints": [Color(0.14, 0.15, 0.17), Color(0.3, 0.13, 0.09)],
+		"names": GERMAN_SHOPS, "de": true, "blade": 0.25, "props": [0, 3, 8, 9, 11, 12]},
 	"vorstadt_de": {"name": "VORSTADT", "shop": 0.15, "low": [7.0, 11.0], "tall": [11.0, 15.0], "tall_p": 0.15, "styles": [6, 6, 4, 5],
 		"tints": [Color(0.46, 0.42, 0.36), Color(0.42, 0.4, 0.38), Color(0.48, 0.4, 0.3), Color(0.38, 0.36, 0.34)], "lit": 0.45,
 		"trees": 0.65, "billboard": 0.0, "neon_edge": 0.0, "lamp": Color(1.0, 0.7, 0.4), "lamp_kind": "classic",
@@ -199,6 +204,8 @@ static func build(race: Dictionary) -> Dictionary:
 		_plan_rivers(track)
 		_plan_hills(track)
 		_plan_city_crossing(track, race)
+		if race.get("city", "") == "kreuzberg":
+			_plan_kreuzberg_el(track)
 		_plan_spurs(track, rng)
 		_plan_medians(track, rng)
 	elif type == "drag":
@@ -249,8 +256,10 @@ static func build(race: Dictionary) -> Dictionary:
 	_build_steam(root, track, rng)
 	if type == "drag":
 		_drag_boards(root, track)
-	if not city.is_empty():
+	if not city.is_empty() or race.has("town"):
 		_build_city_signs(root, track, race)
+	if race.get("city", "") == "kreuzberg":
+		_east_side_gallery(root, track)
 	if loop:
 		_gate(root, track, track["start"] + 12.0, "START · ZIEL", Color(0.2, 1.0, 0.4))
 	else:
@@ -836,6 +845,7 @@ static func _build_road(root: Node3D, track: Dictionary) -> void:
 	var d := 0.0
 	var prev := {}
 	var piece := 0
+	var piece_d0 := 0.0
 	var n_road := 0
 	var n_carr := 0
 	while d <= length:
@@ -941,7 +951,9 @@ static func _build_road(root: Node3D, track: Dictionary) -> void:
 		# In Stücken von 60 m ablegen: der Browser-Renderer beleuchtet jedes Objekt nur mit wenigen Lampen
 		if piece >= 20 or (d > length and piece > 0):
 			if n_road > 0:
-				_road_mesh(root, road, 4.0, HALF_W * 2.0, 0.0)
+				# Altstadt-Abschnitte mit Kopfsteinpflaster: jede Strecke fühlt sich anders an
+				var cob := 1.0 if _district_at(track, piece_d0 + 30.0)["name"] == "ALTSTADT" else 0.0
+				_road_mesh(root, road, 4.0, HALF_W * 2.0, cob)
 			if n_carr > 0:
 				_road_mesh(root, carr, 2.0, HALF_W, 0.0)
 				_flush(root, grass, grass_m)
@@ -952,6 +964,7 @@ static func _build_road(root: Node3D, track: Dictionary) -> void:
 				st.clear()
 				st.begin(Mesh.PRIMITIVE_TRIANGLES)
 			piece = 0
+			piece_d0 = d
 			n_road = 0
 			n_carr = 0
 			n_trough = 0
@@ -2286,6 +2299,37 @@ static func _build_city_landmarks(root: Node3D, track: Dictionary) -> Array:
 		var pos := Vector3(lm["x"], 0, lm["z"])
 		var extra := {}
 		var basis := Basis.IDENTITY
+		if kind == "oberbaumbruecke":
+			# steht auf der Fahrbahn über der Spree: Mitte der Brücke, die der echten Lage am nächsten ist
+			var bd := curve.get_closest_offset(pos)
+			for br in track["bridges"]:
+				if absf(br["d"] - bd) < 400.0:
+					bd = br["d"]
+			var fb := frame_at(curve, bd)
+			pos = Vector3(fb["pos"].x, 0, fb["pos"].z)
+			basis = Basis.looking_at(fb["fwd"], Vector3.UP)
+			extra["hw"] = hw(track, bd) + WALK
+			var nb := Node3D.new()
+			nb.name = kind
+			nb.transform = Transform3D(basis, pos)
+			root.add_child(nb)
+			City.new(nb).make(kind, extra)
+			continue
+		if kind == "fernsehturm":
+			# echt 1,7 km entfernt, weiter als die Kamera sieht: in derselben Richtung näher und kleiner, damit er gleich groß wirkt
+			var qf := curve.get_closest_point(pos)
+			var df := Vector3(pos.x - qf.x, 0, pos.z - qf.z)
+			var k := 1.0
+			if df.length() > 560.0:
+				k = 560.0 / df.length()
+				pos = Vector3(qf.x, 0, qf.z) + df * k
+			var nf := Node3D.new()
+			nf.name = kind
+			nf.position = pos
+			nf.scale = Vector3.ONE * clampf(k * 2.2, 0.6, 1.0)
+			root.add_child(nf)
+			City.new(nf).make(kind, extra)
+			continue
 		if kind == "mainbruecke":
 			# quer über den Fluss an der echten Stelle, Ufer bis Ufer
 			var best := {}
@@ -2414,6 +2458,57 @@ static func _build_osm_buildings(root: Node3D, track: Dictionary, rng: RandomNum
 	return placed
 
 
+## Kreuzberg: die U1 fährt als Hochbahn über der Skalitzer Straße, mit Halt am Kottbusser Tor
+static func _plan_kreuzberg_el(track: Dictionary) -> void:
+	# Der Start liegt mitten auf der Skalitzer, darum zwei Abschnitte: vor dem Ziel (Kotti) und nach dem Start (Schlesisches Tor)
+	var stations := ["KOTTBUSSER TOR", "SCHLESISCHES TOR"]
+	for stt in track["city"]["streets"]:
+		if stt[2] == "Skalitzer Straße" and stt[1] - stt[0] > 300.0 and not stations.is_empty():
+			var d0: float = maxf(stt[0] + 40.0, track["start"] + 130.0)
+			var d1: float = minf(minf(stt[1] - 40.0, d0 + 1300.0), track["length"] - 90.0)
+			if d1 - d0 > 250.0 and _range_free(track, d0 - 25.0, d1 + 25.0):
+				track["el"].append({"from": d0, "to": d1, "side": -1.0, "station": stations.pop_front()})
+
+
+## East Side Gallery: bemalte Mauerreste an der Mühlenstraße, auf der Spreeseite der Straße
+static func _east_side_gallery(root: Node3D, track: Dictionary) -> void:
+	var curve: Curve3D = track["curve"]
+	for stt in track["city"]["streets"]:
+		if stt[2] != "Mühlenstraße":
+			continue
+		var d0: float = stt[0] + 20.0
+		var d1: float = stt[1] - 20.0
+		# Seite zur Spree: dort ist der Fluss näher
+		var fm := frame_at(curve, (d0 + d1) / 2.0)
+		var side := 1.0
+		if _river_clearance(track, fm["pos"] - fm["right"] * 60.0) < _river_clearance(track, fm["pos"] + fm["right"] * 60.0):
+			side = -1.0
+		var groups := {}
+		var concrete := Builder.mat(Color(0.55, 0.55, 0.52), 0.0, 0.9)
+		var cols := [Color(0.9, 0.15, 0.3), Color(0.1, 0.6, 0.95), Color(0.98, 0.8, 0.1), Color(0.2, 0.85, 0.4), Color(0.95, 0.45, 0.1),
+			Color(0.7, 0.2, 0.9), Color(0.95, 0.95, 0.95), Color(0.1, 0.1, 0.12)]
+		var rng := RandomNumberGenerator.new()
+		rng.seed = 1989
+		var d := d0
+		while d < d1:
+			var f := frame_at(curve, d + 0.6)
+			var bf := Basis.looking_at(f["fwd"], Vector3.UP)
+			var base: Vector3 = f["pos"] + f["right"] * side * (hw(track, d) + WALK + 2.0)
+			# Mauersegment (1,2 m breit, 3,6 m hoch) mit rundem Kopf, Wandbild aus Farbfeldern
+			_part(groups, concrete, Builder.box(Vector3(0.25, 3.6, 1.18)), Transform3D(bf, base + Vector3(0, 1.8, 0)))
+			_part(groups, concrete, Builder.box(Vector3(0.4, 0.3, 1.18)), Transform3D(bf, base + Vector3(0, 3.65, 0)))
+			var face: Vector3 = -f["right"] * side * 0.14
+			var c1: Color = cols[rng.randi() % cols.size()]
+			var c2: Color = cols[rng.randi() % cols.size()]
+			var m1 := Builder.mat(c1, 0.0, 0.7, c1, 0.25)
+			var m2 := Builder.mat(c2, 0.0, 0.7, c2, 0.25)
+			_part(groups, m1, Builder.box(Vector3(0.02, rng.randf_range(1.2, 3.2), 1.16)), Transform3D(bf, base + face + Vector3(0, 1.0, 0)))
+			_part(groups, m2, Builder.box(Vector3(0.03, rng.randf_range(0.4, 1.4), rng.randf_range(0.3, 1.0))),
+				Transform3D(bf, base + face * 1.3 + Vector3(0, rng.randf_range(1.2, 2.8), 0)))
+			d += 1.2
+		_bake(root, groups)
+
+
 ## Gelbes Ortsschild hinter dem Start, Straßenschilder an jedem Straßenwechsel
 static func _build_city_signs(root: Node3D, track: Dictionary, race: Dictionary) -> void:
 	var curve: Curve3D = track["curve"]
@@ -2423,8 +2518,8 @@ static func _build_city_signs(root: Node3D, track: Dictionary, race: Dictionary)
 	var yellow := Builder.mat(Color(1.0, 0.8, 0.05), 0.0, 0.5, Color(1.0, 0.8, 0.05), 0.25)
 	var black := Builder.mat(Color(0.02, 0.02, 0.02), 0.0, 0.6)
 	var white := Builder.mat(Color(0.92, 0.92, 0.9), 0.0, 0.5, Color(0.92, 0.92, 0.9), 0.2)
-	var town: String = race.get("town", city["label"])
-	var region: String = city.get("region", "")
+	var town: String = race.get("town", city.get("label", ""))
+	var region: String = race.get("region", city.get("region", ""))
 	var d0: float = track["start"] + 55.0
 	var f := frame_at(curve, d0)
 	var bf := Basis.looking_at(f["fwd"], Vector3.UP)
@@ -2455,7 +2550,7 @@ static func _build_city_signs(root: Node3D, track: Dictionary, race: Dictionary)
 	root.add_child(sl)
 	# Straßennamensschilder (weiß, schwarze Schrift) am rechten Gehweg, kurz nach jeder Einmündung
 	var last := -1e9
-	for stt in city["streets"]:
+	for stt in city.get("streets", []):
 		var d: float = stt[0] + 12.0
 		if d < 40.0 or d > track["length"] - 20.0 or d - last < 60.0 or not bridge_at(track, d).is_empty():
 			continue

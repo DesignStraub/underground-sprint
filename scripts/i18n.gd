@@ -147,6 +147,12 @@ const EN := {
 	# --- Touch / Handy ---
 	"GAS": "GAS", "BREMSE": "BRAKE", "NITRO": "NITRO", "HAND": "HAND",
 	"Bitte das Gerät quer halten": "Please turn your device sideways",
+	"Touch-Steuerung: ": "Touch controls: ", "Auto": "Auto",
+	"KARRIERE": "CAREER", "Nächstes Event: ": "Next event: ", "Gesperrt: gewinne zuerst %s.": "Locked: win %s first.",
+	"Gewonnen": "Won", "KIEZ": "KIEZ", "Berlin Kreuzberg": "Berlin Kreuzberg",
+	"Unter der Hochbahn der U1 durch die Skalitzer Straße, über die Oberbaumbrücke, an der East Side Gallery entlang und über die Schillingbrücke zurück zum Kotti.":
+		"Under the elevated U1 along Skalitzer Straße, over the Oberbaumbrücke, past the East Side Gallery and back over the Schillingbrücke to Kotti.",
+	"Touch-Knöpfe im Rennen. Auto: nur auf Handy und Tablet.": "On-screen buttons in races. Auto: only on phones and tablets.",
 }
 
 static var _added := false

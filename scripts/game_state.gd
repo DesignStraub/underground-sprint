@@ -23,6 +23,8 @@ signal graphics_changed
 ## Grafik-Einstellungen (werden gespeichert)
 var quality := 0 if OS.has_feature("web") else 1  # im Browser (und auf dem Handy) erst einmal niedrig
 var pixel_look := false
+## Touch-Knöpfe im Rennen: 0 Auto (nur Handy/Tablet), 1 immer, 2 nie
+var touch_mode := 0
 ## "" = noch nicht gewählt (beim ersten Start fragt die Garage), sonst "en" oder "de"
 var language := ""
 var vsync := true
@@ -34,6 +36,7 @@ var drift_wins := 0
 var current_car := "kaizen"
 var race_index := 0
 var best_times := {}  # Rennname -> Sekunden
+var won_events: Array = []  # gewonnene Events (Karriere: ein Sieg öffnet das nächste)
 var car_configs := {}  # car_id -> {category: option_index}
 
 
@@ -147,19 +150,48 @@ func cycle_setting(key: String) -> void:
 			vsync = not vsync
 		"fps":
 			fps_limit = (fps_limit + 1) % FPS_LIMITS.size()
+		"touch":
+			touch_mode = (touch_mode + 1) % 3
 	apply_display()
 	graphics_changed.emit()
 	save_game()
 
 
-## Handy/Tablet im Browser (oder nativ): kleinere Welt, Grafik niedrig
+## Handy/Tablet im Browser (oder nativ): kleinere Welt, Grafik niedrig. iPads melden sich als Mac, daher die
+## Prüfung im Browser über Gerätename und Touchpunkte (Laptops mit Touchscreen zählen nicht).
+var _mobile := -1
+
+
 func is_mobile() -> bool:
-	return OS.has_feature("web_android") or OS.has_feature("web_ios") or OS.has_feature("android") or OS.has_feature("ios")
+	if _mobile < 0:
+		_mobile = 1 if (OS.has_feature("web_android") or OS.has_feature("web_ios") or OS.has_feature("android") or OS.has_feature("ios")) else 0
+		if _mobile == 0 and OS.has_feature("web"):
+			var js = JavaScriptBridge.eval("(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent))", true)
+			_mobile = 1 if js == true else 0
+	return _mobile == 1
 
 
-## Bildschirmknöpfe zeigen (Touchscreen vorhanden; --touch erzwingt sie zum Testen)
+## Bildschirmknöpfe zeigen: Auto = nur auf Handy/Tablet, sonst wie eingestellt; --touch erzwingt sie zum Testen
 func touch_ui() -> bool:
-	return DisplayServer.is_touchscreen_available() or OS.get_cmdline_user_args().has("--touch")
+	if OS.get_cmdline_user_args().has("--touch"):
+		return true
+	match touch_mode:
+		1:
+			return true
+		2:
+			return false
+	return is_mobile()
+
+
+## Karriere-Event i ist frei, wenn das vorige gewonnen wurde
+func career_unlocked(i: int) -> bool:
+	return i == 0 or (i < Catalog.CAREER.size() and Catalog.CAREER[i - 1] in won_events)
+
+
+func mark_won(event_name: String) -> void:
+	if not event_name in won_events:
+		won_events.append(event_name)
+	save_game()
 
 
 func set_language(lang: String) -> void:
@@ -182,6 +214,8 @@ func setting_text(key: String) -> String:
 			return tr("Vollbild: ") + tr("An" if fullscreen else "Aus")
 		"language":
 			return tr("Sprache: ") + I18n.NAMES.get(language if language != "" else "en", "English")
+		"touch":
+			return tr("Touch-Steuerung: ") + tr(["Auto", "An", "Aus"][touch_mode])
 	return key
 
 
@@ -296,8 +330,8 @@ func save_game() -> void:
 		return
 	f.store_string(JSON.stringify({
 		"wins": wins, "drift_wins": drift_wins, "current_car": current_car, "race_index": race_index,
-		"best_times": best_times, "car_configs": car_configs,
-		"gfx": {"quality": quality, "pixel": pixel_look, "vsync": vsync, "fps": fps_limit, "fullscreen": fullscreen},
+		"best_times": best_times, "car_configs": car_configs, "won_events": won_events,
+		"gfx": {"quality": quality, "pixel": pixel_look, "vsync": vsync, "fps": fps_limit, "fullscreen": fullscreen, "touch": touch_mode},
 		"language": language,
 	}, "\t"))
 
@@ -325,9 +359,17 @@ func load_game() -> void:
 	# alter Spielstand: Pixel-Stufe Stark/Mittel = Pixel-Look an
 	pixel_look = bool(gfx.get("pixel", int(data.get("pixel_mode_v2", 2)) <= 1))
 	language = str(data.get("language", ""))
+	if data.has("won_events"):
+		won_events = Array(data["won_events"])
+	else:
+		# ältere Spielstände: so viele Karriere-Events gelten als gewonnen, wie es Siege gibt
+		won_events = []
+		for i in mini(wins + drift_wins, Catalog.CAREER.size()):
+			won_events.append(Catalog.CAREER[i])
 	vsync = bool(gfx.get("vsync", true))
 	fps_limit = clampi(int(gfx.get("fps", 0)), 0, FPS_LIMITS.size() - 1)
 	fullscreen = bool(gfx.get("fullscreen", false))
+	touch_mode = clampi(int(gfx.get("touch", 0)), 0, 2)
 	car_configs = {}
 	var cc: Dictionary = data.get("car_configs", {})
 	for car_id in cc:
@@ -347,6 +389,7 @@ func reset_progress() -> void:
 	race_index = 0
 	best_times = {}
 	car_configs = {}
+	won_events = []
 	save_game()
 
 

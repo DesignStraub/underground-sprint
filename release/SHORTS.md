@@ -97,3 +97,21 @@ Szene: Schnitt durch alle fünf Städte, jeweils mit gelbem Ortsschild.
 
 Titel: Echte deutsche Städte als Rennstrecke
 Beschreibung: Straßen aus OpenStreetMap, Wahrzeichen an ihrem Platz. Kartendaten © OpenStreetMap-Mitwirkende.
+
+## 11. Kreuzberg
+Szene: Unter der U1-Hochbahn die Skalitzer Straße runter, über die Oberbaumbrücke, an der East Side Gallery entlang.
+1. „Berlin. Kreuzberg.“
+2. „Unter der U1. Über die Spree.“
+3. „Zurück zum Kotti.“
+
+Titel: Berlin-Kreuzberg – Rundkurs unter der Hochbahn
+Beschreibung: Skalitzer Straße, Oberbaumbrücke, East Side Gallery, Kottbusser Tor. Echte Straßen aus OpenStreetMap. `#berlin #kreuzberg`
+
+## 12. Karriere
+Szene: Deutschlandkarte im Menü, die Route leuchtet Stadt für Stadt auf, Schnitt auf Regen in Aachen, Nebel in Tauberbischofsheim, Neon in Berlin.
+1. „24 Rennen. Ganz Deutschland.“
+2. „Eine nach der anderen.“
+3. „Bis die Karte dir gehört.“
+
+Titel: Quer durch Deutschland – die Karriere
+Beschreibung: Jeder Sieg öffnet die nächste Stadt. Regen, Nebel, Natriumlicht, Neon: jede Strecke mit eigener Nacht.

@@ -30,10 +30,13 @@ const INFO := {
 	"st_martin": {"hd": 11.0, "hl": 24.0},
 	"hammelburg_rathaus": {"hd": 16.0, "hl": 15.0},
 	"saaleck": {"hd": 22.0, "hl": 30.0, "hill": true},
+	"oberbaumbruecke": {"hd": 4.0, "hl": 30.0},
+	"fernsehturm": {"hd": 20.0, "hl": 20.0},
+	"nkz": {"hd": 12.0, "hl": 55.0},
 }
 
 ## Weithin sichtbar (angestrahlt, vom Nachtnebel ausgenommen): Burgen auf den Hügeln und hohe Kirchtürme
-const FAR := ["festung", "kaeppele", "saaleck", "aachen_dom", "kiliansdom", "marienkapelle", "st_martin", "tuermersturm"]
+const FAR := ["festung", "kaeppele", "saaleck", "aachen_dom", "kiliansdom", "marienkapelle", "st_martin", "tuermersturm", "fernsehturm"]
 
 static var _mats := {}
 static var _far_mats := {}
@@ -71,6 +74,9 @@ static func m(key: String) -> StandardMaterial3D:
 		"water": res = Builder.mat(Color(0.02, 0.05, 0.09), 0.2, 0.05, Color(0.1, 0.25, 0.4), 0.4)
 		"lamp": res = Builder.mat(Color(1.0, 0.85, 0.6), 0.0, 0.4, Color(1.0, 0.8, 0.5), 3.5)
 		"iron": res = Builder.mat(Color(0.08, 0.08, 0.09), 0.6, 0.5)
+		"brick": res = lit.call(Color(0.5, 0.16, 0.1), 0.22)
+		"concrete": res = lit.call(Color(0.5, 0.5, 0.5), 0.18)
+		"blink": res = Builder.mat(Color(1.0, 0.1, 0.05), 0.0, 0.4, Color(1.0, 0.1, 0.05), 4.0)
 		_: res = Builder.mat(Color(1, 0, 1))
 	_mats[key] = res
 	return res
@@ -204,6 +210,9 @@ func make(kind: String, extra := {}) -> void:
 		"st_martin": _st_martin()
 		"hammelburg_rathaus": _hammelburg_rathaus()
 		"saaleck": _saaleck()
+		"oberbaumbruecke": _oberbaumbruecke(extra.get("hw", 14.0))
+		"fernsehturm": _fernsehturm()
+		"nkz": _nkz()
 	if INFO.get(kind, {}).get("hill", false):
 		# Sockel- und Stützmauern bis hinunter in den Hang
 		var info: Dictionary = INFO[kind]
@@ -656,3 +665,56 @@ func _saaleck() -> void:
 		box(Vector3(1.6, 6, 40), Vector3(s * 28.0, 3, 0), "sand")
 	windows(-15.0, -13.0, 2.0, 18.0, 1, 0.0, -2.5, Vector2(1.0, 1.6))
 	light(Vector3(0, 10, -24), Color(1.0, 0.8, 0.5), 4.0, 44.0)
+
+
+# --- Berlin-Kreuzberg -----------------------------------------------------------
+
+## Oberbaumbrücke: rote Backsteinbrücke über die Spree mit den zwei Türmen in der Mitte und dem Hochbahn-Viadukt
+## (Bogengang) an der Seite. Steht direkt auf der Fahrbahn: lokal -Z = Fahrtrichtung, hw = halbe Breite bis Gehwegkante.
+func _oberbaumbruecke(hw: float) -> void:
+	var len := 60.0
+	for s in [-1.0, 1.0]:
+		# Brüstung aus Backstein mit Zinnen
+		box(Vector3(0.8, 1.3, len), Vector3(s * (hw + 0.6), 0.65, 0), "brick")
+		var z := -len / 2.0
+		while z <= len / 2.0:
+			box(Vector3(0.9, 0.4, 0.8), Vector3(s * (hw + 0.6), 1.5, z), "brick")
+			z += 2.4
+		# Türme in der Brückenmitte
+		box(Vector3(5.0, 22.0, 5.0), Vector3(s * (hw + 3.0), 11.0, 0), "brick")
+		box(Vector3(5.6, 1.2, 5.6), Vector3(s * (hw + 3.0), 22.4, 0), "brick")
+		spire(4.0, 8.0, Vector3(s * (hw + 3.0), 23.0, 0), "copper")
+		windows(s * (hw + 3.0) - 1.0, s * (hw + 3.0) + 1.0, 2.0, 8.0, 3, 4.5, -2.5, Vector2(0.8, 2.2))
+	# Hochbahn-Viadukt mit Bögen auf der linken Seite
+	var vx := -(hw + 6.5)
+	box(Vector3(7.0, 1.4, len), Vector3(vx, 7.2, 0), "brick")
+	var z2 := -len / 2.0
+	while z2 <= len / 2.0:
+		box(Vector3(7.0, 6.5, 1.6), Vector3(vx, 3.25, z2), "brick")
+		z2 += 7.5
+	for s in [-1.0, 1.0]:
+		box(Vector3(0.3, 1.0, len), Vector3(vx + s * 3.3, 8.4, 0), "iron")
+	light(Vector3(0, 6, 0), Color(1.0, 0.75, 0.5), 3.0, 30.0)
+
+
+## Fernsehturm am Alexanderplatz: weit weg, aber über Kreuzberg immer zu sehen
+func _fernsehturm() -> void:
+	cyl(16.0, 4.5, 200.0, Vector3.ZERO, "concrete", 16)
+	sphere(16.0, Vector3(0, 212.0, 0), "concrete")
+	cyl(16.3, 16.3, 3.0, Vector3(0, 208.0, 0), "win", 24)
+	cyl(4.0, 4.0, 18.0, Vector3(0, 226.0, 0), "concrete", 12)
+	cyl(1.6, 0.4, 120.0, Vector3(0, 244.0, 0), "white", 8)
+	box(Vector3(2.0, 2.0, 2.0), Vector3(0, 364.0, 0), "blink")
+	box(Vector3(1.5, 1.5, 1.5), Vector3(0, 300.0, 0), "blink")
+
+
+## Neues Kreuzberger Zentrum am Kottbusser Tor: langer, geschwungener Wohnblock mit Laubengängen
+func _nkz() -> void:
+	for i in 5:
+		var a := (i - 2) * 0.12
+		var x := (i - 2) * 22.0
+		box(Vector3(23.0, 38.0, 14.0), Vector3(x, 19.0, abs(i - 2) * 3.0), "concrete", a)
+		for f in 12:
+			box(Vector3(22.5, 0.35, 0.8), Vector3(x, 3.0 + f * 3.0, abs(i - 2) * 3.0 - 7.2), "dimstone", a)
+	windows(-50.0, 50.0, 3.0, 3.6, 11, 3.0, -7.3, Vector2(1.4, 1.6))
+	label("KOTTBUSSER TOR", Vector3(0, 4.0, -7.8), 120, Color(1.0, 0.85, 0.3), 2.0)

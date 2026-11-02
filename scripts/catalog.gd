@@ -229,82 +229,87 @@ static func stats(car_id: String, cfg: Dictionary) -> Dictionary:
 ## "fork" (echte Gabelung: kurz mit Gegenverkehr oder breiter Boulevard außen herum).
 ## districts: Gewichte der Stadtviertel. Rundkurse: corners = Eckpunkte, radius = ungefähre Größe.
 const RACES := [
-	{"name": "Bankenviertel-Sprint", "type": "sprint", "tier": 1, "seed": 11, "segments": 18, "max_turn": 50.0,
+	{"name": "Bankenviertel-Sprint", "town": "Frankfurt am Main", "region": "Kreisfreie Stadt", "geo": Vector2(50.1109, 8.6821), "mood": "neon",  "type": "sprint", "tier": 1, "seed": 11, "segments": 18, "max_turn": 50.0,
 		"bulges": {4: "alley", 11: "lake"},
 		"districts": {"downtown": 0.35, "chinatown": 0.25, "shops": 0.25, "residential": 0.15}},
-	{"name": "Prachtallee-Sprint", "type": "sprint", "tier": 1, "seed": 23, "segments": 20, "max_turn": 40.0,
+	{"name": "Prachtallee-Sprint", "town": "München", "region": "Landeshauptstadt", "geo": Vector2(48.1351, 11.582), "mood": "daemmerung",  "type": "sprint", "tier": 1, "seed": 23, "segments": 20, "max_turn": 40.0,
 		"bulges": {5: "fork", 13: "fork"},
 		"districts": {"boulevard": 0.45, "downtown": 0.25, "shops": 0.3}},
-	{"name": "Hafenrunde", "type": "sprint", "tier": 2, "seed": 42, "segments": 24, "max_turn": 65.0,
+	{"name": "Hafenrunde", "town": "Hamburg", "region": "Freie und Hansestadt Hamburg", "geo": Vector2(53.5459, 9.9665), "mood": "regen",  "type": "sprint", "tier": 2, "seed": 42, "segments": 24, "max_turn": 65.0,
 		"bulges": {5: "lake", 13: "fork", 19: "alley"},
 		"districts": {"industrial": 0.45, "chinatown": 0.15, "shops": 0.2, "residential": 0.2}},
-	{"name": "Chinatown-Express", "type": "sprint", "tier": 2, "seed": 5, "segments": 22, "max_turn": 60.0,
+	{"name": "Chinatown-Express", "town": "Düsseldorf", "region": "Landeshauptstadt", "geo": Vector2(51.2277, 6.7735), "mood": "neon",  "type": "sprint", "tier": 2, "seed": 5, "segments": 22, "max_turn": 60.0,
 		"bulges": {4: "fork", 10: "alley", 17: "fork"},
 		"districts": {"chinatown": 0.5, "shops": 0.25, "boulevard": 0.25}},
-	{"name": "Schnellstraßen-Sprint", "type": "sprint", "tier": 3, "seed": 7, "segments": 30, "max_turn": 30.0,
+	{"name": "Schnellstraßen-Sprint", "town": "Dortmund", "region": "Kreisfreie Stadt", "geo": Vector2(51.5136, 7.4653), "mood": "natrium",  "type": "sprint", "tier": 3, "seed": 7, "segments": 30, "max_turn": 30.0,
 		"bulges": {7: "alley", 17: "lake", 24: "fork"},
 		"districts": {"highway": 0.4, "downtown": 0.2, "industrial": 0.2, "boulevard": 0.2}},
-	{"name": "Innenstadtring", "type": "circuit", "tier": 1, "laps": 2, "seed": 101, "corners": 9, "radius": 260.0,
+	{"name": "Innenstadtring", "town": "Köln", "region": "Kreisfreie Stadt", "geo": Vector2(50.9375, 6.9603), "mood": "mitternacht",  "type": "circuit", "tier": 1, "laps": 2, "seed": 101, "corners": 9, "radius": 260.0,
 		"bulges": {3: "alley"},
 		"districts": {"downtown": 0.4, "boulevard": 0.3, "shops": 0.3}},
-	{"name": "Hafenring", "type": "circuit", "tier": 2, "laps": 2, "seed": 202, "corners": 10, "radius": 300.0,
+	{"name": "Hafenring", "town": "Bremen", "region": "Freie Hansestadt Bremen", "geo": Vector2(53.0793, 8.8017), "mood": "regen",  "type": "circuit", "tier": 2, "laps": 2, "seed": 202, "corners": 10, "radius": 300.0,
 		"bulges": {2: "fork", 6: "lake"},
 		"districts": {"industrial": 0.5, "highway": 0.25, "chinatown": 0.25}},
-	{"name": "Nachtschicht", "type": "circuit", "tier": 3, "laps": 2, "seed": 303, "corners": 11, "radius": 360.0,
+	{"name": "Nachtschicht", "town": "Stuttgart", "region": "Landeshauptstadt", "geo": Vector2(48.7758, 9.1829), "mood": "mitternacht",  "type": "circuit", "tier": 3, "laps": 2, "seed": 303, "corners": 11, "radius": 360.0,
 		"bulges": {2: "fork", 7: "alley"},
 		"districts": {"highway": 0.3, "boulevard": 0.3, "downtown": 0.4}},
-	{"name": "Chinatown-Drift", "type": "drift", "tier": 1, "laps": 2, "seed": 401, "corners": 12, "radius": 140.0,
+	{"name": "Chinatown-Drift", "town": "Düsseldorf", "region": "Landeshauptstadt", "geo": Vector2(51.2277, 6.7735), "mood": "kiez",  "type": "drift", "tier": 1, "laps": 2, "seed": 401, "corners": 12, "radius": 140.0,
 		"bulges": {},
 		"districts": {"chinatown": 0.7, "shops": 0.3}},
-	{"name": "Hafen-Drift", "type": "drift", "tier": 2, "laps": 2, "seed": 502, "corners": 12, "radius": 155.0,
+	{"name": "Hafen-Drift", "town": "Hamburg", "region": "Freie und Hansestadt Hamburg", "geo": Vector2(53.5459, 9.9665), "mood": "nebel",  "type": "drift", "tier": 2, "laps": 2, "seed": 502, "corners": 12, "radius": 155.0,
 		"bulges": {},
 		"districts": {"industrial": 0.7, "highway": 0.3}},
-	{"name": "Stadion-Drift", "type": "drift", "tier": 3, "laps": 2, "seed": 603, "corners": 14, "radius": 175.0,
+	{"name": "Stadion-Drift", "town": "Gelsenkirchen", "region": "Kreisfreie Stadt", "geo": Vector2(51.5177, 7.0857), "mood": "natrium",  "type": "drift", "tier": 3, "laps": 2, "seed": 603, "corners": 14, "radius": 175.0,
 		"bulges": {}, "stadium": true,
 		"districts": {"downtown": 0.4, "boulevard": 0.6}},
 	# --- neu: Drag-Rennen (geradeaus, Handschaltung) und weitere Strecken; hinten angehängt, damit gespeicherte
 	# Event-Nummern gültig bleiben
-	{"name": "Hafenmeile", "type": "drag", "tier": 1, "seed": 701, "segments": 8, "max_turn": 4.0,
+	{"name": "Hafenmeile", "town": "Kiel", "region": "Landeshauptstadt", "geo": Vector2(54.3233, 10.1228), "mood": "nebel",  "type": "drag", "tier": 1, "seed": 701, "segments": 8, "max_turn": 4.0,
 		"districts": {"industrial": 0.6, "shops": 0.4}},
-	{"name": "Neon-Gerade", "type": "drag", "tier": 2, "seed": 702, "segments": 10, "max_turn": 6.0,
+	{"name": "Neon-Gerade", "town": "Leipzig", "region": "Kreisfreie Stadt", "geo": Vector2(51.3397, 12.3731), "mood": "kiez",  "type": "drag", "tier": 2, "seed": 702, "segments": 10, "max_turn": 6.0,
 		"districts": {"downtown": 0.5, "chinatown": 0.5}},
-	{"name": "Schnellstraßen-Drag", "type": "drag", "tier": 3, "seed": 703, "segments": 13, "max_turn": 5.0,
+	{"name": "Schnellstraßen-Drag", "town": "Hockenheim", "region": "Rhein-Neckar-Kreis", "geo": Vector2(49.322, 8.547), "mood": "mitternacht",  "type": "drag", "tier": 3, "seed": 703, "segments": 13, "max_turn": 5.0,
 		"districts": {"highway": 0.6, "boulevard": 0.4}},
-	{"name": "Altstadt-Hügel", "type": "sprint", "tier": 2, "seed": 61, "segments": 22, "max_turn": 55.0,
+	{"name": "Altstadt-Hügel", "town": "Heidelberg", "region": "Kreisfreie Stadt", "geo": Vector2(49.3988, 8.6724), "mood": "daemmerung",  "type": "sprint", "tier": 2, "seed": 61, "segments": 22, "max_turn": 55.0,
 		"bulges": {4: "fork", 11: "fork", 17: "alley"},
 		"districts": {"residential": 0.45, "shops": 0.3, "chinatown": 0.25}},
-	{"name": "Hafen-Sprint", "type": "sprint", "tier": 3, "seed": 77, "segments": 26, "max_turn": 70.0,
+	{"name": "Hafen-Sprint", "town": "Rostock", "region": "Hanse- und Universitätsstadt", "geo": Vector2(54.0924, 12.0991), "mood": "nebel",  "type": "sprint", "tier": 3, "seed": 77, "segments": 26, "max_turn": 70.0,
 		"bulges": {5: "lake", 12: "alley", 19: "fork"},
 		"districts": {"industrial": 0.5, "highway": 0.3, "residential": 0.2}},
-	{"name": "Chinatown-Runde", "type": "circuit", "tier": 1, "laps": 3, "seed": 121, "corners": 8, "radius": 220.0,
+	{"name": "Chinatown-Runde", "town": "Mannheim", "region": "Kreisfreie Stadt", "geo": Vector2(49.4875, 8.466), "mood": "neon",  "type": "circuit", "tier": 1, "laps": 3, "seed": 121, "corners": 8, "radius": 220.0,
 		"bulges": {3: "fork"},
 		"districts": {"chinatown": 0.6, "shops": 0.4}},
-	{"name": "Altstadtring", "type": "circuit", "tier": 2, "laps": 2, "seed": 131, "corners": 10, "radius": 290.0,
+	{"name": "Altstadtring", "town": "Nürnberg", "region": "Kreisfreie Stadt", "geo": Vector2(49.4521, 11.0767), "mood": "mitternacht",  "type": "circuit", "tier": 2, "laps": 2, "seed": 131, "corners": 10, "radius": 290.0,
 		"bulges": {2: "fork", 6: "alley"},
 		"districts": {"residential": 0.5, "boulevard": 0.3, "downtown": 0.2}},
 	# --- Orts-Strecken: echte Straßenverläufe (OpenStreetMap, tools/osm_city.py), Wahrzeichen an ihrem Platz.
 	# city = Schlüssel in city_data.gd, town = Ortsschild, shops = Ladennamen der Stadt, station = Haltestelle am Bahnübergang
-	{"name": "Aachen Grabenring", "type": "circuit", "tier": 2, "laps": 2, "seed": 801, "city": "aachen", "town": "Aachen",
+	{"name": "Aachen Grabenring", "geo": Vector2(50.7753, 6.0839), "mood": "regen",  "type": "circuit", "tier": 2, "laps": 2, "seed": 801, "city": "aachen", "town": "Aachen",
 		"shops": ["PRINTEN", "ÖCHER BRAUHAUS", "CAMPUS BAR", "DOMCAFÉ", "PONTSTRASSE", "THERMALBAD", "MENSA", "KAISERCAFÉ"],
 		"districts": {"altstadt_de": 0.35, "innenstadt_de": 0.45, "campus_de": 0.2},
 		"desc": "Über den Grabenring am SuperC der RWTH, am Elisenbrunnen und am Theater vorbei. In der Mitte Dom und Rathaus."},
-	{"name": "Würzburg Mainufer", "type": "sprint", "tier": 3, "seed": 802, "city": "wuerzburg", "town": "Würzburg",
+	{"name": "Würzburg Mainufer", "geo": Vector2(49.7913, 9.9534), "mood": "daemmerung",  "type": "sprint", "tier": 3, "seed": 802, "city": "wuerzburg", "town": "Würzburg",
 		"shops": ["BOCKSBEUTEL", "FRANKENWEIN", "BRÜCKENSCHOPPEN", "WEINHAUS", "KILIANI", "MAINFRANKEN", "SCHOPPEN"],
 		"districts": {"altstadt_de": 0.35, "innenstadt_de": 0.45, "vorstadt_de": 0.2},
 		"desc": "Rennweg an der Residenz, über die Ludwigsbrücke, unter der Festung Marienberg entlang, über die Friedensbrücke zum Alten Kranen."},
-	{"name": "Bad Kissingen Kurmeile", "type": "sprint", "tier": 1, "seed": 803, "city": "badkissingen", "town": "Bad Kissingen",
+	{"name": "Bad Kissingen Kurmeile", "geo": Vector2(50.2, 10.077), "mood": "daemmerung",  "type": "sprint", "tier": 1, "seed": 803, "city": "badkissingen", "town": "Bad Kissingen",
 		"shops": ["KURCAFÉ", "KURAPOTHEKE", "RAKOCZY", "TRINKHALLE", "KONZERTCAFÉ", "KURHAUS", "SALINE"],
 		"districts": {"kurviertel_de": 0.55, "innenstadt_de": 0.2, "vorstadt_de": 0.25},
 		"desc": "Vom Regentenbau am Kurgarten über die Saale, dann am Fluss entlang zum Gradierbau der Oberen Saline."},
-	{"name": "Tauberbischofsheim Altstadt", "type": "circuit", "tier": 1, "laps": 3, "seed": 804, "city": "tbb", "town": "Tauberbischofsheim",
+	{"name": "Tauberbischofsheim Altstadt", "geo": Vector2(49.6236, 9.6627), "mood": "nebel",  "type": "circuit", "tier": 1, "laps": 3, "seed": 804, "city": "tbb", "town": "Tauberbischofsheim",
 		"shops": ["FECHTCLUB", "TAUBERWEIN", "FECHTERSTADT", "TAUBERTAL", "LIOBA CAFÉ", "SCHLOSSCAFÉ"],
 		"districts": {"altstadt_de": 0.6, "vorstadt_de": 0.4},
 		"desc": "Rund um die Altstadt der Fechterstadt, Türmersturm, Rathaus und St. Martin immer im Blick."},
-	{"name": "Hammelburg Saaleck", "type": "sprint", "tier": 2, "seed": 805, "city": "hammelburg", "town": "Hammelburg",
+	{"name": "Hammelburg Saaleck", "geo": Vector2(50.1162, 9.8906), "mood": "daemmerung",  "type": "sprint", "tier": 2, "seed": 805, "city": "hammelburg", "town": "Hammelburg",
 		"station": "HAMMELBURG",
 		"shops": ["WEINSTADT", "HÄCKERWIRTSCHAFT", "SAALETAL", "WEINFEST", "WINZERSTUBE", "STADTSCHÄNKE"],
 		"districts": {"altstadt_de": 0.5, "vorstadt_de": 0.5},
 		"desc": "Über die Bahnlinie in die Altstadt, am Rathaus mit Marktbrunnen vorbei, über die Saale hinauf zu Schloss Saaleck."},
+	{"name": "Berlin Kreuzberg", "geo": Vector2(52.4990, 13.4300), "mood": "kiez", "type": "circuit", "tier": 3, "laps": 2,
+		"seed": 806, "city": "kreuzberg", "town": "Berlin",
+		"shops": ["SPÄTI", "DÖNER", "CURRYWURST", "PLATTENLADEN", "VEGAN", "SHISHA BAR", "KIEZKNEIPE", "FAHRRADLADEN", "TATTOO"],
+		"districts": {"kiez_de": 0.7, "innenstadt_de": 0.3},
+		"desc": "Unter der Hochbahn der U1 durch die Skalitzer Straße, über die Oberbaumbrücke, an der East Side Gallery entlang und über die Schillingbrücke zurück zum Kotti."},
 ]
 
 const EVENT_TYPES := {
@@ -314,6 +319,20 @@ const EVENT_TYPES := {
 	"drag": {"label": "Drag", "desc": "Geradeaus gegen 3 Gegner. A/D wechselt die Spur, E/Q schaltet: im grünen Bereich perfekt. Zu lange im Begrenzer: Motorschaden. Crash mit Verkehr: Totalschaden."},
 }
 const TYPE_ORDER := ["sprint", "circuit", "drag", "drift"]
+## Karriere: so werden die Events nacheinander freigeschaltet (Sieg im vorigen Event öffnet das nächste)
+const CAREER := ["Bankenviertel-Sprint", "Tauberbischofsheim Altstadt", "Hafenmeile", "Bad Kissingen Kurmeile", "Chinatown-Drift",
+	"Prachtallee-Sprint", "Innenstadtring", "Chinatown-Runde", "Hafenrunde", "Hammelburg Saaleck", "Neon-Gerade", "Aachen Grabenring",
+	"Chinatown-Express", "Hafen-Drift", "Altstadt-Hügel", "Hafenring", "Altstadtring", "Berlin Kreuzberg", "Schnellstraßen-Sprint",
+	"Schnellstraßen-Drag", "Hafen-Sprint", "Stadion-Drift", "Nachtschicht", "Würzburg Mainufer"]
+
+
+static func race_index(name: String) -> int:
+	for i in RACES.size():
+		if RACES[i]["name"] == name:
+			return i
+	return -1
+
+
 ## Früher englische Eventnamen: Bestzeiten im Spielstand werden beim Laden umgeschrieben
 const RENAMED := {
 	"Downtown Sprint": "Bankenviertel-Sprint",

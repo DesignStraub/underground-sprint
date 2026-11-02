@@ -7,6 +7,7 @@ const Builder := preload("res://scripts/car_builder.gd")
 const PixelView := preload("res://scripts/pixel_view.gd")
 const UI := preload("res://scripts/ui_style.gd")
 const I18n := preload("res://scripts/i18n.gd")
+const CareerMap := preload("res://scripts/career_map.gd")
 
 ## Tipps wie auf den Ladebildschirmen von NFS Underground
 const TIPS := [
@@ -27,6 +28,8 @@ var turntable: Node3D
 var car_node: Node3D
 var cam: Camera3D
 var menu: VBoxContainer
+var menu_scroll: ScrollContainer  # lange Listen (Karriere) scrollen mit dem Fokus mit
+var career_map: Control
 var title: Label
 var info: Label
 var status: Label
@@ -193,11 +196,32 @@ func _build_ui() -> void:
 	title.position = Vector2(13, 15)
 	section = UI.section(root, Vector2(14, 38))
 
+	menu_scroll = ScrollContainer.new()
+	menu_scroll.anchor_bottom = 1.0
+	menu_scroll.offset_left = 14.0
+	menu_scroll.offset_right = 262.0
+	menu_scroll.offset_top = 86.0
+	menu_scroll.offset_bottom = -24.0
+	menu_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	menu_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER
+	menu_scroll.follow_focus = true
+	root.add_child(menu_scroll)
 	menu = VBoxContainer.new()
-	menu.position = Vector2(14, 86)
-	menu.custom_minimum_size = Vector2(210, 0)
+	menu.custom_minimum_size = Vector2(226, 0)
 	menu.add_theme_constant_override("separation", 3)
-	root.add_child(menu)
+	menu_scroll.add_child(menu)
+
+	# Streckenkarte rechts (nur in der Karriere-Liste)
+	career_map = CareerMap.new()
+	career_map.anchor_left = 1.0
+	career_map.anchor_right = 1.0
+	career_map.anchor_bottom = 1.0
+	career_map.offset_left = -196.0
+	career_map.offset_right = -14.0
+	career_map.offset_top = 46.0
+	career_map.offset_bottom = -100.0
+	career_map.visible = false
+	root.add_child(career_map)
 
 	# oben rechts: Stand, Tipp, Leistung des Autos
 	status = _label(root, 10, HORIZONTAL_ALIGNMENT_RIGHT)
@@ -404,6 +428,8 @@ func _show_car(car_id: String, cfg: Dictionary) -> void:
 # --- Menüs ----------------------------------------------------------------
 
 func _clear_menu() -> void:
+	career_map.visible = false
+	menu_scroll.scroll_vertical = 0
 	for c in menu.get_children():
 		menu.remove_child(c)
 		c.queue_free()
@@ -423,10 +449,10 @@ func _button(text: String, cb: Callable, disabled := false) -> Button:
 
 func _focus_first() -> void:
 	menu.modulate.a = 0.0
-	menu.position.x = -24.0
+	menu_scroll.position.x = -24.0
 	section.modulate.a = 0.0
 	var tw := create_tween().set_parallel().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-	tw.tween_property(menu, "position:x", 14.0, 0.18)
+	tw.tween_property(menu_scroll, "position:x", 14.0, 0.18)
 	tw.tween_property(menu, "modulate:a", 1.0, 0.18)
 	tw.tween_property(section, "modulate:a", 1.0, 0.25)
 	for c in menu.get_children():
@@ -463,8 +489,9 @@ func _show_settings() -> void:
 		"fps": "FPS-Limit: begrenzt die Bildrate (schont Akku und Lüfter).",
 		"fullscreen": "Vollbild (auch F / F11).",
 		"language": "Sprache des Spiels. Titel, Orte und Schilder bleiben deutsch.",
+		"touch": "Touch-Knöpfe im Rennen. Auto: nur auf Handy und Tablet.",
 	}
-	for key in ["language", "quality", "pixel", "vsync", "fps", "fullscreen"]:
+	for key in ["language", "quality", "pixel", "vsync", "fps", "fullscreen", "touch"]:
 		var k: String = key
 		var b := _button(GameState.setting_text(k), func(): pass)
 		b.pressed.connect(func():
@@ -483,22 +510,51 @@ func _show_settings() -> void:
 	_focus_first()
 
 
-## Erst die Art wählen, dann das Event. Alles ist frei wählbar; Drift-Siege schalten Driftautos frei.
+## Karriere wie in NFS: alle Events der Reihe nach, ein Sieg öffnet das nächste. Rechts die Deutschlandkarte.
 func _show_races() -> void:
 	_clear_menu()
-	_set_section("RENNEN")
-	for type in Catalog.TYPE_ORDER + ["city"]:
-		var n := 0
-		for r in Catalog.RACES:
-			if _in_list(r, type):
-				n += 1
-		var t: String = type
-		var ty: Dictionary = Catalog.CITY_EVENTS if type == "city" else Catalog.EVENT_TYPES[type]
-		var b := _button("%s  (%d)" % [tr(ty["label"]), n], func(): _show_events(t))
-		b.focus_entered.connect(func(): info.text = tr(ty["desc"]))
+	_set_section("KARRIERE")
+	career_map.visible = true
+	var last_open := 0
+	for i in Catalog.CAREER.size():
+		var ev: String = Catalog.CAREER[i]
+		var ri := Catalog.race_index(ev)
+		var r: Dictionary = Catalog.RACES[ri]
+		var open := GameState.career_unlocked(i)
+		var txt := "%02d  %s  %s" % [i + 1, tr(ev), "*".repeat(r["tier"])]
+		if GameState.best_times.has(ev):
+			var best: float = GameState.best_times[ev]
+			txt += "   " + ("%d P" % int(best) if r["type"] == "drift" else "%d:%05.2f" % [int(best) / 60, fmod(best, 60.0)])
+		var idx := i
+		var b := _button(txt, func():
+			if GameState.career_unlocked(idx):
+				_start_race(ri)
+			else:
+				Sfx.play("thud", -14.0, 1.3))
+		if not open:
+			b.modulate = Color(1, 1, 1, 0.38)
+		else:
+			last_open = i
+		b.focus_entered.connect(func():
+			career_map.selected = ev
+			info.text = _career_info(idx))
 	_button("< Zurück", _show_main)
-	info.text = tr("Fahr, worauf du Lust hast. Rennsiege schalten schnelle Autos frei, Driftsiege die Driftautos.\nTempo-Stufe: %d %% (steigt mit jedem Sieg)") % int(GameState.pace() * 100.0)
 	_focus_first()
+	menu.get_child(last_open).grab_focus.call_deferred()
+
+
+func _career_info(i: int) -> String:
+	var r: Dictionary = Catalog.RACES[Catalog.race_index(Catalog.CAREER[i])]
+	var rt: String = r["type"]
+	var head := "%s  ·  %s" % [r.get("town", ""), tr(Catalog.EVENT_TYPES[rt]["label"])]
+	if r.has("laps") and rt != "sprint":
+		head += "  ·  " + tr("%d Runden. ") % r["laps"]
+	var t := head + "\n" + tr(r.get("desc", Catalog.EVENT_TYPES[rt]["desc"]))
+	if not GameState.career_unlocked(i):
+		t = head + "\n" + tr("Gesperrt: gewinne zuerst %s.") % tr(Catalog.CAREER[i - 1])
+	elif Catalog.CAREER[i] in GameState.won_events:
+		t += "\n" + tr("Gewonnen")
+	return t
 
 
 ## Orts-Strecken nur unter "Städte", nicht zusätzlich unter ihrer Art
