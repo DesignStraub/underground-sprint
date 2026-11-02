@@ -540,7 +540,13 @@ func _show_races() -> void:
 			info.text = _career_info(idx))
 	_button("< Zurück", _show_main)
 	_focus_first()
-	menu.get_child(last_open).grab_focus.call_deferred()
+	var target: Control = menu.get_child(last_open)
+	target.grab_focus.call_deferred()
+	# erst wenn die Liste ausgelegt ist, stimmt die Position: dann zum offenen Event scrollen
+	await get_tree().process_frame
+	await get_tree().process_frame
+	if is_instance_valid(target) and target.is_inside_tree():
+		menu_scroll.ensure_control_visible(target)
 
 
 func _career_info(i: int) -> String:
