@@ -41,6 +41,7 @@ Berlin-Kreuzberg, mit Dom, Residenz, Festung, Oberbaumbrücke und Hochbahn an ih
 - Sprint, Rundkurs, Drag mit Handschaltung, Drift – sechs Strecken auf echten Straßen (OpenStreetMap)
 - Jede Stadt mit eigener Stimmung: Regen auf nasser Fahrbahn, Nebel, Natriumlicht, Dämmerung, Neon, Kiez
 - Tunnel, Hochbahn, Bahnübergang mit Zug, Brücken, Abkürzungen, Verkehr in beide Richtungen
+- Abkürzungen als Lichttunnel aus Neonbögen, Sprünge mit echter Flugphase, Überschläge bei harten Crashs, umfahrbare Laternen und Schilder
 - 9 Autos, Tuning wie in NFS: Optik (Lack, Felgen, Spoiler, Bodykit, Folierung, Neon, Scheiben) und Leistung (Motor, Turbo, Nitro, Fahrwerk, Reifen)
 - Kein Geld, kein Grind: Siege schalten Teile und Autos frei
 - Start- und Zielszene wie damals: Starterin, jubelnde Fans, Kamerafahrt
@@ -72,6 +73,7 @@ cathedral, palace, fortress, Oberbaum Bridge and elevated U-Bahn in their real p
 - Sprint, circuit, drag with manual shifting, drift – six tracks on real streets (OpenStreetMap)
 - Every city has its own mood: rain on wet asphalt, fog, sodium light, dusk, neon, Kiez
 - Tunnels, elevated railway, rail crossing with train, bridges, shortcuts, two-way traffic
+- Shortcuts as neon light tunnels, jumps with real air time, rollovers in hard crashes, lamps and signs you can knock over
 - 9 cars, NFS-style tuning: visual (paint, rims, spoiler, body kit, vinyl, underglow, tint) and performance (engine, turbo, nitro, suspension, tires)
 - No money, no grind: wins unlock parts and cars
 - Start and finish scenes like back in the day: flag girl, cheering crowd, camera fly-in
