@@ -162,7 +162,7 @@ func _shot_car_altstadt(t: Dictionary, vp: SubViewport, cam: Camera3D) -> void:
 
 ## Getuntes Auto unter Lampions, Kamera schräg von vorn
 func _shot_car_chinatown(t: Dictionary, vp: SubViewport, cam: Camera3D) -> void:
-	var d := _district_d(t, "chinatown") + 105.0
+	var d := _district_d(t, "shops") + 105.0
 	var car := Builder.build("vortex", CAR_CFG)
 	vp.add_child(car)
 	car.global_transform = Track.xform_at(t["curve"], d, Track.LANES[2])
@@ -181,7 +181,7 @@ func _shot_skyline(t: Dictionary, _vp: SubViewport, cam: Camera3D) -> void:
 
 ## Lampionketten von oben, für den Seitenhintergrund
 func _shot_lanterns(t: Dictionary, _vp: SubViewport, cam: Camera3D) -> void:
-	var d := _district_d(t, "chinatown") + 30.0
+	var d := _district_d(t, "shops") + 30.0
 	cam.fov = 65.0
 	cam.global_position = _at(t, d, 0.0, 13.0)
 	cam.look_at(_at(t, d + 120.0, 0.0, 5.0), Vector3.UP)

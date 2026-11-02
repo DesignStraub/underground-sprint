@@ -1,17 +1,23 @@
 extends Node3D
 ## Werkzeug: rendert alle Autos schräg von vorn und schräg von hinten (Karosserie, Radkästen, Neon prüfen).
-##   Godot --path . res://tools/car_shots.tscn -- --out=/pfad/prefix
+##   Godot --path . res://tools/car_shots.tscn -- --out=/pfad/prefix [--cars=kaizen,hachi] [--stock] (ab Werk, ohne Tuning)
 
 const Catalog := preload("res://scripts/catalog.gd")
 const Builder := preload("res://scripts/car_builder.gd")
 
 var out := "/tmp/car"
+var cars: Array = Catalog.CAR_ORDER
+var stock := false
 
 
 func _ready() -> void:
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--out="):
 			out = a.substr(6)
+		elif a.begins_with("--cars="):
+			cars = Array(a.substr(7).split(","))
+		elif a == "--stock":
+			stock = true
 	var env := Environment.new()
 	env.background_mode = Environment.BG_COLOR
 	env.background_color = Color(0.08, 0.08, 0.12)
@@ -37,7 +43,11 @@ func _ready() -> void:
 	add_child(cam)
 	cam.make_current()
 	var cfg := {"paint": 5, "rims": 2, "spoiler": 2, "bodykit": 1, "vinyl": 0, "neon": 2, "engine": 0, "nitro": 0}
-	for id in Catalog.CAR_ORDER:
+	if stock:
+		cfg = {}
+		for cat in Catalog.PART_ORDER:
+			cfg[cat] = 0
+	for id in cars:
 		var car := Builder.build(id, cfg, false)
 		add_child(car)
 		for view in [["vorn", Vector3(4.2, 1.6, -5.2)], ["hinten", Vector3(-4.0, 1.5, 5.4)], ["seite", Vector3(8.5, 0.8, 0.0)]]:

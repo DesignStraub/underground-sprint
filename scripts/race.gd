@@ -129,6 +129,8 @@ func _ready() -> void:
 		ai.accel *= 0.8 + 0.2 * GameState.pace()
 		ais.append(ai)
 
+	for ai in ais:
+		ai.rivals = ais
 	if track["crossing"]:
 		track["crossing"].player = player
 	_setup_hall()

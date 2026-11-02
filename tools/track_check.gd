@@ -1,13 +1,16 @@
 extends Node
 ## Werkzeug: prüft alle Strecken auf Baufehler. Zu enge Kurven (Radius kleiner als halbe Breite plus Gehweg: dort
 ## überschneiden sich Fahrbahnrand und Wände) und Wände, die in eine Fahrbahn ragen (unsichtbare Hindernisse).
-## godot --path . res://tools/track_check.tscn [-- --race=8]
+## Mit --ghosts zusätzlich: sichtbare Dinge auf Fahrbahn und Gehweg ohne Kollision (man fährt hindurch); braucht
+## --nobatch, damit die Einzelteile noch einzeln da sind.
+## godot --path . res://tools/track_check.tscn [-- --race=8] [--ghosts --nobatch]
 
 const Catalog := preload("res://scripts/catalog.gd")
 const Track := preload("res://scripts/track_builder.gd")
 
 
 func _ready() -> void:
+	var ghosts := OS.get_cmdline_user_args().has("--ghosts")
 	var only := -1
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--race="):
@@ -23,6 +26,10 @@ func _ready() -> void:
 		for p in t["paths"]:
 			msgs.append_array(_tight(t, p))
 		msgs.append_array(_walls_in_road(t))
+		if ghosts:
+			await get_tree().physics_frame
+			await get_tree().physics_frame
+			msgs.append_array(_ghosts(t))
 		print("%2d %s: %s" % [i, r["name"], "ok" if msgs.is_empty() else "\n     " + "\n     ".join(msgs)])
 		bad += 1 if not msgs.is_empty() else 0
 		t["node"].free()
@@ -88,3 +95,53 @@ func _walls_in_road(t: Dictionary) -> Array:
 	for k in hits:
 		out.append("Wand in der Fahrbahn: %s (%d Flächen)" % [k, hits[k]])
 	return out
+
+
+## Sichtbares über 0,6 m Höhe, unten auf Fahrbahn- oder Gehweghöhe, im erreichbaren Bereich (bis zur Randmauer),
+## das weder selbst ein Körper ist noch von einer Kollisionsform abgedeckt wird
+func _ghosts(t: Dictionary) -> Array:
+	var space := get_viewport().find_world_3d().direct_space_state
+	var found := {}
+	var stack: Array = [t["node"]]
+	while not stack.is_empty():
+		var n: Node = stack.pop_back()
+		if n is PhysicsBody3D:
+			continue  # Umfahrbares, Züge: haben eigene Körper
+		stack.append_array(n.get_children())
+		if not (n is MeshInstance3D or n is MultiMeshInstance3D) or not (n as Node3D).is_visible_in_tree():
+			continue
+		var boxes := []  # [AABB in Welt, Name]
+		if n is MeshInstance3D:
+			boxes.append([(n as MeshInstance3D).global_transform * (n as MeshInstance3D).get_aabb(), (n as MeshInstance3D).mesh.get_class()])
+		else:
+			var mm: MultiMesh = (n as MultiMeshInstance3D).multimesh
+			for k in mm.instance_count:
+				boxes.append([(n as Node3D).global_transform * mm.get_instance_transform(k) * mm.mesh.get_aabb(), "Multi:" + mm.mesh.get_class()])
+		for bx in boxes:
+			_ghost_test(t, space, bx[0], "%s/%s" % [n.get_parent().name.left(18), bx[1]], found)
+	var out := []
+	for k in found:
+		out.append("ohne Kollision: %s bei %s" % [k, found[k].slice(0, 6)])
+	return out
+
+
+func _ghost_test(t: Dictionary, space: PhysicsDirectSpaceState3D, bb: AABB, label: String, found: Dictionary) -> void:
+	if bb.size.y < 0.6 or bb.position.y > 1.2 or bb.size.x > 30.0 or bb.size.z > 30.0:
+		return
+	var c := bb.get_center()
+	var loc := Track.locate(t, Vector3(c.x, 0.0, c.z))
+	var p: Dictionary = loc["path"]
+	var reach: float = (Track.hw(t, loc["d"]) + Track.WALK if p["id"] == 0 else p["half_w"] + (3.0 if p["kind"] == "fork" else 0.0)) + 0.2
+	if absf(loc["lat"]) > reach:
+		return
+	var q := PhysicsShapeQueryParameters3D.new()
+	var box := BoxShape3D.new()
+	box.size = Vector3(maxf(bb.size.x * 0.8, 0.1), 0.6, maxf(bb.size.z * 0.8, 0.1))
+	q.shape = box
+	q.transform = Transform3D(Basis(), Vector3(c.x, bb.position.y + 0.6, c.z))
+	q.collision_mask = 0xFFFFFFFF
+	if space.intersect_shape(q, 1).is_empty():
+		var what := "%s %.1fx%.1fx%.1f" % [label, bb.size.x, bb.size.y, bb.size.z]
+		if not found.has(what):
+			found[what] = []
+		found[what].append(int(loc["d"]))

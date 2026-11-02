@@ -6,10 +6,10 @@ extends RefCounted
 
 const CARS := {
 	"kaizen": {
-		"name": "Kaizen Rally S", "style": "hatch", "unlock": {}, "drift": 0.35,
-		"length": 4.25, "width": 1.74,
+		"name": "Kaizen Rally S", "style": "hatch", "unlock": {}, "drift": 0.35, "paint": Color(0.92, 0.92, 0.89),
+		"length": 4.05, "width": 1.72,
 		"accel": 9.5, "top_speed": 58.0, "grip": 26.0, "steer": 2.3,
-		"desc": "Kompakter Keil-Sportler. Leicht, wendig, verzeiht viel.",
+		"desc": "JDM-Fließheck mit Hochdrehzahl-Motor. Leicht, wendig, verzeiht viel.",
 		# Hochdrehender Sauger-Vierzylinder
 		"sound": {"cyl": 4, "harm": [1.0, 0.45, 0.2, 0.08], "sub": 0.3, "turbo": 0.0, "rough": 0.2},
 	},
@@ -86,7 +86,7 @@ const PARTS := {
 	"paint": {
 		"label": "Lack",
 		"options": [
-			{"name": "Silber", "wins": 0, "color": Color(0.75, 0.77, 0.8)},
+			{"name": "Werkslack", "wins": 0, "color": Color(0.75, 0.77, 0.8)},  # je Auto eigen (CARS.paint), sonst Silber
 			{"name": "Schwarz", "wins": 0, "color": Color(0.05, 0.05, 0.06)},
 			{"name": "Rot", "wins": 0, "color": Color(0.75, 0.05, 0.05)},
 			{"name": "Gelb", "wins": 1, "color": Color(0.95, 0.75, 0.05)},
@@ -231,16 +231,13 @@ static func stats(car_id: String, cfg: Dictionary) -> Dictionary:
 const RACES := [
 	{"name": "Bankenviertel-Sprint", "town": "Frankfurt am Main", "region": "Kreisfreie Stadt", "geo": Vector2(50.1109, 8.6821), "mood": "neon",  "type": "sprint", "tier": 1, "seed": 11, "segments": 18, "max_turn": 50.0,
 		"bulges": {4: "alley", 11: "lake"},
-		"districts": {"downtown": 0.35, "chinatown": 0.25, "shops": 0.25, "residential": 0.15}},
+		"districts": {"downtown": 0.35, "shops": 0.5, "residential": 0.15}},
 	{"name": "Prachtallee-Sprint", "town": "München", "region": "Landeshauptstadt", "geo": Vector2(48.1351, 11.582), "mood": "daemmerung",  "type": "sprint", "tier": 1, "seed": 23, "segments": 20, "max_turn": 40.0,
 		"bulges": {5: "fork", 13: "fork"},
 		"districts": {"boulevard": 0.45, "downtown": 0.25, "shops": 0.3}},
 	{"name": "Hafenrunde", "town": "Hamburg", "region": "Freie und Hansestadt Hamburg", "geo": Vector2(53.5459, 9.9665), "mood": "regen",  "type": "sprint", "tier": 2, "seed": 42, "segments": 24, "max_turn": 65.0,
 		"bulges": {5: "lake", 13: "fork", 19: "alley"},
-		"districts": {"industrial": 0.45, "chinatown": 0.15, "shops": 0.2, "residential": 0.2}},
-	{"name": "Chinatown-Express", "town": "Düsseldorf", "region": "Landeshauptstadt", "geo": Vector2(51.2277, 6.7735), "mood": "neon",  "type": "sprint", "tier": 2, "seed": 5, "segments": 22, "max_turn": 60.0,
-		"bulges": {4: "fork", 10: "alley", 17: "fork"},
-		"districts": {"chinatown": 0.5, "shops": 0.25, "boulevard": 0.25}},
+		"districts": {"industrial": 0.45, "shops": 0.35, "residential": 0.2}},
 	{"name": "Schnellstraßen-Sprint", "town": "Dortmund", "region": "Kreisfreie Stadt", "geo": Vector2(51.5136, 7.4653), "mood": "natrium",  "type": "sprint", "tier": 3, "seed": 7, "segments": 30, "max_turn": 30.0,
 		"bulges": {7: "alley", 17: "lake", 24: "fork"},
 		"districts": {"highway": 0.4, "downtown": 0.2, "industrial": 0.2, "boulevard": 0.2}},
@@ -249,13 +246,10 @@ const RACES := [
 		"districts": {"downtown": 0.4, "boulevard": 0.3, "shops": 0.3}},
 	{"name": "Hafenring", "town": "Bremen", "region": "Freie Hansestadt Bremen", "geo": Vector2(53.0793, 8.8017), "mood": "regen",  "type": "circuit", "tier": 2, "laps": 2, "seed": 202, "corners": 10, "radius": 300.0,
 		"bulges": {2: "fork", 6: "lake"},
-		"districts": {"industrial": 0.5, "highway": 0.25, "chinatown": 0.25}},
+		"districts": {"industrial": 0.5, "highway": 0.25, "shops": 0.25}},
 	{"name": "Nachtschicht", "town": "Stuttgart", "region": "Landeshauptstadt", "geo": Vector2(48.7758, 9.1829), "mood": "mitternacht",  "type": "circuit", "tier": 3, "laps": 2, "seed": 303, "corners": 11, "radius": 360.0,
 		"bulges": {2: "fork", 7: "alley"},
 		"districts": {"highway": 0.3, "boulevard": 0.3, "downtown": 0.4}},
-	{"name": "Chinatown-Drift", "town": "Düsseldorf", "region": "Landeshauptstadt", "geo": Vector2(51.2277, 6.7735), "mood": "kiez",  "type": "drift", "tier": 1, "laps": 2, "seed": 401, "corners": 12, "radius": 140.0,
-		"bulges": {},
-		"districts": {"chinatown": 0.7, "shops": 0.3}},
 	{"name": "Hafen-Drift", "town": "Hamburg", "region": "Freie und Hansestadt Hamburg", "geo": Vector2(53.5459, 9.9665), "mood": "nebel",  "type": "drift", "tier": 2, "laps": 2, "seed": 502, "corners": 12, "radius": 155.0,
 		"bulges": {},
 		"districts": {"industrial": 0.7, "highway": 0.3}},
@@ -267,18 +261,15 @@ const RACES := [
 	{"name": "Hafenmeile", "town": "Kiel", "region": "Landeshauptstadt", "geo": Vector2(54.3233, 10.1228), "mood": "nebel",  "type": "drag", "tier": 1, "seed": 701, "segments": 8, "max_turn": 4.0,
 		"districts": {"industrial": 0.6, "shops": 0.4}},
 	{"name": "Neon-Gerade", "town": "Leipzig", "region": "Kreisfreie Stadt", "geo": Vector2(51.3397, 12.3731), "mood": "kiez",  "type": "drag", "tier": 2, "seed": 702, "segments": 10, "max_turn": 6.0,
-		"districts": {"downtown": 0.5, "chinatown": 0.5}},
+		"districts": {"downtown": 0.5, "shops": 0.5}},
 	{"name": "Schnellstraßen-Drag", "town": "Hockenheim", "region": "Rhein-Neckar-Kreis", "geo": Vector2(49.322, 8.547), "mood": "mitternacht",  "type": "drag", "tier": 3, "seed": 703, "segments": 13, "max_turn": 5.0,
 		"districts": {"highway": 0.6, "boulevard": 0.4}},
 	{"name": "Altstadt-Hügel", "town": "Heidelberg", "region": "Kreisfreie Stadt", "geo": Vector2(49.3988, 8.6724), "mood": "daemmerung",  "type": "sprint", "tier": 2, "seed": 61, "segments": 22, "max_turn": 55.0,
 		"bulges": {4: "fork", 11: "fork", 17: "alley"},
-		"districts": {"residential": 0.45, "shops": 0.3, "chinatown": 0.25}},
+		"districts": {"residential": 0.45, "shops": 0.55}},
 	{"name": "Hafen-Sprint", "town": "Rostock", "region": "Hanse- und Universitätsstadt", "geo": Vector2(54.0924, 12.0991), "mood": "nebel",  "type": "sprint", "tier": 3, "seed": 77, "segments": 26, "max_turn": 70.0,
 		"bulges": {5: "lake", 12: "alley", 19: "fork"},
 		"districts": {"industrial": 0.5, "highway": 0.3, "residential": 0.2}},
-	{"name": "Chinatown-Runde", "town": "Mannheim", "region": "Kreisfreie Stadt", "geo": Vector2(49.4875, 8.466), "mood": "neon",  "type": "circuit", "tier": 1, "laps": 3, "seed": 121, "corners": 8, "radius": 220.0,
-		"bulges": {3: "fork"},
-		"districts": {"chinatown": 0.6, "shops": 0.4}},
 	{"name": "Altstadtring", "town": "Nürnberg", "region": "Kreisfreie Stadt", "geo": Vector2(49.4521, 11.0767), "mood": "mitternacht",  "type": "circuit", "tier": 2, "laps": 2, "seed": 131, "corners": 10, "radius": 290.0,
 		"bulges": {2: "fork", 6: "alley"},
 		"districts": {"residential": 0.5, "boulevard": 0.3, "downtown": 0.2}},
@@ -320,9 +311,9 @@ const EVENT_TYPES := {
 }
 const TYPE_ORDER := ["sprint", "circuit", "drag", "drift"]
 ## Karriere: so werden die Events nacheinander freigeschaltet (Sieg im vorigen Event öffnet das nächste)
-const CAREER := ["Bankenviertel-Sprint", "Tauberbischofsheim Altstadt", "Hafenmeile", "Bad Kissingen Kurmeile", "Chinatown-Drift",
-	"Prachtallee-Sprint", "Innenstadtring", "Chinatown-Runde", "Hafenrunde", "Hammelburg Saaleck", "Neon-Gerade", "Aachen Grabenring",
-	"Chinatown-Express", "Hafen-Drift", "Altstadt-Hügel", "Hafenring", "Altstadtring", "Berlin Kreuzberg", "Schnellstraßen-Sprint",
+const CAREER := ["Bankenviertel-Sprint", "Tauberbischofsheim Altstadt", "Hafenmeile", "Bad Kissingen Kurmeile",
+	"Prachtallee-Sprint", "Innenstadtring", "Hafenrunde", "Hammelburg Saaleck", "Neon-Gerade", "Aachen Grabenring",
+	"Hafen-Drift", "Altstadt-Hügel", "Hafenring", "Altstadtring", "Berlin Kreuzberg", "Schnellstraßen-Sprint",
 	"Schnellstraßen-Drag", "Hafen-Sprint", "Stadion-Drift", "Nachtschicht", "Würzburg Mainufer"]
 
 
@@ -339,20 +330,17 @@ const RENAMED := {
 	"Boulevard Run": "Prachtallee-Sprint",
 	"Feierabendverkehr": "Prachtallee-Sprint",
 	"Harbor Run": "Hafenrunde",
-	"Chinatown Express": "Chinatown-Express",
 	"Highway Rush": "Schnellstraßen-Sprint",
 	"Schnellstraßen-Raserei": "Schnellstraßen-Sprint",
 	"City Loop": "Innenstadtring",
 	"Dock Ring": "Hafenring",
 	"Night Ring": "Nachtschicht",
-	"Chinatown Drift": "Chinatown-Drift",
 	"Dock Drift": "Hafen-Drift",
 	"Stadion Drift": "Stadion-Drift",
 	"Highway Drag": "Schnellstraßen-Drag",
 	"Viertelmeile ohne Tempolimit": "Schnellstraßen-Drag",
 	"Altstadt Hills": "Altstadt-Hügel",
 	"Docks Sprint": "Hafen-Sprint",
-	"Chinatown Loop": "Chinatown-Runde",
 	"Altstadt Ring": "Altstadtring",
 }
 ## Orts-Strecken stehen im Menü unter eigener Rubrik (nicht zusätzlich unter Sprint/Rundkurs)

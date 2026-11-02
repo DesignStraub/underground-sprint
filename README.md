@@ -25,20 +25,20 @@ Ordner in Godot 4.7 öffnen (Import), dann F5. Das Spiel startet mit dem ONE-HUM
 Nitro lädt sich langsam von selbst auf und schneller beim Driften.
 
 ## Events
-**Karriere:** Garage → Rennen fahren zeigt alle 24 Events als Liste neben einer Deutschlandkarte. Jedes Event liegt in
+**Karriere:** Garage → Rennen fahren zeigt alle 21 Events als Liste neben einer Deutschlandkarte. Jedes Event liegt in
 einer deutschen Stadt (die ausgedachten Strecken in Frankfurt, München, Hamburg, Köln, Leipzig …, die echten in ihren
 Orten). Freigeschaltet wird der Reihe nach: Wer ein Event gewinnt, öffnet das nächste. Auf der Karte sind gesperrte
 Städte grau, offene grün, gewonnene gold, die Route verbindet die offenen Städte, die gewählte pulsiert. Umriss: Natural
 Earth (gemeinfrei).
 
-- **Sprint** (7): von A nach B gegen 3 Gegner.
-- **Rundkurs** (5): 2–3 Runden gegen 3 Gegner.
+- **Sprint** (6): von A nach B gegen 3 Gegner.
+- **Rundkurs** (4): 2–3 Runden gegen 3 Gegner.
 - **Drag** (3): geradeaus gegen 3 Gegner, wie in Underground. Gelenkt wird automatisch, A/D wechselt die Spur,
   geschaltet wird von Hand (E/Q). Großer Drehzahlmesser mit grünem Schaltbereich und Schaltlicht: dort schalten ist
   „perfekt“ (kaum Zugkraftunterbrechung, kleiner Schub), zu früh kostet Zug, wer im Begrenzer bleibt, überhitzt den
   Motor (Temperaturbalken) bis zum Motorschaden. Auffahren oder frontal in den Verkehr ist Totalschaden. Start im
   grünen Drehzahlbereich = perfekter Start, Nitro und Near Miss wie sonst. Entfernungstafeln alle 200 m, Viertelmeile.
-- **Drift** (3): allein auf kleinen, rundum abgesperrten Kursen. Eigenes Fahrverhalten: ist das Auto
+- **Drift** (2): allein auf kleinen, rundum abgesperrten Kursen. Eigenes Fahrverhalten: ist das Auto
   quer, hält Gas den Winkel, Lenken steuert ihn, Gas weg richtet es auf. Querfahren ab 12° gibt Punkte
   (Winkel × Tempo, nah an der Bande ×1,6), verkettete Drifts steigern den Multiplikator bis x5,
   jede Bandenberührung kostet die laufende Kette. Zielpunkte für Platz 3/2/1 stehen im HUD.
@@ -92,7 +92,6 @@ Skript), schreibt `scripts/city_data.gd`.
   - **Marktviertel:** Läden, Markisen, Lichterketten über der Straße, Hochbahn
   - **Altstadt:** Backstein, Feuertreppen, Bäume, alte Laternen
   - **Hafen:** Hallen, Containerkräne über der Straße, Schornsteine, Natriumdampf-Licht
-  - **Chinatown:** Tor, Lampionketten, geschwungene Dächer, senkrechte Leuchtschilder
   - **Schnellstraße:** Lärmschutzwände mit Graffiti, Wegweiser-Brücken, Straßenbrücken
 - **Tunnel** unter Häuserblocks (Kacheln, Lichtbänder, Hall im Sound): Die Fahrbahn taucht vorher in einem offenen
   Betontrog gut 6 m ab (Leitlichter in der Mauer, oben läuft der Gehweg der Stadt weiter) und kommt dahinter wieder hoch.
@@ -113,10 +112,18 @@ Skript), schreibt `scripts/city_data.gd`.
   1 s Flug, 3 m hoch). In der Luft hebt sich erst die Nase und kippt dann mit der Flugbahn ab; wer seitlich über eine
   Kante fährt, kippt zur freien Seite. Harte Landungen federn kurz nach, schiefe kosten Tempo. In der Luft kann man
   nicht lenken, Nitro schiebt aber weiter. Wer am See zu kurz springt, fällt ins Wasser.
-- **Überschlag:** Frontal in die Wand oder ins Auto ab gut 85 km/h Aufprall (oder schief gelandet): das Auto hebt ab,
-  rollt um die Längsachse und federt bei jedem Aufschlag. Landet es auf den Rädern, geht es weiter; auf Dach oder
+- **Überschlag** wie in echt: nur wer quer rutschend (ab 36 km/h Querfahrt, Schräglage über gut 30°, mindestens
+  50 km/h) mit der Flanke gegen Wand oder Auto kracht, kippt darüber, oder wer schief landet. Frontal oder streifend
+  gibt es Crash und Dreher, keinen Überschlag. Das Auto hebt ab, rollt um die Längsachse und federt bei jedem Aufschlag. Landet es auf den Rädern, geht es weiter; auf Dach oder
   Seite wird es nach gut einer Sekunde auf die Straße zurückgesetzt. Hart getroffene Verkehrsautos überschlagen sich
   ebenfalls und bleiben liegen. Laternen, Schilder und Poller werden am Treffpunkt angestoßen und kippen um.
+- **Kollision:** Alles Feste und Schmale auf Fahrbahn und Gehweg (Masten, Pfosten, Stämme, Schaltkästen, Schilder,
+  Bänke) bekommt beim Streckenbau automatisch eine Kollisionsbox (`Track._auto_collide`), am Bahnübergang Schranken-
+  antrieb und Andreaskreuz. Durchlässig bleiben nur Schilf, Kabel und Passanten. Prüfen: `tools/track_check.tscn --
+  --ghosts --nobatch`.
+- **Gegner schieben:** Gegner fahren nicht durch dich oder einander hindurch. Von hinten bleiben sie an der
+  Stoßstange und schieben mit (gleich schwere Autos teilen sich das Tempo, Gas geben schiebt den Vorderen weiter),
+  nebeneinander drücken sich beide auseinander, wer blockiert wird, weicht auf die Spur mit dem meisten Platz aus.
 - **Gabelungen:** Vor der Teilung zeigt ein Wegweiser beide Wege. Die Altstadt-Route ist kürzer, aber zweispurig
   mit Gegenverkehr; außen herum geht ein breiter Boulevard. Wer sich nicht entscheidet, landet auf der Verkehrsinsel.
 - **Boulevards:** breite Straßen mit bepflanztem Mittelstreifen (auf der Schnellstraße mit Betonleitwand).
@@ -211,7 +218,10 @@ dann steht „Benutzerdefiniert“ da. Werte in `GameState.GFX`.
   Karosserie wankt nach der echten Querbeschleunigung, taucht beim Bremsen ein; die Verfolgerkamera dreht leicht
   verzögert mit und bleibt nah am Auto (im Stand 4,7 m, bei Tempo knapp 7 m, Blickwinkel 58°–80°). Messwerte aller Autos: `tools/handling_lab.tscn`.
 - **Autos** (9) sind aus Querschnitten gebaut (Radhäuser, Kotflügel-Buckel, Hüften, eingezogenes Glashaus), lose
-  angelehnt an RX-7, 350Z, Celica, Silvia, Skyline, AE86, S2000/MX-5, Lancer Evo/Impreza und Supra. Front- und
+  angelehnt an RX-7, 350Z, Civic EG, Silvia, Skyline, AE86, S2000/MX-5, Lancer Evo/Impreza und Supra. Der Startwagen
+  Kaizen ist ein JDM-Fließheck: langes Dach, steile Heckscheibe, schmale Scheinwerfer, durchgehendes Leuchtenband,
+  Dachspoiler, Sonnenstreifen mit Schriftzug, rotes Emblem und Abschlepphaken, unten schwarz abgesetzt, ab Werk tiefer
+  und in Championship-Weiß (Lack-Stufe „Werkslack“ ist je Auto eigen, `CARS.paint`). Front- und
   Heckschürze sind eigene Teile, Scheinwerfer und Rückleuchten sitzen in der Haut, Türfugen, Spiegel, Griffe,
   Kennzeichen. Unterbodenneon ist ein Lichtteppich auf der Straße.
 - **Straße** matt mit vereinzelten Pfützen. Wo kein Haus die Streckenbegrenzung verdeckt, steht ein Zaun.
@@ -254,7 +264,9 @@ Texte, Cover und Screenshots für die itch.io-Seite: `release/`.
   `--race=n`, `--trace`, `--shot=pfad`, `--times=…`, `--quit=s`, `--intro` (Kameraflug auch im Test),
   `--view=weg:d:quer:höhe:ziel_d:ziel_quer:ziel_höhe` (feste Kamera ohne HUD), `--look=wahrzeichen:höhe:blickhöhe:abstand[:d]`
   (Kamera auf ein Wahrzeichen der Städte-Strecken), `--racelog` (Rennverlauf alle 3 s), `--crash=tempo:winkel|k[:d]`
-  (Auto mit Tempo gegen die Wand bzw. auf die nächste Laterne, Verlauf von Überschlag und Flug), `--airlog`, `--tune=engine` (Garage direkt
+  (Auto mit Tempo gegen die Wand bzw. auf die nächste Laterne, `q` quer rutschend, Verlauf von Überschlag und Flug),
+  `--airlog`, `--tumblelog` (wodurch ein Überschlag ausgelöst wurde), `--block=d:spur` (Spieler blockiert, Abstände der
+  Gegner), `--tune=engine` (Garage direkt
   in einer Tuning-Kategorie), `--touch` (Touch-Knöpfe am Rechner); im Drag schaltet der Autopilot im
   grünen Bereich, `--lateshift` erst im Begrenzer, `--noshift` gar nicht, `--nolanes` ohne Spurwechsel, `--dragcrash`
   setzt Verkehr vor das Auto)

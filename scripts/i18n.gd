@@ -52,7 +52,7 @@ const EN := {
 	"Motor-Tuning steigert Beschleunigung und Höchstgeschwindigkeit.": "Engine tuning raises acceleration and top speed.",
 	"Im Drag nicht im Begrenzer bleiben: der Motor überhitzt.": "In drag races, stay off the rev limiter or the engine overheats.",
 	# --- Autos ---
-	"Kompakter Keil-Sportler. Leicht, wendig, verzeiht viel.": "Compact wedge-shaped sports car. Light, nimble, forgiving.",
+	"JDM-Fließheck mit Hochdrehzahl-Motor. Leicht, wendig, verzeiht viel.": "JDM hatchback with a high-revving engine. Light, nimble, forgiving.",
 	"Heckantrieb-Coupé. Liebt Drifts.": "Rear-wheel-drive coupé. Loves to drift.",
 	"Turbo-Limousine. Brutal auf der Geraden.": "Turbo sedan. Brutal on the straights.",
 	"Leichter Hecktriebler. Gebaut zum Querfahren.": "Light rear-wheel drive. Built to go sideways.",
@@ -65,7 +65,7 @@ const EN := {
 	# --- Tuning ---
 	"Lack": "Paint", "Felgen": "Rims", "Spoiler": "Spoiler", "Bodykit": "Body kit", "Folierung": "Vinyl",
 	"Unterbodenneon": "Underglow", "Motor": "Engine", "Nitro": "Nitro",
-	"Silber": "Silver", "Schwarz": "Black", "Rot": "Red", "Gelb": "Yellow", "Giftgrün": "Toxic Green", "Candyblau": "Candy Blue",
+	"Silber": "Silver", "Werkslack": "Factory paint", "Schwarz": "Black", "Rot": "Red", "Gelb": "Yellow", "Giftgrün": "Toxic Green", "Candyblau": "Candy Blue",
 	"Neonpink": "Neon Pink", "Serie": "Stock", "Fünfspeichen": "Five-spoke", "Gitter Gold": "Mesh Gold",
 	"Tiefbett Schwarz": "Deep Dish Black", "Keiner": "None", "Lippe": "Lip", "GT-Flügel": "GT Wing", "Monster-Flügel": "Monster Wing",
 	"Seitenschweller": "Side skirts", "Breitbau": "Widebody", "Keins": "None", "Rennstreifen": "Racing stripes",
@@ -84,10 +84,10 @@ const EN := {
 	"Echte Straßen aus Aachen, Würzburg, Bad Kissingen, Tauberbischofsheim und Hammelburg, die Wahrzeichen stehen an ihrem Platz. Kartendaten © OpenStreetMap-Mitwirkende.":
 		"Real streets from Aachen, Würzburg, Bad Kissingen, Tauberbischofsheim and Hammelburg, landmarks in their real places. Map data © OpenStreetMap contributors.",
 	"Bankenviertel-Sprint": "Financial District Sprint", "Prachtallee-Sprint": "Boulevard Sprint", "Hafenrunde": "Harbor Run",
-	"Chinatown-Express": "Chinatown Express", "Schnellstraßen-Sprint": "Highway Sprint", "Innenstadtring": "City Ring",
-	"Hafenring": "Harbor Ring", "Nachtschicht": "Night Shift", "Chinatown-Drift": "Chinatown Drift", "Hafen-Drift": "Harbor Drift",
+	"Schnellstraßen-Sprint": "Highway Sprint", "Innenstadtring": "City Ring",
+	"Hafenring": "Harbor Ring", "Nachtschicht": "Night Shift", "Hafen-Drift": "Harbor Drift",
 	"Stadion-Drift": "Stadium Drift", "Hafenmeile": "Harbor Mile", "Neon-Gerade": "Neon Straight", "Schnellstraßen-Drag": "Highway Drag",
-	"Altstadt-Hügel": "Old Town Hills", "Hafen-Sprint": "Harbor Sprint", "Chinatown-Runde": "Chinatown Loop", "Altstadtring": "Old Town Ring",
+	"Altstadt-Hügel": "Old Town Hills", "Hafen-Sprint": "Harbor Sprint", "Altstadtring": "Old Town Ring",
 	"Würzburg Mainufer": "Würzburg Riverside", "Bad Kissingen Kurmeile": "Bad Kissingen Spa Mile",
 	"Tauberbischofsheim Altstadt": "Tauberbischofsheim Old Town",
 	"Über den Grabenring am SuperC der RWTH, am Elisenbrunnen und am Theater vorbei. In der Mitte Dom und Rathaus.":

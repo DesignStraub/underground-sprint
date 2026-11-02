@@ -286,6 +286,7 @@ func _cross_sign(pos: Vector3, facing: Vector3) -> void:
 	var red := Builder.mat(Color(0.85, 0.05, 0.05), 0.0, 0.4)
 	var grey := Builder.mat(Color(0.3, 0.3, 0.32), 0.6, 0.4)
 	Builder._add(n, Builder.box(Vector3(0.12, 3.6, 0.12)), grey, Vector3(0, 1.8, 0))
+	_solid_box(n, Vector3(0.25, 2.0, 0.25), Vector3(0, 1.0, 0))
 	for a in [45.0, -45.0]:
 		Builder._add(n, Builder.box(Vector3(1.9, 0.3, 0.04)), red, Vector3(0, 3.2, 0.06)).rotation_degrees.z = a
 		Builder._add(n, Builder.box(Vector3(1.75, 0.18, 0.04)), white, Vector3(0, 3.2, 0.09)).rotation_degrees.z = a
@@ -303,6 +304,18 @@ func _cross_sign(pos: Vector3, facing: Vector3) -> void:
 		_lights.append(l)
 
 
+## Feste Kollisionsbox (Schrankenantrieb, Mast des Andreaskreuzes)
+func _solid_box(parent: Node3D, size: Vector3, pos: Vector3) -> void:
+	var sb := StaticBody3D.new()
+	sb.position = pos
+	var cs := CollisionShape3D.new()
+	var bs := BoxShape3D.new()
+	bs.size = size
+	cs.shape = bs
+	sb.add_child(cs)
+	parent.add_child(sb)
+
+
 ## Schranke: Drehpunkt am Straßenrand, Baum ragt zur Fahrbahnmitte (lokal -X)
 func _gate(pos: Vector3, facing: Vector3, length: float) -> void:
 	var post := Node3D.new()
@@ -312,6 +325,7 @@ func _gate(pos: Vector3, facing: Vector3, length: float) -> void:
 	var red := Builder.mat(Color(0.9, 0.05, 0.05), 0.0, 0.4, Color(1, 0.05, 0.02), 0.6)
 	var grey := Builder.mat(Color(0.35, 0.35, 0.37), 0.6, 0.4)
 	Builder._add(post, Builder.box(Vector3(0.45, 1.2, 0.45)), grey, Vector3(0, 0.6, 0))
+	_solid_box(post, Vector3(0.5, 1.4, 0.5), Vector3(0, 0.7, 0))  # Schrankenantrieb: fest, man fährt nicht hindurch
 	var pivot := Node3D.new()
 	pivot.position = Vector3(0, 1.05, 0)
 	post.add_child(pivot)

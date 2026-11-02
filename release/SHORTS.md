@@ -81,7 +81,7 @@ Titel: Drag-Rennen – perfekt schalten oder verlieren
 Beschreibung: Handschaltung mit E und Q, Spurwechsel mit A und D. Wer im Begrenzer bleibt, überhitzt den Motor.
 
 ## 9. Drift
-Szene: Chinatown-Drift, Kette bis x5.
+Szene: Hafen-Drift, Kette bis x5.
 1. „Drift-Wertung.“
 2. „Ketten bis x5.“
 3. „Eine Bande, und alles ist weg.“
@@ -109,7 +109,7 @@ Beschreibung: Skalitzer Straße, Oberbaumbrücke, East Side Gallery, Kottbusser 
 
 ## 12. Karriere
 Szene: Deutschlandkarte im Menü, die Route leuchtet Stadt für Stadt auf, Schnitt auf Regen in Aachen, Nebel in Tauberbischofsheim, Neon in Berlin.
-1. „24 Rennen. Ganz Deutschland.“
+1. „21 Rennen. Ganz Deutschland.“
 2. „Eine nach der anderen.“
 3. „Bis die Karte dir gehört.“
 

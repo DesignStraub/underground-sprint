@@ -7,8 +7,10 @@ extends Node
 ##   -- --at=lake|crossing|alley|fork|tunnel|el|stadium|<viertel>|d:<meter>   setzt das Auto nach dem Start direkt vor die Stelle
 ##   -- --race=2           wählt die Strecke (Index in Catalog.RACES)
 ##   -- --times=1.5,4,8    Zeitpunkte für Screenshots
-##   -- --crash=30:90[:d]  setzt das Auto (bei Strecke d) mit 30 m/s im Winkel 90° nach rechts auf die Wand zu,
+##   -- --crash=30:90[:d]  (oder 30:q quer rutschend, 30:k auf die nächste Laterne) setzt das Auto (bei Strecke d) mit 30 m/s im Winkel 90° nach rechts auf die Wand zu,
 ##                         gibt den Verlauf aus (Überschlag, Flug, Höhe) – Test der Fallphysik
+##   -- --block=d:spur     Spieler steht ab dem Start bei Strecke d auf Spur 0–3 und blockiert; gibt Abstände der
+##                         Gegner zum Spieler und untereinander aus (Schiebe-Logik)
 ##   -- --bench            misst während des Rennens Bildzeit, GPU-Zeit und Draw Calls, gibt am Ende "BENCH ..." aus
 
 const Track := preload("res://scripts/track_builder.gd")
@@ -41,6 +43,8 @@ var _bench := []  # je Bild: [Bildzeit ms, GPU ms, CPU-Render ms, Draw Calls, Ob
 var _bench_vp := RID()
 var _crash: PackedStringArray = []
 var _crash_done := false
+var _block: PackedStringArray = []
+var _block_done := false
 var _added := {}  # in diesem Bild neu hinzugefügte Knoten nach Art (Ruckler-Suche)
 
 
@@ -55,6 +59,8 @@ func _ready() -> void:
 			bench = true
 		elif a.begins_with("--crash="):
 			_crash = a.substr(8).split(":")
+		elif a.begins_with("--block="):
+			_block = a.substr(8).split(":")
 		elif a == "--demo":
 			demo = true
 			drive = true
@@ -274,12 +280,27 @@ func _process(dt: float) -> void:
 		var p2 = race.player
 		print("air t=%.1f v=%.1f y=%.2f vy=%.1f luft=%s nick=%.2f roll=%.2f d=%.0f pfad=%d wasser=%.1f" % [_t, p2.velocity.length(), p2.position.y, p2.vy,
 			p2.airborne, p2._air_pitch, p2._air_roll, p2.progress, p2.path_id, p2.sinking])
+	if not _block.is_empty() and race and "curve" in race and race.player and race.state == 1:
+		var bp = race.player
+		if not _block_done:
+			_block_done = true
+			bp.place(Track.xform_at(race.track["curve"], float(_block[0]), Track.LANES[int(_block[1])]))
+			bp.controls_enabled = false
+		elif fmod(_t, 0.25) < dt:
+			var parts := []
+			var min_ai := 1e9
+			for a in race.ais:
+				parts.append("ki d=%.0f spur=%.1f v=%.0f abst=%.1f" % [a.progress, a.lane, a.speed, a.global_position.distance_to(bp.global_position)])
+				for b in race.ais:
+					if a != b:
+						min_ai = minf(min_ai, a.global_position.distance_to(b.global_position))
+			print("block t=%.1f spieler d=%.0f v=%.1f | %s | ki-min=%.1f" % [_t, bp.progress, bp.velocity.length(), " | ".join(parts), min_ai])
 	if not _crash.is_empty() and race and "curve" in race and race.player and race.state == 1:
 		var pl = race.player
 		if not _crash_done:
 			_crash_done = true
 			if _crash.size() > 2:
-				pl.place(Track.xform_at(race.track["curve"], float(_crash[2]), 0.0))
+				pl.place(Track.xform_at(race.track["curve"], float(_crash[2]), float(_crash[3]) if _crash.size() > 3 else 0.0))
 			if _crash[1] == "k":
 				# auf das nächste Umfahrbare (Laterne, Schild) 25–70 m voraus zielen
 				var best: Node3D = null
@@ -296,6 +317,10 @@ func _process(dt: float) -> void:
 				if best:
 					pl.look_at(Vector3(best.global_position.x, pl.global_position.y, best.global_position.z), Vector3.UP)
 					print("crash ziel: %s bei %s" % [best.name, best.global_position])
+			elif _crash[1] == "q":
+				# quer rutschend (wie nach einem Dreher) nach rechts auf die Wand zu
+				pl.velocity = pl.global_basis.x * float(_crash[0])
+				return
 			else:
 				pl.rotate_y(-deg_to_rad(float(_crash[1])))
 			pl.velocity = -pl.global_basis.z * float(_crash[0])

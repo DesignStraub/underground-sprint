@@ -3,6 +3,9 @@ extends CharacterBody3D
 ## weicht Baustellen und dem Spieler aus, nimmt manchmal Abkürzungen, springt über Rampen.
 ## Am Bahnübergang hält er, wenn der Zug kommt – oder nimmt Anlauf über die Rampe.
 ## Auf Boulevards bleibt er auf seiner Seite des Mittelstreifens; in Gabelungen fährt er rechts und bremst hinter Verkehr.
+## Berührt er den Spieler oder einen anderen Gegner, fährt er nicht hindurch: von hinten bleibt er an der Stoßstange und
+## schiebt mit (gleich schwere Autos teilen sich das Tempo), seitlich drücken sich beide auseinander; wer blockiert
+## wird, sucht eine andere Spur.
 
 const Builder := preload("res://scripts/car_builder.gd")
 const Track := preload("res://scripts/track_builder.gd")
@@ -46,6 +49,10 @@ var _steer := 0.0
 var _last_yaw := 0.0
 var _think := 0.0
 var _decided := {}
+var rivals: Array = []  # alle Gegner (race.gd), für Kontakte untereinander
+var width := 1.8
+var _blocked_t := 0.0  # wie lange schon jemand direkt vor der Stoßstange klebt
+var _blocker_lat := 0.0
 
 
 func setup(track_: Dictionary, car_id: String, cfg: Dictionary, start_progress: float, start_lane: float, top_speed: float, skill_factor: float) -> void:
@@ -57,6 +64,7 @@ func setup(track_: Dictionary, car_id: String, cfg: Dictionary, start_progress: 
 	model = Builder.build(car_id, cfg)
 	add_child(model)
 	length = model.get_meta("length")
+	width = model.get_meta("width")
 	var col := CollisionShape3D.new()
 	var shape := BoxShape3D.new()
 	shape.size = Vector3(model.get_meta("width"), 1.2, length)
@@ -121,11 +129,20 @@ func _physics_process(dt: float) -> void:
 			if _think <= 0.0:
 				_think = 0.15
 				var ahead := 12.0 + speed * 1.4
-				if not _lane_free(lane_target, -2.0, ahead) or _player_blocks(lane_target):
+				var split := Track.median_at(track, d) > 0.3 or Track.median_at(track, d + ahead) > 0.3
+				if _blocked_t > 0.6:
+					# klebt hinter jemandem: auf die Spur mit dem meisten Abstand zum Hindernis ausweichen
+					var far := lane_target
+					for l in Track.LANES:
+						if split and signf(l) != signf(lane):
+							continue
+						if absf(l - _blocker_lat) > absf(far - _blocker_lat) and absf(l - _blocker_lat) > 3.0:
+							far = l
+					lane_target = far
+				elif not _lane_free(lane_target, -2.0, ahead) or _player_blocks(lane_target):
 					var best := lane_target
 					var best_cost := 1e9
 					# Mittelstreifen in der Nähe: nur Spuren auf der eigenen Seite
-					var split := Track.median_at(track, d) > 0.3 or Track.median_at(track, d + ahead) > 0.3
 					for l in Track.LANES:
 						if split and signf(l) != signf(lane):
 							continue
@@ -188,6 +205,7 @@ func _physics_process(dt: float) -> void:
 		lane_target = clampf(lane, Track.LANES[0], Track.LANES[3])
 	c = path["curve"]
 	on_main = path["id"] == 0
+	_contacts(dt, c, on_main, target)
 	if on_main and track["loop"] and d >= track["length"]:
 		d -= track["length"]
 		lap += 1
@@ -236,6 +254,62 @@ func _update_vertical(dt: float) -> void:
 	var prev := y
 	y = gh
 	_ground_vy = (y - prev) / maxf(dt, 0.0001)
+
+
+## Kontakte mit Spieler und anderen Gegnern (siehe Kopf). Positionen in Fahrtrichtung dieses Wagens.
+func _contacts(dt: float, c: Curve3D, on_main: bool, target: float) -> void:
+	_blocked_t = maxf(_blocked_t - dt * 0.5, 0.0)
+	if not running:
+		return
+	var f := Track.frame_at(c, d)
+	var lat := Track.lane_lat(track, d, lane) if on_main else lane
+	var pos: Vector3 = f["pos"] + f["right"] * lat
+	var others := []
+	if player and is_instance_valid(player) and not player.tumbling and player.sinking <= 0.0:
+		others.append([player, player.velocity, player._length, player.model.get_meta("width")])
+	for r in rivals:
+		if r != self and is_instance_valid(r) and not r.airborne:
+			others.append([r, -r.global_basis.z * r.speed, r.length, r.width])
+	for o in others:
+		var rel: Vector3 = (o[0] as Node3D).global_position - pos
+		rel.y = 0.0
+		var along: float = rel.dot(f["fwd"])
+		var side: float = rel.dot(f["right"])
+		var lsum: float = (length + o[2]) * 0.5
+		var wsum: float = (width + o[3]) * 0.5
+		if absf(side) >= wsum or absf(along) >= lsum + 0.3:
+			continue
+		var their: float = (o[1] as Vector3).dot(f["fwd"])
+		if along > lsum * 0.55 and absf(side) < wsum * 0.85:
+			# Der andere ist vorn: nicht hineinfahren, an der Stoßstange bleiben
+			d -= maxf(lsum + 0.15 - along, 0.0)
+			if speed > their:
+				var share := (speed - their) * 0.5  # unelastischer Stoß gleich schwerer Autos
+				speed -= share
+				_push(o[0], f["fwd"] * share)
+			if target > speed + 1.0:
+				# Gas geben schiebt den Vorderen mit (beide zusammen beschleunigen halb so stark)
+				_push(o[0], f["fwd"] * accel * 0.5 * dt)
+				speed = maxf(speed, their)
+			_blocked_t += dt * 1.5
+			_blocker_lat = lat + side
+		elif along > -lsum * 0.55:
+			# nebeneinander: beide weichen seitlich aus, je nach Überlappung
+			var over := wsum - absf(side)
+			lane -= signf(side) * over * 0.5
+			lane_vel -= signf(side) * minf(over * 4.0, 3.0)
+			_push(o[0], f["right"] * signf(side) * minf(over * 4.0, 3.0))
+
+
+## Stoß an den Spieler (Geschwindigkeit) oder einen anderen Gegner (Tempo und Querbewegung) weitergeben
+func _push(o: Node, dv: Vector3) -> void:
+	if o == player:
+		player.velocity += Vector3(dv.x, 0.0, dv.z)
+	else:
+		var n3 := o as Node3D
+		var fwd := -n3.global_basis.z
+		o.speed = maxf(o.speed + dv.dot(fwd), 0.0)
+		o.lane_vel += dv.dot(n3.global_basis.x)
 
 
 func _check_traffic_crash() -> void:

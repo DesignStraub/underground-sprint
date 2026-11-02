@@ -26,11 +26,13 @@ static var _glow_tex: ImageTexture
 ## Optional: pipes/pipe_r (Endrohre), tire_w (Reifenbreite), softtop (Stoffverdeck), black_bumpers (Schürzen aus
 ##   schwarzem Kunststoff), trim_low (schwarzer Streifen unten an der Flanke)
 const SHAPES := {
-	"kaizen": {  # Keil wie eine Celica: flache spitze Nase, lange scharfe Scheinwerfer, hohes kurzes Heck
-		"nose": 0.57, "hood": 0.84, "cowl": 0.36, "rf": 0.53, "rr": 0.63, "ge": 0.9, "cp": 0.74,
-		"roof": 1.21, "deck": 0.97, "tail": 0.99, "belt": 0.84, "fender": 0.03, "hips": 0.03,
-		"round_f": 0.17, "round_r": 0.09, "tumble": 0.17, "hl": {6: 0.16, 5: 0.06}, "tl": {5: 0.955, 6: 0.965},
-		"doors": [0.375, 0.66], "intake": Vector2(0.62, 0.1),
+	"kaizen": {  # JDM-Fließheck (Civic-EG-Gefühl): rundliche flache Nase, schmale breite Scheinwerfer, große Scheiben,
+		# langes Dach, steile Heckscheibe, fast senkrechte Klappe mit umlaufenden Rückleuchten, dicker Endtopf
+		"nose": 0.6, "hood": 0.82, "cowl": 0.3, "rf": 0.49, "rr": 0.66, "ge": 0.935, "cp": 0.85,
+		"roof": 1.29, "deck": 0.99, "tail": 0.95, "belt": 0.8, "fender": 0.0, "hips": 0.02,
+		"round_f": 0.22, "round_r": 0.08, "tumble": 0.15, "hl": {6: 0.085, 5: 0.025}, "tl": {6: 0.957, 5: 0.962},
+		"doors": [0.315, 0.62], "intake": Vector2(0.48, 0.06), "pipes": [0.46], "pipe_r": 0.085, "trim_low": true,
+		"drop": 0.035,  # ab Werk etwas tiefer
 	},
 	"mirai": {  # 350Z: lange Haube, Dachbogen fließt ins kurze Heck, breite Hüften
 		"nose": 0.6, "hood": 0.86, "cowl": 0.42, "rf": 0.56, "rr": 0.64, "ge": 0.89, "cp": 0.71,
@@ -88,7 +90,7 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 	var spec: Dictionary = Catalog.CARS[car_id]
 	var S: Dictionary = SHAPES.get(car_id, SHAPES["kaizen"])
 	var P: Dictionary = Catalog.PARTS
-	var paint_c: Color = P["paint"]["options"][cfg["paint"]]["color"]
+	var paint_c: Color = paint_color(car_id, cfg)
 	var rim: Dictionary = P["rims"]["options"][cfg["rims"]]
 	var kit: int = cfg["bodykit"]
 	var L: float = spec["length"]
@@ -160,9 +162,13 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 		"sakura":
 			for s in [-1, 1]:
 				_add(fb, box(Vector3(0.09, 0.04, 0.012)), amber, Vector3(s * (fw - 0.07), CLEARANCE + 0.14, zf - 0.004))
-		"kaizen":
+		"kaizen":  # JDM: schmaler Grill mit rotem Emblem, Blinker an den Ecken, roter Abschlepphaken
+			var gy: float = S["nose"] - 0.085
+			_add(fb, box(Vector3(fw * 0.9, 0.045, 0.02)), dark, Vector3(0, gy, zf + 0.012))
+			_add(fb, box(Vector3(0.075, 0.034, 0.012)), mat(Color(0.85, 0.02, 0.03), 0.3, 0.3, Color(0.9, 0.0, 0.05), 0.6), Vector3(0, gy, zf + 0.001))
 			for s in [-1, 1]:
-				_add(fb, _disc(0.045, 0.012), head_m, Vector3(s * (fw - 0.14), CLEARANCE + 0.12, zf - 0.005)).rotation_degrees.x = 90
+				_add(fb, box(Vector3(0.11, 0.035, 0.012)), amber, Vector3(s * (fw - 0.1), gy - 0.05, zf + 0.03))
+			_add(fb, box(Vector3(0.05, 0.05, 0.1)), mat(Color(0.85, 0.05, 0.04), 0.4, 0.4), Vector3(-fw * 0.55, CLEARANCE + 0.09, zf - 0.02))
 		"kaze":  # großes Maul in der Mitte, außen kleine Einlässe, Blinker unter den Scheinwerfern
 			for s in [-1, 1]:
 				_add(fb, box(Vector3(0.15, 0.06, 0.012)), dark, Vector3(s * (fw - 0.14), CLEARANCE + 0.13, zf - 0.004))
@@ -251,10 +257,17 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 			for s in [-1, 1]:
 				_add(rbm, box(Vector3(0.4, 0.1, 0.01)), tail_m, Vector3(s * (rw - 0.22), ty, zr + 0.006))
 				_add(rbm, box(Vector3(0.09, 0.1, 0.01)), amber, Vector3(s * (rw - 0.47), ty, zr + 0.006))
-		_:  # Kaizen: hohe Leuchten an den Ecken, dunkle Blende dazwischen
+		"kaizen":  # durchgehendes Leuchtenband über die ganze Klappe, außen Rückfahrlicht
+			_add(rbm, box(Vector3(rw * 2.0 - 0.04, 0.12, 0.01)), tail_m, Vector3(0, ty, zr + 0.004))
+			_add(rbm, box(Vector3(rw * 0.8, 0.03, 0.012)), dark, Vector3(0, ty, zr + 0.006))
+			for s in [-1, 1]:
+				_add(rbm, box(Vector3(0.08, 0.05, 0.012)), rev_m, Vector3(s * (rw - 0.3), ty - 0.03, zr + 0.006))
+		_:
 			_add(rbm, box(Vector3(rw * 2.0 - 0.3, 0.1, 0.01)), dark, Vector3(0, ty, zr + 0.003))
 			for s in [-1, 1]:
 				_add(rbm, box(Vector3(0.12, 0.2, 0.01)), tail_m, Vector3(s * (rw - 0.08), ty - 0.02, zr + 0.004))
+	if car_id == "kaizen":
+		_kaizen_extras(body, S, W, L, mats)
 
 	# Spiegel, Türgriffe
 	var ms: PackedVector2Array = _section(S, S["cowl"] + 0.035, W, L, flare)["p"]
@@ -465,7 +478,7 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 			if zi == -1:
 				fronts.append(pivot)
 
-	body.position.y -= Catalog.part_of(cfg, "suspension")["drop"]
+	body.position.y -= Catalog.part_of(cfg, "suspension")["drop"] + S.get("drop", 0.0)
 	if not OS.get_cmdline_user_args().has("--nobatch"):
 		_merge_parts(root, body, fronts, spinners, flames)
 		if lod:
@@ -479,6 +492,44 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 	root.set_meta("width", W)
 	root.set_meta("eye", Vector3(0, S["roof"] - 0.1, zf + (S["cowl"] + 0.07) * L))
 	return root
+
+
+## Lackfarbe: "Werkslack" (Stufe 0) ist je Auto eigen (Kaizen in Championship-Weiß), sonst die gewählte Farbe
+static func paint_color(car_id: String, cfg: Dictionary) -> Color:
+	var opt: Dictionary = Catalog.PARTS["paint"]["options"][cfg.get("paint", 0)]
+	if int(cfg.get("paint", 0)) == 0:
+		return Catalog.CARS[car_id].get("paint", opt["color"])
+	return opt["color"]
+
+
+## Kaizen-Erkennungszeichen: Dachspoiler über der Heckscheibe und Sonnenstreifen mit Schriftzug oben in der Scheibe
+static func _kaizen_extras(body: Node3D, S: Dictionary, W: float, L: float, mats: Dictionary) -> void:
+	var roof_w: float = (W / 2.0 - S["tumble"]) * 2.0
+	# Dachspoiler: setzt bündig an der Dachkante an und läuft flach über den Anfang der Heckscheibe
+	var t0: float = S["rr"] + 0.01
+	var t1: float = S["rr"] + 0.09
+	var p0 := Vector3(0, _top_c(S, t0), (t0 - 0.5) * L)
+	var p1 := Vector3(0, _top_c(S, t1) + 0.06, (t1 - 0.5) * L)
+	var sb := Basis.looking_at(p1 - p0, Vector3.UP)
+	_add(body, box(Vector3(roof_w * 0.9, 0.028, (p1 - p0).length() + 0.06)), mats["paint"], (p0 + p1) / 2.0 + Vector3(0, 0.02, 0)).basis = sb
+	var ta: float = S["rf"] - 0.05
+	var tb: float = S["rf"] - 0.008
+	var a := Vector3(0, _top_c(S, ta), (ta - 0.5) * L)
+	var b := Vector3(0, _top_c(S, tb), (tb - 0.5) * L)
+	var up := (b - a).normalized()
+	var bas := Basis(Vector3(-1, 0, 0), up, Vector3(-1, 0, 0).cross(up))
+	var mid := (a + b) / 2.0 + bas.z * 0.012
+	var strip := _add(body, box(Vector3(roof_w * 0.98, (b - a).length(), 0.008)), mat(Color(0.02, 0.06, 0.2), 0.2, 0.3), mid)
+	strip.basis = bas
+	var l := Label3D.new()
+	l.text = "KAIZEN"
+	l.font_size = 40
+	l.pixel_size = 0.0022
+	l.modulate = Color(0.95, 0.95, 0.95)
+	l.outline_size = 0
+	l.double_sided = false
+	l.transform = Transform3D(bas, mid + bas.z * 0.006)
+	body.add_child(l)
 
 
 ## Ein Auto hat 50 bis 70 Einzelteile, jedes wäre ein eigener Draw Call. Alles, was sich gemeinsam bewegt
@@ -1042,7 +1093,7 @@ static func showcase(car: Node3D, car_id: String, cfg: Dictionary, mode: String)
 	var sc := Node3D.new()
 	sc.name = "Showcase"
 	body.add_child(sc)
-	var paint := mat(Catalog.part_of(cfg, "paint")["color"], 0.55, 0.22)
+	var paint := mat(paint_color(car_id, cfg), 0.55, 0.22)
 	var bay := mat(Color(0.03, 0.03, 0.035), 0.3, 0.6)
 	var chrome := mat(Color(0.78, 0.78, 0.8), 0.95, 0.15)
 	var t0: float

@@ -21,7 +21,10 @@ const TOP_RPM := 6600.0  # Drehzahl bei Höchstgeschwindigkeit im 6. Gang
 const GEAR_PULL := [0.0, 1.0, 0.86, 0.74, 0.63, 0.54, 0.46]
 const GRAVITY := 18.0  # knapp 2 g: Sprünge mit spürbarer Flugphase, ohne zu schweben
 const MAX_LAUNCH_VY := 14.0
-const TUMBLE_HIT := 24.0  # m/s in die Wand oder ins andere Auto hinein (gut 85 km/h): ab hier Überschlag
+## Überschlag nur wie in echt: quer rutschend mit der Flanke gegen ein Hindernis (die Räder haken, das Auto kippt
+## darüber), ab 36 km/h Querfahrt und mindestens 50 km/h Tempo. Frontal gibt es Crash und Dreher, keinen Überschlag.
+const TRIP_V := 10.0
+const TRIP_MIN_SPEED := 14.0
 const PIVOT := Vector3(0, 0.7, 0)  # Schwerpunkt: um ihn dreht sich das Auto in der Luft und beim Überschlag
 const MIN_RADIUS := 5.2  # kleinster Wendekreis (Radius) bei voll eingeschlagener Lenkung
 const BRAKE := 22.0  # m/s² Vollbremsung (gut 2 g: kräftig, aber nicht wie gegen eine Wand)
@@ -706,12 +709,24 @@ func _land(gh: float, water: bool) -> void:
 		_air_roll_v *= 0.3
 
 
+## Kippt das Auto über das Hindernis? Nur wenn es quer zur eigenen Achse schnell darauf zu rutscht und das Hindernis
+## seitlich liegt (n zeigt auf die Flanke), nicht bei frontalen oder streifenden Treffern. rel: Geschwindigkeit
+## relativ zum Hindernis.
+func _trips(pre: Vector3, n: Vector3, rel: Vector3) -> bool:
+	var side := global_basis.x
+	var lat := rel.dot(side)  # Querrutschen relativ zum Hindernis
+	return pre.length() > TRIP_MIN_SPEED and absf(lat) > TRIP_V and absf(lat) > 0.55 * rel.length() \
+		and absf(n.dot(side)) > 0.6 and lat * n.dot(side) < 0.0
+
+
 ## Überschlag: das Auto hebt ab und rollt um die Längsachse (dazu etwas Nicken und Drehen). Jeder Bodenkontakt
 ## federt ab und kostet Tempo. Kommt es auf den Rädern zum Liegen, geht es weiter; liegt es auf Dach oder Seite,
 ## wird es nach kurzer Zeit auf die Straße zurückgesetzt (wie in NFS).
 func start_tumble(push: Vector3, strength: float) -> void:
 	if tumbling or sinking > 0.0:
 		return
+	if OS.get_cmdline_user_args().has("--tumblelog"):
+		print("UEBERSCHLAG v=%s quer=%.1f stärke=%.1f luft=%s %s" % [velocity, velocity.dot(global_basis.x), strength, airborne, get_stack()[1]["function"]])
 	tumbling = true
 	rollovers += 1
 	crashes += 1
@@ -957,8 +972,8 @@ func _hit_wall(pre: Vector3, n: Vector3) -> void:
 		_shake = minf(_shake + vn * 0.025, 0.8)
 	if drift_mode and head_on > 0.5:
 		_sliding = false
-	if vn > TUMBLE_HIT and head_on > 0.7 and not drag_mode and not drift_mode:
-		start_tumble(n, vn)
+	if _trips(pre, n, pre) and not drag_mode and not drift_mode:
+		start_tumble(n, absf(pre.dot(global_basis.x)))
 	elif vn > 14.0 and head_on > 0.75 and _crash_cooldown <= 0.0:
 		crashes += 1
 		stun = 0.35
@@ -978,11 +993,11 @@ func _hit_traffic(other: Node, pre: Vector3, n: Vector3) -> void:
 	audio.crash(clampf(hit / 22.0, 0.25, 1.0))
 	if drag_mode and hit > 9.0 and head_on > 0.5:
 		totaled = true  # Drag: wer frontal oder ins Heck kracht, ist raus
-	if hit > TUMBLE_HIT and head_on > 0.55 and not drag_mode:
+	if _trips(pre, n, rel) and not drag_mode:
 		other.knock(pre * 0.7)
 		velocity = ov * 0.5 + n * 4.0 + pre * 0.15
 		_crash_cooldown = 0.7
-		start_tumble(n, hit)
+		start_tumble(n, absf(rel.dot(global_basis.x)))
 	elif hit > 14.0 and head_on > 0.55:
 		other.knock(pre * 0.7)
 		velocity = ov * 0.4 + n * 3.0

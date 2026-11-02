@@ -2,7 +2,8 @@ extends RefCounted
 ## Erzeugt eine Sprintstrecke durch eine nächtliche Stadt aus einem Seed.
 ## Hauptstraße mit Gehweg, Abkürzungen (kurvige Gasse, Seesprung über eine Schanze), Seitenstraßen mit Ampeln,
 ## Bahnübergang mit Rampe, Baustellen, Tunnel, Hochbahn, Brücken, Gabelungen, Boulevards mit Mittelstreifen,
-## Stadtviertel mit eigenem Stil (Downtown, Boulevard, Marktviertel, Altstadt, Docks, Chinatown, Schnellstraße).
+## Stadtviertel mit eigenem Stil (Downtown, Boulevard, Marktviertel, Altstadt, Docks, Schnellstraße; Chinatown ist
+## derzeit keiner Strecke zugeordnet).
 ## Sprints laufen von A nach B, Rundkurse (circuit/drift) sind geschlossene Schleifen.
 ##
 ## Wege ("paths"): Index 0 ist die Hauptstraße, danach Abkürzungen und Seitenstraßen. Jeder Weg hat eine eigene
@@ -49,8 +50,8 @@ const PARAPET := 0.9  # Trogmauer: so weit ragt sie über den Gehweg
 const HILL_H := 5.5  # Bergstraße (Gabelung Altstadt): Höhe der Kuppe
 const EL_H := 7.4  # Unterkante der Hochbahn
 const TUNNEL_NAMES := ["INNENSTADTTUNNEL", "HAFENTUNNEL", "RINGTUNNEL", "NORDTUNNEL", "KAIZEN-TUNNEL", "UNTERFÜHRUNG OST"]
-const STATIONS := ["MARKTPLATZ", "HAFENSTRASSE", "STADION", "CHINATOWN", "NORDRING", "ZENTRUM", "DOCKS"]
-const GANTRY_SIGNS := [["ZENTRUM", "STADION 2 km"], ["HAFEN", "CONTAINERTERMINAL"], ["FLUGHAFEN", "RING"], ["CHINATOWN", "MARKT"],
+const STATIONS := ["MARKTPLATZ", "HAFENSTRASSE", "STADION", "RATHAUS", "NORDRING", "ZENTRUM", "DOCKS"]
+const GANTRY_SIGNS := [["ZENTRUM", "STADION 2 km"], ["HAFEN", "CONTAINERTERMINAL"], ["FLUGHAFEN", "RING"], ["MESSE", "MARKT"],
 	["ALTSTADT", "AUSFAHRT"], ["A 7  NORD", "INDUSTRIE"], ["ALLE RICHTUNGEN", "AUTOBAHN"], ["MESSE", "HAUPTBAHNHOF"]]
 const SIGNS := ["PENSION", "24 STD.", "TUNING", "KNEIPE", "HOTEL", "NUDELN", "DISKO", "WERKSTATT", "ERSATZTEILE", "SPIELHALLE"]
 const SHOPS := ["PIZZA", "DÖNER", "KIOSK", "BÄCKEREI", "APOTHEKE", "FRISEUR", "TATTOO", "AUTOTEILE",
@@ -280,9 +281,59 @@ static func build(race: Dictionary) -> Dictionary:
 	root.add_child(gb)
 	_bb_flush(root)
 	_finalize_walls(root)
+	_auto_collide(root, track)
 	if not OS.get_cmdline_user_args().has("--nobatch"):
 		batch_static(root)
 	return track
+
+
+## Alles Feste und Schmale, das auf Fahrbahn oder Gehweg steht (Masten, Pfosten, Baumstämme, Schaltkästen,
+## Schilder, Bänke), bekommt eine Kollisionsbox, falls es keine eigene hat; sonst fährt man hindurch.
+## Ausgenommen: Flaches (Bordsteine, Markierungen), Hochliegendes (Schilder über der Straße), Durchsichtiges,
+## Dünnes (Schilf, Kabel), Großes (Häuser, Brücken: haben eigene Wände) und alles mit Skript oder eigenem Körper.
+static func _auto_collide(root: Node3D, track: Dictionary) -> void:
+	var body := StaticBody3D.new()
+	body.name = "AutoCollide"
+	var stack: Array = [[root, Transform3D.IDENTITY]]
+	while not stack.is_empty():
+		var e: Array = stack.pop_back()
+		for c in (e[0] as Node).get_children():
+			if not c is Node3D or c is PhysicsBody3D or c.get_script() != null:
+				continue
+			var xf: Transform3D = e[1] * (c as Node3D).transform
+			if c is MeshInstance3D:
+				_auto_box(c, xf, track, body)
+			if c.get_child_count() > 0 and not c.get_children().any(func(k): return k is StaticBody3D):
+				stack.append([c, xf])
+	if body.get_child_count() > 0:
+		root.add_child(body)
+
+
+static func _auto_box(mi: MeshInstance3D, xf: Transform3D, track: Dictionary, body: StaticBody3D) -> void:
+	if mi.mesh == null or not mi.visible:
+		return
+	var m := mi.material_override
+	if m is BaseMaterial3D and (m as BaseMaterial3D).transparency != BaseMaterial3D.TRANSPARENCY_DISABLED:
+		return
+	var ab := mi.get_aabb()
+	var sc := xf.basis.get_scale()
+	var size := ab.size * sc
+	var wb: AABB = xf * ab
+	if wb.size.y < 0.6 or minf(size.x, size.z) < 0.08 or maxf(size.x, size.z) > 4.0:
+		return
+	var c := wb.get_center()
+	var loc := locate(track, Vector3(c.x, 0.0, c.z))
+	var p: Dictionary = loc["path"]
+	var reach: float = (hw(track, loc["d"]) + WALK if p["id"] == 0 else p["half_w"] + (3.0 if p["kind"] == "fork" else 0.0)) + 0.2
+	var ground := elev_at(p["curve"], loc["d"])
+	if absf(loc["lat"]) > reach or wb.position.y - ground > 1.2:
+		return
+	var cs := CollisionShape3D.new()
+	var bs := BoxShape3D.new()
+	bs.size = size.max(Vector3(0.15, 0.15, 0.15))
+	cs.shape = bs
+	cs.transform = Transform3D(xf.basis.orthonormalized(), xf * ab.get_center())
+	body.add_child(cs)
 
 
 ## Statisches Zusammenfassen wie in großen Engines: unbewegliche Teile mit gleichem Material (gleiche Werte) und

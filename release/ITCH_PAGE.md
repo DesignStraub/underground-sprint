@@ -32,12 +32,12 @@ Per `release/push_itch.sh` (butler): Kanäle windows, mac, linux, html5.
 
 **Need for Geschwindigkeit** – Street-Racing bei Nacht, im Geist der frühen 2000er.
 
-Fahr dich in der Karriere quer durch Deutschland: 24 Events von Hamburg bis München, jeder Sieg öffnet die nächste
+Fahr dich in der Karriere quer durch Deutschland: 21 Events von Hamburg bis München, jeder Sieg öffnet die nächste
 Stadt. Sechs Strecken folgen echten Straßen – Aachen, Würzburg, Bad Kissingen, Tauberbischofsheim, Hammelburg und
 Berlin-Kreuzberg, mit Dom, Residenz, Festung, Oberbaumbrücke und Hochbahn an ihrem echten Platz.
 
 **Features**
-- Karriere mit Deutschlandkarte: 24 Events, eins nach dem anderen freischalten
+- Karriere mit Deutschlandkarte: 21 Events, eins nach dem anderen freischalten
 - Sprint, Rundkurs, Drag mit Handschaltung, Drift – sechs Strecken auf echten Straßen (OpenStreetMap)
 - Jede Stadt mit eigener Stimmung: Regen auf nasser Fahrbahn, Nebel, Natriumlicht, Dämmerung, Neon, Kiez
 - Tunnel, Hochbahn, Bahnübergang mit Zug, Brücken, Abkürzungen, Verkehr in beide Richtungen
@@ -64,12 +64,12 @@ Musik: Tracks von Pixabay (Pixabay Content License). Kartendaten der Städte © 
 
 **Need for Geschwindigkeit** – illegal street racing at night, in the spirit of the early 2000s.
 
-Race your career across Germany: 24 events from Hamburg to Munich, every win unlocks the next city. Six tracks
+Race your career across Germany: 21 events from Hamburg to Munich, every win unlocks the next city. Six tracks
 follow real streets – Aachen, Würzburg, Bad Kissingen, Tauberbischofsheim, Hammelburg and Berlin-Kreuzberg, with
 cathedral, palace, fortress, Oberbaum Bridge and elevated U-Bahn in their real places.
 
 **Features**
-- Career with a map of Germany: 24 events, unlocked one after another
+- Career with a map of Germany: 21 events, unlocked one after another
 - Sprint, circuit, drag with manual shifting, drift – six tracks on real streets (OpenStreetMap)
 - Every city has its own mood: rain on wet asphalt, fog, sodium light, dusk, neon, Kiez
 - Tunnels, elevated railway, rail crossing with train, bridges, shortcuts, two-way traffic
