@@ -1,15 +1,14 @@
 # itch.io – Need for Geschwindigkeit
 
-Alles, was du auf itch.io eintragen musst (früher „Underground Sprint“; die Adresse `underground-sprint` bleibt,
-nur der Titel ändert sich im Dashboard unter Edit game → Title).
+Alles, was du auf der neuen itch.io-Seite eintragen musst (das Spiel hieß früher „Underground Sprint“).
 
 ## Grunddaten
 
 | Feld | Eintrag |
 |---|---|
 | Title | Need for Geschwindigkeit |
-| Project URL | `underground-sprint` (bestehende Seite, Links bleiben gültig) |
-| Short description / tagline | Nächtliche Street-Rennen durch deutsche Städte. Tunen, Nitro, Drift, Drag – kostenlos. |
+| Project URL | wie beim Anlegen gewählt, z. B. `need-for-geschwindigkeit` (für `push_itch.sh` als 3. Angabe) |
+| Short description / tagline | Straßenrennen bei Nacht durch echte deutsche Städte. Lachgas statt NOS, TÜV erst nächstes Jahr. Kostenlos. |
 | Classification | Games |
 | Kind of project | Downloadable + HTML |
 | Release status | In development |
@@ -18,8 +17,8 @@ nur der Titel ändert sich im Dashboard unter Edit game → Title).
 | Tags | racing, street-racing, arcade, 3d, low-poly, retro, nitro, drift, tuning, night |
 | AI generation disclosure | Ja – Code mit KI-Unterstützung erstellt (itch.io fragt das ab) |
 | Cover image | `itch_seite/need_for_geschwindigkeit_cover_630x500.png` |
-| Screenshots | alle Bilder aus `screenshots/` |
-| Trailer | YouTube-Link zum Short oder Trailer (itch.io nimmt nur YouTube/Vimeo-Links) |
+| Screenshots | alle Bilder aus `screenshots/` (1600×900) |
+| Trailer | YouTube-Link zu `need_for_geschwindigkeit_trailer.mp4` (itch.io nimmt nur YouTube/Vimeo-Links) |
 
 ## Uploads
 

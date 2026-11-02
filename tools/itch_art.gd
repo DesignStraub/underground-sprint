@@ -45,7 +45,8 @@ func _ready() -> void:
 
 func _run() -> void:
 	# Spielszenen
-	var street := await _render_3d(Vector2i(1920, 1440), 0, _shot_car_chinatown)
+	# Cover: getuntes Auto in der Würzburger Altstadt (Fachwerk, Ziegeldächer) – zeigt gleich die deutschen Städte
+	var street := await _render_3d(Vector2i(1920, 1440), 19, _shot_car_altstadt)
 	var skyline := await _render_3d(Vector2i(1920, 800), 0, _shot_skyline)
 	var lanterns := await _render_3d(Vector2i(1920, 1080), 0, _shot_lanterns)
 	var street_t := ImageTexture.create_from_image(street)
@@ -146,6 +147,17 @@ func _at(t: Dictionary, d: float, lat: float, h: float) -> Vector3:
 func _district_d(t: Dictionary, key: String) -> float:
 	var i: int = t["districts"].find(key)
 	return maxf(i, 0) * Track.DISTRICT_LEN
+
+
+## Getuntes Auto in einer Fachwerkgasse der Altstadt, Kamera schräg von vorn
+func _shot_car_altstadt(t: Dictionary, vp: SubViewport, cam: Camera3D) -> void:
+	var d := _district_d(t, "altstadt_de") + 140.0
+	var car := Builder.build("vortex", CAR_CFG)
+	vp.add_child(car)
+	car.global_transform = Track.xform_at(t["curve"], d, Track.LANES[2])
+	cam.fov = 40.0
+	cam.global_position = _at(t, d + 9.0, 7.4, 1.25)
+	cam.look_at(_at(t, d - 1.0, 1.4, 2.4), Vector3.UP)
 
 
 ## Getuntes Auto unter Lampions, Kamera schräg von vorn

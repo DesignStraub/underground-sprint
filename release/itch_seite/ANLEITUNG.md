@@ -11,6 +11,10 @@ Neu erzeugen: `Godot --path . res://tools/itch_art.tscn` (Hintergründe sind ech
 | `need_for_geschwindigkeit_banner_960x320.png` | Alternative zum Banner, mit Straßenszene dahinter |
 | `need_for_geschwindigkeit_hintergrund_1920x1080.jpg` | Edit theme → **Background**, nicht wiederholen, fixiert |
 
+**Screenshots** (Edit game → Screenshots, 1600×900, in dieser Reihenfolge): alle Bilder aus `release/screenshots/`.
+**Trailer:** `need_for_geschwindigkeit_trailer.mp4` (liegt nicht im Repo) auf YouTube hochladen und den Link unter
+Edit game → Trailer eintragen; itch.io nimmt nur YouTube- oder Vimeo-Links.
+
 ## Profil ONE HUMANITY (onehumanity.itch.io)
 
 | Datei | Wohin |

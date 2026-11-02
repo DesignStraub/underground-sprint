@@ -1020,7 +1020,7 @@ static func _build_barriers(root: Node3D, track: Dictionary, rng: RandomNumberGe
 	tm.radial_segments = 10
 	_multi(root, tm, tire, tires)
 	# Sponsorentafeln auf der Bande und Flutlicht
-	var brands := ["DRIFT KINGS", "NOS", "KAIZEN", "TURBO COLA", "SPEED FM", "ONE HUMANITY", "SAKURA", "RONIN"]
+	var brands := ["DRIFTKÖNIGE", "LACHGAS", "KAIZEN", "TURBO-SCHORLE", "RADIO VOLLGAS", "ONE HUMANITY", "SAKURA", "RONIN", "REIFEN-RUDI"]
 	var dd := 20.0
 	var i := 0
 	while dd < length - 10.0:

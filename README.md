@@ -181,3 +181,4 @@ Texte, Cover und Screenshots für die itch.io-Seite: `release/`.
   grünen Bereich, `--lateshift` erst im Begrenzer, `--noshift` gar nicht, `--nolanes` ohne Spurwechsel, `--dragcrash`
   setzt Verkehr vor das Auto)
 - `tools/short_overlays.gd` – rendert Texttafeln fürs Release-Short
+- `tools/trailer_cards.tscn` – Texttafeln für den Trailer (Titel, Abspann, Sprüche, gelbe Ortsschilder): `-- --out=ordner`
