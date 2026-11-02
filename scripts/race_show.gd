@@ -21,6 +21,7 @@ var _fin_t := -1.0
 var _fans: Array = []  # [Figur, Start, Ziel, Verzögerung]
 var _orbit := 0.0
 var _won := false
+var _fans_wanted := true
 
 
 func setup(t: Dictionary, p: Node3D, start_lat: float) -> void:
@@ -107,9 +108,10 @@ func go() -> void:
 
 
 ## Zieleinlauf: Kamera kreist ums Auto, Fans laufen von den Gehwegen herbei und tanzen (Sieg) oder klatschen
-func finish(won: bool) -> void:
+func finish(won: bool, fans := true) -> void:
 	_won = won
 	_fin_t = 0.0
+	_fans_wanted = fans
 	_orbit = player.global_rotation.y
 	cam.global_transform = player.cam.global_transform
 	cam.make_current()
@@ -161,7 +163,7 @@ func _update_finish(dt: float) -> void:
 	cam.global_position = cam.global_position.lerp(want, 1.0 - exp(-dt * 2.0))
 	cam.look_at(car + Vector3(0, 0.7, 0), Vector3.UP)
 	# Fans losschicken, sobald das Auto fast steht
-	if _fans.is_empty() and (player.velocity.length() < 7.0 or _fin_t > 3.0):
+	if _fans_wanted and _fans.is_empty() and (player.velocity.length() < 7.0 or _fin_t > 3.0):
 		_spawn_fans()
 	for fan in _fans:
 		var mi: MeshInstance3D = fan[0]

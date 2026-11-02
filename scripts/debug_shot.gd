@@ -119,6 +119,8 @@ func _process(dt: float) -> void:
 			Input.action_release("accelerate")  # Gas weg: aufrichten
 		if fmod(_drift_t, 0.2) < dt:
 			print("t=%.1f winkel=%.0f rutscht=%s tempo=%.1f wand=%d" % [_drift_t, pl.drift_angle, pl._sliding, pl.velocity.length(), pl.wall_hits])
+	elif drive and race and "curve" in race and race.player and race.player.drag_mode:
+		_drag_pilot(race)
 	elif drive and race and "curve" in race and race.player and not race.player.loc.is_empty():
 		var pl = race.player
 		var p: Dictionary = race.track["paths"][pl.path_id]
@@ -207,6 +209,50 @@ func _process(dt: float) -> void:
 			get_tree().quit()
 	if quit_after > 0.0 and _t >= quit_after:
 		get_tree().quit()
+
+
+## Drag-Autopilot: Vollgas, schaltet im grünen Bereich (--lateshift: erst im Begrenzer), weicht Verkehr per
+## Spurwechsel aus, Nitro ab dem 3. Gang
+var _tap := ""
+var _shift_t := 0.0
+var _crash_set := false
+
+
+func _drag_pilot(race) -> void:
+	var pl = race.player
+	for a in ["shift_up", "steer_left", "steer_right"]:
+		Input.action_release(a)
+	if _tap != "":
+		_tap = ""
+		return  # nach jedem Tippen ein Bild loslassen, sonst zählt der nächste Druck nicht
+	Input.action_press("accelerate")
+	if not pl.controls_enabled:
+		return
+	var late := OS.get_cmdline_user_args().has("--lateshift")
+	if OS.get_cmdline_user_args().has("--dragcrash") and _t > 9.0 and not race.traffic.is_empty() and not _crash_set:
+		_crash_set = true  # Test: Verkehrsauto direkt vor das eigene Auto setzen (Totalschaden)
+		var t = race.traffic[0]
+		t.progress = pl.progress + 45.0
+		t.lane = Track.LANES[pl.drag_lane]
+		t._lane_cur = t.lane
+	if OS.get_cmdline_user_args().has("--noshift"):
+		return  # Test: im 1. Gang im Begrenzer bleiben (Motorschaden)
+	if pl.gear < 6 and pl.rpm >= (7950.0 if late else 7250.0) and _t - _shift_t > 0.4:
+		_tap = "shift_up"
+		_shift_t = _t
+	elif not OS.get_cmdline_user_args().has("--nolanes") and not _lane_free(race, Track.LANES[pl.drag_lane], -3.0, 30.0 + absf(pl.speed_fwd) * 1.4):
+		for dl in [-1, 1]:
+			var nl: int = pl.drag_lane + dl
+			if nl >= 0 and nl <= 3 and _lane_free(race, Track.LANES[nl], -6.0, 30.0 + absf(pl.speed_fwd) * 1.4) and not _crash_set:
+				_tap = "steer_left" if dl < 0 else "steer_right"
+				break
+	if _tap != "":
+		Input.action_press(_tap)
+	if pl.gear >= 3 and not late:
+		Input.action_press("nitro")
+	if fmod(_t, 0.5) < get_process_delta_time():
+		print("drag t=%.1f v=%d gang=%d rpm=%d heiß=%.2f spur=%d platz=%d d=%.0f nos=%.2f%s" % [_t, int(pl.speed_fwd * 3.6), pl.gear, int(pl.rpm),
+			pl.engine_heat, pl.drag_lane, race._place(), pl.progress, pl.nitro, " AN" if pl.nitro_on else ""])
 
 
 func _place_at(race) -> void:

@@ -30,6 +30,7 @@ var speed := 0.0
 var top := 55.0
 var accel := 9.0
 var skill := 1.0
+var drag := false  # Drag: Beschleunigung lässt mit dem Tempo nach (wie Gänge und Luftwiderstand)
 var running := false
 var finish_time := -1.0
 var stun := 0.0
@@ -160,7 +161,10 @@ func _physics_process(dt: float) -> void:
 							target = minf(target, t.speed * 0.9)
 			else:
 				target = minf(target, 30.0)  # enge Gasse
-	speed = move_toward(speed, target, dt * (accel if target > speed else 22.0))
+	var acc := accel
+	if drag:
+		acc = accel * 0.8 * maxf(1.0 - pow(speed / maxf(top * skill, 1.0), 1.6), 0.05)
+	speed = move_toward(speed, target, dt * (acc if target > speed else 22.0))
 	var prev_d := d
 	d += speed * dt
 

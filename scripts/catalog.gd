@@ -160,7 +160,8 @@ const PARTS := {
 const PART_ORDER := ["paint", "rims", "spoiler", "bodykit", "vinyl", "neon", "engine", "nitro"]
 
 ## Events: werden aus dem Seed prozedural erzeugt. Alle sind von Anfang an fahrbar.
-## type: "sprint" (A nach B), "circuit" (Rundkurs, laps Runden), "drift" (Rundkurs allein, Punkte fürs Querfahren).
+## type: "sprint" (A nach B), "circuit" (Rundkurs, laps Runden), "drift" (Rundkurs allein, Punkte fürs Querfahren),
+## "drag" (gerade, Spurwechsel und Handschaltung).
 ## tier: Schwierigkeit 1..3. bulges: Segment-Index -> "alley" (kurvige Gasse), "lake" (Seesprung),
 ## "fork" (echte Gabelung: kurz mit Gegenverkehr oder breiter Boulevard außen herum).
 ## districts: Gewichte der Stadtviertel. Rundkurse: corners = Eckpunkte, radius = ungefähre Größe.
@@ -198,11 +199,32 @@ const RACES := [
 	{"name": "Stadion Drift", "type": "drift", "tier": 3, "laps": 2, "seed": 603, "corners": 14, "radius": 175.0,
 		"bulges": {}, "stadium": true,
 		"districts": {"downtown": 0.4, "boulevard": 0.6}},
+	# --- neu: Drag-Rennen (geradeaus, Handschaltung) und weitere Strecken; hinten angehängt, damit gespeicherte
+	# Event-Nummern gültig bleiben
+	{"name": "Hafenmeile", "type": "drag", "tier": 1, "seed": 701, "segments": 8, "max_turn": 4.0,
+		"districts": {"industrial": 0.6, "shops": 0.4}},
+	{"name": "Neon-Gerade", "type": "drag", "tier": 2, "seed": 702, "segments": 10, "max_turn": 6.0,
+		"districts": {"downtown": 0.5, "chinatown": 0.5}},
+	{"name": "Highway Drag", "type": "drag", "tier": 3, "seed": 703, "segments": 13, "max_turn": 5.0,
+		"districts": {"highway": 0.6, "boulevard": 0.4}},
+	{"name": "Altstadt Hills", "type": "sprint", "tier": 2, "seed": 61, "segments": 22, "max_turn": 55.0,
+		"bulges": {4: "fork", 11: "fork", 17: "alley"},
+		"districts": {"residential": 0.45, "shops": 0.3, "chinatown": 0.25}},
+	{"name": "Docks Sprint", "type": "sprint", "tier": 3, "seed": 77, "segments": 26, "max_turn": 70.0,
+		"bulges": {5: "lake", 12: "alley", 19: "fork"},
+		"districts": {"industrial": 0.5, "highway": 0.3, "residential": 0.2}},
+	{"name": "Chinatown Loop", "type": "circuit", "tier": 1, "laps": 3, "seed": 121, "corners": 8, "radius": 220.0,
+		"bulges": {3: "fork"},
+		"districts": {"chinatown": 0.6, "shops": 0.4}},
+	{"name": "Altstadt Ring", "type": "circuit", "tier": 2, "laps": 2, "seed": 131, "corners": 10, "radius": 290.0,
+		"bulges": {2: "fork", 6: "alley"},
+		"districts": {"residential": 0.5, "boulevard": 0.3, "downtown": 0.2}},
 ]
 
 const EVENT_TYPES := {
 	"sprint": {"label": "Sprint", "desc": "Von A nach B gegen 3 Gegner. Gabelungen und Abkürzungen: du entscheidest. * ohne Verkehr, ** wenig, *** voll."},
 	"circuit": {"label": "Rundkurs", "desc": "2 Runden gegen 3 Gegner. Wer die beste Linie findet, gewinnt. * ohne Verkehr, ** wenig, *** voll."},
 	"drift": {"label": "Drift", "desc": "Allein auf der Strecke. Querfahren gibt Punkte, Ketten geben Multiplikator, Crash kostet die Kette."},
+	"drag": {"label": "Drag", "desc": "Geradeaus gegen 3 Gegner. A/D wechselt die Spur, E/Q schaltet: im grünen Bereich perfekt. Zu lange im Begrenzer: Motorschaden. Crash mit Verkehr: Totalschaden."},
 }
-const TYPE_ORDER := ["sprint", "circuit", "drift"]
+const TYPE_ORDER := ["sprint", "circuit", "drag", "drift"]

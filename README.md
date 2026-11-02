@@ -14,7 +14,8 @@ Ordner in Godot 4.7 öffnen (Import), dann F5. Das Spiel startet mit dem ONE-HUM
 | S / ↓ | LT | Bremse / Rückwärts |
 | A D / ← → | linker Stick | Lenken |
 | Leertaste | B | Handbremse (Drift) |
-| Shift / N | A | Nitro |
+| Shift / N | A | Nitro (leer ist leer: erst loslassen, dann lädt es nach) |
+| E / Q | RB / LB | Drag: hoch-/runterschalten (A/D wechselt dort die Spur) |
 | C | Y | Kamera: Verfolger (Standard) / Stoßstange / Motorhaube |
 | R | Back | Auto auf die Straße zurücksetzen |
 | M | | Nächster Musiktrack |
@@ -25,8 +26,13 @@ Nitro lädt sich langsam von selbst auf und schneller beim Driften.
 
 ## Events
 Alles ist von Anfang an frei wählbar (Garage → Rennen fahren → Art → Event):
-- **Sprint** (5): von A nach B gegen 3 Gegner.
-- **Rundkurs** (3): 2 Runden gegen 3 Gegner.
+- **Sprint** (7): von A nach B gegen 3 Gegner.
+- **Rundkurs** (5): 2–3 Runden gegen 3 Gegner.
+- **Drag** (3): geradeaus gegen 3 Gegner, wie in Underground. Gelenkt wird automatisch, A/D wechselt die Spur,
+  geschaltet wird von Hand (E/Q). Großer Drehzahlmesser mit grünem Schaltbereich und Schaltlicht: dort schalten ist
+  „perfekt“ (kaum Zugkraftunterbrechung, kleiner Schub), zu früh kostet Zug, wer im Begrenzer bleibt, überhitzt den
+  Motor (Temperaturbalken) bis zum Motorschaden. Auffahren oder frontal in den Verkehr ist Totalschaden. Start im
+  grünen Drehzahlbereich = perfekter Start, Nitro und Near Miss wie sonst. Entfernungstafeln alle 200 m, Viertelmeile.
 - **Drift** (3): allein auf kleinen, rundum abgesperrten Kursen. Eigenes Fahrverhalten: ist das Auto
   quer, hält Gas den Winkel, Lenken steuert ihn, Gas weg richtet es auf. Querfahren ab 12° gibt Punkte
   (Winkel × Tempo, nah an der Bande ×1,6), verkettete Drifts steigern den Multiplikator bis x5,
@@ -92,9 +98,13 @@ Garage → Einstellungen (wird gespeichert):
 - Verkehr nach Schwierigkeit: 1 Stern ohne, 2 Sterne wenig, 3 Sterne voller Verkehr.
 - **Tempo-Stufe:** am Anfang fahren alle (auch Gegner) mit 72 % Höchsttempo, mit jedem Sieg mehr, ab 20 Siegen volles Tempo.
 - **Fahrgefühl:** alle Autos mit Heckantrieb; mit Gas in der Kurve schiebt das Heck raus, im Drift dreht das Auto
-  um die Vorderachse. Gas setzt weich ein, Drehmoment folgt der Drehzahl. Bei Tempo ist die Drehrate durch die
-  Querbeschleunigung begrenzt (kein Zappeln), Kurven kosten kein Tempo, Rutschen radiert etwas ab. Der Rutschzustand
-  ist stufenlos, die Kamera wackelt nur bei Einschlägen.
+  um die Vorderachse. Gas setzt weich ein, Drehmoment folgt der Drehzahl, das Getriebe schaltet mit Hysterese (kein
+  Pendeln an Gangwechseln). Langsam begrenzt der Wendekreis (5,2 m), bei Tempo die Querbeschleunigung (2,1–2,7 g je
+  Auto, bei Topspeed etwas weniger). Kurven kosten kein Tempo, an der Haftgrenze rutscht das Auto sichtbar ein paar
+  Grad; Rutschen radiert etwas ab, würgt das Tempo aber nicht ab. Anbremsen in die Kurve lässt das Heck leicht kommen,
+  Handbremse dreht bei 80 km/h in 0,8 s um gut 90°. Bremsen ~2,4 g, Gegenlenken geht schneller als Einlenken.
+  Karosserie wankt nach der echten Querbeschleunigung, taucht beim Bremsen ein; die Verfolgerkamera dreht leicht
+  verzögert mit. Messwerte aller Autos: `tools/handling_lab.tscn`.
 - **Autos** (9) sind aus Querschnitten gebaut (Radhäuser, Kotflügel-Buckel, Hüften, eingezogenes Glashaus), lose
   angelehnt an RX-7, 350Z, Celica, Silvia, Skyline, AE86, S2000/MX-5, Lancer Evo/Impreza und Supra. Front- und
   Heckschürze sind eigene Teile, Scheinwerfer und Rückleuchten sitzen in der Haut, Türfugen, Spiegel, Griffe,
@@ -125,8 +135,12 @@ Texte, Cover und Screenshots für die itch.io-Seite: `release/`.
 - `scripts/race_show.gd` – Kameraflug, Publikum und Starterin am Start, Zielszene
 - `scripts/elevated_rail.gd` – Hochbahn-Zug, `scripts/ambient_sound.gd` – ortsfeste Geräusche (Stadion)
 - `tools/track_stats.tscn` – baut alle Strecken und zeigt Kennzahlen
+- `tools/handling_lab.tscn` – Fahrphysik-Messlabor (0–100, Bremsweg, Kurvenradius, Querbeschleunigung, Schräglauf,
+  Lenkansprechen, Handbremse) auf leerer Fläche: `--headless --fixed-fps 60 … -- --cars=kaizen,kaze`
 - `tools/overview.tscn` – Bilder aus erhöhter Sicht auf Tunnel, Hochbahn, Stadion, Viertel (`-- --race=1 --out=pfad`)
 - `scripts/debug_shot.gd` – nur für Tests/Videos (`-- --drive`, `--demo`, `--at=lake|crossing|alley|fork|tunnel|el|stadium|<viertel>|d:<m>`,
   `--race=n`, `--trace`, `--shot=pfad`, `--times=…`, `--quit=s`, `--intro` (Kameraflug auch im Test),
-  `--view=weg:d:quer:höhe:ziel_d:ziel_quer:ziel_höhe` (feste Kamera ohne HUD))
+  `--view=weg:d:quer:höhe:ziel_d:ziel_quer:ziel_höhe` (feste Kamera ohne HUD); im Drag schaltet der Autopilot im
+  grünen Bereich, `--lateshift` erst im Begrenzer, `--noshift` gar nicht, `--nolanes` ohne Spurwechsel, `--dragcrash`
+  setzt Verkehr vor das Auto)
 - `tools/short_overlays.gd` – rendert Texttafeln fürs Release-Short

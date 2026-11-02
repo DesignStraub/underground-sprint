@@ -109,7 +109,7 @@ static func build(race: Dictionary) -> Dictionary:
 	_bb = {}
 
 	var type: String = race.get("type", "sprint")
-	var loop := type != "sprint"
+	var loop := type == "circuit" or type == "drift"
 	var gen := _loop_centerline(race, rng) if loop else _centerline(race, rng)
 	var pts: Array = gen["pts"]
 	var curve := Curve3D.new()
@@ -153,7 +153,11 @@ static func build(race: Dictionary) -> Dictionary:
 
 	for b in gen["bulges"]:
 		_plan_shortcut(track, b, rng)
-	if type != "drift":
+	if type == "drag":
+		# Drag: vier freie Spuren geradeaus (kein Bahnübergang, keine Hochbahnstützen, kein Mittelstreifen)
+		_plan_tunnels(track, rng)
+		_plan_spurs(track, rng)
+	elif type != "drift":
 		# Drift-Kurse sind abgesperrt: keine Seitenstraßen, Tunnel, Hochbahn, Mittelstreifen, Bahnübergang
 		_plan_crossing(track, rng)
 		_plan_tunnels(track, rng)
@@ -177,7 +181,7 @@ static func build(race: Dictionary) -> Dictionary:
 		track["crossing"] = rc
 	_build_tunnels(root, track, rng)
 	_build_el(root, track, rng)
-	if type != "drift":
+	if type != "drift" and type != "drag":
 		_build_roadworks(root, track, rng)
 	var occupied := _build_landmarks(root, track, rng)
 	occupied.append_array(_build_structures(root, track, rng))
@@ -190,6 +194,8 @@ static func build(race: Dictionary) -> Dictionary:
 	else:
 		_build_props(root, track, rng)
 	_build_steam(root, track, rng)
+	if type == "drag":
+		_drag_boards(root, track)
 	if loop:
 		_gate(root, track, track["start"] + 12.0, "START · ZIEL", Color(0.2, 1.0, 0.4))
 	else:
@@ -2571,6 +2577,30 @@ static func _build_steam(root: Node3D, track: Dictionary, rng: RandomNumberGener
 			disc.radial_segments = 12
 			Builder._add(root, disc, cover, pos + Vector3(0, 0.01, 0))
 		d += rng.randf_range(160.0, 280.0)
+
+
+## Drag: Entfernungstafeln am Rand (alle 200 m) und eine leuchtende Viertelmeile
+static func _drag_boards(root: Node3D, track: Dictionary) -> void:
+	var curve: Curve3D = track["curve"]
+	var post := Builder.mat(Color(0.2, 0.2, 0.22), 0.6, 0.4)
+	var board := Builder.mat(Color(0.05, 0.05, 0.06), 0.2, 0.5, Color(1.0, 0.85, 0.2), 0.6)
+	var k := 1
+	while track["start"] + k * 200.0 < track["finish"] - 30.0:
+		var d: float = track["start"] + k * 200.0
+		var f := frame_at(curve, d)
+		if _trough_at(track, d) == 0:
+			for s in [-1.0, 1.0]:
+				var n := Node3D.new()
+				n.transform = Transform3D(Basis.looking_at(f["fwd"], Vector3.UP), f["pos"] + f["right"] * s * (hw(track, d) + 1.2) + Vector3(0, CURB_H, 0))
+				root.add_child(n)
+				Builder._add(n, Builder.box(Vector3(0.12, 2.6, 0.12)), post, Vector3(0, 1.3, 0))
+				Builder._add(n, Builder.box(Vector3(1.6, 0.8, 0.08)), board, Vector3(0, 2.6, 0))
+				var l := _label(n, "%d m" % (k * 200), Color(1.0, 0.85, 0.2), 40, Vector3(0, 2.6, 0.05), 2.0)
+				l.rotation.y = 0.0  # zum ankommenden Fahrer
+		k += 1
+	var qd: float = track["start"] + 402.0
+	if qd < track["finish"] - 40.0 and _trough_at(track, qd) == 0 and not _near_post(track, qd, 12.0):
+		_gate(root, track, qd, "1/4 MEILE", Color(1.0, 0.75, 0.15))
 
 
 static func _gate(root: Node3D, track: Dictionary, d: float, text: String, col: Color) -> void:

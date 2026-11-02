@@ -56,6 +56,8 @@ func _setup_input() -> void:
 	_add_action("steer_right", [KEY_D, KEY_RIGHT], [], [JOY_AXIS_LEFT_X, 1.0])
 	_add_action("handbrake", [KEY_SPACE], [JOY_BUTTON_B], [])
 	_add_action("nitro", [KEY_SHIFT, KEY_N], [JOY_BUTTON_A], [])
+	_add_action("shift_up", [KEY_E], [JOY_BUTTON_RIGHT_SHOULDER], [])  # Drag: hochschalten
+	_add_action("shift_down", [KEY_Q], [JOY_BUTTON_LEFT_SHOULDER], [])
 	_add_action("camera", [KEY_C], [JOY_BUTTON_Y], [])
 	_add_action("reset_car", [KEY_R], [JOY_BUTTON_BACK], [])
 	_add_action("pause", [KEY_ESCAPE, KEY_P], [JOY_BUTTON_START], [])

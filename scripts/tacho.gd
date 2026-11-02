@@ -13,6 +13,10 @@ var speed_kmh := 0
 var gear := "N"
 var nitro := 1.0
 var nitro_on := false
+## Drag: grüner Schaltbereich auf der Skala, Schaltlicht, Motortemperatur
+var drag := false
+var heat := 0.0
+const PERFECT := Vector2(7100.0, 7650.0)
 var _needle := 0.0
 
 
@@ -28,7 +32,7 @@ func _ang(frac: float) -> float:
 func _draw() -> void:
 	var c := size / 2.0
 	var font := get_theme_default_font()
-	var shift_light := rpm > REDLINE + 300.0
+	var shift_light := rpm > (PERFECT.y if drag else REDLINE + 300.0) and gear != "6"
 
 	draw_circle(c, R + 8.0, Color(0.0, 0.0, 0.03, 0.7))
 	draw_arc(c, R + 8.0, 0.0, TAU, 64, Color(1, 0.15, 0.1) if shift_light else Color(0.2, 0.7, 1.0, 0.8), 2.0, true)
@@ -37,6 +41,8 @@ func _draw() -> void:
 	var red_frac := REDLINE / MAX_RPM
 	draw_arc(c, R - 4.0, _ang(0.0), _ang(1.0), 48, Color(1, 1, 1, 0.08), 6.0, true)
 	draw_arc(c, R - 4.0, _ang(red_frac), _ang(1.0), 16, Color(0.6, 0.0, 0.0, 0.7), 6.0, true)
+	if drag:
+		draw_arc(c, R - 4.0, _ang(PERFECT.x / MAX_RPM), _ang(PERFECT.y / MAX_RPM), 8, Color(0.1, 0.9, 0.3, 0.9), 8.0, true)
 	if _needle > 0.005:
 		var col := Color(1.0, 0.25, 0.1) if _needle > red_frac else Color(1.0, 0.6, 0.15)
 		draw_arc(c, R - 4.0, _ang(0.0), _ang(_needle), 48, col, 6.0, true)
@@ -65,6 +71,21 @@ func _draw() -> void:
 	draw_rect(gb, Color(0, 0, 0, 0.6))
 	draw_rect(gb, Color(1, 0.6, 0.15), false, 1.0)
 	draw_string(font, gb.position + Vector2(0, 14), gear, HORIZONTAL_ALIGNMENT_CENTER, 16, 13, Color(1, 0.7, 0.2))
+
+	if drag:
+		# Schaltlicht über der Ganganzeige, Temperatur als Balken links
+		var lc := Color(0.15, 0.15, 0.18)
+		if rpm >= PERFECT.x and rpm <= PERFECT.y:
+			lc = Color(0.2, 1.0, 0.35)
+		elif rpm > PERFECT.y:
+			lc = Color(1.0, 0.15, 0.1)
+		draw_circle(c + Vector2(26, -20), 6.0, lc)
+		var hb := Rect2(c + Vector2(-38, -10), Vector2(7, 30))
+		draw_rect(hb, Color(0, 0, 0, 0.6))
+		var hh := 30.0 * clampf(heat, 0.0, 1.0)
+		draw_rect(Rect2(hb.position + Vector2(0, 30.0 - hh), Vector2(7, hh)), Color(1.0, 0.2, 0.1).lerp(Color(1, 1, 0.3), 1.0 - heat))
+		draw_rect(hb, Color(1, 0.4, 0.2, 0.8), false, 1.0)
+		draw_string(font, hb.position + Vector2(-6, 40), "TEMP", HORIZONTAL_ALIGNMENT_LEFT, 30, 6, Color(1, 0.6, 0.4))
 
 	# Nitro im unteren Spalt
 	var n0 := deg_to_rad(122.0)

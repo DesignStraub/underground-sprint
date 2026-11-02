@@ -86,6 +86,7 @@ func _ready() -> void:
 	world.add_child(player)
 	player.setup(car_id, GameState.get_config(car_id))
 	player.drift_mode = event_type == "drift"
+	player.drag_mode = event_type == "drag"
 	# Tempo-Stufe gilt für alle gleich (Spieler und Gegner)
 	player.top_speed *= GameState.pace()
 	player.accel *= 0.8 + 0.2 * GameState.pace()
@@ -114,7 +115,10 @@ func _ready() -> void:
 		ai.crossing = track["crossing"]
 		world.add_child(ai)
 		var top: float = Catalog.CARS[id]["top_speed"] * (0.95 + 0.03 * i) * GameState.pace()
-		ai.setup(track, id, cfg, track["start"] + (i - 1) * 4.0, lanes[i], top, difficulty + rng.randf_range(-0.03, 0.03))
+		# Drag: alle nebeneinander an der Linie
+		var start_d: float = track["start"] if event_type == "drag" else track["start"] + (i - 1) * 4.0
+		ai.drag = event_type == "drag"
+		ai.setup(track, id, cfg, start_d, lanes[i], top, difficulty + rng.randf_range(-0.03, 0.03))
 		ai.accel *= 0.8 + 0.2 * GameState.pace()
 		ais.append(ai)
 
@@ -125,7 +129,9 @@ func _ready() -> void:
 	for n in get_tree().get_nodes_in_group("ambient"):
 		n.target = player
 	# Verkehr nach Schwierigkeit: leicht ohne, mittel wenig, schwer voll
-	if event_type != "drift" and race.get("tier", 1) >= 2:
+	if event_type == "drag" and race.get("tier", 1) >= 2:
+		_spawn_drag_traffic()
+	elif event_type != "drift" and race.get("tier", 1) >= 2:
 		_spawn_traffic()
 	_build_hud()
 	show = RaceShow.new()
@@ -141,6 +147,30 @@ func _ready() -> void:
 		show.start_intro()
 	else:
 		show.ready_set()
+
+
+## Drag: langsamer Verkehr auf allen Spuren in unsere Richtung, erst nach dem Start-Stück. Ausweichen per Spurwechsel.
+func _spawn_drag_traffic() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = race["seed"] * 7 + 3
+	var gap: Vector2 = Vector2(110.0, 190.0) if race.get("tier", 1) >= 3 else Vector2(170.0, 270.0)
+	var d: float = track["start"] + 320.0
+	while d < track["finish"] - 100.0:
+		var t := Traffic.new()
+		t.process_mode = Node.PROCESS_MODE_PAUSABLE
+		t.curve = curve
+		t.blocks = track["blocks"]
+		t.progress = d
+		t.lane = Track.LANES[rng.randi() % 4]
+		t.dir = 1.0
+		t.base_speed = rng.randf_range(12.0, 18.0)
+		t.speed = t.base_speed
+		t.track_length = track["length"]
+		t.track = track
+		world.add_child(t)
+		t.setup(Traffic.KINDS[rng.randi() % Traffic.KINDS.size()], rng)
+		traffic.append(t)
+		d += rng.randf_range(gap.x, gap.y)
 
 
 ## Verkehr: rechts in Fahrtrichtung, links Gegenverkehr. Erst ein Stück nach dem Start.
@@ -288,7 +318,8 @@ func _build_title() -> void:
 	t.anchor_bottom = 1.0
 	t.offset_top = -62
 	t.offset_bottom = -26
-	var kind := {"sprint": "SPRINT", "circuit": "RUNDKURS · %d RUNDEN" % track["laps"], "drift": "DRIFT · %d RUNDEN" % track["laps"]}
+	var kind := {"sprint": "SPRINT", "circuit": "RUNDKURS · %d RUNDEN" % track["laps"], "drift": "DRIFT · %d RUNDEN" % track["laps"],
+		"drag": "DRAG · E/Q SCHALTEN"}
 	var sub := _label(root, 11, HORIZONTAL_ALIGNMENT_CENTER)
 	sub.text = "%s   ·   %s   ·   Gas/Enter: los" % [kind.get(event_type, "SPRINT"), "ALLEIN" if event_type == "drift" else "4 FAHRER"]
 	sub.modulate = Color(0.6, 0.85, 1.0)
@@ -361,6 +392,8 @@ func _build_hud() -> void:
 	hud["help"].size = Vector2(240, 60)
 	hud["help"].text = "W/S Gas/Bremse  A/D Lenken\nLeertaste Handbremse  Shift Nitro\nC Kamera  R Zurücksetzen  M Musik\nF Vollbild  Esc Pause"
 	hud["help"].modulate.a = 0.7
+	if event_type == "drag":
+		hud["help"].text = "W Gas  E/Q hoch-/runterschalten\nA/D Spur wechseln  Shift Nitro\nC Kamera  F Vollbild  Esc Pause"
 
 	# Drehzahlmesser unten rechts
 	var tacho := Control.new()
@@ -371,6 +404,14 @@ func _build_hud() -> void:
 	tacho.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(tacho)
 	hud["tacho"] = tacho
+	if event_type == "drag":
+		# Drag: größerer Drehzahlmesser unten rechts mit grünem Schaltbereich und Temperatur
+		tacho.drag = true
+		tacho.scale = Vector2(1.2, 1.2)
+		tacho.offset_left = -186.0
+		tacho.offset_right = -36.0
+		tacho.offset_top = -186.0
+		tacho.offset_bottom = -36.0
 
 	# Fortschritt oben mittig
 	hud["progress"] = _bar(root, Vector2(220, 10), Vector2(200, 6), Color(0.9, 0.9, 1.0))
@@ -461,6 +502,8 @@ func _process(dt: float) -> void:
 		_update_drift(dt)
 	elif state == State.RACING:
 		_check_near_miss()
+	if event_type == "drag":
+		_update_drag()
 	if state == State.RACING and player_progress >= track["finish"]:
 		_on_player_finished()
 
@@ -509,7 +552,8 @@ func _place() -> int:
 				place -= 1
 		return place
 	if state == State.FINISHED:
-		return finish_order.find("player") + 1
+		var i := finish_order.find("player")
+		return i + 1 if i >= 0 else 4  # ausgefallen
 	var place := 1
 	for ai in ais:
 		if ai.finish_time >= 0.0 or ai.total > player_progress:
@@ -616,6 +660,7 @@ func _update_hud() -> void:
 	tacho.speed_kmh = int(absf(player.speed_fwd) * 3.6)
 	tacho.gear = "R" if player.speed_fwd < -0.5 else ("N" if state == State.COUNTDOWN or state == State.INTRO else str(player.gear))
 	tacho.nitro = player.nitro
+	tacho.heat = player.engine_heat
 	tacho.nitro_on = player.nitro_on
 	hud["progress"].size.x = 198.0 * clampf((player_progress - track["start"]) / (track["finish"] - track["start"]), 0.0, 1.0)
 	hud["drift"].text = "DRIFT  +NOS" if player.drifting else ("AIR" if player.airborne else "")
@@ -656,13 +701,46 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("camera"):
 		player.toggle_camera()
 		_flash("Kamera: " + player.CAM_NAMES[player.cam_mode], Color(0.85, 0.9, 1.0))
-	elif event.is_action_pressed("reset_car") and state == State.RACING:
+	elif event.is_action_pressed("reset_car") and state == State.RACING and event_type != "drag":
 		var loc := Track.locate(track, player.global_position)
 		var p: Dictionary = loc["path"]
 		var half: float = p["half_w"] - 2.0
 		player.place(Track.xform_at(p["curve"], loc["d"], clampf(loc["lat"], -half, half)))
 	elif event.is_action_pressed("pause") and state != State.FINISHED:
 		_toggle_pause()
+
+
+## Drag: Schaltvorgänge melden, Motortemperatur warnen, Totalschaden oder Motorschaden beenden das Rennen
+var _heat_warned := false
+
+
+func _update_drag() -> void:
+	match player.shift_result:
+		"perfect":
+			_flash("PERFEKT GESCHALTET", Color(0.4, 1.0, 0.5))
+		"good":
+			_flash("GUT GESCHALTET", Color(1.0, 0.9, 0.4))
+		"early":
+			_flash("ZU FRÜH GESCHALTET", Color(1.0, 0.55, 0.2))
+	player.shift_result = ""
+	if player.engine_heat > 0.6 and not _heat_warned:
+		_heat_warned = true
+		_flash("MOTOR ÜBERHITZT – SCHALTEN!", Color(1.0, 0.3, 0.2))
+	elif player.engine_heat < 0.3:
+		_heat_warned = false
+	if state == State.RACING and (player.totaled or player.blown):
+		_on_player_dnf("TOTALSCHADEN" if player.totaled else "MOTORSCHADEN")
+
+
+func _on_player_dnf(reason: String) -> void:
+	state = State.FINISHED
+	player.controls_enabled = false
+	player.finished = true
+	hud["center"].label_settings = hud["center"].label_settings.duplicate()
+	hud["center"].label_settings.font_size = 40
+	hud["center"].text = reason
+	show.finish(false, false)
+	get_tree().create_timer(3.0).timeout.connect(_show_result.bind(4, false, [], reason))
 
 
 func _on_player_finished() -> void:
@@ -704,7 +782,7 @@ func _on_player_finished() -> void:
 	get_tree().create_timer(4.5).timeout.connect(_show_result.bind(place, new_best, unlocked))
 
 
-func _show_result(place: int, new_best: bool, unlocked: Array) -> void:
+func _show_result(place: int, new_best: bool, unlocked: Array, dnf := "") -> void:
 	var panel := PanelContainer.new()
 	panel.set_anchors_preset(Control.PRESET_CENTER)
 	panel.position = Vector2(-150, 0)
@@ -720,6 +798,8 @@ func _show_result(place: int, new_best: bool, unlocked: Array) -> void:
 	panel.add_child(vb)
 	var t := _label(vb, 14, HORIZONTAL_ALIGNMENT_CENTER)
 	t.text = "Zeit  %s%s" % [_fmt(race_time), "   NEUE BESTZEIT" if new_best else ""]
+	if dnf != "":
+		t.text = "Ausgefallen: " + dnf.capitalize()
 	if event_type == "drift":
 		t.text = "Punkte  %d%s" % [int(drift_score), "   NEUER REKORD" if new_best else ""]
 		var tg := _label(vb, 10, HORIZONTAL_ALIGNMENT_CENTER)
