@@ -677,8 +677,8 @@ func _update_sinking(dt: float) -> void:
 
 
 func _update_camera(dt: float, sf: float) -> void:
-	var base := 64.0 if cam_mode == 0 else 70.0
-	var target_fov := base + 24.0 * sf + (12.0 if nitro_on else 0.0)
+	var base := 58.0 if cam_mode == 0 else 70.0
+	var target_fov := base + (14.0 if cam_mode == 0 else 24.0) * sf + (8.0 if nitro_on else 0.0)
 	_fov = lerpf(_fov, target_fov, dt * (6.0 if nitro_on else 2.5))
 	cam.fov = _fov
 	# Kein Dauerwackeln bei Tempo: nur kurze, weiche Stöße bei Einschlägen und Landungen
@@ -691,8 +691,8 @@ func _update_camera(dt: float, sf: float) -> void:
 		var yaw := global_rotation.y
 		if velocity.length() > 2.0:
 			yaw = lerp_angle(yaw, atan2(-velocity.x, -velocity.z), _cam_drift)
-		var dist := 5.4 + sf * 1.3 + (0.9 if nitro_on else 0.0)
-		var height := 1.9 - sf * 0.3
+		var dist := 4.4 + sf * 0.6 + (0.4 if nitro_on else 0.0)
+		var height := 1.6 - sf * 0.2
 		if not _cam_init:
 			_cam_yaw = yaw
 			_cam_pos = global_position + Basis(Vector3.UP, yaw) * Vector3(0, height, dist)
@@ -700,7 +700,7 @@ func _update_camera(dt: float, sf: float) -> void:
 		# etwas Verzögerung: in Kurven sieht man das Auto einlenken (wie die NFSU-Verfolgerkamera)
 		_cam_yaw = lerp_angle(_cam_yaw, yaw, 1.0 - exp(-dt * (2.0 if airborne else 4.5)))
 		var target := global_position + Basis(Vector3.UP, _cam_yaw) * Vector3(0, height, dist)
-		_cam_pos = _cam_pos.lerp(target, 1.0 - exp(-dt * 14.0))
+		_cam_pos = _cam_pos.lerp(target, 1.0 - exp(-dt * 20.0))
 		_cam_pos.y = lerpf(_cam_pos.y, target.y, 1.0 - exp(-dt * (6.0 if airborne else 20.0)))
 		cam.global_position = _cam_pos
 		cam.look_at(global_position + Basis(Vector3.UP, _cam_yaw) * Vector3(0, 1.1, -7.0), Vector3.UP)

@@ -231,6 +231,9 @@ func _process(dt: float) -> void:
 		for n in get_tree().get_nodes_in_group("ambient"):
 			if "_cars" in n:
 				print("   zug aktiv=%s d=%.0f (%.0f-%.0f) sichtbar=%s y=%.1f" % [n._active, n._d, n.d_from, n.d_to, n._cars[0].visible, n._cars[0].global_position.y])
+	if OS.get_cmdline_user_args().has("--camlog") and race and "curve" in race and race.player and fmod(_t, 0.5) < dt:
+		var pl = race.player
+		print("cam t=%.1f v=%d abstand=%.2f fov=%.1f" % [_t, int(pl.speed_fwd * 3.6), pl.cam.global_position.distance_to(pl.global_position), pl.cam.fov])
 	if OS.get_cmdline_user_args().has("--racelog") and race and "curve" in race and race.player and fmod(_t, 3.0) < dt:
 		# kompakter Rennverlauf: eigenes Auto, Gegner (Gesamtfortschritt), Bildrate
 		var pl = race.player
