@@ -172,6 +172,7 @@ const EN := {
 	"Regen, Dampf aus Gullys und andere Partikel.": "Rain, steam from manholes and other particles.",
 	"Zeigt oben in der Mitte Bildrate und aktuelle 3D-Auflösung.": "Shows frame rate and current 3D resolution at the top.",
 	"STRECKE WIRD VORBEREITET": "PREPARING TRACK",
+	"ÜBERSCHLAG!": "ROLLOVER!",
 	"KARRIERE": "CAREER", "Nächstes Event: ": "Next event: ", "Gesperrt: gewinne zuerst %s.": "Locked: win %s first.",
 	"Gewonnen": "Won", "KIEZ": "KIEZ", "Berlin Kreuzberg": "Berlin Kreuzberg",
 	"Unter der Hochbahn der U1 durch die Skalitzer Straße, über die Oberbaumbrücke, an der East Side Gallery entlang und über die Schillingbrücke zurück zum Kotti.":

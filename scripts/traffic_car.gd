@@ -1,6 +1,7 @@
 extends CharacterBody3D
 ## Ziviler Verkehr: fährt langsam auf seiner Spur (rechts mit, links Gegenverkehr),
-## weicht Baustellen aus, bremst für den Spieler und hält am Bahnübergang. Bei einem Crash wird er weggeschleudert.
+## weicht Baustellen aus, bremst für den Spieler und hält am Bahnübergang. Bei einem Crash wird er weggeschleudert,
+## bei einem harten Treffer hebt er ab, überschlägt sich und bleibt auf Seite oder Dach liegen.
 ## Fährt auf der Hauptstraße (mit Mittelstreifen-Versatz) oder in einer Gabelung (path_id).
 
 const Builder := preload("res://scripts/car_builder.gd")
@@ -31,6 +32,10 @@ var _lane_cur := 2.25
 var _wreck_vel := Vector3.ZERO
 var _wreck_spin := 0.0
 var velocity_vec := Vector3.ZERO
+var _wreck_vy := 0.0
+var _wreck_roll := 0.0
+var _wreck_roll_v := 0.0
+var _wreck_ground := 0.0
 var _far_d2 := 0.0
 var _far_t := 0.0
 
@@ -100,6 +105,23 @@ func _physics_process(dt: float) -> void:
 		rotate_y(_wreck_spin * dt)
 		_wreck_spin = move_toward(_wreck_spin, 0.0, 2.5 * dt)
 		velocity_vec = _wreck_vel
+		if _wreck_roll_v != 0.0 or global_position.y > _wreck_ground + 0.01:
+			_wreck_vy -= 18.0 * dt
+			global_position.y += _wreck_vy * dt
+			rotate_object_local(Vector3.BACK, _wreck_roll_v * dt)
+			_wreck_roll += _wreck_roll_v * dt
+			if global_position.y <= _wreck_ground and _wreck_vy < 0.0:
+				global_position.y = _wreck_ground
+				if _wreck_vy < -3.0:
+					_wreck_vy *= -0.3  # schlägt auf und springt noch einmal
+					_wreck_roll_v *= 0.5
+				else:
+					# liegen bleiben: auf Rädern, Seite oder Dach
+					var flat := roundf(_wreck_roll / (PI / 2.0)) * (PI / 2.0)
+					rotate_object_local(Vector3.BACK, flat - _wreck_roll)
+					_wreck_roll = flat
+					_wreck_roll_v = 0.0
+					_wreck_vy = 0.0
 		return
 
 	# Baustelle auf meiner Spur? Dann eine Spur weiter nach innen.
@@ -161,8 +183,12 @@ func knock(v: Vector3) -> void:
 	if not wrecked:
 		wrecked = true
 		_wreck_vel = velocity_vec
+		_wreck_ground = global_position.y
 	_wreck_vel += Vector3(v.x, 0, v.z) * 0.6
 	_wreck_spin += randf_range(-1.0, 1.0) * clampf(v.length() / 10.0, 0.5, 3.0)
+	if v.length() > 20.0 and _wreck_roll_v == 0.0 and global_position.y <= _wreck_ground + 0.01:
+		_wreck_vy = clampf(v.length() * 0.18, 3.5, 7.0)
+		_wreck_roll_v = randf_range(4.0, 7.0) * (1.0 if randf() < 0.5 else -1.0)
 
 
 ## Für KI/Verkehrslogik: aktuelle Querposition auf der Strecke

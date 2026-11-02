@@ -7,6 +7,8 @@ extends Node
 ##   -- --at=lake|crossing|alley|fork|tunnel|el|stadium|<viertel>|d:<meter>   setzt das Auto nach dem Start direkt vor die Stelle
 ##   -- --race=2           wählt die Strecke (Index in Catalog.RACES)
 ##   -- --times=1.5,4,8    Zeitpunkte für Screenshots
+##   -- --crash=30:90[:d]  setzt das Auto (bei Strecke d) mit 30 m/s im Winkel 90° nach rechts auf die Wand zu,
+##                         gibt den Verlauf aus (Überschlag, Flug, Höhe) – Test der Fallphysik
 ##   -- --bench            misst während des Rennens Bildzeit, GPU-Zeit und Draw Calls, gibt am Ende "BENCH ..." aus
 
 const Track := preload("res://scripts/track_builder.gd")
@@ -37,6 +39,8 @@ var _drift_dir := 0.0
 var bench := false
 var _bench := []  # je Bild: [Bildzeit ms, GPU ms, CPU-Render ms, Draw Calls, Objekte, Dreiecke]
 var _bench_vp := RID()
+var _crash: PackedStringArray = []
+var _crash_done := false
 var _added := {}  # in diesem Bild neu hinzugefügte Knoten nach Art (Ruckler-Suche)
 
 
@@ -49,6 +53,8 @@ func _ready() -> void:
 			drive = true
 		elif a == "--bench":
 			bench = true
+		elif a.begins_with("--crash="):
+			_crash = a.substr(8).split(":")
 		elif a == "--demo":
 			demo = true
 			drive = true
@@ -264,6 +270,39 @@ func _process(dt: float) -> void:
 			get_tree().quit()
 	if bench and race and "curve" in race and race.player:
 		_bench_sample(race, dt)
+	if OS.get_cmdline_user_args().has("--airlog") and race and "curve" in race and race.player and race.state == 1 and fmod(_t, 0.1) < dt:
+		var p2 = race.player
+		print("air t=%.1f v=%.1f y=%.2f vy=%.1f luft=%s nick=%.2f roll=%.2f d=%.0f pfad=%d wasser=%.1f" % [_t, p2.velocity.length(), p2.position.y, p2.vy,
+			p2.airborne, p2._air_pitch, p2._air_roll, p2.progress, p2.path_id, p2.sinking])
+	if not _crash.is_empty() and race and "curve" in race and race.player and race.state == 1:
+		var pl = race.player
+		if not _crash_done:
+			_crash_done = true
+			if _crash.size() > 2:
+				pl.place(Track.xform_at(race.track["curve"], float(_crash[2]), 0.0))
+			if _crash[1] == "k":
+				# auf das nächste Umfahrbare (Laterne, Schild) 25–70 m voraus zielen
+				var best: Node3D = null
+				var stack: Array = [race.track["node"]]
+				while not stack.is_empty():
+					var nd: Node = stack.pop_back()
+					stack.append_array(nd.get_children())
+					if nd is RigidBody3D and nd.has_method("knock"):
+						var rel: Vector3 = nd.global_position - pl.global_position
+						rel.y = 0.0
+						if rel.length() > 25.0 and rel.length() < 70.0 and rel.normalized().dot(-pl.global_basis.z) > 0.85:
+							if best == null or rel.length() < (best.global_position - pl.global_position).length():
+								best = nd
+				if best:
+					pl.look_at(Vector3(best.global_position.x, pl.global_position.y, best.global_position.z), Vector3.UP)
+					print("crash ziel: %s bei %s" % [best.name, best.global_position])
+			else:
+				pl.rotate_y(-deg_to_rad(float(_crash[1])))
+			pl.velocity = -pl.global_basis.z * float(_crash[0])
+			pl.speed_fwd = float(_crash[0])
+		elif fmod(_t, 0.2) < dt:
+			print("crash t=%.1f v=%.1f y=%.2f luft=%s ueberschlag=%s roll=%.2f nick=%.2f d=%.0f lat=%.1f" % [_t, pl.velocity.length(),
+				pl.position.y, pl.airborne, pl.tumbling, pl._air_roll, pl._air_pitch, pl.progress, pl.lateral])
 	if OS.get_cmdline_user_args().has("--drawlog") and race and "curve" in race and race.player and race.state == 1 and fmod(_t, 2.0) < dt:
 		var vp: RID = race.world.get_viewport_rid()
 		print("DRAWS t=%.0f d=%.0f draws=%d" % [_t, race.player.progress, RenderingServer.viewport_get_render_info(vp,

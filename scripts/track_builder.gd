@@ -33,6 +33,7 @@ const CURB_H := 0.2
 const WALL_H := 12.0  # hoch genug, dass man auch im Sprung nicht rausfliegt
 const LAMP_STEP := 38.0
 const RAMP_H := 1.7
+const WATER_DROP := 1.8  # Seen: so tief fällt man (Physik), gespritzt wird beim Eintauchen in die Oberfläche
 const RAIL_RAMP_H := 3.7
 const SC_HALF := 5.0
 const ALLEY_HALF := 5.0
@@ -172,6 +173,8 @@ static func build(race: Dictionary) -> Dictionary:
 		curve.add_point(pts[i], -t, t)
 	if loop:
 		curve.set_meta("loop", true)
+	if city.is_empty():
+		_round_corners(curve, HALF_W + (6.5 if type == "drift" else 3.0), loop)
 	var length := curve.get_baked_length()
 	var laps: int = race.get("laps", 1) if loop else 1
 
@@ -394,6 +397,51 @@ static func _flat(v: Vector3) -> Vector2:
 
 ## Mittellinie der Hauptstraße. An geplanten Stellen macht sie einen Bogen ("bulge"),
 ## die Sehne dieses Bogens wird später zur Abkürzung.
+## Spitze Ecken runden: Ist die Kurve an einem Eckpunkt enger als min_r, überschneiden sich dort Fahrbahnrand,
+## Leitplanke und Wände (die Drift-Sterne hatten 5 m Radius bei 11,5 m halber Breite: Planke quer über die Straße).
+## Dann werden die Tangenten an diesem Punkt länger, bis der Radius reicht, höchstens bis knapp vor die Nachbarpunkte.
+static func _round_corners(curve: Curve3D, min_r: float, loop: bool) -> void:
+	var n := curve.point_count
+	for it in 16:
+		var changed := false
+		for i in n - (1 if loop else 0):
+			if not loop and (i == 0 or i == n - 1):
+				continue
+			var p := curve.get_point_position(i)
+			if _min_radius(curve, curve.get_closest_offset(p), loop) >= min_r:
+				continue
+			var prev := curve.get_point_position(posmod(i - 1, n - 1) if loop else i - 1)
+			var nxt := curve.get_point_position((i + 1) % (n - 1) if loop else i + 1)
+			var out := curve.get_point_out(i)
+			if out.length() * 1.15 > 0.45 * minf(p.distance_to(prev), p.distance_to(nxt)):
+				continue
+			curve.set_point_in(i, curve.get_point_in(i) * 1.15)
+			curve.set_point_out(i, out * 1.15)
+			if loop and i == 0:
+				curve.set_point_in(n - 1, curve.get_point_in(i))
+				curve.set_point_out(n - 1, curve.get_point_out(i))
+			changed = true
+		if not changed:
+			break
+
+
+## Kleinster Kurvenradius im Umkreis von 24 m um offset (aus drei Punkten im Abstand 6 m)
+static func _min_radius(curve: Curve3D, offset: float, loop: bool) -> float:
+	var L := curve.get_baked_length()
+	var best := 1e9
+	var d := offset - 24.0
+	while d <= offset + 24.0:
+		var at := func(x: float) -> Vector3: return curve.sample_baked(fposmod(x, L) if loop else clampf(x, 0.0, L))
+		var a: Vector3 = at.call(d - 6.0)
+		var b: Vector3 = at.call(d)
+		var c: Vector3 = at.call(d + 6.0)
+		var area := absf((b - a).cross(c - a).y) / 2.0
+		if area > 1e-4:
+			best = minf(best, a.distance_to(b) * b.distance_to(c) * c.distance_to(a) / (4.0 * area))
+		d += 2.0
+	return best
+
+
 static func _centerline(race: Dictionary, rng: RandomNumberGenerator) -> Dictionary:
 	var pts := [Vector3.ZERO]
 	var heading := 0.0
@@ -608,7 +656,9 @@ static func ground(track: Dictionary, loc: Dictionary, pos: Vector3) -> Dictiona
 			var in_gap: bool = loc["d"] > lk["gap0"] and loc["d"] < lk["gap1"]
 			var on_causeway: bool = p["id"] == lk["path"] and absf(loc["lat"]) <= p["half_w"] + 0.4 and not in_gap
 			if not on_causeway:
+				# kein Boden unter dem Wasser: wer zu kurz springt oder abkommt, fällt hinein
 				g["water"] = true
+				g["h"] = g["base"] - WATER_DROP
 	return g
 
 
@@ -825,6 +875,30 @@ static func _flush(root: Node3D, st: SurfaceTool, m: Material) -> void:
 
 ## Wand von a nach b als senkrechte Fläche. Alle Flächen eines Körpers werden am Ende zu einem durchgehenden
 ## Dreiecksnetz (_finalize_walls): keine Kisten-Stöße, an denen man beim Entlangschrammen hängen bleibt.
+## Schräge vom Gehweg-Rand (Stadtmauer) zur Trogmauer über 16 m, dazu ein gelb-schwarzer Anpralldämpfer.
+## dir -1: liegt vor der Mauer (Einfahrt in Fahrtrichtung), +1: dahinter
+static func _trough_wedge(root: Node3D, walls: StaticBody3D, track: Dictionary, d_wall: float, dir: float) -> void:
+	var curve: Curve3D = track["curve"]
+	var fa := frame_at(curve, d_wall + dir * 16.0)
+	var fb := frame_at(curve, d_wall)
+	var h: float = HALF_W + track["extra"] + median_at(track, d_wall)
+	var yel := Builder.mat(Color(0.95, 0.7, 0.05), 0.0, 0.5, Color(0.95, 0.65, 0.05), 0.35)
+	var blk := Builder.mat(Color(0.04, 0.04, 0.045), 0.0, 0.7)
+	for sd in [-1.0, 1.0]:
+		var a: Vector3 = fa["pos"] + fa["right"] * sd * (h + WALK + 0.3) + Vector3(0, fa["y"], 0)
+		var b: Vector3 = fb["pos"] + fb["right"] * sd * (TUN_W + 0.1) + Vector3(0, fb["y"], 0)
+		_wall_shape(walls, a, b)
+		var len := a.distance_to(b)
+		var bas := Basis.looking_at((b - a).normalized(), Vector3.UP)
+		var k := 0
+		var u := 0.6
+		while u < len:
+			Builder._add(root, Builder.box(Vector3(0.45, 0.9, 1.15)), yel if k % 2 == 0 else blk,
+				a.lerp(b, u / len) + Vector3(0, CURB_H + 0.45, 0)).basis = bas
+			k += 1
+			u += 1.2
+
+
 static func _wall_shape(walls: StaticBody3D, a: Vector3, b: Vector3, h := WALL_H) -> void:
 	if not walls.has_meta("faces"):
 		walls.set_meta("faces", [])
@@ -928,6 +1002,10 @@ static func _build_road(root: Node3D, track: Dictionary) -> void:
 			else:
 				_strip(road, prev["l"], prev["r"], cur["l"], cur["r"], prev["d"], d)
 				n_road += 1
+			if (cur["tr"] > 0) != (prev["tr"] > 0):
+				# Anfang/Ende der Trogmauer: schräger Anlauf mit Anpralldämpfer vom Gehweg her, sonst fährt man am
+				# Bordstein frontal auf die Mauerkante und bleibt hängen
+				_trough_wedge(root, walls, track, cur["d"] if cur["tr"] > 0 else prev["d"], -1.0 if cur["tr"] > 0 else 1.0)
 			if in_tr:
 				# Seitenstreifen auf Fahrbahnhöhe bis zur Trog-/Tunnelwand
 				_strip(walk, prev["lt"] + up, prev["l"] + up, cur["lt"] + up, cur["l"] + up, 0.0, 0.0)
@@ -1259,6 +1337,8 @@ static func _build_branch(root: Node3D, track: Dictionary, p: Dictionary, rng: R
 	if n_ret > 0:
 		_flush(root, ret, concrete)
 
+	if kind in SHORTCUT_COL:
+		_shortcut_lights(root, track, p, gap0, gap1)
 	match kind:
 		"fork":
 			_fork_details(root, track, p, rng)
@@ -1293,6 +1373,97 @@ static func _build_branch(root: Node3D, track: Dictionary, p: Dictionary, rng: R
 				dl += 22.0
 		"spur":
 			_spur_details(root, track, p, rng)
+
+
+## Abkürzungen hell machen, wie ein Lichttunnel: alle 12 m ein leuchtender Bogen über der Fahrbahn (jeder zweite
+## bzw. dritte mit Lampe), am ersten Bogen groß "ABKÜRZUNG", dazu Leuchtbänder an beiden Rändern, die den Weg zeigen.
+## Seen-Dämme nur mit Leuchtbändern, dort wird über die Lücke gesprungen.
+const SHORTCUT_COL := {"fork": Color(0.2, 0.85, 1.0), "alley": Color(1.0, 0.3, 0.75), "lake": Color(1.0, 0.75, 0.4)}
+
+
+static func _shortcut_lights(root: Node3D, track: Dictionary, p: Dictionary, gap0: float, gap1: float) -> void:
+	var c: Curve3D = p["curve"]
+	var len: float = p["length"]
+	var half: float = p["half_w"]
+	var kind: String = p["kind"]
+	var col: Color = SHORTCUT_COL[kind]
+	var neon := Builder.mat(col, 0.0, 0.4, col, 4.0)
+	var dark := Builder.mat(Color(0.06, 0.06, 0.07), 0.5, 0.5)
+	var walk_w := 3.0 if kind == "fork" else 0.0
+	# Leuchtbänder: Gabelung auf der Bordsteinkante, Gasse am Fuß der Hauswand, Damm flach am Fahrbahnrand
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var n := 0
+	var prev := {}
+	var d := 0.0
+	while d <= len + 0.01:
+		var f := frame_at(c, d)
+		var y := Vector3(0, f["y"], 0)
+		var r: Vector3 = f["right"]
+		var cur := {"ok": _main_clearance(track, f["pos"]) > WALK + 1.0 and (d < gap0 - 2.0 or d > gap1 + 2.0)}
+		for sd in [-1.0, 1.0]:
+			var lat: float = {"fork": half + 0.12, "alley": half + 0.02, "lake": half - 0.15}[kind]
+			cur[sd] = f["pos"] + r * sd * lat + y
+		if not prev.is_empty() and prev["ok"] and cur["ok"]:
+			for sd in [-1.0, 1.0]:
+				if kind != "alley":
+					var w: Vector3 = r * sd * 0.07
+					var up := Vector3(0, (CURB_H if kind == "fork" else 0.0) + 0.015, 0)
+					_strip(st, prev[sd] - w + up, prev[sd] + w + up, cur[sd] - w + up, cur[sd] + w + up, 0.0, 0.0)
+				else:
+					_wall_quad(st, prev[sd] + Vector3(0, 0.12, 0), cur[sd] + Vector3(0, 0.12, 0), prev[sd].y + 0.3, cur[sd].y + 0.3, sd > 0.0)
+				n += 1
+		prev = cur
+		d += 4.0
+	if n > 0:
+		neon.cull_mode = BaseMaterial3D.CULL_DISABLED
+		_flush(root, st, neon)
+	if kind == "lake":
+		return
+	# Bögen; Gabelung mit Pfosten in der Randmauer (dort hängt man nicht), in der Gasse hängt der Bogen zwischen den
+	# Fassaden und die Leuchtstreifen liegen flach auf der Hauswand
+	var alley := kind == "alley"
+	var span := half + 0.02 if alley else half + walk_w + 0.4
+	var top := 4.3 if kind == "alley" else 5.6
+	var lit := Color(col.r * 0.5 + 0.5, col.g * 0.5 + 0.5, col.b * 0.5 + 0.5)
+	var k := 0
+	var dd := 8.0
+	while dd < len - 6.0:
+		var f := frame_at(c, dd)
+		if _main_clearance(track, f["pos"]) < span + WALK:
+			dd += 4.0
+			continue
+		var b := Basis.looking_at(f["fwd"], Vector3.UP)
+		var base: Vector3 = f["pos"] + Vector3(0, f["y"], 0)
+		var r: Vector3 = f["right"]
+		for sd in [-1.0, 1.0]:
+			if not alley:
+				Builder._add(root, Builder.box(Vector3(0.3, top, 0.3)), dark, base + r * sd * span + Vector3(0, top / 2.0, 0)).basis = b
+			var inset := 0.0 if alley else 0.17
+			Builder._add(root, Builder.box(Vector3(0.06, top - 0.5, 0.1)), neon, base + r * sd * (span - inset) + Vector3(0, top / 2.0, 0)).basis = b
+		Builder._add(root, Builder.box(Vector3(span * 2.0 + 0.3, 0.32, 0.32)), dark, base + Vector3(0, top, 0)).basis = b
+		Builder._add(root, Builder.box(Vector3(span * 2.0 - 0.3, 0.07, 0.14)), neon, base + Vector3(0, top - 0.19, 0)).basis = b
+		if alley or k % 2 == 0:
+			var ol := OmniLight3D.new()
+			ol.light_color = lit
+			ol.light_energy = 2.6 if alley else 3.2
+			ol.omni_range = 14.0 if alley else 19.0
+			ol.light_specular = 0.2
+			ol.position = base + Vector3(0, top - 1.0, 0)
+			root.add_child(ol)
+		if k == 0:
+			var l := Label3D.new()
+			l.text = "ABKÜRZUNG"
+			l.font_size = 96
+			l.pixel_size = 0.012
+			l.outline_size = 18
+			l.modulate = Color(col.r * 2.2, col.g * 2.2, col.b * 2.2)
+			l.outline_modulate = Color(0, 0, 0, 0.9)
+			l.shaded = false
+			l.transform = Transform3D(b, base + Vector3(0, top + 0.75, 0))
+			root.add_child(l)
+		k += 1
+		dd += 12.0
 
 
 ## Gabelung: Wegweiser vor der Teilung, Verkehrsinsel mit Büschen zwischen den Fahrbahnen, Laternen
@@ -1375,7 +1546,7 @@ static func _fork_details(root: Node3D, track: Dictionary, p: Dictionary, rng: R
 		dl += 32.0
 
 
-## Gasse: Lichterketten, Müllcontainer, Kisten, Hinweisschild
+## Gasse: Lichterketten, Müllcontainer, Kisten, Hinweisschild (Licht kommt von den Bögen, _shortcut_lights)
 static func _alley_details(root: Node3D, track: Dictionary, p: Dictionary, rng: RandomNumberGenerator) -> void:
 	var c: Curve3D = p["curve"]
 	var len: float = p["length"]
@@ -1407,12 +1578,6 @@ static func _alley_details(root: Node3D, track: Dictionary, p: Dictionary, rng: 
 					cm.material_override = cable
 					cm.transform = Transform3D(Basis.looking_at(seg.normalized(), Vector3.UP), (q + q2) / 2)
 					root.add_child(cm)
-			var ol := OmniLight3D.new()
-			ol.light_color = Color(1.0, 0.7, 0.55)
-			ol.light_energy = 1.4
-			ol.omni_range = 11.0
-			ol.position = f["pos"] + Vector3(0, 4.0, 0)
-			root.add_child(ol)
 		d += 14.0
 	# Container und Kisten an den Wänden (harte Hindernisse)
 	var cols := [Color(0.1, 0.3, 0.15), Color(0.15, 0.2, 0.45), Color(0.45, 0.25, 0.08)]

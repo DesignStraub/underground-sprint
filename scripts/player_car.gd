@@ -19,8 +19,10 @@ const GEARS := [0.0, 0.16, 0.31, 0.47, 0.63, 0.81, 1.3]
 const SHIFT_RPM := 7400.0
 const TOP_RPM := 6600.0  # Drehzahl bei Höchstgeschwindigkeit im 6. Gang
 const GEAR_PULL := [0.0, 1.0, 0.86, 0.74, 0.63, 0.54, 0.46]
-const GRAVITY := 30.0
-const MAX_LAUNCH_VY := 10.0  # kurze, knackige Sprünge statt Weitflug
+const GRAVITY := 18.0  # knapp 2 g: Sprünge mit spürbarer Flugphase, ohne zu schweben
+const MAX_LAUNCH_VY := 14.0
+const TUMBLE_HIT := 24.0  # m/s in die Wand oder ins andere Auto hinein (gut 85 km/h): ab hier Überschlag
+const PIVOT := Vector3(0, 0.7, 0)  # Schwerpunkt: um ihn dreht sich das Auto in der Luft und beim Überschlag
 const MIN_RADIUS := 5.2  # kleinster Wendekreis (Radius) bei voll eingeschlagener Lenkung
 const BRAKE := 22.0  # m/s² Vollbremsung (gut 2 g: kräftig, aber nicht wie gegen eine Wand)
 const DRAG_LIMIT := 8000.0  # Begrenzer im Drag
@@ -94,6 +96,13 @@ var last_air := 0.0  # Dauer des letzten Sprungs (für das HUD)
 var landings := 0
 var vy := 0.0
 var sinking := 0.0
+var tumbling := false  # Überschlag läuft (keine Kontrolle)
+var rollovers := 0
+var _air_pitch := 0.0  # Lage in der Luft: Nicken und Rollen mit eigener Drehgeschwindigkeit
+var _air_pitch_v := 0.0
+var _air_roll := 0.0
+var _air_roll_v := 0.0
+var _tumble_rest := 0.0
 
 var _shift_timer := 0.0
 var _shake := 0.0
@@ -213,7 +222,9 @@ func toggle_camera() -> void:
 
 func _on_prop_hit(body: Node) -> void:
 	if body.has_method("knock") and not body.knocked:
-		body.knock(velocity)
+		# Treffpunkt auf Stoßstangenhöhe: hohe Teile kippen um, statt als Ganzes wegzufliegen
+		var fwd := -global_basis.z
+		body.knock(velocity, global_position + fwd * _length * 0.5 + Vector3(0, 0.55, 0))
 		velocity *= 1.0 - (1.0 - body.slowdown) * 0.65  # kostet Tempo, aber man bleibt nicht hängen
 		_shake = minf(_shake + 0.12, 1.0)
 		audio.crash(0.15 + body.mass / 200.0)
@@ -232,6 +243,9 @@ func _physics_process(dt: float) -> void:
 	_wall_cool = maxf(_wall_cool - dt, 0.0)
 	if sinking > 0.0:
 		_update_sinking(dt)
+		return
+	if tumbling:
+		_update_tumble(dt)
 		return
 	if stun > 0.0:
 		# Nach einem Crash kurz keine Kontrolle
@@ -454,7 +468,7 @@ func _physics_process(dt: float) -> void:
 	# Querbeschleunigung (Gierrate * Tempo) nach außen, im Rutschen zusätzlich zur Rutschseite
 	var pitch := clampf(a * 0.0028, -0.05, 0.035)
 	if airborne:
-		pitch = clampf(atan2(vy, maxf(spd, 1.0)) * 0.8, -0.35, 0.3)
+		pitch = 0.0  # in der Luft dreht sich das ganze Auto (unten), nicht die Karosserie
 	var yaw_now := wrapf(global_rotation.y - _yaw_prev, -PI, PI) / maxf(dt, 0.0001)
 	_yaw_prev = global_rotation.y
 	var roll := clampf(-yaw_now * spd / 9.81 * 0.022, -0.065, 0.065) - clampf(l2 * 0.003, -0.035, 0.035)
@@ -464,7 +478,15 @@ func _physics_process(dt: float) -> void:
 		model.rotation.x = lerp_angle(model.rotation.x, _slope_pitch, 1.0 - exp(-dt * 12.0))
 		model.rotation.z = lerp_angle(model.rotation.z, _slope_roll, 1.0 - exp(-dt * 12.0))
 	else:
-		model.rotation.z = lerp_angle(model.rotation.z, 0.0, 1.0 - exp(-dt * 3.0))
+		# Flug: die Nase folgt der Flugbahn mit etwas Trägheit (nach der Rampe noch oben, dann kippt sie ab),
+		# einmal angestoßenes Rollen (Kante seitlich runter) läuft weiter
+		var target := clampf(atan2(vy, maxf(spd, 1.0)) * 1.4, -0.6, 0.45)
+		_air_pitch_v += ((target - _air_pitch) * 10.0 - _air_pitch_v * 4.5) * dt
+		_air_pitch += _air_pitch_v * dt
+		_air_roll_v *= exp(-0.5 * dt)
+		_air_roll += _air_roll_v * dt
+		model.rotation.x = _air_pitch
+		model.rotation.z = _air_roll
 	_update_camera(dt, sf)
 
 	audio.rpm = rpm
@@ -599,18 +621,31 @@ func _update_vertical(dt: float) -> void:
 		vy -= GRAVITY * dt
 		position.y += vy * dt
 		air_time += dt
-		if position.y <= gh:
+		if g["water"] and position.y <= base - 0.5 and vy < 0.0:
+			_land(position.y, true)  # taucht durch die Wasseroberfläche (auf Straßenhöhe gezeichnet)
+			return
+		if position.y <= gh and vy < 0.0:
 			_curb_y = gh - base
 			vy -= bvy  # Aufprall relativ zur Fahrbahn (bergab landet es sich weicher)
 			_land(gh, g["water"])
 		return
 	var prev := position.y
-	if gh - base < _curb_y - 0.35 and absf(speed_fwd) > 6.0 or crest:
-		# Rampenende oder Kuppe (die Straße fällt schneller weg, als die Schwerkraft das Auto mitnimmt): abheben
+	var drop := gh - base < _curb_y - 0.8
+	if gh - base < _curb_y - 0.35 and absf(speed_fwd) > 6.0 or crest or drop:
+		# Rampenende, Kuppe (die Straße fällt schneller weg, als die Schwerkraft das Auto mitnimmt) oder eine Kante,
+		# hinter der es tiefer geht (Damm, Rampe seitlich): abheben und fallen
 		airborne = true
 		vy = minf(_ground_vy, MAX_LAUNCH_VY)
 		air_time = 0.0
-		Sfx.play("whoosh", -8.0 + clampf(vy, 0.0, 8.0), randf_range(0.9, 1.1))
+		if not tumbling:
+			# von der Rampe mit erhobener Nase, so steil wie die Flugbahn beginnt
+			_air_pitch = maxf(model.rotation.x, atan2(maxf(vy, 0.0), maxf(absf(speed_fwd), 1.0)) * 1.4)
+			_air_pitch_v = 0.0
+			_air_roll = model.rotation.z
+			# seitlich über die Kante: die Seite, die zuerst den Halt verliert, sackt weg
+			_air_roll_v = clampf(-speed_lat * 0.15, -1.2, 1.2) if drop and absf(speed_lat) > 1.5 else 0.0
+		if not drop and not tumbling:
+			Sfx.play("whoosh", -8.0 + clampf(vy, 0.0, 8.0), randf_range(0.9, 1.1))
 		return
 	if g["water"]:
 		_splash()
@@ -634,19 +669,147 @@ func _update_vertical(dt: float) -> void:
 
 func _land(gh: float, water: bool) -> void:
 	var impact := -vy
-	airborne = false
 	position.y = gh
+	if water:
+		airborne = false
+		vy = 0.0
+		tumbling = false
+		_reset_pose()
+		_splash()
+		return
+	if tumbling:
+		_tumble_bounce(impact)
+		return
+	# Wie liegt das Auto beim Aufsetzen? Schräg aufs Dach/die Seite oder steil mit der Nase: Überschlag
+	var roll := absf(wrapf(_air_roll, -PI, PI))
+	var nose := absf(_air_pitch - _slope_pitch)
+	if (roll > 0.9 or nose > 0.85) and velocity.length() > 10.0 and not drag_mode:
+		start_tumble(-global_basis.z, maxf(impact, 12.0))
+		return
+	airborne = false
 	vy = 0.0
 	last_air = air_time
 	landings += 1
-	if water:
-		_splash()
-		return
 	Sfx.play("thud", linear_to_db(clampf(impact / 14.0, 0.3, 1.0)), randf_range(0.9, 1.05))
 	audio.crash(clampf(impact / 30.0, 0.1, 0.4))
 	_shake = minf(_shake + impact * 0.025, 0.7)
-	velocity *= 0.97 if impact < 10.0 else 0.92
-	model.get_meta("body").rotation.x = -0.08
+	# schief aufgesetzt kostet mehr Tempo als sauber auf allen vier Rädern
+	velocity *= (0.97 if impact < 10.0 else 0.92) * (1.0 - 0.3 * clampf(nose + roll * 0.5, 0.0, 1.0))
+	model.get_meta("body").rotation.x = -clampf(impact * 0.012, 0.05, 0.16)  # Federn tauchen ein
+	if impact > 9.0:
+		# hart gelandet: federt noch einmal kurz ab
+		airborne = true
+		vy = impact * 0.18
+		air_time = 0.0
+		_air_pitch = _slope_pitch
+		_air_pitch_v = 0.0
+		_air_roll_v *= 0.3
+
+
+## Überschlag: das Auto hebt ab und rollt um die Längsachse (dazu etwas Nicken und Drehen). Jeder Bodenkontakt
+## federt ab und kostet Tempo. Kommt es auf den Rädern zum Liegen, geht es weiter; liegt es auf Dach oder Seite,
+## wird es nach kurzer Zeit auf die Straße zurückgesetzt (wie in NFS).
+func start_tumble(push: Vector3, strength: float) -> void:
+	if tumbling or sinking > 0.0:
+		return
+	tumbling = true
+	rollovers += 1
+	crashes += 1
+	airborne = true
+	air_time = 0.0
+	vy = clampf(strength * 0.28, 4.5, 9.0)
+	# rollt weiter, wenn es schon schief liegt, sonst über die getroffene Seite; frontal kippt die Nase mit nach unten
+	var side := signf(_air_roll) if absf(_air_roll) > 0.3 else signf(push.dot(global_basis.x) + randf_range(-0.4, 0.4))
+	var fwd := -global_basis.z
+	_air_roll = model.rotation.z
+	_air_roll_v = side * clampf(strength * 0.3, 5.0, 10.0)
+	_air_pitch = model.rotation.x
+	_air_pitch_v = clampf(push.dot(fwd), -1.0, 0.0) * 3.0 + randf_range(-1.0, 1.0)
+	_spin = randf_range(-1.6, 1.6)
+	_tumble_rest = 0.0
+	nitro_on = false
+	stun = 0.0
+	_shake = 1.0
+	audio.crash(1.0)
+	Sfx.play("thud", 0.0, 0.8)
+
+
+func _update_tumble(dt: float) -> void:
+	var h := Vector3(velocity.x, 0.0, velocity.z)
+	if not airborne:
+		h = h.move_toward(Vector3.ZERO, 11.0 * dt)  # schleift über den Asphalt
+	velocity = h
+	rotate_y(_spin * dt)
+	_spin = move_toward(_spin, 0.0, dt * (0.6 if airborne else 3.0))
+	var pre := velocity
+	move_and_slide()
+	_handle_collisions(pre)
+	_update_vertical(dt)
+	if not tumbling:
+		return  # ins Wasser gefallen
+	_air_roll += _air_roll_v * dt
+	_air_pitch += _air_pitch_v * dt
+	if not airborne:
+		_air_pitch_v = move_toward(_air_pitch_v, 0.0, dt * 8.0)
+		_air_pitch = lerp_angle(_air_pitch, _slope_pitch, 1.0 - exp(-dt * 4.0))
+		var r := wrapf(_air_roll, -PI, PI)
+		if absf(_air_roll_v) < 2.5 and absf(r) < 1.2:
+			# kippt zurück auf die Räder
+			_air_roll_v = 0.0
+			_air_roll = lerp_angle(_air_roll, 0.0, 1.0 - exp(-dt * 7.0))
+			if absf(wrapf(_air_roll, -PI, PI)) < 0.04:
+				tumbling = false
+				stun = 0.5
+				_reset_pose()
+				return
+		else:
+			# rollt aus und bleibt auf Dach oder Seite liegen
+			_air_roll_v = move_toward(_air_roll_v, 0.0, dt * 9.0)
+			if absf(_air_roll_v) < 2.5:
+				_air_roll_v = 0.0
+				var flat := roundf(r / (PI / 2.0)) * (PI / 2.0)
+				_air_roll = lerp_angle(_air_roll, flat, 1.0 - exp(-dt * 8.0))
+				_tumble_rest += dt
+				if _tumble_rest > 1.3:
+					var p: Dictionary = loc["path"]
+					var half: float = p["half_w"] - 2.0
+					place(Track.xform_at(p["curve"], loc["d"], clampf(loc["lat"], -half, half)))
+					stun = 0.3
+					return
+	var b := Basis(Vector3.BACK, _air_roll) * Basis(Vector3.RIGHT, _air_pitch)
+	# auf der Seite ist das Auto breiter als der Schwerpunkt hoch: etwas anheben, sonst steckt es im Asphalt
+	model.transform = Transform3D(b, PIVOT - b * PIVOT + Vector3(0, absf(sin(_air_roll)) * 0.22, 0))
+	speed_fwd = h.dot(-global_basis.z)
+	rpm = move_toward(rpm, 1200.0, dt * 3000.0)
+	audio.rpm = rpm
+	audio.throttle = 0.0
+	audio.speed = h.length()
+	audio.slip = 0.6 if not airborne and h.length() > 3.0 else 0.0
+	_update_camera(dt, 0.0)
+
+
+func _tumble_bounce(impact: float) -> void:
+	if impact > 3.0:
+		vy = impact * 0.35  # federt ab
+		_air_roll_v *= 0.65
+		_air_pitch_v *= -0.5
+		velocity *= 0.78
+		Sfx.play("thud", linear_to_db(clampf(impact / 12.0, 0.3, 1.0)), randf_range(0.8, 0.95))
+		audio.crash(clampf(impact / 15.0, 0.3, 1.0))
+		_shake = minf(_shake + impact * 0.04, 1.0)
+	else:
+		airborne = false
+		vy = 0.0
+
+
+func _reset_pose() -> void:
+	tumbling = false
+	_air_roll = 0.0
+	_air_roll_v = 0.0
+	_air_pitch = 0.0
+	_air_pitch_v = 0.0
+	if model:
+		model.transform = Transform3D.IDENTITY
 
 
 func _splash() -> void:
@@ -732,8 +895,7 @@ func place(xform: Transform3D) -> void:
 	_cam_init = false
 	_base_ok = false
 	_curb_y = 0.0
-	if model:
-		model.rotation = Vector3.ZERO
+	_reset_pose()
 
 
 ## Verkehr ist das Schlimmste (frontal oder Auffahren: Dreher, kurz keine Kontrolle; seitlich: abprallen),
@@ -795,7 +957,9 @@ func _hit_wall(pre: Vector3, n: Vector3) -> void:
 		_shake = minf(_shake + vn * 0.025, 0.8)
 	if drift_mode and head_on > 0.5:
 		_sliding = false
-	if vn > 14.0 and head_on > 0.75 and _crash_cooldown <= 0.0:
+	if vn > TUMBLE_HIT and head_on > 0.7 and not drag_mode and not drift_mode:
+		start_tumble(n, vn)
+	elif vn > 14.0 and head_on > 0.75 and _crash_cooldown <= 0.0:
 		crashes += 1
 		stun = 0.35
 		_crash_cooldown = 0.5
@@ -814,7 +978,12 @@ func _hit_traffic(other: Node, pre: Vector3, n: Vector3) -> void:
 	audio.crash(clampf(hit / 22.0, 0.25, 1.0))
 	if drag_mode and hit > 9.0 and head_on > 0.5:
 		totaled = true  # Drag: wer frontal oder ins Heck kracht, ist raus
-	if hit > 14.0 and head_on > 0.55:
+	if hit > TUMBLE_HIT and head_on > 0.55 and not drag_mode:
+		other.knock(pre * 0.7)
+		velocity = ov * 0.5 + n * 4.0 + pre * 0.15
+		_crash_cooldown = 0.7
+		start_tumble(n, hit)
+	elif hit > 14.0 and head_on > 0.55:
 		other.knock(pre * 0.7)
 		velocity = ov * 0.4 + n * 3.0
 		_spin = randf_range(1.2, 2.4) * (1.0 if randf() < 0.5 else -1.0) * clampf(hit / 25.0, 0.5, 1.0)

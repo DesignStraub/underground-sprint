@@ -48,6 +48,7 @@ var hud := {}
 var result_panel: Control
 var _last_path := 0
 var _last_landings := 0
+var _last_rollovers := 0
 var _flash_t := 0.0
 var pause_panel: Control
 var env: Environment
@@ -820,7 +821,7 @@ func _update_hud() -> void:
 	tacho.heat = player.engine_heat
 	tacho.nitro_on = player.nitro_on
 	hud["progress"].size.x = 198.0 * clampf((player_progress - track["start"]) / (track["finish"] - track["start"]), 0.0, 1.0)
-	hud["drift"].text = tr("DRIFT  +NITRO") if player.drifting else (tr("SPRUNG") if player.airborne else "")
+	hud["drift"].text = tr("DRIFT  +NITRO") if player.drifting else (tr("SPRUNG") if player.airborne and not player.tumbling else "")
 	if state == State.COUNTDOWN:
 		hud["drift"].text = tr("Gas kurz vor LOS = perfekter Start")
 	if event_type == "drift":
@@ -841,6 +842,9 @@ func _update_hud() -> void:
 		elif kind == "fork":
 			_flash(tr("ALTSTADT · GEGENVERKEHR!"), Color(1.0, 0.75, 0.2))
 		_last_path = player.path_id
+	if player.rollovers != _last_rollovers:
+		_last_rollovers = player.rollovers
+		_flash(tr("ÜBERSCHLAG!"), Color(1.0, 0.35, 0.25))
 	if player.landings != _last_landings:
 		_last_landings = player.landings
 		if player.last_air > 0.5:

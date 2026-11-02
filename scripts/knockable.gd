@@ -1,12 +1,15 @@
 extends RigidBody3D
-## Straßenobjekt (Laterne, Mülltonne, Hydrant, Bake ...): steht fest, bis ein Auto es trifft,
-## dann fliegt es physikalisch weg und verstreut Trümmer. Bremst das Auto je nach Gewicht (slowdown), stoppt es aber nie.
+## Straßenobjekt (Laterne, Mülltonne, Hydrant, Bake ...): steht fest, bis ein Auto es trifft, dann fliegt es
+## physikalisch weg und verstreut Trümmer. Der Stoß wirkt am Treffpunkt (Stoßstangenhöhe): hohe Teile wie Laternen
+## knicken unten weg und kippen um, kleine fliegen und überschlagen sich. Bremst das Auto je nach Gewicht
+## (slowdown), stoppt es aber nie.
 
 const LAYER := 4  # Physik-Ebene 3
 const GROUND := 8  # Ebene 4: Boden nur für umherfliegende Teile
 
 var slowdown := 0.95
 var knocked := false
+var _hit_at := Vector3.INF
 
 
 func _init() -> void:
@@ -16,18 +19,28 @@ func _init() -> void:
 	collision_mask = 1 | LAYER | GROUND
 
 
-func knock(v: Vector3) -> void:
+func knock(v: Vector3, at := Vector3.INF) -> void:
 	if knocked:
 		return
 	knocked = true
+	_hit_at = at
 	_launch.call_deferred(v)
 
 
 func _launch(v: Vector3) -> void:
 	freeze = false
+	angular_damp = 0.4
 	var spd := v.length()
-	apply_central_impulse((v * 0.8 + Vector3.UP * spd * 0.25) * mass)
-	apply_torque_impulse(Vector3(randf_range(-1, 1), randf_range(-0.3, 0.3), randf_range(-1, 1)) * mass * spd * 0.4)
+	var h := Vector3(v.x, 0.0, v.z)
+	if _hit_at.is_finite():
+		# am Treffpunkt angestoßen: die Physik macht daraus Schieben und Kippen
+		var off := _hit_at - global_position
+		off.y = minf(off.y, 0.8)
+		apply_impulse((h * 0.7 + Vector3.UP * spd * 0.12) * mass, Vector3(0.0, off.y, 0.0))
+		apply_torque_impulse(Vector3(randf_range(-0.2, 0.2), randf_range(-0.4, 0.4), randf_range(-0.2, 0.2)) * mass * spd * 0.1)
+	else:
+		apply_central_impulse((v * 0.8 + Vector3.UP * spd * 0.25) * mass)
+		apply_torque_impulse(Vector3(randf_range(-1, 1), randf_range(-0.3, 0.3), randf_range(-1, 1)) * mass * spd * 0.4)
 	for c in get_children():
 		if c is Light3D:
 			c.queue_free()
