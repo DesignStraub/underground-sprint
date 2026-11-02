@@ -120,14 +120,15 @@ var _last_prog := 0.0
 
 func setup(car_id: String, cfg: Dictionary) -> void:
 	_spec = Catalog.CARS[car_id]
-	var eng: Dictionary = Catalog.PARTS["engine"]["options"][cfg["engine"]]
-	var nos: Dictionary = Catalog.PARTS["nitro"]["options"][cfg["nitro"]]
-	accel = _spec["accel"] * eng["accel"]
-	top_speed = _spec["top_speed"] * eng["top"]
-	grip_k = _spec["grip"] * 0.6
-	steer_rate = _spec["steer"]
-	lat_acc = 14.0 + _spec["grip"] * 0.42  # 2,3–2,7 g: griffig wie NFSU, aber enge Ecken wollen angebremst werden
-	drift_k = _spec.get("drift", 0.3)
+	var nos := Catalog.part_of(cfg, "nitro")
+	# Tuning wirkt wirklich: Motor und Turbo auf Schub und Endtempo, Fahrwerk und Reifen auf Grip und Lenkung
+	var st := Catalog.stats(car_id, cfg)
+	accel = st["accel"]
+	top_speed = st["top"]
+	grip_k = st["grip"] * 0.6
+	steer_rate = st["steer"]
+	lat_acc = 14.0 + st["grip"] * 0.42  # 2,3–2,7 g ab Werk: griffig wie NFSU, aber enge Ecken wollen angebremst werden
+	drift_k = st["drift"]
 	nitro_power = nos["power"]
 	nitro_cap = nos["capacity"]
 
@@ -182,7 +183,11 @@ func setup(car_id: String, cfg: Dictionary) -> void:
 	_apply_cam()
 
 	audio = EngineAudio.new()
-	audio.configure(_spec["sound"])
+	var snd: Dictionary = _spec["sound"].duplicate()
+	var turbo_stage := int(cfg.get("turbo", 0))
+	if turbo_stage > 0:
+		snd["turbo"] = maxf(snd.get("turbo", 0.0), 0.35 + 0.2 * turbo_stage)  # nachgerüsteter Lader zischt hörbar
+	audio.configure(snd)
 	add_child(audio)
 
 

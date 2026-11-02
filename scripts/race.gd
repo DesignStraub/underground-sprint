@@ -13,6 +13,7 @@ const Traffic := preload("res://scripts/traffic_car.gd")
 const SKY_SHADER := preload("res://shaders/night_sky.gdshader")
 const RaceShow := preload("res://scripts/race_show.gd")
 const UI := preload("res://scripts/ui_style.gd")
+const TOUCH := preload("res://scripts/touch_controls.gd")
 
 enum State { COUNTDOWN, RACING, FINISHED, INTRO }
 
@@ -415,6 +416,23 @@ func _build_hud() -> void:
 		tacho.offset_right = -36.0
 		tacho.offset_top = -186.0
 		tacho.offset_bottom = -36.0
+
+	if GameState.touch_ui():
+		# Handy/Tablet: Knöpfe links und rechts unten, Drehzahlmesser klein oben rechts (unten wäre das Auto
+		# verdeckt), Tastaturhilfe aus
+		var tc := TOUCH.new()
+		tc.drag = event_type == "drag"
+		add_child(tc)
+		hud["help"].visible = false
+		tacho.scale = Vector2(0.72, 0.72) * (1.15 if event_type == "drag" else 1.0)
+		tacho.anchor_left = 1.0
+		tacho.anchor_right = 1.0
+		tacho.anchor_top = 0.0
+		tacho.anchor_bottom = 0.0
+		tacho.offset_left = -150.0 * tacho.scale.x - 8.0
+		tacho.offset_right = tacho.offset_left + 150.0
+		tacho.offset_top = 6.0
+		tacho.offset_bottom = 156.0
 
 	# Fortschritt oben mittig
 	hud["progress"] = _bar(root, Vector2(220, 10), Vector2(200, 6), Color(0.9, 0.9, 1.0))

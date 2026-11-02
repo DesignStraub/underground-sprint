@@ -21,7 +21,7 @@ const FPS_LIMITS := [0, 30, 60, 120]
 signal graphics_changed
 
 ## Grafik-Einstellungen (werden gespeichert)
-var quality := 0 if OS.has_feature("web") else 1
+var quality := 0 if OS.has_feature("web") else 1  # im Browser (und auf dem Handy) erst einmal niedrig
 var pixel_look := false
 ## "" = noch nicht gewählt (beim ersten Start fragt die Garage), sonst "en" oder "de"
 var language := ""
@@ -43,6 +43,7 @@ func _ready() -> void:
 	_setup_input()
 	load_game()
 	I18n.setup(language if language != "" else "en")
+	_build_rotate_hint()
 	_init_window()
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--race="):
@@ -149,6 +150,16 @@ func cycle_setting(key: String) -> void:
 	apply_display()
 	graphics_changed.emit()
 	save_game()
+
+
+## Handy/Tablet im Browser (oder nativ): kleinere Welt, Grafik niedrig
+func is_mobile() -> bool:
+	return OS.has_feature("web_android") or OS.has_feature("web_ios") or OS.has_feature("android") or OS.has_feature("ios")
+
+
+## Bildschirmknöpfe zeigen (Touchscreen vorhanden; --touch erzwingt sie zum Testen)
+func touch_ui() -> bool:
+	return DisplayServer.is_touchscreen_available() or OS.get_cmdline_user_args().has("--touch")
 
 
 func set_language(lang: String) -> void:
@@ -337,3 +348,36 @@ func reset_progress() -> void:
 	best_times = {}
 	car_configs = {}
 	save_game()
+
+
+## Hochkant auf dem Handy: Hinweis zum Drehen (das Spiel ist für Querformat gebaut)
+var _rotate_layer: CanvasLayer
+
+
+func _build_rotate_hint() -> void:
+	_rotate_layer = CanvasLayer.new()
+	_rotate_layer.layer = 100
+	_rotate_layer.visible = false
+	add_child(_rotate_layer)
+	var bg := ColorRect.new()
+	bg.color = Color(0.02, 0.02, 0.04, 0.96)
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_rotate_layer.add_child(bg)
+	var l := Label.new()
+	l.set_anchors_preset(Control.PRESET_FULL_RECT)
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	var ls := LabelSettings.new()
+	ls.font_size = 22
+	ls.font_color = Color(0.45, 1.0, 0.3)
+	l.label_settings = ls
+	l.text = "Bitte das Gerät quer halten"
+	_rotate_layer.add_child(l)
+	get_viewport().size_changed.connect(_check_rotate)
+	_check_rotate()
+
+
+func _check_rotate() -> void:
+	var s := get_viewport().get_visible_rect().size
+	_rotate_layer.visible = touch_ui() and s.y > s.x

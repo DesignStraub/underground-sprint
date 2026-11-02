@@ -122,6 +122,23 @@ Im Stil von NFS Underground (`scripts/ui_style.gd`): schräge Leisten, Neongrün
 DIN-Schmalschrift, große Abschnittstitel (GARAGE, RENNEN, TUNING, AUTOHAUS), Leistungsbalken des Autos (mit
 Motor-Tuning), Tastenleiste unten, wechselnde Tipps oben rechts. Pause und Ergebnis im gleichen Look.
 
+## Tuning wie in NFS
+Garage → Tuning → **Optik** (Lack, Felgen, Spoiler, Bodykit, Folierung, Unterbodenneon, Scheiben) oder **Leistung**
+(Motor, Turbo, Nitro, Fahrwerk, Reifen) → Teil wählen: die Kamera fährt an das Teil (Felge, Heck, Unterboden …),
+beim Motor und Turbo geht die Haube auf (Ventildeckel in der Farbe der Stufe, Pilzfilter, Turbolader, Domstrebe),
+beim Nitro der Kofferraum (Flaschen je nach Stufe). Vorschau beim Auswählen, Einbauen mit Enter, gesperrte Teile
+zeigen die nötigen Siege. Leistungsteile wirken wirklich (`Catalog.stats`): Motor und Turbo auf Schub und Endtempo,
+Fahrwerk und Reifen auf Grip und Lenkung, das Fahrwerk legt das Auto tiefer; die Balken zeigen Gewinn (cyan) und
+Verlust (rot) gegenüber dem eingebauten Teil. Ab Werk: Bremsscheiben mit Sätteln (rot ab der ersten Leistungsstufe),
+Frontlippe, Diffusor, Chrom-Endrohre (größer ab Motor+Turbo 2), Ladeluftkühler im Einlass mit Turbo, Haubenschlitze
+mit Motor Stufe 3.
+
+## Handy und Tablet (Browser)
+Auf Touchgeräten erscheinen Knöpfe: links Lenken (Daumen kann rüberrutschen), rechts Gas, Bremse, Handbremse, Nitro,
+im Drag Hoch-/Runterschalten statt Bremse; Pause oben in der Mitte, Drehzahlmesser klein oben rechts. Hochkant kommt
+ein Hinweis zum Drehen. Auf Handys werden in den Städten nur die Häuser nahe der Strecke gebaut, Grafik startet
+niedrig. Zum Testen am Rechner: `-- --touch`.
+
 ## Sprachen
 Englisch und Deutsch: Beim ersten Start fragt das Spiel (Englisch vorausgewählt), später unter Einstellungen → Sprache.
 Übersetzungen in `scripts/i18n.gd` (Schlüssel sind die deutschen Texte, `tr()`); Titel, Ortsnamen, Läden und Schilder
@@ -187,7 +204,8 @@ Texte, Cover und Screenshots für die itch.io-Seite: `release/`.
 - `scripts/debug_shot.gd` – nur für Tests/Videos (`-- --drive`, `--demo`, `--at=lake|crossing|alley|fork|tunnel|el|stadium|<viertel>|d:<m>`,
   `--race=n`, `--trace`, `--shot=pfad`, `--times=…`, `--quit=s`, `--intro` (Kameraflug auch im Test),
   `--view=weg:d:quer:höhe:ziel_d:ziel_quer:ziel_höhe` (feste Kamera ohne HUD), `--look=wahrzeichen:höhe:blickhöhe:abstand[:d]`
-  (Kamera auf ein Wahrzeichen der Städte-Strecken), `--racelog` (Rennverlauf alle 3 s); im Drag schaltet der Autopilot im
+  (Kamera auf ein Wahrzeichen der Städte-Strecken), `--racelog` (Rennverlauf alle 3 s), `--tune=engine` (Garage direkt
+  in einer Tuning-Kategorie), `--touch` (Touch-Knöpfe am Rechner); im Drag schaltet der Autopilot im
   grünen Bereich, `--lateshift` erst im Begrenzer, `--noshift` gar nicht, `--nolanes` ohne Spurwechsel, `--dragcrash`
   setzt Verkehr vor das Auto)
 - `tools/short_overlays.gd` – rendert Texttafeln fürs Release-Short

@@ -20,6 +20,10 @@ Alles, was du auf der neuen itch.io-Seite eintragen musst (das Spiel hieß früh
 | Screenshots | alle Bilder aus `screenshots/` (1600×900) |
 | Trailer | YouTube-Link zu `need_for_geschwindigkeit_trailer.mp4` (itch.io nimmt nur YouTube/Vimeo-Links) |
 
+## Handy im Browser
+Edit game → Embed options: **Mobile friendly** anhaken, **Orientation: Landscape**, **Fullscreen button** an.
+Das Spiel zeigt auf Touchgeräten eigene Knöpfe (Lenken, Gas, Bremse, Handbremse, Nitro, Pause).
+
 ## Uploads
 
 Per `release/push_itch.sh` (butler): Kanäle windows, mac, linux, html5.

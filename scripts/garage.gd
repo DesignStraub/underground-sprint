@@ -142,6 +142,12 @@ func _build_scene() -> void:
 	cam = Camera3D.new()
 	cam.fov = 50
 	world.add_child(cam)
+	_work_light = OmniLight3D.new()
+	_work_light.light_color = Color(1.0, 0.95, 0.88)
+	_work_light.light_energy = 0.0
+	_work_light.omni_range = 5.0
+	_work_light.position = Vector3(0.3, 0.3, 0.0)
+	cam.add_child(_work_light)
 	cam.make_current()
 
 
@@ -262,17 +268,17 @@ func _build_ui() -> void:
 
 
 ## Leistungsbalken wie im Autohaus (10 Segmente), Motor-Tuning eingerechnet
-func _show_stats(car_id: String, cfg: Dictionary) -> void:
+func _show_stats(car_id: String, cfg: Dictionary, base := {}) -> void:
 	for c in stats.get_children():
 		c.queue_free()
-	var spec: Dictionary = Catalog.CARS[car_id]
-	var eng: Dictionary = Catalog.PARTS["engine"]["options"][cfg.get("engine", 0)]
+	var st := Catalog.stats(car_id, cfg)
+	var bs := Catalog.stats(car_id, base if not base.is_empty() else cfg)
 	var head := _label(stats, 10, HORIZONTAL_ALIGNMENT_RIGHT)
 	head.label_settings.font = UI.font("cond", 0.2)
 	head.label_settings.font_color = UI.GREEN
 	head.text = tr("LEISTUNG")
-	for row in [["BESCHLEUNIGUNG", spec["accel"] * eng["accel"], 9.0, 14.5], ["TOPSPEED", spec["top_speed"] * eng["top"], 54.0, 82.0],
-			["GRIP", spec["grip"], 19.0, 30.0], ["DRIFT", spec.get("drift", 0.3), 0.0, 1.0]]:
+	for row in [["BESCHLEUNIGUNG", "accel", 9.0, 17.0], ["TOPSPEED", "top", 54.0, 90.0], ["GRIP", "grip", 19.0, 38.0],
+			["DRIFT", "drift", 0.0, 1.0]]:
 		var hb := HBoxContainer.new()
 		hb.add_theme_constant_override("separation", 2)
 		stats.add_child(hb)
@@ -280,17 +286,25 @@ func _show_stats(car_id: String, cfg: Dictionary) -> void:
 		l.label_settings.font = UI.font("bold", 0.12)
 		l.text = tr(row[0])
 		l.custom_minimum_size = Vector2(76, 0)
-		var n := int(round(clampf((row[1] - row[2]) / (row[3] - row[2]), 0.05, 1.0) * 10.0))
+		var n := int(round(clampf((st[row[1]] - row[2]) / (row[3] - row[2]), 0.05, 1.0) * 10.0))
+		var n0 := int(round(clampf((bs[row[1]] - row[2]) / (row[3] - row[2]), 0.05, 1.0) * 10.0))
 		for k in 10:
 			var seg := ColorRect.new()
 			seg.custom_minimum_size = Vector2(11, 6)
 			seg.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-			seg.color = (UI.GREEN if k < n else Color(1, 1, 1, 0.12))
+			if k < mini(n, n0):
+				seg.color = UI.GREEN
+			elif k < n:
+				seg.color = UI.CYAN  # Gewinn durch das Teil in der Vorschau
+			elif k < n0:
+				seg.color = Color(1.0, 0.25, 0.2, 0.8)  # Verlust
+			else:
+				seg.color = Color(1, 1, 1, 0.12)
 			hb.add_child(seg)
 	var top := _label(stats, 8, HORIZONTAL_ALIGNMENT_RIGHT)
 	top.label_settings.font = UI.font("bold", 0.12)
 	top.label_settings.font_color = UI.CYAN
-	top.text = "%d KM/H" % int(spec["top_speed"] * eng["top"] * 3.6)
+	top.text = "%d KM/H" % int(st["top"] * 3.6)
 
 
 func _set_section(text: String, with_stats := false) -> void:
@@ -301,6 +315,40 @@ func _set_section(text: String, with_stats := false) -> void:
 
 
 var _music_label: Label
+var _cam_view := ""  # "" = Drehteller kreist, sonst Kategorie, deren Teil die Kamera zeigt
+var _cam_pos := Vector3(4.6, 1.7, 5.6)
+var _cam_look := Vector3(-1.6, 0.55, 0)
+var _work_light: OmniLight3D  # Arbeitslicht an der Kamera für Nahaufnahmen (Felgen, Motor)
+
+
+## Kamerapunkt und Blickziel je Tuning-Kategorie (Auto in Grundstellung: vorn -Z, rechte Seite +X)
+func _view_for(cat: String) -> Array:
+	var spec: Dictionary = Catalog.CARS[preview_car]
+	var L: float = spec["length"]
+	var W: float = spec["width"]
+	var fz := -(L / 2.0 - 0.78)
+	match cat:
+		"paint":
+			return [Vector3(3.4, 1.35, -3.4), Vector3(0.2, 0.55, 0.0)]
+		"rims", "tires":
+			return [Vector3(W / 2.0 + 1.3, 0.45, fz - 0.9), Vector3(W / 2.0, 0.32, fz)]
+		"suspension":
+			return [Vector3(W / 2.0 + 1.6, 0.55, fz - 0.6), Vector3(W / 2.0 - 0.1, 0.42, fz + 0.1)]
+		"spoiler":
+			return [Vector3(1.7, 1.55, L / 2.0 + 1.7), Vector3(0.0, 0.95, L / 2.0 - 0.35)]
+		"bodykit":
+			return [Vector3(3.2, 0.55, -2.6), Vector3(0.2, 0.35, -0.3)]
+		"vinyl":
+			return [Vector3(4.4, 1.1, 0.2), Vector3(0.0, 0.6, 0.0)]
+		"neon":
+			return [Vector3(3.3, 0.32, -1.6), Vector3(0.0, 0.05, 0.0)]
+		"tint":
+			return [Vector3(2.8, 1.45, -2.2), Vector3(0.0, 1.0, -0.2)]
+		"engine", "turbo":
+			return [Vector3(1.3, 1.95, -L / 2.0 - 1.4), Vector3(0.0, 0.8, -L / 2.0 + 0.85)]
+		"nitro":
+			return [Vector3(1.3, 1.95, L / 2.0 + 1.4), Vector3(0.0, 0.85, L / 2.0 - 0.6)]
+	return [Vector3(3.6, 1.6, -4.0), Vector3(0.0, 0.6, 0.0)]
 
 
 func _label(parent: Node, size: int, align := HORIZONTAL_ALIGNMENT_LEFT) -> Label:
@@ -322,10 +370,25 @@ func _process(dt: float) -> void:
 		_tip_t = 0.0
 		_tip_i = (_tip_i + 1) % TIPS.size()
 		tip.text = tr("TIPP: ") + tr(TIPS[_tip_i])
-	turntable.rotation.y += dt * 0.3
-	var target := Vector3(-1.6, 0.55, 0)
-	cam.position = Vector3(4.6 + sin(_t * 0.2) * 0.2, 1.7 + sin(_t * 0.3) * 0.08, 5.6)
-	cam.look_at(target)
+	var goal_pos := Vector3(4.6 + sin(_t * 0.2) * 0.2, 1.7 + sin(_t * 0.3) * 0.08, 5.6)
+	var goal_look := Vector3(-1.6, 0.55, 0)
+	var goal_off := 0.0
+	if _cam_view == "":
+		turntable.rotation.y += dt * 0.3
+	else:
+		# Tuning: Auto dreht in Grundstellung, Kamera fährt an das Teil heran (Ziel rechts vom Menü)
+		turntable.rotation.y = lerp_angle(turntable.rotation.y, 0.0, 1.0 - exp(-dt * 4.0))
+		var v := _view_for(_cam_view)
+		goal_pos = v[0] + Vector3(0, sin(_t * 0.4) * 0.02, 0)
+		goal_look = v[1]
+		goal_off = -0.2 * goal_pos.distance_to(goal_look)
+	var k := 1.0 - exp(-dt * 3.5)
+	_cam_pos = _cam_pos.lerp(goal_pos, k)
+	_cam_look = _cam_look.lerp(goal_look, k)
+	cam.h_offset = lerpf(cam.h_offset, goal_off, k)
+	cam.position = _cam_pos
+	cam.look_at(_cam_look)
+	_work_light.light_energy = lerpf(_work_light.light_energy, 0.0 if _cam_view == "" else 1.4, k)
 	status.text = tr("RENNSIEGE %d   ·   DRIFTSIEGE %d   ·   %s") % [GameState.wins, GameState.drift_wins, Catalog.CARS[GameState.current_car]["name"].to_upper()]
 	_music_label.text = (tr("Musik: ") + Music.current_title) if Music.current_title != "" else tr("Keine Musik: mp3/ogg in music/ legen")
 
@@ -374,6 +437,7 @@ func _focus_first() -> void:
 
 func _show_main() -> void:
 	_clear_menu()
+	_cam_view = ""
 	preview_car = GameState.current_car
 	preview_cfg = GameState.get_config(preview_car).duplicate()
 	_show_car(preview_car, preview_cfg)
@@ -477,50 +541,122 @@ func _start_race(i: int) -> void:
 
 func _show_tuning() -> void:
 	_clear_menu()
+	_cam_view = ""
+	preview_cfg = GameState.get_config(preview_car).duplicate()
+	_show_car(preview_car, preview_cfg)
 	_set_section("TUNING", true)
-	for cat in Catalog.PART_ORDER:
-		var b := _button("", func(): _cycle_part(cat, 1))
-		b.set_meta("cat", cat)
-		b.gui_input.connect(func(ev): _lr_input(ev, func(dir): _cycle_part(cat, dir)))
-		b.focus_entered.connect(func(): _part_info(cat))
-	_button("< Fertig", _show_main)
-	_refresh_tuning()
+	var bo := _button("Optik", func(): _show_group("optik"))
+	bo.focus_entered.connect(func(): info.text = tr("Lack, Felgen, Spoiler, Bodykit, Folierung, Unterbodenneon, Scheiben."))
+	var bl := _button("Leistung", func(): _show_group("leistung"))
+	bl.focus_entered.connect(func(): info.text = tr("Motor, Turbo, Nitro, Fahrwerk, Reifen. Wirkt wirklich auf das Fahrverhalten."))
+	_button("< Fertig", func(): _cam_view = ""; _show_main())
 	_focus_first()
 
 
-func _refresh_tuning() -> void:
-	for b in menu.get_children():
-		if not b.has_meta("cat"):
-			continue
-		var cat: String = b.get_meta("cat")
-		var opt: Dictionary = Catalog.PARTS[cat]["options"][preview_cfg[cat]]
-		var lock := "" if GameState.is_part_unlocked(cat, preview_cfg[cat]) else tr("  [GESPERRT]")
-		b.text = ("%s:  < %s >%s" % [tr(Catalog.PARTS[cat]["label"]), tr(opt["name"]), lock]).to_upper()
-
-
-func _cycle_part(cat: String, dir: int) -> void:
-	var n: int = Catalog.PARTS[cat]["options"].size()
-	preview_cfg[cat] = posmod(preview_cfg[cat] + dir, n)
-	if GameState.is_part_unlocked(cat, preview_cfg[cat]):
-		GameState.get_config(preview_car)[cat] = preview_cfg[cat]
-		GameState.save_game()
+## Kategorien einer Gruppe, rechts daneben jeweils das eingebaute Teil
+func _show_group(group: String) -> void:
+	_clear_menu()
+	preview_cfg = GameState.get_config(preview_car).duplicate()
 	_show_car(preview_car, preview_cfg)
-	_show_stats(preview_car, preview_cfg)
-	_refresh_tuning()
-	_part_info(cat)
+	_set_section("OPTIK" if group == "optik" else "LEISTUNG", group == "leistung")
+	for cat in Catalog.PART_GROUPS[group]:
+		var c: String = cat
+		var opt := Catalog.part_of(preview_cfg, c)
+		var b := _button("%s:  %s" % [tr(Catalog.PARTS[c]["label"]), tr(opt["name"])], func(): _show_parts(c, group))
+		b.focus_entered.connect(func():
+			_cam_view = c
+			Builder.showcase(car_node, preview_car, preview_cfg, _showcase_mode(c))
+			info.text = tr(Catalog.PARTS[c]["label"]) + ": " + tr(opt["name"]))
+	_button("< Zurück", _show_tuning)
+	_focus_first()
 
 
-func _part_info(cat: String) -> void:
-	var idx: int = preview_cfg[cat]
+func _showcase_mode(cat: String) -> String:
+	if cat == "engine" or cat == "turbo":
+		return "engine"
+	if cat == "nitro":
+		return "nitro"
+	return ""
+
+
+## Teile einer Kategorie: Vorschau beim Auswählen, Einbauen mit Enter (wenn freigeschaltet)
+func _show_parts(cat: String, group: String) -> void:
+	_clear_menu()
+	_cam_view = cat
+	section.text = tr(Catalog.PARTS[cat]["label"]).to_upper()
+	stats.get_parent().visible = group == "leistung"  # Optik-Teile ändern keine Fahrwerte: Balken weg, Auto frei
+	var installed: int = GameState.get_config(preview_car).get(cat, 0)
+	var opts: Array = Catalog.PARTS[cat]["options"]
+	for i in opts.size():
+		var idx := i
+		var b := _button("", func(): _install(cat, idx, group))
+		b.set_meta("part", idx)
+		b.focus_entered.connect(func(): _preview_part(cat, idx))
+	_button("< Zurück", func(): _show_group(group))
+	_refresh_parts(cat)
+	_focus_first()
+	# Fokus auf das eingebaute Teil
+	if installed > 0 and installed < menu.get_child_count():
+		menu.get_child(installed).grab_focus.call_deferred()
+
+
+func _refresh_parts(cat: String) -> void:
+	var installed: int = GameState.get_config(preview_car).get(cat, 0)
+	for b in menu.get_children():
+		if not b.has_meta("part"):
+			continue
+		var i: int = b.get_meta("part")
+		var opt: Dictionary = Catalog.PARTS[cat]["options"][i]
+		var suffix := ""
+		if i == installed:
+			suffix = "   " + tr("EINGEBAUT")
+		elif not GameState.is_part_unlocked(cat, i):
+			suffix = "   " + (tr("1 SIEG") if opt["wins"] == 1 else tr("%d SIEGE") % opt["wins"])
+		b.text = (tr(opt["name"]) + suffix).to_upper()
+
+
+func _preview_part(cat: String, idx: int) -> void:
+	var base := GameState.get_config(preview_car).duplicate()
+	preview_cfg = base.duplicate()
+	preview_cfg[cat] = idx
+	_show_car(preview_car, preview_cfg)
+	Builder.showcase(car_node, preview_car, preview_cfg, _showcase_mode(cat))
+	_show_stats(preview_car, preview_cfg, base)
+	_part_info(cat, idx)
+
+
+func _install(cat: String, idx: int, group: String) -> void:
+	if not GameState.is_part_unlocked(cat, idx):
+		Sfx.play("thud", -14.0, 1.3)
+		return
+	GameState.get_config(preview_car)[cat] = idx
+	GameState.save_game()
+	Sfx.play("clang", -16.0, 1.6)
+	_refresh_parts(cat)
+	_show_stats(preview_car, preview_cfg, GameState.get_config(preview_car))
+	_part_info(cat, idx)
+
+
+## Wirkung des Teils in Zahlen (wie die Werte im NFS-Tuning)
+func _part_info(cat: String, idx: int) -> void:
 	var opt: Dictionary = Catalog.PARTS[cat]["options"][idx]
-	if GameState.is_part_unlocked(cat, idx):
-		info.text = tr("%s: %s\nLinks/Rechts zum Wechseln.") % [tr(Catalog.PARTS[cat]["label"]), tr(opt["name"])]
-	else:
+	var t := tr(Catalog.PARTS[cat]["label"]) + ": " + tr(opt["name"])
+	match cat:
+		"engine", "turbo":
+			t += "\n" + tr("Beschleunigung +%d %%   ·   Topspeed +%d %%") % [roundi((opt["accel"] - 1.0) * 100.0), roundi((opt["top"] - 1.0) * 100.0)]
+		"nitro":
+			t += "\n" + tr("Nitro-Schub +%d %%   ·   Füllung +%d %%") % [roundi((opt["power"] - 1.0) * 100.0), roundi((opt["capacity"] - 1.0) * 100.0)]
+		"suspension":
+			t += "\n" + tr("Grip +%d %%   ·   Lenkung +%d %%   ·   %d mm tiefer") % [roundi(opt["grip"] / Catalog.CARS[preview_car]["grip"] * 100.0),
+				roundi(opt["steer"] / Catalog.CARS[preview_car]["steer"] * 100.0), roundi(opt["drop"] * 1000.0)]
+		"tires":
+			t += "\n" + tr("Grip +%d %%") % roundi(opt["grip"] / Catalog.CARS[preview_car]["grip"] * 100.0)
+	if not GameState.is_part_unlocked(cat, idx):
 		var missing: int = opt["wins"] - GameState.total_wins()
-		if missing == 1:
-			info.text = tr("%s ist gesperrt.\nNoch 1 Sieg nötig. (Nur Vorschau)") % tr(opt["name"])
-		else:
-			info.text = tr("%s ist gesperrt.\nNoch %d Siege nötig. (Nur Vorschau)") % [tr(opt["name"]), missing]
+		t += "\n" + (tr("Gesperrt: noch 1 Sieg nötig.") if missing == 1 else tr("Gesperrt: noch %d Siege nötig.") % missing)
+	elif idx != GameState.get_config(preview_car).get(cat, 0):
+		t += "\n" + tr("ENTER: einbauen")
+	info.text = t
 
 
 func _show_cars() -> void:

@@ -2360,6 +2360,7 @@ static func _build_city_landmarks(root: Node3D, track: Dictionary) -> Array:
 static func _build_osm_buildings(root: Node3D, track: Dictionary, rng: RandomNumberGenerator, blockers: Array) -> Array:
 	var curve: Curve3D = track["curve"]
 	var data: Array = track["city"].get("buildings", [])
+	var mobile := OS.has_feature("web_android") or OS.has_feature("web_ios")
 	var placed := []
 	var grid := {}
 	for o in blockers:
@@ -2374,8 +2375,11 @@ static func _build_osm_buildings(root: Node3D, track: Dictionary, rng: RandomNum
 		var ang: float = data[i + 4]
 		var h: float = data[i + 5]
 		var r := Vector2(L, W).length() * 0.5
-		if _main_clearance(track, pos) < WALK + 14.0 + W * 0.5 or _branch_clearance(track, pos) < r * 0.7 + 2.0:
+		var mc := _main_clearance(track, pos)
+		if mc < WALK + 14.0 + W * 0.5 or _branch_clearance(track, pos) < r * 0.7 + 2.0:
 			continue
+		if mobile and mc > 110.0:
+			continue  # Handy: nur die Häuser nahe der Strecke
 		if _in_river(track, pos, r * 0.5) or (not track["hills"].is_empty() and hill_h(track, pos) > 0.5):
 			continue
 		var blocked := false

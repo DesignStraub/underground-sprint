@@ -9,6 +9,7 @@ extends Node
 ##   -- --times=1.5,4,8    Zeitpunkte für Screenshots
 
 const Track := preload("res://scripts/track_builder.gd")
+const Catalog := preload("res://scripts/catalog.gd")
 
 var prefix := ""
 var drive := false
@@ -82,6 +83,12 @@ func _process(dt: float) -> void:
 		_step += 1
 	var race = get_tree().current_scene
 	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--tune=") and race and race.has_method("_show_parts") and _t > 0.5 and not _menu_done:
+			_menu_done = true  # Test: Tuning-Teileliste einer Kategorie öffnen (z. B. --tune=engine), Kamera fährt hin
+			var cat := a.substr(7)
+			var grp := "optik" if cat in Catalog.PART_GROUPS["optik"] else "leistung"
+			race._show_tuning()
+			race._show_parts(cat, grp)
 		if a.begins_with("--menu=") and race and race.has_method("_show_events") and _t > 0.8 and not _menu_done:
 			_menu_done = true  # Test: Garage direkt auf einer Event-Liste öffnen (z. B. --menu=city, --menu=tuning, --menu=cars, --menu=main)
 			var which := a.substr(7)

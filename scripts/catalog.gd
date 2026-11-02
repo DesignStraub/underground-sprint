@@ -98,10 +98,10 @@ const PARTS := {
 	"rims": {
 		"label": "Felgen",
 		"options": [
-			{"name": "Serie", "wins": 0, "color": Color(0.5, 0.5, 0.52), "radius": 0.2, "spokes": 0},
-			{"name": "Fünfspeichen", "wins": 1, "color": Color(0.85, 0.85, 0.9), "radius": 0.25, "spokes": 5},
-			{"name": "Gitter Gold", "wins": 2, "color": Color(0.85, 0.65, 0.2), "radius": 0.26, "spokes": 10},
-			{"name": "Tiefbett Schwarz", "wins": 4, "color": Color(0.08, 0.08, 0.08), "radius": 0.28, "spokes": 6},
+			{"name": "Serie", "wins": 0, "color": Color(0.62, 0.63, 0.66), "radius": 0.22, "spokes": 7},
+			{"name": "Fünfspeichen", "wins": 1, "color": Color(0.85, 0.85, 0.9), "radius": 0.27, "spokes": 5},
+			{"name": "Gitter Gold", "wins": 2, "color": Color(0.85, 0.65, 0.2), "radius": 0.28, "spokes": 10},
+			{"name": "Tiefbett Schwarz", "wins": 4, "color": Color(0.08, 0.08, 0.08), "radius": 0.29, "spokes": 6},
 		],
 	},
 	"spoiler": {
@@ -138,6 +138,15 @@ const PARTS := {
 			{"name": "Grün", "wins": 3, "color": Color(0.1, 1.0, 0.3)},
 		],
 	},
+	"tint": {
+		"label": "Scheiben",
+		"options": [
+			{"name": "Klar", "wins": 0, "color": Color(0.03, 0.04, 0.06)},
+			{"name": "Getönt", "wins": 1, "color": Color(0.012, 0.012, 0.016)},
+			{"name": "Dunkel", "wins": 2, "color": Color(0.003, 0.003, 0.004)},
+			{"name": "Blau verspiegelt", "wins": 3, "color": Color(0.02, 0.07, 0.2)},
+		],
+	},
 	"engine": {
 		"label": "Motor",
 		"options": [
@@ -155,9 +164,63 @@ const PARTS := {
 			{"name": "Stufe 2", "wins": 5, "power": 1.4, "capacity": 1.5},
 		],
 	},
+	# Turbo: mehr Schub und etwas mehr Endtempo, lauteres Ladedruck-Zischen
+	"turbo": {
+		"label": "Turbo",
+		"options": [
+			{"name": "Serie", "wins": 0, "accel": 1.0, "top": 1.0},
+			{"name": "Stufe 1", "wins": 2, "accel": 1.06, "top": 1.03},
+			{"name": "Stufe 2", "wins": 4, "accel": 1.12, "top": 1.06},
+			{"name": "Stufe 3", "wins": 7, "accel": 1.18, "top": 1.09},
+		],
+	},
+	# Fahrwerk: mehr Grip, direktere Lenkung, Karosserie tiefer (drop in Metern)
+	"suspension": {
+		"label": "Fahrwerk",
+		"options": [
+			{"name": "Serie", "wins": 0, "grip": 0.0, "steer": 0.0, "drop": 0.0},
+			{"name": "Sport", "wins": 1, "grip": 1.5, "steer": 0.06, "drop": 0.025},
+			{"name": "Gewinde", "wins": 3, "grip": 3.0, "steer": 0.12, "drop": 0.045},
+			{"name": "Rennfahrwerk", "wins": 6, "grip": 4.5, "steer": 0.18, "drop": 0.06},
+		],
+	},
+	# Reifen: mehr Grip in Kurven, Rennreifen kleben, driften dafür etwas unwilliger
+	"tires": {
+		"label": "Reifen",
+		"options": [
+			{"name": "Serie", "wins": 0, "grip": 0.0, "drift": 0.0},
+			{"name": "Sport", "wins": 1, "grip": 1.0, "drift": 0.0},
+			{"name": "Semi-Slicks", "wins": 4, "grip": 2.5, "drift": -0.04},
+			{"name": "Rennreifen", "wins": 6, "grip": 4.0, "drift": -0.08},
+		],
+	},
 }
 
-const PART_ORDER := ["paint", "rims", "spoiler", "bodykit", "vinyl", "neon", "engine", "nitro"]
+const PART_ORDER := ["paint", "rims", "spoiler", "bodykit", "vinyl", "neon", "tint", "engine", "turbo", "nitro", "suspension", "tires"]
+## Tuning-Menü wie in NFS: erst Optik oder Leistung, dann die Kategorie, dann das Teil
+const PART_GROUPS := {"optik": ["paint", "rims", "spoiler", "bodykit", "vinyl", "neon", "tint"],
+	"leistung": ["engine", "turbo", "nitro", "suspension", "tires"]}
+
+
+## Option einer Kategorie aus einer Konfiguration (fehlende Kategorien = Serie)
+static func part_of(cfg: Dictionary, cat: String) -> Dictionary:
+	return PARTS[cat]["options"][clampi(int(cfg.get(cat, 0)), 0, PARTS[cat]["options"].size() - 1)]
+
+
+## Fahrwerte mit Tuning: Beschleunigung, Endtempo (m/s), Grip, Lenkung, Drift
+static func stats(car_id: String, cfg: Dictionary) -> Dictionary:
+	var spec: Dictionary = CARS[car_id]
+	var eng := part_of(cfg, "engine")
+	var tur := part_of(cfg, "turbo")
+	var sus := part_of(cfg, "suspension")
+	var tir := part_of(cfg, "tires")
+	return {
+		"accel": spec["accel"] * eng["accel"] * tur["accel"],
+		"top": spec["top_speed"] * eng["top"] * tur["top"],
+		"grip": spec["grip"] + sus["grip"] + tir["grip"],
+		"steer": spec["steer"] + sus["steer"],
+		"drift": clampf(spec.get("drift", 0.3) + tir["drift"], 0.0, 1.0),
+	}
 
 ## Events: werden aus dem Seed prozedural erzeugt. Alle sind von Anfang an fahrbar.
 ## type: "sprint" (A nach B), "circuit" (Rundkurs, laps Runden), "drift" (Rundkurs allein, Punkte fürs Querfahren),

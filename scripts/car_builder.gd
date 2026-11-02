@@ -108,9 +108,11 @@ static func build(car_id: String, cfg: Dictionary, headlights := true) -> Node3D
 	paint.clearcoat = 1.0
 	var dark := mat(Color(0.04, 0.04, 0.05), 0.2, 0.6)
 	var stripe_c := Color(0.95, 0.95, 0.95) if paint_c.get_luminance() < 0.5 else Color(0.05, 0.05, 0.05)
+	var tint: Dictionary = Catalog.part_of(cfg, "tint")
+	var perf := int(cfg.get("engine", 0)) + int(cfg.get("turbo", 0)) + int(cfg.get("suspension", 0)) + int(cfg.get("tires", 0))
 	var mats := {
 		"paint": paint,
-		"glass": mat(Color(0.02, 0.03, 0.05), 0.6, 0.06),
+		"glass": mat(tint["color"], 0.8 if int(cfg.get("tint", 0)) == 3 else 0.6, 0.06),
 		"under": mat(Color(0.025, 0.025, 0.03), 0.0, 0.85),
 		"seam": mat(Color(0.012, 0.012, 0.016), 0.2, 0.7),
 		"head": mat(Color(1, 1, 0.95), 0, 0.3, Color(1, 0.97, 0.9), 2.6),
@@ -130,6 +132,17 @@ static func build(car_id: String, cfg: Dictionary, headlights := true) -> Node3D
 	var fw: float = front[6].x  # halbe Breite der Bugfläche in Gürtelhöhe
 	var iv: Vector2 = S["intake"]
 	_add(fb, box(Vector3(fw * 2.0 * iv.x, iv.y, 0.012)), dark, Vector3(0, CLEARANCE + 0.07 + iv.y / 2.0, zf - 0.004))
+	if int(cfg.get("turbo", 0)) > 0:
+		# Ladeluftkühler hinter dem Einlass: silbernes Netz mit Lamellen
+		var ic := mat(Color(0.55, 0.57, 0.6), 0.85, 0.35)
+		var icw := fw * 2.0 * iv.x * 0.86
+		var ich := iv.y * 0.78
+		_add(fb, box(Vector3(icw, ich, 0.01)), ic, Vector3(0, CLEARANCE + 0.07 + iv.y / 2.0, zf - 0.011))
+		for k in int(ich / 0.022):
+			_add(fb, box(Vector3(icw, 0.006, 0.012)), dark, Vector3(0, CLEARANCE + 0.07 + iv.y / 2.0 - ich / 2.0 + 0.011 + k * 0.022, zf - 0.017))
+	if kit == 0:
+		# dezente Frontlippe ab Werk (sportlich, nicht so ausladend wie das Bodykit)
+		_add(fb, box(Vector3(fw * 2.0 - 0.18, 0.018, 0.08)), dark, Vector3(0, CLEARANCE + 0.005, zf + 0.03))
 	var hy: float = S["nose"] - 0.09
 	match car_id:
 		"ronin":  # Klappscheinwerfer (zu): Fugen auf der Haube, kleine Lichter unten in der Schürze
@@ -198,6 +211,8 @@ static func build(car_id: String, cfg: Dictionary, headlights := true) -> Node3D
 	var ty: float = S["tail"] - 0.2
 	_add(rbm, box(Vector3(0.33, 0.165, 0.01)), mat(Color(0.85, 0.85, 0.8), 0.0, 0.5), Vector3(0, CLEARANCE + 0.3, zr + 0.004))
 	_add(rbm, box(Vector3(rw * 1.1, 0.07, 0.05)), dark, Vector3(0, CLEARANCE + 0.04, zr - 0.01))
+	for k in 5:  # Diffusor-Finnen
+		_add(rbm, box(Vector3(0.012, 0.09, 0.22)), dark, Vector3((k - 2) * rw * 0.22, CLEARANCE + 0.03, zr - 0.1))
 	match car_id:
 		"ronin":  # dunkles Band über das ganze Heck, darin runde Leuchten
 			_add(rbm, box(Vector3(rw * 2.0 - 0.08, 0.13, 0.01)), dark, Vector3(0, ty, zr + 0.004))
@@ -272,6 +287,12 @@ static func build(car_id: String, cfg: Dictionary, headlights := true) -> Node3D
 		for zi in [-1, 1]:
 			for s in [-1, 1]:
 				_add(body, box(Vector3(0.22, 0.2, 0.012)), flap, Vector3(s * (W / 2.0 - 0.18), CLEARANCE + 0.04, zi * (L / 2.0 - AXLE) + WHEEL_R + 0.1))
+
+	if int(cfg.get("engine", 0)) >= 3 and car_id != "vortex" and car_id != "raijin":
+		var hv: PackedVector2Array = _section(S, 0.24, W, L, flare)["p"]
+		for sx in [-1, 1]:
+			for k in 4:
+				_add(body, box(Vector3(0.2, 0.008, 0.018)), dark, Vector3(sx * 0.3, _top_y(hv, 0.3 / hv[7].x) + 0.004, zf + 0.24 * L - 0.06 + k * 0.04))
 
 	# Bodykit: Schweller, Frontlippe
 	if kit >= 1:
@@ -362,14 +383,16 @@ static func build(car_id: String, cfg: Dictionary, headlights := true) -> Node3D
 	var flame_m := mat(Color(0.3, 0.6, 1), 0, 0.5, Color(0.3, 0.6, 1.0), 6.0)
 	flame_m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	flame_m.albedo_color.a = 0.8
-	var pr: float = S.get("pipe_r", 0.05)
+	var pr: float = S.get("pipe_r", 0.05) * (1.25 if int(cfg.get("engine", 0)) + int(cfg.get("turbo", 0)) >= 2 else 1.0)
+	var chrome := mat(Color(0.75, 0.75, 0.78), 0.95, 0.15)
 	for x in S.get("pipes", [-0.38, 0.38]):  # RX-7: ein Endrohr in der Mitte
 		var pipe := CylinderMesh.new()
 		pipe.top_radius = pr - 0.005
 		pipe.bottom_radius = pr
 		pipe.height = 0.16
-		var p := _add(body, pipe, mat(Color(0.6, 0.6, 0.6), 0.9, 0.2), Vector3(x, CLEARANCE + 0.08, zr + 0.03))
+		var p := _add(body, pipe, chrome, Vector3(x, CLEARANCE + 0.08, zr + 0.03))
 		p.rotation_degrees.x = 90
+		_add(body, _disc(pr * 0.72, 0.01), dark, Vector3(x, CLEARANCE + 0.08, zr + 0.112)).rotation_degrees.x = 90
 		var cone := CylinderMesh.new()
 		cone.top_radius = 0.0
 		cone.bottom_radius = 0.09
@@ -381,7 +404,9 @@ static func build(car_id: String, cfg: Dictionary, headlights := true) -> Node3D
 
 	# Räder
 	var tire_m := mat(Color(0.05, 0.05, 0.05), 0, 0.9)
-	var rim_m := mat(rim["color"], 0.9, 0.2)
+	var rim_m := mat(rim["color"], 0.65, 0.28)
+	var rotor_m := mat(Color(0.42, 0.42, 0.44), 0.8, 0.35)
+	var caliper_m := mat(Color(0.85, 0.06, 0.04), 0.3, 0.35) if perf > 0 else mat(Color(0.2, 0.2, 0.22), 0.5, 0.5)
 	var fronts := []
 	var spinners := []
 	var track := W / 2 - 0.15 + (0.05 if kit == 2 else 0.0)  # bündig unter dem Kotflügel
@@ -405,9 +430,21 @@ static func build(car_id: String, cfg: Dictionary, headlights := true) -> Node3D
 			disc.bottom_radius = rim["radius"]
 			disc.height = 0.02
 			disc.radial_segments = 14
-			var rim_dark := mat(Color(0.1, 0.1, 0.1), 0.5, 0.5) if rim["spokes"] > 0 else rim_m
-			# Schichten mit klarem Abstand (Reifen bis o, Scheibe bis o + 0.012, Speichen bis o + 0.025): kein Flackern
-			_add(spin, disc, rim_dark, Vector3(s * (o + 0.002), 0, 0)).rotation_degrees.z = 90
+			# Schichten mit klarem Abstand (Reifen bis o, Bremsscheibe o + 0.004, Sattel o + 0.01, Speichen bis o + 0.025)
+			if rim["spokes"] > 0:
+				var rotor := CylinderMesh.new()
+				rotor.top_radius = rim["radius"] * 0.8
+				rotor.bottom_radius = rim["radius"] * 0.8
+				rotor.height = 0.008
+				rotor.radial_segments = 14
+				_add(spin, rotor, rotor_m, Vector3(s * (o + 0.004), 0, 0)).rotation_degrees.z = 90
+				_add(spin, _disc(rim["radius"] * 0.26, 0.012), mat(Color(0.12, 0.12, 0.12), 0.6, 0.4), Vector3(s * (o + 0.02), 0, 0)).rotation_degrees.z = 90
+				# Bremssattel steht still (am Achsschenkel), oben hinten an der Scheibe
+				var cal := _add(pivot, box(Vector3(0.012, rim["radius"] * 0.42, 0.09)), caliper_m,
+					Vector3(s * (o + 0.013), rim["radius"] * 0.5, rim["radius"] * 0.38))
+				cal.rotation_degrees.x = -40.0
+			else:
+				_add(spin, disc, rim_m, Vector3(s * (o + 0.002), 0, 0)).rotation_degrees.z = 90
 			var n: int = rim["spokes"]
 			var rr: float = rim["radius"]
 			for k in n:
@@ -428,6 +465,7 @@ static func build(car_id: String, cfg: Dictionary, headlights := true) -> Node3D
 			if zi == -1:
 				fronts.append(pivot)
 
+	body.position.y -= Catalog.part_of(cfg, "suspension")["drop"]
 	_set_layer(root)
 	root.set_meta("body", body)
 	root.set_meta("front_pivots", fronts)
@@ -798,3 +836,129 @@ static func _quad(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, d: Vector
 	for v in [a, c, b, a, d, c]:
 		st.set_normal(n)
 		st.add_vertex(v)
+
+
+## Werkstatt-Ansicht in der Garage: Motorhaube auf mit Motor (mode "engine") oder Kofferraum auf mit
+## Nitroflaschen (mode "nitro"). Die Teile zeigen die eingebauten Tuning-Stufen. "" räumt wieder ab.
+static func showcase(car: Node3D, car_id: String, cfg: Dictionary, mode: String) -> void:
+	var body: Node3D = car.get_meta("body")
+	var old := body.get_node_or_null("Showcase")
+	if old:
+		body.remove_child(old)
+		old.queue_free()
+	if mode == "":
+		return
+	var spec: Dictionary = Catalog.CARS[car_id]
+	var S: Dictionary = SHAPES.get(car_id, SHAPES["kaizen"])
+	var L: float = spec["length"]
+	var W: float = spec["width"]
+	var flare := 0.06 if int(cfg.get("bodykit", 0)) == 2 else 0.0
+	var zf := -L / 2.0
+	var sc := Node3D.new()
+	sc.name = "Showcase"
+	body.add_child(sc)
+	var paint := mat(Catalog.part_of(cfg, "paint")["color"], 0.55, 0.22)
+	var bay := mat(Color(0.03, 0.03, 0.035), 0.3, 0.6)
+	var chrome := mat(Color(0.78, 0.78, 0.8), 0.95, 0.15)
+	var t0: float
+	var t1: float
+	if mode == "engine":
+		t0 = 0.1
+		t1 = S["cowl"] - 0.035
+	else:
+		t0 = minf(S["ge"], 0.84) + 0.01
+		t1 = 0.965
+	var p0: PackedVector2Array = _section(S, t0, W, L, flare)["p"]
+	var p1: PackedVector2Array = _section(S, t1, W, L, flare)["p"]
+	var y0 := p0[10].y
+	var y1 := p1[10].y
+	var depth := (t1 - t0) * L
+	var half := minf(p0[7].x, p1[7].x) * 0.86
+	# Fläche entlang der Haube bzw. des Hecks, darauf die Teile
+	var plate := Node3D.new()
+	plate.position = Vector3(0, (y0 + y1) / 2.0 + 0.012, zf + (t0 + t1) / 2.0 * L)
+	plate.rotation.x = atan2(y0 - y1, depth)
+	sc.add_child(plate)
+	_add(plate, box(Vector3(half * 2.0, 0.02, depth)), bay, Vector3.ZERO)
+	# Deckel: an der Scheibe (Haube) bzw. an der Heckscheibe (Kofferraum) angeschlagen, offen
+	var hinge := Node3D.new()
+	sc.add_child(hinge)
+	var lid := box(Vector3(half * 2.0 + 0.06, 0.025, depth + 0.04))
+	if mode == "engine":
+		hinge.position = Vector3(0, y1 + 0.03, zf + t1 * L)
+		hinge.rotation_degrees.x = 62.0
+		_add(hinge, lid, paint, Vector3(0, 0, -(depth + 0.04) / 2.0))
+		_add(hinge, box(Vector3(half * 2.0 - 0.1, 0.01, depth - 0.1)), bay, Vector3(0, -0.018, -(depth + 0.04) / 2.0))
+		var stage := int(cfg.get("engine", 0))
+		var turbo := int(cfg.get("turbo", 0))
+		var cover_cols := [Color(0.45, 0.45, 0.47), Color(0.8, 0.08, 0.06), Color(0.1, 0.3, 0.9), Color(0.85, 0.65, 0.15)]
+		var cover := mat(cover_cols[stage], 0.6, 0.3)
+		var cyl: int = spec["sound"].get("cyl", 4)
+		var bl := minf(depth * 0.55, 0.12 + cyl * 0.07)
+		# Motorblock mit Ventildeckel, Ansaugbrücke, Zündkerzen-Reihe
+		_add(plate, box(Vector3(0.42, 0.16, bl)), mat(Color(0.18, 0.18, 0.19), 0.6, 0.5), Vector3(-0.05, 0.09, 0.02))
+		_add(plate, box(Vector3(0.36, 0.06, bl - 0.04)), cover, Vector3(-0.05, 0.2, 0.02))
+		for k in cyl if cyl <= 6 else 4:
+			var zz := -bl / 2.0 + 0.05 + k * (bl - 0.1) / maxf((cyl if cyl <= 6 else 4) - 1, 1)
+			_add(plate, box(Vector3(0.05, 0.03, 0.03)), mat(Color(0.05, 0.05, 0.05), 0.2, 0.6), Vector3(-0.05, 0.245, 0.02 + zz))
+			_add(plate, box(Vector3(0.16, 0.035, 0.04)), chrome if stage >= 2 else mat(Color(0.3, 0.3, 0.32), 0.7, 0.4), Vector3(0.17, 0.15, 0.02 + zz))
+		_add(plate, box(Vector3(0.08, 0.1, bl)), chrome if stage >= 2 else mat(Color(0.3, 0.3, 0.32), 0.7, 0.4), Vector3(0.27, 0.16, 0.02))
+		# Luftfilter: offener Pilzfilter ab Stufe 1, sonst Kasten
+		if stage >= 1:
+			var cone := CylinderMesh.new()
+			cone.top_radius = 0.05
+			cone.bottom_radius = 0.075
+			cone.height = 0.13
+			cone.radial_segments = 12
+			_add(plate, cone, cover, Vector3(0.36, 0.17, -bl / 2.0 - 0.02)).rotation_degrees.z = -90
+		else:
+			_add(plate, box(Vector3(0.2, 0.1, 0.16)), mat(Color(0.06, 0.06, 0.06), 0.1, 0.8), Vector3(half - 0.2, 0.06, -depth / 2.0 + 0.14))
+		# Turbolader: Schneckengehäuse mit Rohr zum Ladeluftkühler
+		if turbo > 0 or spec["sound"].get("turbo", 0.0) > 0.4:
+			var snail := TorusMesh.new()
+			snail.inner_radius = 0.03
+			snail.outer_radius = 0.075 + 0.012 * turbo
+			_add(plate, snail, chrome, Vector3(-0.35, 0.13, -0.02)).rotation_degrees.z = 90
+			var pipe := CylinderMesh.new()
+			pipe.top_radius = 0.028
+			pipe.bottom_radius = 0.028
+			pipe.height = depth * 0.45
+			_add(plate, pipe, chrome, Vector3(-0.35, 0.09, -depth * 0.25)).rotation_degrees.x = 90
+		# Domstrebe ab Fahrwerk Gewinde
+		if int(cfg.get("suspension", 0)) >= 2:
+			_add(plate, box(Vector3(half * 1.8, 0.025, 0.035)), mat(Color(0.85, 0.08, 0.06), 0.6, 0.3), Vector3(0, 0.27, depth / 2.0 - 0.08))
+		# Kühler vorn, Batterie
+		_add(plate, box(Vector3(half * 1.6, 0.12, 0.04)), mat(Color(0.2, 0.2, 0.22), 0.7, 0.4), Vector3(0, 0.07, -depth / 2.0 + 0.05))
+		_add(plate, box(Vector3(0.14, 0.12, 0.12)), mat(Color(0.05, 0.05, 0.06), 0.1, 0.7), Vector3(-half + 0.12, 0.07, depth / 2.0 - 0.14))
+		_add(plate, box(Vector3(0.03, 0.02, 0.03)), mat(Color(0.8, 0.05, 0.05), 0, 0.5), Vector3(-half + 0.08, 0.14, depth / 2.0 - 0.12))
+	else:
+		hinge.position = Vector3(0, y0 + 0.03, zf + t0 * L)
+		hinge.rotation_degrees.x = -64.0
+		_add(hinge, lid, paint, Vector3(0, 0, (depth + 0.04) / 2.0))
+		_add(hinge, box(Vector3(half * 2.0 - 0.1, 0.01, depth - 0.1)), bay, Vector3(0, -0.018, (depth + 0.04) / 2.0))
+		# Nitroflaschen quer im Kofferraum, mit Halteschellen und Ventilen
+		var stage := int(cfg.get("nitro", 0))
+		var n := 1 + mini(stage, 1)
+		var r := 0.065 + 0.012 * stage
+		var bottle := mat(Color(0.08, 0.3, 0.95), 0.5, 0.25)
+		for k in n:
+			var zz := (k - (n - 1) / 2.0) * (r * 2.4)
+			var b := CylinderMesh.new()
+			b.top_radius = r
+			b.bottom_radius = r
+			b.height = half * 1.5
+			b.radial_segments = 14
+			_add(plate, b, bottle, Vector3(0, r + 0.01, zz)).rotation_degrees.z = 90
+			var cap := CylinderMesh.new()
+			cap.top_radius = r * 0.45
+			cap.bottom_radius = r * 0.6
+			cap.height = 0.06
+			_add(plate, cap, chrome, Vector3(half * 0.78, r + 0.01, zz)).rotation_degrees.z = -90
+			for x in [-0.25, 0.25]:
+				_add(plate, box(Vector3(0.03, r * 2.1, r * 2.1)), chrome, Vector3(x * half * 1.4, r + 0.01, zz))
+		var hose := CylinderMesh.new()
+		hose.top_radius = 0.012
+		hose.bottom_radius = 0.012
+		hose.height = depth * 0.8
+		_add(plate, hose, mat(Color(0.05, 0.05, 0.05), 0.2, 0.6), Vector3(half * 0.85, 0.03, 0)).rotation_degrees.x = 90
+	_set_layer(sc)

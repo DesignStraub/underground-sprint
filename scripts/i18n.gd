@@ -130,6 +130,23 @@ const EN := {
 	"FREIGESCHALTET:\n": "UNLOCKED:\n", "Nur Platz 1 schaltet neue Teile frei.": "Only 1st place unlocks new parts.",
 	"NOCHMAL": "RETRY", "PAUSE": "PAUSE", "Weiter": "Resume", "Vollbild": "Fullscreen", "Neustart": "Restart", "Garage": "Garage",
 	"x1000 U/min": "x1000 rpm",
+	# --- Tuning wie NFS ---
+	"Optik": "Visual", "Leistung": "Performance", "OPTIK": "VISUAL",
+	"Lack, Felgen, Spoiler, Bodykit, Folierung, Unterbodenneon, Scheiben.": "Paint, rims, spoiler, body kit, vinyl, underglow, windows.",
+	"Motor, Turbo, Nitro, Fahrwerk, Reifen. Wirkt wirklich auf das Fahrverhalten.": "Engine, turbo, nitro, suspension, tires. Really changes how the car drives.",
+	"EINGEBAUT": "INSTALLED", "1 SIEG": "1 WIN", "%d SIEGE": "%d WINS",
+	"Beschleunigung +%d %%   ·   Topspeed +%d %%": "Acceleration +%d %%   ·   Top speed +%d %%",
+	"Nitro-Schub +%d %%   ·   Füllung +%d %%": "Nitro boost +%d %%   ·   Capacity +%d %%",
+	"Grip +%d %%   ·   Lenkung +%d %%   ·   %d mm tiefer": "Grip +%d %%   ·   Steering +%d %%   ·   %d mm lower",
+	"Grip +%d %%": "Grip +%d %%",
+	"Gesperrt: noch 1 Sieg nötig.": "Locked: 1 more win needed.", "Gesperrt: noch %d Siege nötig.": "Locked: %d more wins needed.",
+	"ENTER: einbauen": "ENTER: install",
+	"Scheiben": "Windows", "Klar": "Clear", "Getönt": "Tinted", "Dunkel": "Dark", "Blau verspiegelt": "Blue mirror",
+	"Turbo": "Turbo", "Fahrwerk": "Suspension", "Sport": "Sport", "Gewinde": "Coilovers", "Rennfahrwerk": "Race suspension",
+	"Reifen": "Tires", "Semi-Slicks": "Semi-slicks", "Rennreifen": "Race tires",
+	# --- Touch / Handy ---
+	"GAS": "GAS", "BREMSE": "BRAKE", "NITRO": "NITRO", "HAND": "HAND",
+	"Bitte das Gerät quer halten": "Please turn your device sideways",
 }
 
 static var _added := false
