@@ -3,6 +3,9 @@ extends Node
 
 const Catalog := preload("res://scripts/catalog.gd")
 const SAVE_PATH := "user://save.json"
+## D-DIN (Datto, SIL Open Font License 1.1, siehe assets/fonts/COPYING.txt)
+const FONT := preload("res://assets/fonts/D-DIN-Bold.otf")
+const FONT_WIDE := preload("res://assets/fonts/D-DINExp-Bold.otf")
 ## Grafikstufen. max_h: höchste 3D-Auflösung (Zeilen), darüber wird hochskaliert – bei diesem Stil sieht man den
 ## Unterschied zu 4K kaum, die Grafikkarte aber sehr. aa: Kantenglättung, ssr: Spiegelungen auf nasser Straße,
 ## ssao: Schatten in Ecken, far: Sichtweite, lod: ab welcher Entfernung Kleinteile/Lampen ausgeblendet werden.
@@ -32,6 +35,8 @@ var car_configs := {}  # car_id -> {category: option_index}
 
 
 func _ready() -> void:
+	# Schrift im Stil der deutschen Straßenschilder (DIN 1451) für alles: Menü, HUD, Schilder in der Welt
+	ThemeDB.fallback_font = FONT
 	_setup_input()
 	load_game()
 	_init_window()
@@ -252,6 +257,16 @@ func register_win(event_type: String) -> Array:
 
 # --- Speichern ------------------------------------------------------------
 
+## Das Spiel hieß früher "Underground Sprint": Godot legt user:// nach dem Spielnamen an. Gibt es im neuen Ordner
+## noch keinen Spielstand, wird der alte einmal herüberkopiert (der alte bleibt liegen).
+func _migrate_save() -> void:
+	if FileAccess.file_exists(SAVE_PATH):
+		return
+	var old := OS.get_user_data_dir().get_base_dir().path_join("Underground Sprint").path_join("save.json")
+	if FileAccess.file_exists(old):
+		DirAccess.copy_absolute(old, ProjectSettings.globalize_path(SAVE_PATH))
+
+
 func save_game() -> void:
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f == null:
@@ -264,6 +279,7 @@ func save_game() -> void:
 
 
 func load_game() -> void:
+	_migrate_save()
 	if not FileAccess.file_exists(SAVE_PATH):
 		return
 	var data = JSON.parse_string(FileAccess.get_file_as_string(SAVE_PATH))
@@ -276,6 +292,10 @@ func load_game() -> void:
 		current_car = "kaizen"
 	race_index = clampi(int(data.get("race_index", 0)), 0, Catalog.RACES.size() - 1)
 	best_times = data.get("best_times", {})
+	for old in Catalog.RENAMED:
+		if best_times.has(old):
+			best_times[Catalog.RENAMED[old]] = best_times[old]
+			best_times.erase(old)
 	var gfx: Dictionary = data.get("gfx", {})
 	quality = clampi(int(gfx.get("quality", quality)), 0, QUALITY.size() - 1)
 	# alter Spielstand: Pixel-Stufe Stark/Mittel = Pixel-Look an

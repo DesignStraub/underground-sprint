@@ -392,10 +392,10 @@ func _build_hud() -> void:
 	hud["help"].set_anchors_preset(Control.PRESET_TOP_RIGHT)
 	hud["help"].position = Vector2(-250, 6)
 	hud["help"].size = Vector2(240, 60)
-	hud["help"].text = "W/S Gas/Bremse  A/D Lenken\nLeertaste Handbremse  Shift Nitro\nC Kamera  R Zurücksetzen  M Musik\nF Vollbild  Esc Pause"
+	hud["help"].text = "W/S Gas/Bremse  A/D Lenken\nLeertaste Handbremse  Shift Lachgas\nC Kamera  R Zurücksetzen  M Musik\nF Vollbild  Esc Pause"
 	hud["help"].modulate.a = 0.7
 	if event_type == "drag":
-		hud["help"].text = "W Gas  E/Q hoch-/runterschalten\nA/D Spur wechseln  Shift Nitro\nC Kamera  F Vollbild  Esc Pause"
+		hud["help"].text = "W Gas  E/Q hoch-/runterschalten\nA/D Spur wechseln  Shift Lachgas\nC Kamera  F Vollbild  Esc Pause"
 
 	# Drehzahlmesser unten rechts
 	var tacho := Control.new()
@@ -466,7 +466,7 @@ func _process(dt: float) -> void:
 		State.COUNTDOWN:
 			countdown -= dt
 			var n := int(ceil(countdown - 1.0))
-			hud["center"].text = str(n) if n > 0 else "GO!"
+			hud["center"].text = str(n) if n > 0 else "LOS!"
 			if countdown <= 1.0 and not player.controls_enabled:
 				player.controls_enabled = true
 				_launch_check()
@@ -642,7 +642,7 @@ func _check_near_miss() -> void:
 		if fast and absf(along) < 2.5 and side > 1.7 and side < 3.4 and not _near.has(id):
 			_near[id] = true
 			player.nitro = minf(player.nitro + 0.12, 1.0)
-			_flash("NEAR MISS  +NOS", Color(1.0, 0.85, 0.2))
+			_flash("HAARSCHARF!  +LACHGAS", Color(1.0, 0.85, 0.2))
 			Sfx.play("whoosh", -12.0, randf_range(1.1, 1.3))
 
 
@@ -679,9 +679,9 @@ func _update_hud() -> void:
 	tacho.heat = player.engine_heat
 	tacho.nitro_on = player.nitro_on
 	hud["progress"].size.x = 198.0 * clampf((player_progress - track["start"]) / (track["finish"] - track["start"]), 0.0, 1.0)
-	hud["drift"].text = "DRIFT  +NOS" if player.drifting else ("AIR" if player.airborne else "")
+	hud["drift"].text = "QUER!  +LACHGAS" if player.drifting else ("FLUGMODUS" if player.airborne else "")
 	if state == State.COUNTDOWN:
-		hud["drift"].text = "Gas kurz vor GO = perfekter Start"
+		hud["drift"].text = "Gas kurz vor LOS = perfekter Start"
 	if event_type == "drift":
 		if drift_chain > 0.0:
 			hud["drift"].text = "x%d   %d" % [_drift_mult(), int(drift_chain)]
@@ -703,7 +703,7 @@ func _update_hud() -> void:
 	if player.landings != _last_landings:
 		_last_landings = player.landings
 		if player.last_air > 0.5:
-			_flash("AIR  %.1f s" % player.last_air, Color(0.4, 0.85, 1.0))
+			_flash("FLUGMODUS  %.1f s" % player.last_air, Color(0.4, 0.85, 1.0))
 	if _flash_t > 0.0:
 		_flash_t -= get_process_delta_time()
 		hud["flash"].modulate.a = clampf(_flash_t / 0.4, 0.0, 1.0)
@@ -783,7 +783,7 @@ func _on_player_finished() -> void:
 		if new_best:
 			GameState.best_times[key] = race_time
 	GameState.save_game()
-	hud["center"].text = "SIEG!" if place == 1 else "%d. PLATZ" % place
+	hud["center"].text = "SIEG!" if place == 1 else ("4. PLATZ\nTEILNAHMEURKUNDE" if place == 4 else "%d. PLATZ" % place)
 	# Zielszene: Verkehr in der Nähe verschwindet (sonst fährt er durch die Fans), Kamera kreist, Fans kommen
 	for t in traffic.duplicate():
 		if t.global_position.distance_to(player.global_position) < 180.0:

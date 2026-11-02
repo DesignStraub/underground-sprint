@@ -51,11 +51,9 @@ func _label(parent: Control, text: String, font: Font, size: int, col: Color, y:
 
 
 func _build_overlay() -> void:
-	var heavy := SystemFont.new()
-	heavy.font_names = PackedStringArray(["Impact", "Arial Black"])
-	var light := SystemFont.new()
-	light.font_names = PackedStringArray(["Avenir Next", "Helvetica Neue"])
-	light.font_weight = 600
+	var heavy: Font = load("res://assets/fonts/D-DINExp-Bold.otf")
+	var cond: Font = load("res://assets/fonts/D-DINCondensed-Bold.otf")
+	var light: Font = load("res://assets/fonts/D-DIN-Bold.otf")
 	var layer := CanvasLayer.new()
 	layer.layer = 5
 	add_child(layer)
@@ -76,9 +74,9 @@ func _build_overlay() -> void:
 	shade.set_anchors_preset(Control.PRESET_TOP_WIDE)
 	shade.size.y = 220
 	root.add_child(shade)
-	_label(root, "UNDERGROUND", heavy, 78, Color.WHITE, 14).label_settings.shadow_color = Color(CYAN.r, CYAN.g, CYAN.b, 0.8)
-	_label(root, "SPRINT", heavy, 78, CYAN, 92).label_settings.shadow_color = Color(PINK.r, PINK.g, PINK.b, 0.7)
-	_label(root, "FREE  ·  NIGHT STREET RACING", light, 18, GREEN, 186)
+	_label(root, "NEED FOR", heavy, 50, Color.WHITE, 16).label_settings.shadow_color = Color(CYAN.r, CYAN.g, CYAN.b, 0.8)
+	_label(root, "GESCHWINDIGKEIT", cond, 84, CYAN, 66).label_settings.shadow_color = Color(PINK.r, PINK.g, PINK.b, 0.7)
+	_label(root, "KOSTENLOS  ·  STRASSENRENNEN BEI NACHT", light, 18, GREEN, 176)
 	var logo := TextureRect.new()
 	logo.texture = LOGO
 	logo.expand_mode = TextureRect.EXPAND_IGNORE_SIZE

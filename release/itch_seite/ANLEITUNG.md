@@ -2,14 +2,14 @@
 
 Neu erzeugen: `Godot --path . res://tools/itch_art.tscn` (Hintergründe sind echte Szenen aus dem Spiel).
 
-## Spielseite Underground Sprint
+## Spielseite Need for Geschwindigkeit
 
 | Datei | Wohin |
 |---|---|
-| `underground_sprint_cover_630x500.png` | Edit game → **Cover image** (die 1260×1000-Version ist dasselbe Bild doppelt so scharf) |
-| `underground_sprint_titel_960x260.png` | Edit theme → **Banner** (transparent, ersetzt den Titel oben auf der Seite) |
-| `underground_sprint_banner_960x320.png` | Alternative zum Banner, mit Straßenszene dahinter |
-| `underground_sprint_hintergrund_1920x1080.jpg` | Edit theme → **Background**, nicht wiederholen, fixiert |
+| `need_for_geschwindigkeit_cover_630x500.png` | Edit game → **Cover image** (die 1260×1000-Version ist dasselbe Bild doppelt so scharf) |
+| `need_for_geschwindigkeit_titel_960x260.png` | Edit theme → **Banner** (transparent, ersetzt den Titel oben auf der Seite) |
+| `need_for_geschwindigkeit_banner_960x320.png` | Alternative zum Banner, mit Straßenszene dahinter |
+| `need_for_geschwindigkeit_hintergrund_1920x1080.jpg` | Edit theme → **Background**, nicht wiederholen, fixiert |
 
 ## Profil ONE HUMANITY (onehumanity.itch.io)
 

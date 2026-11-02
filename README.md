@@ -1,6 +1,6 @@
-# Underground Sprint
+# Need for Geschwindigkeit
 
-Nächtliches Straßenrennen im Stil von NFS Underground, Low-Poly-3D mit Pixel-Look (Godot 4.7).
+Nächtliches Straßenrennen im Stil der frühen 2000er (früher „Underground Sprint“), Low-Poly-3D mit Pixel-Look (Godot 4.7).
 
 Ein Spiel von **ONE HUMANITY** – kostenlos auf itch.io.
 
@@ -78,10 +78,10 @@ Skript), schreibt `scripts/city_data.gd`.
 
 ## Strecken
 - Jede Strecke führt durch mehrere Stadtviertel mit eigenem Stil (Name wird beim Reinfahren eingeblendet):
-  - **Downtown:** Glastürme, LED-Videowände, Schilderbrücken
+  - **Bankenviertel:** Glastürme, LED-Videowände, Schilderbrücken
   - **Marktviertel:** Läden, Markisen, Lichterketten über der Straße, Hochbahn
   - **Altstadt:** Backstein, Feuertreppen, Bäume, alte Laternen
-  - **Docks:** Hallen, Containerkräne über der Straße, Schornsteine, Natriumdampf-Licht
+  - **Hafen:** Hallen, Containerkräne über der Straße, Schornsteine, Natriumdampf-Licht
   - **Chinatown:** Tor, Lampionketten, geschwungene Dächer, senkrechte Leuchtschilder
   - **Schnellstraße:** Lärmschutzwände mit Graffiti, Wegweiser-Brücken, Straßenbrücken
 - **Tunnel** unter Häuserblocks (Kacheln, Lichtbänder, Hall im Sound): Die Fahrbahn taucht vorher in einem offenen
@@ -116,6 +116,12 @@ Weitere mp3/ogg-Dateien in `music/` laufen automatisch mit, in zufälliger Reihe
 
 Motorsound, Reifen, Nitro und Crashs werden im Spiel erzeugt. Zug, Glocke, Landung, Platschen, Tunnel, Stadion usw.
 sind synthetisch erzeugte WAVs in `assets/sfx/` (`python3 tools/make_sfx.py`).
+
+## Schrift und Texte
+Alles auf Deutsch, mit Augenzwinkern (Lachgas statt NOS, Flugmodus bei Sprüngen, Teilnahmeurkunde für Platz 4,
+Dachwerbung wie „TÜV? NÄCHSTES JAHR.“). Schrift überall im Stil der deutschen Straßenschilder (DIN 1451):
+D-DIN von Datto, SIL Open Font License 1.1 (`assets/fonts/COPYING.txt`). Alte englische Eventnamen werden im
+Spielstand automatisch umgeschrieben, der Spielstand aus „Underground Sprint“ wird beim ersten Start übernommen.
 
 ## Grafik
 Garage → Einstellungen (wird gespeichert):

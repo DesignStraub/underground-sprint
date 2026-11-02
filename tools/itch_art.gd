@@ -1,5 +1,5 @@
 extends Node
-## Werkzeug: Bilder für die itch.io-Seiten (ONE HUMANITY und Underground Sprint) nach release/itch_seite/.
+## Werkzeug: Bilder für die itch.io-Seiten (ONE HUMANITY und Need for Geschwindigkeit) nach release/itch_seite/.
 ## Hintergründe sind echte Szenen aus dem Spiel (volle Auflösung), Schrift und Logo kommen als Neon-Ebene darüber.
 ##   Godot --path . res://tools/itch_art.tscn
 
@@ -14,7 +14,8 @@ const PINK := Color(1.0, 0.25, 0.7)
 const GREEN := Color(0.4, 1.0, 0.5)
 const CAR_CFG := {"paint": 5, "rims": 2, "spoiler": 2, "bodykit": 2, "vinyl": 1, "neon": 2, "engine": 3, "nitro": 2}
 
-var heavy: SystemFont
+var heavy: Font
+var cond: Font
 var light: Font
 var wide: FontVariation
 var logo_img: Image  # Logo als Bild (dunkel; der Glow-Shader färbt es um)
@@ -24,11 +25,10 @@ var logo_white: ImageTexture
 func _ready() -> void:
 	AudioServer.set_bus_mute(0, true)  # Musik und Geräusche der Szenen stummschalten
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(OUT))
-	heavy = SystemFont.new()
-	heavy.font_names = PackedStringArray(["Impact", "Arial Black"])
-	var sf := SystemFont.new()
-	sf.font_names = PackedStringArray(["Avenir Next", "Helvetica Neue"])
-	sf.font_weight = 600
+	# DIN-Schrift wie auf deutschen Straßenschildern (D-DIN, SIL OFL)
+	heavy = load("res://assets/fonts/D-DINExp-Bold.otf")
+	cond = load("res://assets/fonts/D-DINCondensed-Bold.otf")
+	var sf: Font = load("res://assets/fonts/D-DIN-Bold.otf")
 	light = sf
 	wide = FontVariation.new()
 	wide.base_font = sf
@@ -52,14 +52,14 @@ func _run() -> void:
 	var skyline_t := ImageTexture.create_from_image(skyline)
 	var lanterns_t := ImageTexture.create_from_image(lanterns)
 
-	# --- Underground Sprint ---
+	# --- Need for Geschwindigkeit ---
 	var cover := await _compose(Vector2i(1260, 1000), false, func(r: Control, s: Vector2): _cover(r, s, street_t))
-	_save(cover, "underground_sprint_cover_1260x1000.png")
+	_save(cover, "need_for_geschwindigkeit_cover_1260x1000.png")
 	cover.resize(630, 500, Image.INTERPOLATE_LANCZOS)
-	_save(cover, "underground_sprint_cover_630x500.png")
-	_save(await _compose(Vector2i(960, 260), true, _title), "underground_sprint_titel_960x260.png")
-	_save(await _compose(Vector2i(960, 320), false, func(r: Control, s: Vector2): _banner(r, s, street_t)), "underground_sprint_banner_960x320.png")
-	_save(await _compose(Vector2i(1920, 1080), false, func(r: Control, s: Vector2): _background(r, s, lanterns_t, 0.55)), "underground_sprint_hintergrund_1920x1080.jpg")
+	_save(cover, "need_for_geschwindigkeit_cover_630x500.png")
+	_save(await _compose(Vector2i(960, 260), true, _title), "need_for_geschwindigkeit_titel_960x260.png")
+	_save(await _compose(Vector2i(960, 320), false, func(r: Control, s: Vector2): _banner(r, s, street_t)), "need_for_geschwindigkeit_banner_960x320.png")
+	_save(await _compose(Vector2i(1920, 1080), false, func(r: Control, s: Vector2): _background(r, s, lanterns_t, 0.55)), "need_for_geschwindigkeit_hintergrund_1920x1080.jpg")
 
 	# --- ONE HUMANITY ---
 	_save(await _compose(Vector2i(512, 512), false, _profile), "onehumanity_profilbild_512.png")
@@ -275,9 +275,9 @@ func _cover(r: Control, s: Vector2, bg: Texture2D) -> void:
 	_image(r, bg, Rect2(Vector2.ZERO, s))
 	_shade(r, s, Color(0.02, 0.01, 0.06, 0.88), Color(0, 0, 0, 0), 0.0, 0.42)
 	_shade(r, s, Color(0, 0, 0, 0), Color(0.02, 0.01, 0.05, 0.7), 0.72, 1.0)
-	_neon(r, "UNDERGROUND", heavy, 156, Color.WHITE, CYAN, Rect2(0, 22, s.x, 170))
-	_neon(r, "SPRINT", heavy, 156, CYAN, PINK, Rect2(0, 168, s.x, 170))
-	_neon(r, "NIGHT STREET RACING  ·  FREE", wide, 30, GREEN, GREEN, Rect2(0, 338, s.x, 50), HORIZONTAL_ALIGNMENT_CENTER, 0.6)
+	_neon(r, "NEED FOR", heavy, 104, Color.WHITE, CYAN, Rect2(0, 30, s.x, 130))
+	_neon(r, "GESCHWINDIGKEIT", cond, 168, CYAN, PINK, Rect2(0, 140, s.x, 200))
+	_neon(r, "STRASSENRENNEN BEI NACHT  ·  KOSTENLOS  ·  OHNE TÜV", wide, 30, GREEN, GREEN, Rect2(0, 346, s.x, 50), HORIZONTAL_ALIGNMENT_CENTER, 0.6)
 	_brand(r, Vector2(s.x - 420, s.y - 104), 84, 30)
 
 
@@ -285,13 +285,12 @@ func _title(r: Control, s: Vector2) -> void:
 	var f := FontVariation.new()
 	f.base_font = heavy
 	f.variation_transform = Transform2D(Vector2(1.0, 0.2), Vector2(0.0, 1.0), Vector2.ZERO)  # leicht schräg wie Tempo
-	var px := 100
-	var w1 := f.get_string_size("UNDERGROUND ", HORIZONTAL_ALIGNMENT_LEFT, -1, px).x
-	var w2 := f.get_string_size("SPRINT", HORIZONTAL_ALIGNMENT_LEFT, -1, px).x
-	var x0 := (s.x - w1 - w2) / 2.0
-	_neon(r, "UNDERGROUND", f, px, Color.WHITE, CYAN, Rect2(x0, 24, w1 + 60, 140), HORIZONTAL_ALIGNMENT_LEFT)
-	_neon(r, "SPRINT", f, px, CYAN, PINK, Rect2(x0 + w1, 24, w2 + 60, 140), HORIZONTAL_ALIGNMENT_LEFT)
-	_neon(r, "NIGHT STREET RACING  ·  ONE HUMANITY", wide, 24, GREEN, GREEN, Rect2(0, 172, s.x, 50), HORIZONTAL_ALIGNMENT_CENTER, 0.6)
+	var fc := FontVariation.new()
+	fc.base_font = cond
+	fc.variation_transform = f.variation_transform
+	_neon(r, "NEED FOR", f, 54, Color.WHITE, CYAN, Rect2(0, 8, s.x, 70))
+	_neon(r, "GESCHWINDIGKEIT", fc, 112, CYAN, PINK, Rect2(0, 52, s.x, 130))
+	_neon(r, "STRASSENRENNEN BEI NACHT  ·  ONE HUMANITY", wide, 24, GREEN, GREEN, Rect2(0, 182, s.x, 50), HORIZONTAL_ALIGNMENT_CENTER, 0.6)
 
 
 func _banner(r: Control, s: Vector2, bg: Texture2D) -> void:

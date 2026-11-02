@@ -16,25 +16,25 @@ var lang := "de"
 
 const TEXT := {
 	"de": {
-		"shots": [["UNDERGROUND\nSPRINT", "NEU", "Street-Racing bei Nacht"], ["TUNE DEIN\nAUTO", "", "Teile freischalten durch Siege"],
+		"shots": [["NEED FOR\nGESCHWINDIGKEIT", "NEU", "Street-Racing bei Nacht"], ["TUNE DEIN\nAUTO", "", "Teile freischalten durch Siege"],
 			["SPRINTS DURCH\nDIE STADT", "", "3 Gegner · Verkehr · Baustellen"], ["NITRO.\nDRIFT. SPEED.", "", "Ein Crash kostet dich das Rennen"]],
 		"free": "JETZT KOSTENLOS", "on": "auf itch.io", "platforms": "Windows · Mac · Linux",
 	},
 	"en": {
-		"shots": [["UNDERGROUND\nSPRINT", "NEW", "Street racing after dark"], ["TUNE YOUR\nRIDE", "", "Unlock parts by winning races"],
+		"shots": [["NEED FOR\nGESCHWINDIGKEIT", "NEW", "Street racing after dark"], ["TUNE YOUR\nRIDE", "", "Unlock parts by winning races"],
 			["CITY\nSPRINTS", "", "3 rivals · traffic · roadworks"], ["NITRO.\nDRIFT. SPEED.", "", "One crash can cost you the race"]],
 		"free": "OUT NOW · FREE", "on": "on itch.io", "platforms": "Windows · Mac · Linux",
 	},
 	"update_en": {
-		"shots": [["UNDERGROUND\nSPRINT", "UPDATE", "Street racing after dark"], ["NEON\nTUNNELS", "", "Blast right under the city"],
+		"shots": [["NEED FOR\nGESCHWINDIGKEIT", "UPDATE", "Street racing after dark"], ["NEON\nTUNNELS", "", "Blast right under the city"],
 			["JUMP THE\nTRAIN", "", "Gates down? Hit the ramp"], ["UNDER THE\nRAILS", "", "Trains thunder overhead"],
 			["6 DISTRICTS", "", "Chinatown · Docks · Highway\nDowntown · Market · Old Town"]],
 		"free": "PLAY FREE", "on": "right in your browser", "url": "onehumanity.itch.io",
 		"platforms": "also on Windows · Mac · Linux",
 	},
 }
-var heavy: SystemFont
-var light: SystemFont
+var heavy: Font
+var light: Font
 
 
 func _ready() -> void:
@@ -43,11 +43,8 @@ func _ready() -> void:
 			out = a.substr(6)
 		elif a.begins_with("--lang="):
 			lang = a.substr(7)
-	heavy = SystemFont.new()
-	heavy.font_names = PackedStringArray(["Impact", "Arial Black"])
-	light = SystemFont.new()
-	light.font_names = PackedStringArray(["Avenir Next", "Helvetica Neue"])
-	light.font_weight = 600
+	heavy = load("res://assets/fonts/D-DINCondensed-Bold.otf")
+	light = load("res://assets/fonts/D-DIN-Bold.otf")
 
 	var shots: Array = TEXT[lang]["shots"]
 	for i in shots.size():
@@ -128,7 +125,7 @@ func _end_card() -> Control:
 	m.shader = GLOW
 	logo.material = m
 	root.add_child(logo)
-	_label(root, "UNDERGROUND SPRINT", heavy, 96, Color.WHITE, 880).label_settings.shadow_color = Color(CYAN.r, CYAN.g, CYAN.b, 0.8)
+	_label(root, "NEED FOR\nGESCHWINDIGKEIT", heavy, 104, Color.WHITE, 820).label_settings.shadow_color = Color(CYAN.r, CYAN.g, CYAN.b, 0.8)
 	_label(root, TEXT[lang]["free"], heavy, 120, GREEN, 1080)
 	_label(root, TEXT[lang]["on"], light, 84 if not TEXT[lang].has("url") else 68, Color.WHITE, 1240)
 	var py := 1380.0

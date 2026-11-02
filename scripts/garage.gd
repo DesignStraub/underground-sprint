@@ -136,7 +136,7 @@ func _build_ui() -> void:
 
 	title = _label(root, 22)
 	title.position = Vector2(14, 10)
-	title.text = "UNDERGROUND\nSPRINT"
+	title.text = "NEED FOR\nGESCHWINDIGKEIT"
 	title.label_settings.font_color = Color(0.4, 0.85, 1.0)
 	status = _label(root, 11)
 	status.position = Vector2(14, 72)
@@ -238,7 +238,7 @@ func _show_main() -> void:
 	_button("Auto wechseln", _show_cars)
 	_button("Einstellungen", _show_settings)
 	if not OS.has_feature("web"):  # im Browser schließt man einfach den Tab
-		_button("Beenden", func(): get_tree().quit())
+		_button("Feierabend", func(): get_tree().quit())
 	info.text = Catalog.CARS[preview_car]["desc"] + "\nF / F11: Vollbild"
 	_focus_first()
 
@@ -411,7 +411,7 @@ func _choose_car() -> void:
 
 func _confirm_reset() -> void:
 	_clear_menu()
-	info.text = "Alle Siege und Tuningteile gehen verloren."
+	info.text = "Alle Siege und Tuningteile gehen verloren. Wie beim TÜV: weg ist weg."
 	_button("Ja, zurücksetzen", func(): GameState.reset_progress(); _show_main())
 	_button("Abbrechen", _show_main)
 	menu.get_child(1).grab_focus.call_deferred()

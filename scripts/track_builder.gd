@@ -47,19 +47,21 @@ const DIP_RAMP := 70.0  # Länge der Rampe hinunter in den Trog und wieder hinau
 const PARAPET := 0.9  # Trogmauer: so weit ragt sie über den Gehweg
 const HILL_H := 5.5  # Bergstraße (Gabelung Altstadt): Höhe der Kuppe
 const EL_H := 7.4  # Unterkante der Hochbahn
-const TUNNEL_NAMES := ["CITY-TUNNEL", "HAFENTUNNEL", "RING-TUNNEL", "NORDTUNNEL", "KAIZEN-TUNNEL", "UNTERFÜHRUNG OST"]
+const TUNNEL_NAMES := ["INNENSTADTTUNNEL", "HAFENTUNNEL", "RINGTUNNEL", "NORDTUNNEL", "KAIZEN-TUNNEL", "UNTERFÜHRUNG OST"]
 const STATIONS := ["MARKTPLATZ", "HAFENSTRASSE", "STADION", "CHINATOWN", "NORDRING", "ZENTRUM", "DOCKS"]
-const GANTRY_SIGNS := [["CENTRUM", "STADION 2 km"], ["HAFEN", "DOCKS"], ["FLUGHAFEN", "RING"], ["CHINATOWN", "MARKT"],
-	["ALTSTADT", "AUSFAHRT"], ["A 7  NORD", "INDUSTRIE"]]
-const SIGNS := ["MOTEL", "24H", "TUNING", "BAR", "HOTEL", "NOODLES", "CLUB", "GARAGE", "PARTS", "NEON"]
+const GANTRY_SIGNS := [["ZENTRUM", "STADION 2 km"], ["HAFEN", "CONTAINERTERMINAL"], ["FLUGHAFEN", "RING"], ["CHINATOWN", "MARKT"],
+	["ALTSTADT", "AUSFAHRT"], ["A 7  NORD", "INDUSTRIE"], ["ALLE RICHTUNGEN", "BAUSTELLE SEIT 1998"], ["FEIERABEND", "STAU 5 km"]]
+const SIGNS := ["PENSION", "24 STD.", "TUNING", "KNEIPE", "HOTEL", "NUDELN", "DISKO", "WERKSTATT", "ERSATZTEILE", "SPIELHÖLLE"]
 const SHOPS := ["PIZZA", "DÖNER", "KIOSK", "BÄCKEREI", "APOTHEKE", "FRISEUR", "TATTOO", "AUTOTEILE",
-	"WÄSCHEREI", "SPÄTI", "SUSHI", "BURGER", "HANDY SHOP", "BLUMEN", "JUWELIER", "SPIELHALLE", "MUSIK",
-	"SNEAKER", "NAILS", "WETTBÜRO", "CAFE", "BAR", "TUNING", "REIFEN", "VIDEOTHEK", "ASIA IMBISS",
-	"BUCHLADEN", "GAMES", "FITNESS", "OPTIKER", "SHISHA", "PFANDHAUS"]
-const BRANDS := ["KAIZEN MOTORS", "VORTEX GT-R", "NOS", "MIRAI 240R", "TURBO COLA", "ONE HUMANITY",
-	"NEON NIGHTS", "SPEED FM", "DRIFT KINGS", "UNDERGROUND"]
-const CHINA_SHOPS := ["NOODLES", "DIM SUM", "TEEHAUS", "KARAOKE", "MAHJONG", "JADE", "LUCKY 8", "DRAGON", "WOK",
-	"RAMEN", "PHO", "GOLDEN", "LOTUS", "TOFU", "BOBA", "ASIA MARKT", "HOT POT", "PANDA"]
+	"WÄSCHEREI", "SPÄTI", "SUSHI", "CURRYWURST", "HANDYLADEN", "BLUMEN", "JUWELIER", "SPIELHALLE", "MUSIK",
+	"TURNSCHUHE", "NAGELSTUDIO", "WETTBÜRO", "CAFÉ", "KNEIPE", "TUNING", "REIFEN", "VIDEOTHEK", "ASIA IMBISS",
+	"BUCHLADEN", "SPIELE", "MUCKIBUDE", "OPTIKER", "SHISHA", "PFANDHAUS", "SCHNITZELHAUS", "LOTTO TOTO"]
+## Dachwerbung: ausgedachte Marken, Sprüche mit Augenzwinkern (lange Texte brechen auf der Tafel um)
+const BRANDS := ["KAIZEN MOTORS", "VORTEX GT-R", "LACHGAS & SÖHNE", "MIRAI 240R", "TURBO-SCHORLE", "ONE HUMANITY",
+	"RADIO VOLLGAS", "DRIFTKÖNIGE e.V.", "NEED FOR GESCHWINDIGKEIT", "TÜV? NÄCHSTES JAHR.", "TEMPOLIMIT? NIE GEHÖRT.",
+	"DÖNER MIT ALLES", "FAHRSCHULE VOLLGAS", "BAUSPAREN? LIEBER TUNEN."]
+const CHINA_SHOPS := ["NUDELBAR", "DIM SUM", "TEEHAUS", "KARAOKE", "MAHJONG", "JADE", "GLÜCKS-8", "DRACHE", "WOK",
+	"RAMEN", "PHO", "GOLD", "LOTUS", "TOFU", "BUBBLE TEA", "ASIA MARKT", "FEUERTOPF", "PANDA"]
 const NEON := [Color(1, 0.1, 0.6), Color(0.1, 0.8, 1), Color(0.7, 0.2, 1), Color(1, 0.5, 0.1), Color(0.2, 1, 0.4), Color(1, 0.9, 0.3)]
 const GERMAN_SHOPS := ["BÄCKEREI", "METZGEREI", "APOTHEKE", "WEINSTUBE", "EISCAFÉ", "DÖNER", "BUCHHANDLUNG", "OPTIKER",
 	"FRISEUR", "BIERGARTEN", "KIOSK", "BLUMEN", "GASTHAUS", "SCHUHHAUS", "CAFÉ", "PIZZERIA", "BRAUHAUS", "WEINHANDEL",
@@ -69,7 +71,7 @@ const RIVER_Y := -2.2  # Wasserspiegel der Flüsse (Ufermauer bis Straßenniveau
 ## Stadtviertel: Bebauung, Fassadenstile (siehe building.gdshader), Farben, Laternen, Ausstattung.
 ## props: welche Gehweg-Möbel vorkommen (Nummern siehe _build_props).
 const DISTRICTS := {
-	"downtown": {"name": "DOWNTOWN", "shop": 0.3, "low": [6.0, 10.0], "tall": [24.0, 90.0], "tall_p": 0.7, "styles": [0, 1, 3, 3],
+	"downtown": {"name": "BANKENVIERTEL", "shop": 0.3, "low": [6.0, 10.0], "tall": [24.0, 90.0], "tall_p": 0.7, "styles": [0, 1, 3, 3],
 		"tints": [Color(0.08, 0.09, 0.11), Color(0.13, 0.14, 0.17), Color(0.05, 0.07, 0.1)], "lit": 0.45,
 		"trees": 0.1, "billboard": 0.3, "neon_edge": 0.3, "lamp": Color(0.8, 0.88, 1.0), "lamp_kind": "modern",
 		"screens": 0.35, "gantry": 0.5, "props": [0, 3, 7, 8, 9, 10, 11, 12, 13], "median": 0.35},
@@ -77,7 +79,7 @@ const DISTRICTS := {
 		"tints": [Color(0.22, 0.12, 0.09), Color(0.17, 0.16, 0.14), Color(0.11, 0.11, 0.13)], "lit": 0.5,
 		"trees": 0.35, "billboard": 0.15, "neon_edge": 0.1, "lamp": Color(1.0, 0.68, 0.35), "lamp_kind": "classic",
 		"blade": 0.3, "bulbs": true, "props": [0, 1, 2, 4, 5, 6, 8, 9, 11, 12]},
-	"boulevard": {"name": "BOULEVARD", "shop": 0.45, "low": [10.0, 16.0], "tall": [22.0, 46.0], "tall_p": 0.45, "styles": [0, 1, 4],
+	"boulevard": {"name": "PRACHTALLEE", "shop": 0.45, "low": [10.0, 16.0], "tall": [22.0, 46.0], "tall_p": 0.45, "styles": [0, 1, 4],
 		"tints": [Color(0.24, 0.2, 0.17), Color(0.16, 0.16, 0.18), Color(0.3, 0.26, 0.2)], "lit": 0.55,
 		"trees": 0.7, "billboard": 0.15, "neon_edge": 0.1, "lamp": Color(1.0, 0.82, 0.55), "lamp_kind": "classic",
 		"median": 1.0, "blade": 0.15, "props": [0, 4, 5, 8, 9, 10, 13]},
@@ -85,7 +87,7 @@ const DISTRICTS := {
 		"tints": [Color(0.28, 0.13, 0.08), Color(0.3, 0.25, 0.18), Color(0.22, 0.2, 0.18)], "lit": 0.55,
 		"trees": 0.6, "billboard": 0.0, "neon_edge": 0.0, "lamp": Color(1.0, 0.75, 0.45), "lamp_kind": "classic",
 		"fire_escape": 0.5, "props": [0, 4, 5, 6, 8, 13, 14]},
-	"industrial": {"name": "DOCKS", "shop": 0.05, "low": [7.0, 12.0], "tall": [12.0, 22.0], "tall_p": 0.2, "styles": [2, 2, 0],
+	"industrial": {"name": "HAFEN", "shop": 0.05, "low": [7.0, 12.0], "tall": [12.0, 22.0], "tall_p": 0.2, "styles": [2, 2, 0],
 		"tints": [Color(0.15, 0.17, 0.18), Color(0.2, 0.18, 0.14), Color(0.1, 0.14, 0.15)], "lit": 0.3,
 		"trees": 0.0, "billboard": 0.1, "neon_edge": 0.0, "lamp": Color(1.0, 0.62, 0.3), "lamp_kind": "sodium",
 		"containers": true, "cranes": 0.14, "stacks": 0.35, "overpass": 0.5, "props": [2, 2, 6, 7, 14, 15]},
@@ -2867,8 +2869,10 @@ static func _billboard(root: Node3D, pos: Vector3, face_dir: Vector3, roof_y: fl
 		Builder._add(n, Builder.box(Vector3(0.2, 2.4, 0.2)), dark, Vector3(x, 1.2, 0))
 	var l := Label3D.new()
 	l.text = BRANDS[rng.randi() % BRANDS.size()]
-	l.font_size = 120
+	l.font_size = 120 if l.text.length() <= 13 else 76
 	l.pixel_size = 0.012
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	l.width = 8.4 / l.pixel_size
 	l.modulate = Color(2.5, 2.5, 2.5)
 	l.outline_modulate = Color(col.r, col.g, col.b, 1.0)
 	l.outline_size = 16
