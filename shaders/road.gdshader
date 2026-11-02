@@ -1,5 +1,5 @@
 shader_type spatial;
-// Nasser Asphalt (oder Kopfsteinpflaster) mit Markierungen, Gullydeckeln und Flickstellen.
+// Matter Asphalt (oder Kopfsteinpflaster) mit Markierungen, Gullydeckeln, Flickstellen und vereinzelten Pfützen.
 // UV.x = quer (0..1), UV.y = Meter in Fahrtrichtung.
 
 uniform float lanes = 4.0;  // 4 Hauptstraße, 2 Seitenstraße, 0 ohne Markierung
@@ -31,7 +31,8 @@ void fragment() {
 		white += step(abs(x - 0.5), lw) * step(fract(y / 6.0), 0.5);
 	}
 	float n = noise(vec2(xm * 2.2, y * 0.5)) * 0.5 + noise(vec2(xm * 6.6, y * 2.0)) * 0.5;
-	float puddle = smoothstep(0.55, 0.72, noise(vec2(xm * 0.39, y * 0.12)));
+	// Pfützen nur hier und da: seltene, klar umrissene Flecken
+	float puddle = smoothstep(0.69, 0.75, noise(vec2(xm * 0.33, y * 0.085))) * step(0.45, noise(vec2(y * 0.013, 7.3)));
 	vec3 col = vec3(0.055, 0.055, 0.065) * (0.7 + 0.6 * n);
 	// Flickstellen
 	vec2 pc = vec2(floor(y / 14.0), floor(xm / 4.5));
@@ -52,15 +53,15 @@ void fragment() {
 	}
 	col = mix(col, vec3(0.85), clamp(white, 0.0, 1.0));
 	col = mix(col, vec3(0.9, 0.65, 0.1), clamp(yellow, 0.0, 1.0));
-	col *= mix(1.0, 0.6, puddle);
-	float wet_rough = 0.04;
+	col *= mix(1.0, 0.55, puddle);
+	float wet_rough = 0.05;
 #if CURRENT_RENDERER == RENDERER_COMPATIBILITY
 	// Browser: keine Bildschirm-Spiegelungen, also etwas heller und breitere Lichtreflexe der Laternen
 	col *= 1.7;
 	wet_rough = 0.22;
 #endif
 	ALBEDO = col;
-	ROUGHNESS = mix(0.5, wet_rough, puddle) * (1.0 - manhole * 0.3);
-	METALLIC = 0.15 + manhole * 0.4;
-	SPECULAR = 0.7;
+	ROUGHNESS = mix(0.84, wet_rough, puddle) * (1.0 - manhole * 0.2);
+	METALLIC = manhole * 0.3;
+	SPECULAR = mix(0.3, 0.6, puddle);
 }

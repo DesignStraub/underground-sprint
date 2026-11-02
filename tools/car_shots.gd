@@ -40,7 +40,7 @@ func _ready() -> void:
 	for id in Catalog.CAR_ORDER:
 		var car := Builder.build(id, cfg, false)
 		add_child(car)
-		for view in [["vorn", Vector3(4.2, 1.6, -5.2)], ["hinten", Vector3(-4.0, 1.5, 5.4)]]:
+		for view in [["vorn", Vector3(4.2, 1.6, -5.2)], ["hinten", Vector3(-4.0, 1.5, 5.4)], ["seite", Vector3(8.5, 0.8, 0.0)]]:
 			cam.position = view[1]
 			cam.look_at(Vector3(0, 0.55, 0))
 			for i in 8:

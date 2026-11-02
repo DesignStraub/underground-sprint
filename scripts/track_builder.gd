@@ -185,10 +185,10 @@ static func build(race: Dictionary) -> Dictionary:
 		_build_props(root, track, rng)
 	_build_steam(root, track, rng)
 	if loop:
-		_gate(root, curve, track["start"] + 12.0, "START · ZIEL", Color(0.2, 1.0, 0.4))
+		_gate(root, track, track["start"] + 12.0, "START · ZIEL", Color(0.2, 1.0, 0.4))
 	else:
-		_gate(root, curve, track["start"] + 12.0, "START", Color(0.2, 1.0, 0.4))
-		_gate(root, curve, track["finish"], "ZIEL", Color(1.0, 0.2, 0.4))
+		_gate(root, track, track["start"] + 12.0, "START", Color(0.2, 1.0, 0.4))
+		_gate(root, track, track["finish"], "ZIEL", Color(1.0, 0.2, 0.4))
 
 	# Boden (sichtbar) + Boden-Kollision nur für umherfliegende Teile
 	var ground := MeshInstance3D.new()
@@ -206,6 +206,7 @@ static func build(race: Dictionary) -> Dictionary:
 	gb.add_child(gs)
 	root.add_child(gb)
 	_bb_flush(root)
+	_finalize_walls(root)
 	return track
 
 
@@ -428,10 +429,11 @@ static func _in_zone(track: Dictionary, d: float, margin: float) -> bool:
 
 
 ## Abstand zur nächsten Nebenstraße (Abkürzung/Seitenstraße) minus deren halbe Breite
-static func _branch_clearance(track: Dictionary, pos: Vector3) -> float:
+## skip_spurs: Sackgassen ignorieren (deren Einmündung ist abgesperrt, die Randmauer läuft dort durch)
+static func _branch_clearance(track: Dictionary, pos: Vector3, skip_spurs := false) -> float:
 	var best := 1e9
 	for p in track["paths"]:
-		if p["id"] == 0:
+		if p["id"] == 0 or (skip_spurs and p["kind"] == "spur"):
 			continue
 		var c: Curve3D = p["curve"]
 		var q := c.get_closest_point(pos)
@@ -604,15 +606,29 @@ static func _flush(root: Node3D, st: SurfaceTool, m: Material) -> void:
 	root.add_child(mi)
 
 
-static func _wall_shape(walls: StaticBody3D, a: Vector3, b: Vector3) -> void:
-	var cs := CollisionShape3D.new()
-	var bs := BoxShape3D.new()
-	bs.size = Vector3(0.6, WALL_H, a.distance_to(b) + 0.6)
-	cs.shape = bs
-	var dir := (b - a)
-	dir.y = 0.0
-	cs.transform = Transform3D(Basis.looking_at(dir.normalized(), Vector3.UP), (a + b) / 2 + Vector3(0, WALL_H / 2, 0))
-	walls.add_child(cs)
+## Wand von a nach b als senkrechte Fläche. Alle Flächen eines Körpers werden am Ende zu einem durchgehenden
+## Dreiecksnetz (_finalize_walls): keine Kisten-Stöße, an denen man beim Entlangschrammen hängen bleibt.
+static func _wall_shape(walls: StaticBody3D, a: Vector3, b: Vector3, h := WALL_H) -> void:
+	if not walls.has_meta("faces"):
+		walls.set_meta("faces", [])
+	var f: Array = walls.get_meta("faces")
+	var lo := Vector3(0, -0.5, 0)
+	var up := Vector3(0, h, 0)
+	f.append_array([a + lo, b + lo, b + up, a + lo, b + up, a + up])
+
+
+static func _finalize_walls(n: Node) -> void:
+	for c in n.get_children():
+		if c is StaticBody3D and c.has_meta("faces"):
+			var sh := ConcavePolygonShape3D.new()
+			sh.backface_collision = true
+			sh.set_faces(PackedVector3Array(c.get_meta("faces")))
+			var cs := CollisionShape3D.new()
+			cs.shape = sh
+			c.add_child(cs)
+			c.remove_meta("faces")
+		elif c.get_child_count() > 0 and not c is MeshInstance3D:
+			_finalize_walls(c)
 
 
 static func _build_road(root: Node3D, track: Dictionary) -> void:
@@ -661,8 +677,17 @@ static func _build_road(root: Node3D, track: Dictionary) -> void:
 				_strip_v(walk, prev["mr"], cur["mr"], CURB_H, true)
 				n_carr += 1
 				var mm: float = minf(cur["m"], prev["m"])
-				if mm > 2.0:  # erst wo die Büsche schon stehen; an der flachen Spitze rutscht man über den Bordstein
-					_median_shape(walls, (prev["ml"] + prev["mr"]) / 2.0, (cur["ml"] + cur["mr"]) / 2.0, mm * 2.0)
+				# Kollision genau an den Bordsteinkanten: spitz zulaufende Insel, an der man seitlich abgleitet
+				if mm > 0.35:
+					_wall_shape(walls, prev["ml"], cur["ml"], 1.6)
+					_wall_shape(walls, prev["mr"], cur["mr"], 1.6)
+				elif maxf(cur["m"], prev["m"]) > 0.35:
+					# Spitze als Keil, der bis zur Mitte des vorigen Stücks zuläuft: man gleitet seitlich ab
+					var wide: Dictionary = cur if cur["m"] > prev["m"] else prev
+					var thin: Dictionary = prev if cur["m"] > prev["m"] else cur
+					var tip: Vector3 = (thin["ml"] + thin["mr"]) / 2.0
+					_wall_shape(walls, tip, wide["ml"], 1.6)
+					_wall_shape(walls, tip, wide["mr"], 1.6)
 				if mm > 1.2:
 					var mid: Vector3 = (prev["ml"] + prev["mr"] + cur["ml"] + cur["mr"]) / 4.0 + up
 					var bf := Basis.looking_at(f["fwd"], Vector3.UP)
@@ -682,7 +707,7 @@ static func _build_road(root: Node3D, track: Dictionary) -> void:
 				_strip(walk, prev["r"] + up, prev["ro"] + up, cur["r"] + up, cur["ro"] + up, 0.0, 0.0)
 				_strip_v(walk, prev["r"], cur["r"], CURB_H, false)
 			for side in ["lw", "rw"]:
-				if _branch_clearance(track, (prev[side] + cur[side]) / 2) > 1.0:
+				if _branch_clearance(track, (prev[side] + cur[side]) / 2, true) > 1.0:
 					_wall_shape(walls, prev[side], cur[side])
 			piece += 1
 		prev = cur
@@ -709,18 +734,6 @@ static func _build_road(root: Node3D, track: Dictionary) -> void:
 	_multi(root, bush, Builder.mat(Color(0.05, 0.22, 0.07), 0.0, 0.9), bushes)
 	_multi(root, Builder.tapered_box(Vector2(0.7, 3.1), Vector2(0.28, 3.1), 0.85, 0.0), Builder.mat(Color(0.42, 0.42, 0.43), 0.0, 0.85), barriers)
 	_build_median_lamps(root, track)
-
-
-## Kollision für den Mittelstreifen (Box entlang a->b, so breit wie der Streifen)
-static func _median_shape(walls: StaticBody3D, a: Vector3, b: Vector3, width: float) -> void:
-	var cs := CollisionShape3D.new()
-	var bs := BoxShape3D.new()
-	bs.size = Vector3(width, 1.6, a.distance_to(b) + 0.3)
-	cs.shape = bs
-	var dir := b - a
-	dir.y = 0.0
-	cs.transform = Transform3D(Basis.looking_at(dir.normalized(), Vector3.UP), (a + b) / 2 + Vector3(0, 0.8, 0))
-	walls.add_child(cs)
 
 
 ## Drift-Kurs: durchgehende Bande an beiden Rändern (rot-weiß, mit Sponsorentafeln), Reifenstapel außen in
@@ -960,7 +973,8 @@ static func _build_branch(root: Node3D, track: Dictionary, p: Dictionary, rng: R
 						n_walk += 1
 			for side in ["lw", "rw"]:
 				var wm: Vector3 = (prev[side] + cur[side]) / 2
-				if _main_clearance(track, wm) < WALK + 0.4 or (d > gap0 - 1.0 and prev["d"] < gap1 + 1.0):
+				# Sackgassen: Wände erst hinter der durchlaufenden Randmauer der Hauptstraße (keine Kante in deren Linie)
+				if _main_clearance(track, wm) < WALK + (1.6 if kind == "spur" else 0.4) or (d > gap0 - 1.0 and prev["d"] < gap1 + 1.0):
 					continue
 				_wall_shape(walls, prev[side], cur[side])
 				var seg: Vector3 = cur[side] - prev[side]
@@ -1053,8 +1067,8 @@ static func _fork_details(root: Node3D, track: Dictionary, p: Dictionary, rng: R
 			Builder._add(root, Builder.box(Vector3(w, 0.2, 3.2)), curb, Vector3.ZERO).transform = xf
 			# Büsche: wer reinfährt, verliert Tempo und Grünzeug fliegt
 			var kb := Knockable.new()
-			kb.mass = 70.0
-			kb.slowdown = 0.75
+			kb.mass = 40.0
+			kb.slowdown = 0.93
 			kb.transform = Transform3D(b, mid + Vector3(0, 0.2, 0))
 			root.add_child(kb)
 			var sm := SphereMesh.new()
@@ -1233,6 +1247,23 @@ static func _spur_details(root: Node3D, track: Dictionary, p: Dictionary, rng: R
 		lmat.set_shader_parameter("which", float(k))
 		lmat.set_shader_parameter("phase", phase)
 		Builder._add(tl, sm, lmat, head_pos + Vector3(0, 0.4 - k * 0.4, 0.18))
+	# Einmündung abgesperrt (die Randmauer der Hauptstraße läuft hier durch): Baken mit Blinklicht
+	var fb := frame_at(c, HALF_W + WALK + 0.3)
+	var mouth := Node3D.new()
+	mouth.transform = Transform3D(Basis.looking_at(fb["fwd"], Vector3.UP), fb["pos"])
+	root.add_child(mouth)
+	var red := Builder.mat(Color(0.9, 0.15, 0.1), 0.0, 0.6)
+	var bm := ShaderMaterial.new()
+	bm.shader = BLINK_SHADER
+	bm.set_shader_parameter("col", Color(1.0, 0.6, 0.05))
+	bm.set_shader_parameter("rate", 1.2)
+	for i in 5:
+		Builder._add(mouth, Builder.box(Vector3(2.4, 0.9, 0.5)), red if i % 2 == 0 else white, Vector3(-SPUR_HALF + 1.2 + i * 2.4, 0.45 + CURB_H, 0))
+		if i % 2 == 0:
+			var lamp := SphereMesh.new()
+			lamp.radius = 0.13
+			lamp.height = 0.26
+			Builder._add(mouth, lamp, bm, Vector3(-SPUR_HALF + 1.2 + i * 2.4, 1.1 + CURB_H, 0))
 	# Absperrung + Gebäude am Ende der Sackgasse
 	var fz := frame_at(c, len - 1.0)
 	var bar := Node3D.new()
@@ -1400,9 +1431,10 @@ static func _tree(root: Node3D, pos: Vector3, rng: RandomNumberGenerator, solid:
 		var sb := StaticBody3D.new()
 		sb.position = pos + Vector3(0, 1.0, 0)
 		var cs := CollisionShape3D.new()
-		var bs := BoxShape3D.new()
-		bs.size = Vector3(0.5, 2.0, 0.5)
-		cs.shape = bs
+		var cy := CylinderShape3D.new()  # rund: wer streift, gleitet ab
+		cy.radius = 0.22
+		cy.height = 2.0
+		cs.shape = cy
 		sb.add_child(cs)
 		root.add_child(sb)
 
@@ -2186,7 +2218,8 @@ static func _build_props(root: Node3D, track: Dictionary, rng: RandomNumberGener
 				continue
 			var dist: Dictionary = _district_at(track, d)
 			if rng.randf() < dist["trees"]:
-				var tp: Vector3 = f["pos"] + f["right"] * side * (hwd + WALK - 1.3)
+				# an der Bordsteinkante: der Streifen an der Mauer bleibt frei zum Entlangschrammen
+				var tp: Vector3 = f["pos"] + f["right"] * side * (hwd + 1.5)
 				var ring := CylinderMesh.new()
 				ring.top_radius = 0.7
 				ring.bottom_radius = 0.7
@@ -2394,24 +2427,25 @@ static func _build_steam(root: Node3D, track: Dictionary, rng: RandomNumberGener
 		d += rng.randf_range(160.0, 280.0)
 
 
-static func _gate(root: Node3D, curve: Curve3D, d: float, text: String, col: Color) -> void:
-	var f := frame_at(curve, d)
+static func _gate(root: Node3D, track: Dictionary, d: float, text: String, col: Color) -> void:
+	var f := frame_at(track["curve"], d)
 	var basis := Basis.looking_at(f["fwd"], Vector3.UP)
 	var em := Builder.mat(col, 0.0, 0.4, col, 3.0)
 	var dark := Builder.mat(Color(0.1, 0.1, 0.12), 0.5, 0.4)
+	var half := hw(track, d) + 1.4  # Pfeiler immer neben der Fahrbahn (Drift-Kurse sind breiter)
 	for s in [-1, 1]:
 		var pillar := Node3D.new()
-		pillar.transform = Transform3D(basis, f["pos"] + f["right"] * s * (HALF_W + 1.4))
+		pillar.transform = Transform3D(basis, f["pos"] + f["right"] * s * half)
 		root.add_child(pillar)
 		Builder._add(pillar, Builder.box(Vector3(0.8, 7.0, 0.8)), dark, Vector3(0, 3.5, 0))
 		_solid(pillar, Vector3(0.8, 7.0, 0.8), Vector3(0, 3.5, 0))
 	var beam := MeshInstance3D.new()
-	beam.mesh = Builder.box(Vector3(HALF_W * 2 + 3.6, 1.4, 0.6))
+	beam.mesh = Builder.box(Vector3(half * 2.0 + 0.8, 1.4, 0.6))
 	beam.material_override = dark
 	beam.transform = Transform3D(basis, f["pos"] + Vector3(0, 7.2, 0))
 	root.add_child(beam)
 	var strip := MeshInstance3D.new()
-	strip.mesh = Builder.box(Vector3(HALF_W * 2 + 3.6, 0.15, 0.65))
+	strip.mesh = Builder.box(Vector3(half * 2.0 + 0.8, 0.15, 0.65))
 	strip.material_override = em
 	strip.transform = Transform3D(basis, f["pos"] + Vector3(0, 6.5, 0))
 	root.add_child(strip)
@@ -2771,6 +2805,21 @@ static func _build_tunnels(root: Node3D, track: Dictionary, rng: RandomNumberGen
 				fl.position = Vector3(s * 8.0, TUN_H + 3.0, 6.0)
 				pn.add_child(fl)
 			if end == 0:
+				# Schräge Leitwand vom Gehweg zur Tunnelwand: wer außen an der Mauer entlangschrammt, wird in den
+				# Tunnel gelenkt statt frontal gegen das Portal zu prallen
+				var fa := frame_at(curve, d - 14.0)
+				for s in [-1.0, 1.0]:
+					var a: Vector3 = fa["pos"] + fa["right"] * s * (HALF_W + WALK + 0.2)
+					var b: Vector3 = f["pos"] + f["right"] * s * (TUN_W + 0.3)
+					_wall_shape(walls, a, b, 3.0)
+					var seg := b - a
+					seg.y = 0.0
+					var jn := Node3D.new()
+					jn.transform = Transform3D(Basis.looking_at(seg.normalized(), Vector3.UP), (a + b) / 2.0 + Vector3(0, CURB_H, 0))
+					root.add_child(jn)
+					Builder._add(jn, Builder.tapered_box(Vector2(0.62, seg.length()), Vector2(0.24, seg.length()), 0.85, 0.0),
+						Builder.mat(Color(0.5, 0.5, 0.5), 0.0, 0.85), Vector3.ZERO)
+					Builder._add(jn, Builder.box(Vector3(0.26, 0.06, seg.length())), warn, Vector3(0, 0.85, 0))
 				var l := Label3D.new()
 				l.text = t["name"]
 				l.font_size = 110

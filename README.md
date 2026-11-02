@@ -53,8 +53,12 @@ Ronin DR) gibt es für Driftsiege, schnelle Autos für Rennsiege, Teile für Sie
 - **Gabelungen:** Vor der Teilung zeigt ein Wegweiser beide Wege. Die Altstadt-Route ist kürzer, aber zweispurig
   mit Gegenverkehr; außen herum geht ein breiter Boulevard. Wer sich nicht entscheidet, landet auf der Verkehrsinsel.
 - **Boulevards:** breite Straßen mit bepflanztem Mittelstreifen (auf der Schnellstraße mit Betonleitwand).
-- Kreuzungen mit Ampeln, Baustellen, Verkehr in beide Richtungen. Laternen, Mülltonnen, Zeitungsboxen, Parkuhren
-  und Schilder fliegen weg; Hydranten, Poller, Telefonzellen, Container und Betonleitwände nicht.
+- Kreuzungen mit Ampeln, Baustellen, Verkehr in beide Richtungen. Laternen, Mülltonnen, Zeitungsboxen, Parkuhren,
+  Schilder, Büsche und Container fliegen weg und kosten etwas Tempo. Sackgassen sind an der Einmündung abgesperrt,
+  vor Tunnelportalen lenkt eine schräge Leitwand in den Tunnel.
+- **Anecken wie in NFSU:** An Wänden und Banden schrammt man entlang und wird parallel gestellt; je flacher der
+  Winkel, desto weniger Tempo kostet es (15° ≈ 12 %, 45° ≈ 45 %), nur frontal prallt man ab. Verkehr bestraft härter:
+  seitlich abprallen, frontal oder beim Auffahren Dreher und kurz keine Kontrolle. Mittelstreifen laufen spitz aus.
 
 ## Fortschritt
 Kein Geld: Jeder 1. Platz zählt als Sieg. Siege schalten Autos, Strecken und Tuningteile frei
@@ -76,9 +80,13 @@ Garage → Einstellungen (wird gespeichert):
 - Verkehr nach Schwierigkeit: 1 Stern ohne, 2 Sterne wenig, 3 Sterne voller Verkehr.
 - **Tempo-Stufe:** am Anfang fahren alle (auch Gegner) mit 72 % Höchsttempo, mit jedem Sieg mehr, ab 20 Siegen volles Tempo.
 - **Fahrgefühl:** alle Autos mit Heckantrieb; mit Gas in der Kurve schiebt das Heck raus, im Drift dreht das Auto
-  um die Vorderachse. Gas setzt weich ein, Drehmoment folgt der Drehzahl.
-- **Autos** bestehen aus Karosserie mit Radkästen plus Anbauteilen (Stoßstangen, Schweller, Spiegel, Fugen),
-  Lichter eingelassen und je Auto eigen. Wo kein Haus die Streckenbegrenzung verdeckt, steht ein Zaun.
+  um die Vorderachse. Gas setzt weich ein, Drehmoment folgt der Drehzahl. Bei Tempo ist die Drehrate durch die
+  Querbeschleunigung begrenzt (kein Zappeln), Kurven kosten kein Tempo, Rutschen radiert etwas ab. Der Rutschzustand
+  ist stufenlos, die Kamera wackelt nur bei Einschlägen.
+- **Autos** sind aus Querschnitten gebaut (Radhäuser, Kotflügel-Buckel, Hüften, eingezogenes Glashaus), lose angelehnt
+  an RX-7, 350Z, Celica, Silvia und Skyline. Front- und Heckschürze sind eigene Teile, Scheinwerfer und Rückleuchten
+  sitzen in der Haut, Türfugen, Spiegel, Griffe, Kennzeichen. Unterbodenneon ist ein Lichtteppich auf der Straße.
+- **Straße** matt mit vereinzelten Pfützen. Wo kein Haus die Streckenbegrenzung verdeckt, steht ein Zaun.
 
 ## Export
 Vorlagen für Windows, macOS, Linux und Web stehen in `export_presets.cfg` (Godot-Exportvorlagen 4.7.1 nötig).

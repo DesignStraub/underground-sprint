@@ -7,15 +7,15 @@ extends RefCounted
 const CARS := {
 	"kaizen": {
 		"name": "Kaizen Rally S", "style": "hatch", "unlock": {}, "drift": 0.35,
-		"length": 4.0, "width": 1.75, "height": 0.6, "cabin_len": 2.1, "cabin_off": 0.25, "cabin_h": 0.5,
+		"length": 4.25, "width": 1.74,
 		"accel": 9.5, "top_speed": 58.0, "grip": 26.0, "steer": 2.3,
-		"desc": "Kompakter Fronttriebler. Leicht, wendig, verzeiht viel.",
+		"desc": "Kompakter Keil-Sportler. Leicht, wendig, verzeiht viel.",
 		# Hochdrehender Sauger-Vierzylinder
 		"sound": {"cyl": 4, "harm": [1.0, 0.45, 0.2, 0.08], "sub": 0.3, "turbo": 0.0, "rough": 0.2},
 	},
 	"mirai": {
 		"name": "Mirai 240R", "style": "coupe", "unlock": {"race": 2, "drift": 1}, "drift": 0.65,
-		"length": 4.45, "width": 1.78, "height": 0.52, "cabin_len": 1.8, "cabin_off": 0.45, "cabin_h": 0.44,
+		"length": 4.35, "width": 1.82,
 		"accel": 11.0, "top_speed": 66.0, "grip": 22.0, "steer": 2.2,
 		"desc": "Heckantrieb-Coupé. Liebt Drifts.",
 		# Bollernder Turbo-Vierzylinder
@@ -23,15 +23,15 @@ const CARS := {
 	},
 	"vortex": {
 		"name": "Vortex GT-R", "style": "sedan", "unlock": {"race": 5}, "drift": 0.3,
-		"length": 4.6, "width": 1.85, "height": 0.55, "cabin_len": 1.9, "cabin_off": 0.35, "cabin_h": 0.46,
+		"length": 4.6, "width": 1.8,
 		"accel": 12.5, "top_speed": 74.0, "grip": 28.0, "steer": 2.05,
-		"desc": "Allrad-Monster. Brutal auf der Geraden.",
+		"desc": "Turbo-Limousine. Brutal auf der Geraden.",
 		# Seidiger Reihensechser mit großem Turbo
 		"sound": {"cyl": 6, "harm": [1.0, 0.5, 0.3, 0.15], "sub": 0.12, "turbo": 1.0, "rough": 0.12},
 	},
 	"sakura": {
 		"name": "Sakura D2", "style": "hatch", "unlock": {"drift": 1}, "drift": 0.9,
-		"length": 4.2, "width": 1.7, "height": 0.55, "cabin_len": 1.95, "cabin_off": 0.3, "cabin_h": 0.48,
+		"length": 4.3, "width": 1.72,
 		"accel": 10.2, "top_speed": 60.0, "grip": 21.0, "steer": 2.5,
 		"desc": "Leichter Hecktriebler. Gebaut zum Querfahren.",
 		# Kurzhubiger Turbo-Vierzylinder
@@ -39,7 +39,7 @@ const CARS := {
 	},
 	"ronin": {
 		"name": "Ronin DR", "style": "coupe", "unlock": {"drift": 3}, "drift": 1.0,
-		"length": 4.6, "width": 1.86, "height": 0.5, "cabin_len": 1.85, "cabin_off": 0.5, "cabin_h": 0.42,
+		"length": 4.3, "width": 1.78,
 		"accel": 12.2, "top_speed": 69.0, "grip": 20.0, "steer": 2.45,
 		"desc": "Drift-Monster mit V8-Swap. Steht quer, wann immer du willst.",
 		# Tiefer, grollender V8

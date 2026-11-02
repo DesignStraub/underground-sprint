@@ -77,6 +77,9 @@ func _process(dt: float) -> void:
 		if not _placed and race.state == 1:
 			_placed = true
 			_place_at(race)
+	if OS.get_cmdline_user_args().has("--handling") and race and "curve" in race and race.player and race.state == 1:
+		_handling(race, dt)
+		return
 	# --slidetest: festes Drift-Manöver auf der Geraden (Fahrmodell prüfen): 0,25 s Handbremse + links, dann nur Gas
 	if OS.get_cmdline_user_args().has("--slidetest") and race and "curve" in race and race.player and race.state == 1:
 		var pl = race.player
@@ -161,6 +164,11 @@ func _process(dt: float) -> void:
 		var rel: float = pl.progress - race.track["crossing_d"]
 		if rel > -30.0 and rel < 30.0:
 			print("rel=%.1f lat=%.1f y=%.2f vy=%.1f v=%.1f air=%s path=%d train=%s" % [rel, pl.lateral, pl.position.y, pl.vy, pl.speed_fwd, pl.airborne, pl.path_id, race.track["crossing"].train.global_position])
+	if race and "curve" in race and race.player and (OS.get_cmdline_user_args().has("--trace") or OS.get_cmdline_user_args().has("--handling")):
+		race.player.debug_hits = true
+	if race and "curve" in race and race.player and race.player.last_hit != "":
+		print("  >> Treffer t=%.1f: %s" % [_t, race.player.last_hit])
+		race.player.last_hit = ""
 	if OS.get_cmdline_user_args().has("--trace") and race and "curve" in race and race.player and fmod(_t, 0.1) < dt:
 		var pl = race.player
 		var near := ""
@@ -239,3 +247,69 @@ func _drop(race, d: float) -> void:
 	for t in race.traffic:
 		if t.progress > d - 30.0 and t.progress < d + 90.0:
 			t.progress = tr["length"] - 30.0
+
+
+## --handling: Fahrverhalten messen. Slalom bei mittlerem Tempo mit Tastatur-Lenkung (voll oder nichts),
+## dann flach (15°) und steil (45°) gegen die Randmauer, dann frontal auf eine Mittelstreifen-Spitze.
+var _h_phase := -1
+var _h_t := 0.0
+var _h_v0 := 0.0
+const H_TESTS := [["slalom", 0.0], ["wand", 15.0], ["wand", 30.0], ["wand", 45.0], ["insel", 0.0]]
+
+
+func _handling(race, dt: float) -> void:
+	var pl = race.player
+	var tr: Dictionary = race.track
+	_h_t += dt
+	pl.debug_hits = true
+	if pl.last_hit != "":
+		print("  >> Treffer: ", pl.last_hit)
+		pl.last_hit = ""
+	for a in ["steer_left", "steer_right", "handbrake", "accelerate", "brake", "nitro"]:
+		Input.action_release(a)
+	if _h_phase < 0 or (_h_t > 3.5 and _h_phase < H_TESTS.size()):
+		_h_phase += 1
+		_h_t = 0.0
+		if _h_phase >= H_TESTS.size():
+			get_tree().quit()
+			return
+		for t in race.traffic:
+			t.progress = tr["length"] - 30.0
+		var kind: String = H_TESTS[_h_phase][0]
+		var ang: float = H_TESTS[_h_phase][1]
+		var d := 260.0
+		var lat: float = Track.LANES[1]
+		if kind == "insel":
+			if tr["medians"].is_empty():
+				print("TEST insel: keine Mittelstreifen auf dieser Strecke")
+				return
+			d = tr["medians"][0]["from"] - 25.0
+			lat = 0.0
+			_h_v0 = 0.6
+		var xf: Transform3D = Track.xform_at(tr["curve"], d, Track.lane_lat(tr, d, lat) if kind != "insel" else 0.0)
+		if kind == "wand":
+			xf.basis = xf.basis.rotated(Vector3.UP, -deg_to_rad(ang))  # nach rechts zur Mauer
+		pl.place(xf)
+		pl.velocity = -pl.global_basis.z * (30.0 if kind == "slalom" else 35.0)
+		pl.wall_hits = 0
+		pl.crashes = 0
+		_h_v0 = 0.0
+		print("TEST %s %.0f° bei d=%.0f" % [kind, ang, d])
+		if _h_phase == 0:
+			print("  tunnel=", tr["tunnels"].map(func(t): return [int(t["from"]), int(t["to"])]), " el=", tr["el"].map(func(t): return [int(t["from"]), int(t["to"])]),
+				" kreuzung=", int(tr["crossing_d"]), " seitenwege=", tr["paths"].map(func(p): return [p["kind"], int(p.get("from", 0)), int(p.get("to", 0))]))
+		return
+	var kind: String = H_TESTS[_h_phase][0]
+	Input.action_press("accelerate", 0.75)
+	if kind == "slalom":
+		Input.action_press("steer_left" if int(_h_t / 0.6) % 2 == 0 else "steer_right")
+	if kind == "insel":
+		var err: float = pl.lateral - 0.6
+		if absf(err) > 0.1:
+			Input.action_press("steer_left" if err > 0.0 else "steer_right", clampf(absf(err) / 2.0, 0.0, 1.0))
+
+	if fmod(_h_t, 0.1) < dt:
+		var yaw_v := atan2(-pl.velocity.x, -pl.velocity.z)
+		print("  t=%.1f v=%.1f winkel=%.1f drift=%s halt=%.2f wand=%d crash=%d stun=%.2f lat=%.1f kam=%.3f/%.3f" % [_h_t, pl.velocity.length(),
+			pl.drift_angle, pl.drifting, pl._slip_hold, pl.wall_hits, pl.crashes, pl.stun, pl.lateral, pl.cam.h_offset, pl.cam.v_offset])
+
