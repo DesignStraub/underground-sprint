@@ -77,7 +77,7 @@ func _ready() -> void:
 
 	track = Track.build(race)
 	curve = track["curve"]
-	Track.apply_lod(track["node"], GameState.q()["lod"])
+	Track.apply_lod(track["node"], GameState.lod_ranges())
 	track["node"].process_mode = Node.PROCESS_MODE_PAUSABLE
 	world.add_child(track["node"])
 	_setup_environment()
@@ -96,7 +96,7 @@ func _ready() -> void:
 	Music.next()  # jedes Rennen mit einem neuen Track
 	player.place(Track.xform_at(curve, track["start"], Track.LANES[2]))
 	if mood["rain"]:
-		_rain = Moods.rain(220 if GameState.is_mobile() else 520)
+		_rain = Moods.rain([200, 340, 520][GameState.gv("fx")])
 		player.cam.add_child(_rain)
 
 	# Gegner mit zufälligem Tuning; Stärke nach Schwierigkeit des Events, leicht steigend mit deinen Siegen
@@ -153,6 +153,106 @@ func _ready() -> void:
 		show.start_intro()
 	else:
 		show.ready_set()
+	if RenderingServer.get_current_rendering_method() == "gl_compatibility" and not OS.get_cmdline_user_args().has("--nowarmup"):
+		_warmup()
+
+
+## Im Browser (WebGL) übersetzt die Grafikkarte jeden Shader erst, wenn er zum ersten Mal im Bild ist; mitten im
+## Rennen ruckelt das spürbar. Deshalb vor dem Start hinter einem Ladebild: unsichtbare Kameras fahren die Strecke
+## in beide Richtungen ab und schauen auf die Autos (Nitroflammen kurz an), bis alles einmal gezeichnet wurde.
+var _warming := false
+
+
+func _warmup() -> void:
+	_warming = true
+	get_tree().paused = true
+	var cover := CanvasLayer.new()
+	cover.layer = 50
+	add_child(cover)
+	var bg := ColorRect.new()
+	bg.color = Color(0.01, 0.01, 0.02)
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	cover.add_child(bg)
+	var lbl := Label.new()
+	lbl.text = tr("STRECKE WIRD VORBEREITET")
+	lbl.label_settings = LabelSettings.new()
+	lbl.label_settings.font = UI.font("cond", 0.2)
+	lbl.label_settings.font_size = 16
+	lbl.label_settings.font_color = UI.CYAN
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_center(lbl, Rect2(-150, -24, 300, 24))
+	cover.add_child(lbl)
+	var bar := ColorRect.new()
+	bar.color = UI.PINK
+	_center(bar, Rect2(-120, 8, 0, 3))
+	cover.add_child(bar)
+	world.render_target_update_mode = SubViewport.UPDATE_DISABLED
+	# Blickpunkte: alle Wege alle 150 m vorwärts, alle 300 m rückwärts, dazu die Autos am Start
+	var views := []
+	for p in track["paths"]:
+		var c: Curve3D = p["curve"]
+		var len := c.get_baked_length()
+		var d := 0.0
+		while d < len:
+			var f := Track.frame_at(c, d)
+			var eye: Vector3 = f["pos"] + Vector3(0, f["y"] + 2.5, 0)
+			views.append([eye, eye + f["fwd"] * 50.0])
+			if fmod(d, 300.0) < 1.0:
+				views.append([eye, eye - f["fwd"] * 50.0])
+			d += 150.0
+	for t in traffic:
+		t.place()  # Verkehr steht sonst bis zum ersten Physik-Takt noch nicht auf der Straße
+	var flames := []
+	for car in [player] + ais:
+		var back: Vector3 = car.global_transform.basis.z
+		views.append([car.global_position + back * 7.0 + Vector3(0, 2.0, 0), car.global_position])
+		for fl in car.model.get_meta("flames"):
+			if not fl.visible:
+				fl.visible = true
+				flames.append(fl)
+	views.append([player.cam.global_position, player.cam.global_position - player.cam.global_transform.basis.z * 10.0, player.cam])
+	var cams := []
+	for i in 6:
+		var vp := SubViewport.new()
+		vp.size = Vector2i(192, 108)
+		vp.world_3d = world.find_world_3d()
+		vp.msaa_3d = world.msaa_3d
+		vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+		var cam := Camera3D.new()
+		cam.fov = 95.0
+		cam.far = GameState.view_distance()
+		vp.add_child(cam)
+		cover.add_child(vp)
+		cams.append(cam)
+	var i := 0
+	while i < views.size():
+		for cam in cams:
+			if i < views.size():
+				var v: Array = views[i]
+				if v.size() > 2:
+					cam.global_transform = (v[2] as Camera3D).global_transform  # Regen hängt an der Fahrerkamera
+				else:
+					cam.look_at_from_position(v[0], v[1], Vector3.UP)
+				i += 1
+		bar.offset_right = -120.0 + 240.0 * i / views.size()
+		await get_tree().process_frame
+	await get_tree().process_frame
+	for fl in flames:
+		fl.visible = false
+	world.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	await get_tree().process_frame
+	cover.queue_free()
+	get_tree().paused = false
+	_warming = false
+
+
+## Element um die Bildschirmmitte legen (r relativ zur Mitte)
+static func _center(c: Control, r: Rect2) -> void:
+	c.set_anchors_preset(Control.PRESET_CENTER)
+	c.offset_left = r.position.x
+	c.offset_top = r.position.y
+	c.offset_right = r.end.x
+	c.offset_bottom = r.end.y
 
 
 ## Drag: langsamer Verkehr auf allen Spuren in unsere Richtung, erst nach dem Start-Stück. Ausweichen per Spurwechsel.
@@ -281,7 +381,7 @@ func _setup_environment() -> void:
 	env.ambient_light_energy = mood["amb_e"]
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	env.tonemap_exposure = 0.88
-	env.glow_enabled = true
+	env.glow_enabled = GameState.gv("bloom")
 	# Glühen nur für wirklich helle Lichter, kein Weichzeichner über der ganzen Stadt
 	env.glow_intensity = 0.6
 	env.glow_bloom = 0.02
@@ -298,10 +398,9 @@ func _setup_environment() -> void:
 		(m as ShaderMaterial).set_shader_parameter("wet", mood["wet"])
 	env.fog_sky_affect = 0.15
 	# Spiegelungen und Umgebungsverdeckung nur, wenn die Grafikstufe sie vorsieht (die teuersten Effekte)
-	var q: Dictionary = GameState.q()
-	env.ssr_enabled = q["ssr"] > 0
-	env.ssr_max_steps = maxi(q["ssr"], 8)
-	env.ssao_enabled = q["ssao"]
+	env.ssr_enabled = GameState.gfx_available("ssr") and GameState.gv("ssr") > 0
+	env.ssr_max_steps = maxi(GameState.gv("ssr"), 8)
+	env.ssao_enabled = GameState.gfx_available("ssao") and GameState.gv("ssao")
 	# günstige Varianten: Spiegelungen ohne Unschärfe-Berechnung, Umgebungsverdeckung in halber Auflösung
 	RenderingServer.environment_set_ssr_roughness_quality(RenderingServer.ENV_SSR_ROUGHNESS_QUALITY_DISABLED)
 	RenderingServer.environment_set_ssao_quality(RenderingServer.ENV_SSAO_QUALITY_LOW, true, 0.5, 2, 50.0, 300.0)
@@ -539,6 +638,7 @@ func _process(dt: float) -> void:
 		t.player_progress = p_d
 		t.player_lateral = p_lat
 		t.player_path = player.path_id
+		t.player_pos = player.global_position
 	if event_type == "drift":
 		_update_drift(dt)
 	elif state == State.RACING:
@@ -752,6 +852,8 @@ func _update_hud() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if _warming:
+		return
 	if state == State.INTRO and (event.is_action_pressed("accelerate") or event.is_action_pressed("ui_accept")):
 		show.skip_intro()
 		return

@@ -277,7 +277,35 @@ static func build(race: Dictionary) -> Dictionary:
 	root.add_child(gb)
 	_bb_flush(root)
 	_finalize_walls(root)
+	if not OS.get_cmdline_user_args().has("--nobatch"):
+		batch_static(root)
 	return track
+
+
+## Statisches Zusammenfassen wie in großen Engines: unbewegliche Teile mit gleichem Material (gleiche Werte) und
+## gleicher Detailstufe werden je Rasterzelle zu einem Mesh verschmolzen. Im Browser kostet jeder Draw Call viel
+## Prozessorzeit, so fallen die meisten weg. Alles mit Skript (Umfahrbares, Züge, Schranken) bleibt, wie es ist.
+const STATIC_CELL := [32.0, 64.0, 128.0]  # Zellgröße je Detailstufe (klein, mittel, groß wie in apply_lod)
+
+
+static func batch_static(root: Node3D) -> void:
+	var buckets := {}
+	Builder.collect_static(root, Transform3D.IDENTITY, {}, {}, buckets, func(mi: MeshInstance3D, xf: Transform3D) -> Array:
+		var size := mi.get_aabb().size.length()
+		var cls := 0 if size < 4.0 else (1 if size < 15.0 else 2)
+		var c: Vector3 = xf * mi.get_aabb().get_center()
+		return [cls, Vector2i(floori(c.x / STATIC_CELL[cls]), floori(c.z / STATIC_CELL[cls]))])
+	for mi in Builder.merge_buckets(root, buckets):
+		mi.set_meta("lod_class", mi.get_meta("merge_extra")[0])
+	# Umfahrbares (Laternen, Schilder, Poller) bewegt sich als Ganzes: je Teil die Flächen pro Material zusammen
+	var stack: Array = [root]
+	while not stack.is_empty():
+		var nd: Node = stack.pop_back()
+		for c in nd.get_children():
+			if c is Knockable:
+				Builder.merge_static(c)
+			elif c.get_child_count() > 0:
+				stack.append(c)
 
 
 ## Boden der Stadt als Quadtree: grobe Platten weit weg, feine Kacheln am Rand der offenen Tröge, über dem Trog
@@ -770,17 +798,18 @@ static func apply_lod(n: Node, ranges: Array) -> void:
 		if c is GeometryInstance3D:
 			var gi := c as GeometryInstance3D
 			var size := gi.get_aabb().size.length()
-			if size < 4.0:
+			var cls: int = gi.get_meta("lod_class", 0 if size < 4.0 else (1 if size < 15.0 else 2))
+			if cls == 0:
 				gi.visibility_range_end = ranges[0]
-			elif size < 15.0:
+			elif cls == 1:
 				gi.visibility_range_end = ranges[1]
 		elif c is Light3D:
 			var l := c as Light3D
 			l.distance_fade_enabled = true
 			l.distance_fade_begin = ranges[2]
 			l.distance_fade_length = 40.0
-		elif c is GPUParticles3D and ranges[0] < 200.0:
-			c.queue_free()  # Grafik niedrig: kein Gully-Dampf
+		elif c is GPUParticles3D and GameState.gv("fx") == 0:
+			c.queue_free()  # Effekte niedrig: kein Gully-Dampf
 			continue
 		apply_lod(c, ranges)
 

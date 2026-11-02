@@ -31,15 +31,13 @@ const EN := {
 	"Fahr, worauf du Lust hast. Rennsiege schalten schnelle Autos frei, Driftsiege die Driftautos.\nTempo-Stufe: %d %% (steigt mit jedem Sieg)":
 		"Race whatever you like. Race wins unlock fast cars, drift wins unlock drift cars.\nPace level: %d %% (rises with every win)",
 	"%d Runden. ": "%d laps. ",
-	"Niedrig: schnell, ohne Spiegelungen. Mittel: Spiegelungen auf nasser Straße. Hoch: alles, braucht eine starke Grafikkarte. Gilt ab dem nächsten Rennen.":
-		"Low: fast, no reflections. Medium: reflections on wet roads. High: everything, needs a strong graphics card. Applies from the next race.",
 	"Pixel-Look: die 3D-Welt grob gerastert wie ein Retro-Spiel. Spart zusätzlich Leistung.":
 		"Pixel look: the 3D world rendered in coarse pixels like a retro game. Also saves performance.",
 	"V-Sync: kein Bildreißen. Aus = mehr FPS, aber evtl. Tearing.": "V-Sync: no screen tearing. Off = more FPS, but possible tearing.",
 	"FPS-Limit: begrenzt die Bildrate (schont Akku und Lüfter).": "FPS limit: caps the frame rate (easier on battery and fans).",
 	"Vollbild (auch F / F11).": "Fullscreen (also F / F11).",
 	"Sprache des Spiels. Titel, Orte und Schilder bleiben deutsch.": "Game language. Title, places and signs stay German.",
-	"Grafik: ": "Graphics: ", "Pixel-Look: ": "Pixel look: ", "V-Sync: ": "V-Sync: ", "FPS-Limit: ": "FPS limit: ",
+	"Pixel-Look: ": "Pixel look: ", "V-Sync: ": "V-Sync: ", "FPS-Limit: ": "FPS limit: ",
 	"Vollbild: ": "Fullscreen: ", "Sprache: ": "Language: ", "An": "On", "Aus": "Off",
 	"Niedrig": "Low", "Mittel": "Medium", "Hoch": "High",
 	# Ladetipps
@@ -148,6 +146,32 @@ const EN := {
 	"GAS": "GAS", "BREMSE": "BRAKE", "NITRO": "NITRO", "HAND": "HAND",
 	"Bitte das Gerät quer halten": "Please turn your device sideways",
 	"Touch-Steuerung: ": "Touch controls: ", "Auto": "Auto",
+	# Grafikmenü
+	"Grafik  >": "Graphics  >", "GRAFIK": "GRAPHICS", "Voreinstellung: ": "Preset: ", "Benutzerdefiniert": "Custom",
+	"Ultra": "Ultra", "FPS anzeigen: ": "Show FPS: ", "3D-Auflösung": "3D resolution", "Dynamische Auflösung": "Dynamic resolution",
+	"Sichtweite": "View distance", "Detaildichte": "Level of detail", "Lichter": "Lights", "Kantenglättung": "Anti-aliasing",
+	"Glühen": "Bloom", "Spiegelungen": "Reflections", "Umgebungsverdeckung": "Ambient occlusion", "Effekte": "Effects",
+	"Grafik wie in großen PC-Spielen: Voreinstellung wählen oder jede Option einzeln anpassen.":
+		"Graphics like in big PC games: pick a preset or adjust every option yourself.",
+	"Niedrig: für Handy, Tablet und schwache Rechner. Mittel: ausgewogen. Hoch und Ultra: für starke Grafikkarten. Links/Rechts wechselt.":
+		"Low: for phones, tablets and weak computers. Medium: balanced. High and Ultra: for strong graphics cards. Left/Right to change.",
+	"Höchste Auflösung der 3D-Welt, darüber wird weich hochskaliert. Größter Hebel für die Bildrate.":
+		"Maximum resolution of the 3D world, upscaled smoothly beyond that. Biggest lever for the frame rate.",
+	"Senkt die 3D-Auflösung automatisch, wenn die Bildrate unter 60 fällt, und hebt sie danach wieder an.":
+		"Lowers the 3D resolution automatically when the frame rate drops below 60, and raises it again afterwards.",
+	"Wie weit du siehst. Weiter = mehr Häuser und Wahrzeichen im Bild, kostet Leistung.":
+		"How far you can see. Further = more buildings and landmarks on screen, costs performance.",
+	"Ab welcher Entfernung Kleinteile verschwinden und Autos vereinfacht gezeichnet werden.":
+		"Distance at which small objects disappear and cars switch to a simplified model.",
+	"Bis zu welcher Entfernung Laternen und Leuchtreklamen die Straße beleuchten.":
+		"Distance up to which street lamps and neon signs light up the road.",
+	"Glättet Treppchen an Kanten. MSAA ist schärfer, kostet aber mehr.": "Smooths jagged edges. MSAA is sharper but costs more.",
+	"Leuchtreklamen, Scheinwerfer und Neon strahlen über.": "Neon signs, headlights and underglow bloom.",
+	"Spiegelungen auf nasser Straße. Teuer.": "Reflections on wet roads. Expensive.",
+	"Weiche Schatten in Ecken und unter Autos. Teuer.": "Soft shadows in corners and under cars. Expensive.",
+	"Regen, Dampf aus Gullys und andere Partikel.": "Rain, steam from manholes and other particles.",
+	"Zeigt oben in der Mitte Bildrate und aktuelle 3D-Auflösung.": "Shows frame rate and current 3D resolution at the top.",
+	"STRECKE WIRD VORBEREITET": "PREPARING TRACK",
 	"KARRIERE": "CAREER", "Nächstes Event: ": "Next event: ", "Gesperrt: gewinne zuerst %s.": "Locked: win %s first.",
 	"Gewonnen": "Won", "KIEZ": "KIEZ", "Berlin Kreuzberg": "Berlin Kreuzberg",
 	"Unter der Hochbahn der U1 durch die Skalitzer Straße, über die Oberbaumbrücke, an der East Side Gallery entlang und über die Schillingbrücke zurück zum Kotti.":

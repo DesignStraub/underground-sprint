@@ -45,6 +45,7 @@ Berlin-Kreuzberg, mit Dom, Residenz, Festung, Oberbaumbrücke und Hochbahn an ih
 - Kein Geld, kein Grind: Siege schalten Teile und Autos frei
 - Start- und Zielszene wie damals: Starterin, jubelnde Fans, Kamerafahrt
 - Motorsound in Echtzeit erzeugt – jedes Auto klingt anders
+- Grafikmenü wie in großen PC-Spielen: Voreinstellungen Niedrig bis Ultra, dynamische Auflösung, Sichtweite, Details, Kantenglättung, FPS-Anzeige
 - Englisch und Deutsch, Retro-Pixel-Look (einstellbar), läuft bis 4K und im Browser, auch auf Handy und Tablet
 
 **Steuerung**
@@ -75,6 +76,7 @@ cathedral, palace, fortress, Oberbaum Bridge and elevated U-Bahn in their real p
 - No money, no grind: wins unlock parts and cars
 - Start and finish scenes like back in the day: flag girl, cheering crowd, camera fly-in
 - Real-time engine sound – every car sounds different
+- Graphics menu like big PC games: Low to Ultra presets, dynamic resolution, view distance, detail, anti-aliasing, FPS counter
 - English and German (choose at first start), retro pixel look, runs up to 4K and in the browser, also on phones and tablets
 
 **Controls**

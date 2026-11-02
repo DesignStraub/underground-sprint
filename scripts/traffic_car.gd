@@ -25,15 +25,20 @@ var wrecked := false
 var player_progress := 0.0  # Spieler auf seinem Weg (Meter ab Wegbeginn)
 var player_lateral := 100.0
 var player_path := 0
+var player_pos := Vector3.ZERO  # Spieler in der Welt (race.gd): weit Entferntes wird ausgedünnt
 var crossing: Node
 var _lane_cur := 2.25
 var _wreck_vel := Vector3.ZERO
 var _wreck_spin := 0.0
 var velocity_vec := Vector3.ZERO
+var _far_d2 := 0.0
+var _far_t := 0.0
 
 
 func setup(kind: String, rng: RandomNumberGenerator) -> void:
 	add_to_group("traffic")
+	_far_d2 = pow(GameState.view_distance() + 80.0, 2.0)
+	_far_t = rng.randf() * 0.5
 	_lane_cur = lane
 	collision_layer = 2
 	collision_mask = 0
@@ -56,6 +61,7 @@ func setup(kind: String, rng: RandomNumberGenerator) -> void:
 				Builder._add(self, Builder.box(Vector3(0.05, 0.9, 9.0)), win, Vector3(s * 1.26, 2.1, 0.5))
 			Builder._add(self, Builder.box(Vector3(2.3, 1.0, 0.05)), win, Vector3(0, 2.0, -5.51))
 	length = size.z
+	Builder.merge_static(self)
 	var cs := CollisionShape3D.new()
 	var bs := BoxShape3D.new()
 	bs.size = size
@@ -128,6 +134,19 @@ func _physics_process(dt: float) -> void:
 		progress = 40.0
 	elif progress < 40.0:
 		progress = track_length - 10.0
+	# Außer Sichtweite: unsichtbar und Lage nur zweimal pro Sekunde neu (spart im Browser viel Rechenzeit)
+	var far := global_position.distance_squared_to(player_pos) > _far_d2
+	visible = not far
+	if far:
+		_far_t -= dt
+		if _far_t > 0.0:
+			return
+		_far_t = 0.5
+	place()
+
+
+## Auf die Straße setzen (Spur, Fahrtrichtung, Steigung)
+func place() -> void:
 	var lat := Track.lane_lat(track, progress, _lane_cur) if path_id == 0 else _lane_cur
 	var xf := Track.xform_at(curve, progress, lat, true)
 	if dir < 0.0:

@@ -30,7 +30,7 @@ func setup(t: Dictionary, p: Node3D, start_lat: float) -> void:
 	cam = Camera3D.new()
 	cam.fov = 62.0
 	cam.near = 0.05
-	cam.far = GameState.q()["far"]
+	cam.far = GameState.view_distance()
 	add_child(cam)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 4711

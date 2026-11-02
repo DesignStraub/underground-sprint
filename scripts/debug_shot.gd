@@ -7,6 +7,7 @@ extends Node
 ##   -- --at=lake|crossing|alley|fork|tunnel|el|stadium|<viertel>|d:<meter>   setzt das Auto nach dem Start direkt vor die Stelle
 ##   -- --race=2           wählt die Strecke (Index in Catalog.RACES)
 ##   -- --times=1.5,4,8    Zeitpunkte für Screenshots
+##   -- --bench            misst während des Rennens Bildzeit, GPU-Zeit und Draw Calls, gibt am Ende "BENCH ..." aus
 
 const Track := preload("res://scripts/track_builder.gd")
 const Catalog := preload("res://scripts/catalog.gd")
@@ -33,6 +34,10 @@ var look: PackedStringArray = []  # --look=wahrzeichen:höhe:blickhöhe:abstand[
 var _vcam: Camera3D
 var _drift_t := -1.0  # laufendes Drift-Manöver (--drifty)
 var _drift_dir := 0.0
+var bench := false
+var _bench := []  # je Bild: [Bildzeit ms, GPU ms, CPU-Render ms, Draw Calls, Objekte, Dreiecke]
+var _bench_vp := RID()
+var _added := {}  # in diesem Bild neu hinzugefügte Knoten nach Art (Ruckler-Suche)
 
 
 func _ready() -> void:
@@ -42,6 +47,8 @@ func _ready() -> void:
 			prefix = a.substr(7)
 		elif a == "--drive":
 			drive = true
+		elif a == "--bench":
+			bench = true
 		elif a == "--demo":
 			demo = true
 			drive = true
@@ -255,8 +262,120 @@ func _process(dt: float) -> void:
 		_i += 1
 		if _i == times.size() and quit_after <= 0.0:
 			get_tree().quit()
+	if bench and race and "curve" in race and race.player:
+		_bench_sample(race, dt)
+	if OS.get_cmdline_user_args().has("--drawlog") and race and "curve" in race and race.player and race.state == 1 and fmod(_t, 2.0) < dt:
+		var vp: RID = race.world.get_viewport_rid()
+		print("DRAWS t=%.0f d=%.0f draws=%d" % [_t, race.player.progress, RenderingServer.viewport_get_render_info(vp,
+			RenderingServer.VIEWPORT_RENDER_INFO_TYPE_VISIBLE, RenderingServer.VIEWPORT_RENDER_INFO_DRAW_CALLS_IN_FRAME)])
 	if quit_after > 0.0 and _t >= quit_after:
+		_bench_report(race)
 		get_tree().quit()
+
+
+func _bench_sample(race, dt: float) -> void:
+	if not _bench_vp.is_valid():
+		DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
+		Engine.max_fps = 0
+		_bench_vp = race.world.get_viewport_rid()
+		get_tree().node_added.connect(func(nd: Node):
+			var k: String = nd.get_script().resource_path.get_file() if nd.get_script() else nd.get_class()
+			_added[k] = _added.get(k, 0) + 1)
+		RenderingServer.viewport_set_measure_render_time(_bench_vp, true)
+		RenderingServer.viewport_set_measure_render_time(get_viewport().get_viewport_rid(), true)
+		return
+	if race.state != 1:
+		return
+	if _bench.size() == 600:
+		_bench_breakdown(race)
+	var rs := RenderingServer
+	_bench.append([dt * 1000.0,
+		rs.viewport_get_measured_render_time_gpu(_bench_vp) + rs.viewport_get_measured_render_time_gpu(get_viewport().get_viewport_rid()),
+		rs.viewport_get_measured_render_time_cpu(_bench_vp),
+		rs.viewport_get_render_info(_bench_vp, rs.VIEWPORT_RENDER_INFO_TYPE_VISIBLE, rs.VIEWPORT_RENDER_INFO_DRAW_CALLS_IN_FRAME),
+		rs.viewport_get_render_info(_bench_vp, rs.VIEWPORT_RENDER_INFO_TYPE_VISIBLE, rs.VIEWPORT_RENDER_INFO_OBJECTS_IN_FRAME),
+		rs.viewport_get_render_info(_bench_vp, rs.VIEWPORT_RENDER_INFO_TYPE_VISIBLE, rs.VIEWPORT_RENDER_INFO_PRIMITIVES_IN_FRAME),
+		Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0, Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0, _t, _added.duplicate()])
+	_added.clear()
+
+
+## Was steht gerade im Bild? Sichtbare Geometrie nach Herkunft (Auto, Umfahrbares, Strecke ...) gezählt
+func _bench_breakdown(race) -> void:
+	var cam: Camera3D = race.world.get_camera_3d()
+	var planes := cam.get_frustum()
+	var out := {}
+	var stack: Array = [race.world]
+	while not stack.is_empty():
+		var nd: Node = stack.pop_back()
+		stack.append_array(nd.get_children())
+		if not nd is GeometryInstance3D or not (nd as Node3D).is_visible_in_tree():
+			continue
+		var gi := nd as GeometryInstance3D
+		var aabb := gi.global_transform * gi.get_aabb()
+		var c := aabb.get_center()
+		var dist := c.distance_to(cam.global_position)
+		if dist > cam.far + aabb.size.length() * 0.5 or (gi.visibility_range_end > 0.0 and dist > gi.visibility_range_end) or dist < gi.visibility_range_begin:
+			continue
+		var inside := true
+		for pl in planes:
+			if pl.distance_to(c) > aabb.size.length() * 0.5:
+				inside = false
+				break
+		if not inside:
+			continue
+		var owner_k := "track"
+		var p := nd.get_parent()
+		while p and p != race.world:
+			if p.get_script():
+				owner_k = p.get_script().resource_path.get_file()
+				break
+			p = p.get_parent()
+		var k := "%s/%s" % [owner_k, nd.get_class()]
+		out[k] = out.get(k, 0) + 1
+	var keys := out.keys()
+	keys.sort_custom(func(a, b): return out[a] > out[b])
+	print("BENCH sichtbar: ", ", ".join(keys.map(func(k): return "%s=%d" % [k, out[k]])))
+
+
+func _bench_report(race) -> void:
+	if not bench or _bench.size() < 10 or not race or not "track" in race:
+		return
+	var sums := [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+	var worst := []
+	for s in _bench:
+		for k in 8:
+			sums[k] += s[k]
+		worst.append(s[0])
+	worst.sort()
+	var n := float(_bench.size())
+	var med: float = worst[int(n / 2)]
+	var spikes := []  # Ruckler: Bilder über dem Dreifachen des Medians (mind. 20 ms)
+	for s in _bench:
+		if s[0] > maxf(med * 3.0, 20.0):
+			spikes.append("%.1fs:%dms%s" % [s[8], int(s[0]), "" if s[9].is_empty() else str(s[9])])
+	var counts := {"mesh": 0, "multimesh": 0, "omni": 0, "spot": 0, "label": 0, "particles": 0, "bodies": 0}
+	var stack: Array = [race.world]
+	while not stack.is_empty():
+		var nd: Node = stack.pop_back()
+		if nd is MeshInstance3D:
+			counts["mesh"] += 1
+		elif nd is MultiMeshInstance3D:
+			counts["multimesh"] += 1
+		elif nd is OmniLight3D:
+			counts["omni"] += 1
+		elif nd is SpotLight3D:
+			counts["spot"] += 1
+		elif nd is Label3D:
+			counts["label"] += 1
+		elif nd is GPUParticles3D or nd is CPUParticles3D:
+			counts["particles"] += 1
+		elif nd is PhysicsBody3D:
+			counts["bodies"] += 1
+		stack.append_array(nd.get_children())
+	print("BENCH race=%s q=%d frames=%d frame=%.2fms med=%.2fms p99=%.2fms gpu=%.2fms cpu_render=%.2fms process=%.2fms physics=%.2fms draws=%d objs=%d tris=%dk %s" % [
+		race.race["name"], GameState.preset, _bench.size(), sums[0] / n, med, worst[int(n * 0.99) - 1], sums[1] / n, sums[2] / n,
+		sums[6] / n, sums[7] / n, int(sums[3] / n), int(sums[4] / n), int(sums[5] / n / 1000.0), counts])
+	print("BENCH spikes=%d %s" % [spikes.size(), " ".join(spikes.slice(0, 40))])
 
 
 ## Drag-Autopilot: Vollgas, schaltet im grünen Bereich (--lateshift: erst im Begrenzer), weicht Verkehr per

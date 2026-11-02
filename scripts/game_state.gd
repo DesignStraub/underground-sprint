@@ -7,21 +7,35 @@ const SAVE_PATH := "user://save.json"
 ## D-DIN (Datto, SIL Open Font License 1.1, siehe assets/fonts/COPYING.txt)
 const FONT := preload("res://assets/fonts/D-DIN-Bold.otf")
 const FONT_WIDE := preload("res://assets/fonts/D-DINExp-Bold.otf")
-## Grafikstufen. max_h: höchste 3D-Auflösung (Zeilen), darüber wird hochskaliert – bei diesem Stil sieht man den
-## Unterschied zu 4K kaum, die Grafikkarte aber sehr. aa: Kantenglättung, ssr: Spiegelungen auf nasser Straße,
-## ssao: Schatten in Ecken, far: Sichtweite, lod: ab welcher Entfernung Kleinteile/Lampen ausgeblendet werden.
-const QUALITY := [
-	{"name": "Niedrig", "max_h": 720.0, "aa": "aus", "ssr": 0, "ssao": false, "far": 650.0, "lod": [140.0, 280.0, 120.0], "steam": false},
-	{"name": "Mittel", "max_h": 900.0, "aa": "fxaa", "ssr": 16, "ssao": false, "far": 900.0, "lod": [220.0, 420.0, 170.0], "steam": true},
-	{"name": "Hoch", "max_h": 1080.0, "aa": "msaa", "ssr": 32, "ssao": true, "far": 1200.0, "lod": [320.0, 650.0, 240.0], "steam": true},
-]
+## Grafik wie in großen PC-Spielen: eine Voreinstellung (Niedrig bis Ultra) setzt alle Einzeloptionen, jede lässt
+## sich danach einzeln verstellen (dann "Benutzerdefiniert"). Je Option: Stufen, Werte je Stufe, Stufe je Voreinstellung.
+##   res: höchste 3D-Auflösung (Zeilen), darüber wird weich hochskaliert. dynres: senkt sie, wenn die Bildrate fällt.
+##   view: Sichtweite (m). detail: ab welcher Entfernung Kleinteile / mittlere Teile verschwinden und Autos auf die
+##   Fernansicht wechseln. lights: ab wann Laternen ausblenden. fx: Partikel (Regen, Dampf).
+const PRESETS := ["Niedrig", "Mittel", "Hoch", "Ultra"]
+const GFX := {
+	"res": {"label": "3D-Auflösung", "levels": ["540p", "720p", "900p", "1080p", "1440p"], "values": [540.0, 720.0, 900.0, 1080.0, 1440.0], "preset": [1, 2, 3, 4]},
+	"dynres": {"label": "Dynamische Auflösung", "levels": ["Aus", "An"], "values": [false, true], "preset": [1, 1, 0, 0]},
+	"view": {"label": "Sichtweite", "levels": ["Niedrig", "Mittel", "Hoch", "Ultra"], "values": [600.0, 850.0, 1100.0, 1400.0], "preset": [0, 1, 2, 3]},
+	"detail": {"label": "Detaildichte", "levels": ["Niedrig", "Mittel", "Hoch", "Ultra"],
+		"values": [[110.0, 230.0, 25.0], [170.0, 340.0, 35.0], [260.0, 520.0, 50.0], [380.0, 800.0, 80.0]], "preset": [0, 1, 2, 3]},
+	"lights": {"label": "Lichter", "levels": ["Niedrig", "Mittel", "Hoch", "Ultra"], "values": [80.0, 120.0, 170.0, 250.0], "preset": [0, 1, 2, 3]},
+	"aa": {"label": "Kantenglättung", "levels": ["Aus", "FXAA", "MSAA 2x", "MSAA 4x"], "values": ["aus", "fxaa", "msaa2", "msaa4"], "preset": [0, 1, 2, 3]},
+	"bloom": {"label": "Glühen", "levels": ["Aus", "An"], "values": [false, true], "preset": [1, 1, 1, 1]},
+	"ssr": {"label": "Spiegelungen", "levels": ["Aus", "Niedrig", "Hoch"], "values": [0, 16, 32], "preset": [0, 1, 2, 2], "desktop": true},
+	"ssao": {"label": "Umgebungsverdeckung", "levels": ["Aus", "An"], "values": [false, true], "preset": [0, 0, 1, 1], "desktop": true},
+	"fx": {"label": "Effekte", "levels": ["Niedrig", "Mittel", "Hoch"], "values": [0, 1, 2], "preset": [0, 1, 2, 2]},
+}
+const GFX_ORDER := ["res", "dynres", "view", "detail", "lights", "aa", "bloom", "ssr", "ssao", "fx"]
 const PIXEL_H := 540.0  # Pixel-Look: 3D in 540 Zeilen, pixelgenau hochskaliert
 const FPS_LIMITS := [0, 30, 60, 120]
 
 signal graphics_changed
 
-## Grafik-Einstellungen (werden gespeichert)
-var quality := 0 if OS.has_feature("web") else 1  # im Browser (und auf dem Handy) erst einmal niedrig
+## Grafik-Einstellungen (werden gespeichert). preset -1 = Benutzerdefiniert
+var preset := -1
+var gfx := {}
+var show_fps := false
 var pixel_look := false
 ## Touch-Knöpfe im Rennen: 0 Auto (nur Handy/Tablet), 1 immer, 2 nie
 var touch_mode := 0
@@ -44,6 +58,7 @@ func _ready() -> void:
 	# Schrift im Stil der deutschen Straßenschilder (DIN 1451) für alles: Menü, HUD, Schilder in der Welt
 	ThemeDB.fallback_font = FONT
 	_setup_input()
+	apply_preset(_default_preset())
 	load_game()
 	I18n.setup(language if language != "" else "en")
 	_build_rotate_hint()
@@ -52,10 +67,11 @@ func _ready() -> void:
 		if a.begins_with("--race="):
 			race_index = clampi(int(a.substr(7)), 0, Catalog.RACES.size() - 1)
 		elif a.begins_with("--quality="):  # nur für Tests, wird nicht gespeichert
-			quality = clampi(int(a.substr(10)), 0, QUALITY.size() - 1)
+			apply_preset(clampi(int(a.substr(10)), 0, PRESETS.size() - 1))
 		elif a.begins_with("--pixel="):
 			pixel_look = a.substr(8) == "1"
 	apply_display()
+	_build_fps_overlay()
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--shot=") or a.begins_with("--at=") or a.begins_with("--quit=") or a in ["--drive", "--demo"]:
 			add_child(preload("res://scripts/debug_shot.gd").new())
@@ -125,8 +141,39 @@ func toggle_fullscreen() -> void:
 	save_game()
 
 
-func q() -> Dictionary:
-	return QUALITY[quality]
+## Erststart: Handy/Tablet Niedrig, Browser am Rechner und alle anderen Mittel (beide mit dynamischer Auflösung)
+func _default_preset() -> int:
+	return 0 if is_mobile() else 1
+
+
+func apply_preset(i: int) -> void:
+	preset = i
+	for k in GFX:
+		gfx[k] = GFX[k]["preset"][i]
+
+
+## Wert einer Grafikoption in der eingestellten Stufe
+func gv(key: String):
+	return GFX[key]["values"][gfx[key]]
+
+
+## Optionen, die es nur mit dem vollen Renderer gibt (im Browser nicht)
+func gfx_available(key: String) -> bool:
+	return not GFX[key].get("desktop", false) or RenderingServer.get_current_rendering_method() != "gl_compatibility"
+
+
+func view_distance() -> float:
+	return gv("view")
+
+
+## [Kleinteile, mittlere Teile, Lampen] für Track.apply_lod
+func lod_ranges() -> Array:
+	var d: Array = gv("detail")
+	return [d[0], d[1], gv("lights")]
+
+
+func car_lod_distance() -> float:
+	return gv("detail")[2]
 
 
 ## V-Sync, FPS-Limit und Vollbild auf das Fenster anwenden
@@ -139,11 +186,28 @@ func apply_display() -> void:
 		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
 
 
-## Eine Einstellung weiterschalten, anwenden und speichern
-func cycle_setting(key: String) -> void:
+## Eine Einstellung weiterschalten (dir -1: zurück), anwenden und speichern
+func cycle_setting(key: String, dir := 1) -> void:
+	if GFX.has(key):
+		var n: int = GFX[key]["levels"].size()
+		gfx[key] = posmod(gfx[key] + dir, n)
+		preset = -1
+		for i in PRESETS.size():
+			if GFX_ORDER.all(func(k): return gfx[k] == GFX[k]["preset"][i]):
+				preset = i
+		apply_display()
+		graphics_changed.emit()
+		save_game()
+		return
+	if key == "preset" and dir < 0:
+		apply_preset(posmod((preset if preset >= 0 else 0) - 1, PRESETS.size()))
+		apply_display()
+		graphics_changed.emit()
+		save_game()
+		return
 	match key:
-		"quality":
-			quality = (quality + 1) % QUALITY.size()
+		"preset":
+			apply_preset((maxi(preset, -1) + 1) % PRESETS.size())
 		"pixel":
 			pixel_look = not pixel_look
 		"vsync":
@@ -152,6 +216,8 @@ func cycle_setting(key: String) -> void:
 			fps_limit = (fps_limit + 1) % FPS_LIMITS.size()
 		"touch":
 			touch_mode = (touch_mode + 1) % 3
+		"show_fps":
+			show_fps = not show_fps
 	apply_display()
 	graphics_changed.emit()
 	save_game()
@@ -202,8 +268,10 @@ func set_language(lang: String) -> void:
 
 func setting_text(key: String) -> String:
 	match key:
-		"quality":
-			return tr("Grafik: ") + tr(q()["name"])
+		"preset":
+			return tr("Voreinstellung: ") + tr(PRESETS[preset] if preset >= 0 else "Benutzerdefiniert")
+		"show_fps":
+			return tr("FPS anzeigen: ") + tr("An" if show_fps else "Aus")
 		"pixel":
 			return tr("Pixel-Look: ") + tr("An" if pixel_look else "Aus")
 		"vsync":
@@ -216,6 +284,8 @@ func setting_text(key: String) -> String:
 			return tr("Sprache: ") + I18n.NAMES.get(language if language != "" else "en", "English")
 		"touch":
 			return tr("Touch-Steuerung: ") + tr(["Auto", "An", "Aus"][touch_mode])
+	if GFX.has(key):
+		return tr(GFX[key]["label"]) + ": " + tr(GFX[key]["levels"][gfx[key]])
 	return key
 
 
@@ -331,7 +401,8 @@ func save_game() -> void:
 	f.store_string(JSON.stringify({
 		"wins": wins, "drift_wins": drift_wins, "current_car": current_car, "race_index": race_index,
 		"best_times": best_times, "car_configs": car_configs, "won_events": won_events,
-		"gfx": {"quality": quality, "pixel": pixel_look, "vsync": vsync, "fps": fps_limit, "fullscreen": fullscreen, "touch": touch_mode},
+		"gfx": {"preset": preset, "opts": gfx, "pixel": pixel_look, "vsync": vsync, "fps": fps_limit, "fullscreen": fullscreen,
+			"touch": touch_mode, "show_fps": show_fps},
 		"language": language,
 	}, "\t"))
 
@@ -354,10 +425,16 @@ func load_game() -> void:
 		if best_times.has(old):
 			best_times[Catalog.RENAMED[old]] = best_times[old]
 			best_times.erase(old)
-	var gfx: Dictionary = data.get("gfx", {})
-	quality = clampi(int(gfx.get("quality", quality)), 0, QUALITY.size() - 1)
+	var g: Dictionary = data.get("gfx", {})
+	if g.has("opts"):
+		preset = clampi(int(g.get("preset", -1)), -1, PRESETS.size() - 1)
+		for k in GFX:
+			gfx[k] = clampi(int(g["opts"].get(k, gfx[k])), 0, GFX[k]["levels"].size() - 1)
+	elif g.has("quality"):
+		apply_preset(clampi(int(g["quality"]), 0, 2))  # alter Spielstand: Niedrig/Mittel/Hoch
+	show_fps = bool(g.get("show_fps", false))
 	# alter Spielstand: Pixel-Stufe Stark/Mittel = Pixel-Look an
-	pixel_look = bool(gfx.get("pixel", int(data.get("pixel_mode_v2", 2)) <= 1))
+	pixel_look = bool(g.get("pixel", int(data.get("pixel_mode_v2", 2)) <= 1))
 	language = str(data.get("language", ""))
 	if data.has("won_events"):
 		won_events = Array(data["won_events"])
@@ -366,10 +443,10 @@ func load_game() -> void:
 		won_events = []
 		for i in mini(wins + drift_wins, Catalog.CAREER.size()):
 			won_events.append(Catalog.CAREER[i])
-	vsync = bool(gfx.get("vsync", true))
-	fps_limit = clampi(int(gfx.get("fps", 0)), 0, FPS_LIMITS.size() - 1)
-	fullscreen = bool(gfx.get("fullscreen", false))
-	touch_mode = clampi(int(gfx.get("touch", 0)), 0, 2)
+	vsync = bool(g.get("vsync", true))
+	fps_limit = clampi(int(g.get("fps", 0)), 0, FPS_LIMITS.size() - 1)
+	fullscreen = bool(g.get("fullscreen", false))
+	touch_mode = clampi(int(g.get("touch", 0)), 0, 2)
 	car_configs = {}
 	var cc: Dictionary = data.get("car_configs", {})
 	for car_id in cc:
@@ -391,6 +468,45 @@ func reset_progress() -> void:
 	car_configs = {}
 	won_events = []
 	save_game()
+
+
+## FPS-Anzeige oben in der Mitte (Einstellung "FPS anzeigen"), dazu die aktuelle 3D-Auflösung. Dort ist in der
+## Garage und im Rennen frei (Siege und Auto stehen rechts, Platz und Zeit links).
+var _fps_label: Label
+var _fps_t := 0.0
+var render_lines := 0  # aktuelle 3D-Auflösung (Zeilen), setzt PixelView
+
+
+func _build_fps_overlay() -> void:
+	var cl := CanvasLayer.new()
+	cl.layer = 99
+	add_child(cl)
+	_fps_label = Label.new()
+	_fps_label.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	_fps_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_fps_label.offset_left = -50.0
+	_fps_label.offset_right = 50.0
+	_fps_label.offset_top = 2.0
+	_fps_label.offset_bottom = 15.0
+	_fps_label.add_theme_font_size_override("font_size", 10)
+	var bg := StyleBoxFlat.new()
+	bg.bg_color = Color(0, 0, 0, 0.55)
+	bg.set_corner_radius_all(3)
+	_fps_label.add_theme_stylebox_override("normal", bg)
+	_fps_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	cl.add_child(_fps_label)
+
+
+func _process(dt: float) -> void:
+	if _fps_label == null:
+		return
+	_fps_label.visible = show_fps
+	_fps_t -= dt
+	if show_fps and _fps_t <= 0.0:
+		_fps_t = 0.5
+		var fps := Engine.get_frames_per_second()
+		_fps_label.text = "%d FPS" % fps + ("  ·  %dp" % render_lines if render_lines > 0 else "")
+		_fps_label.modulate = Color(0.4, 1.0, 0.5) if fps >= 55 else (Color(1.0, 0.85, 0.3) if fps >= 30 else Color(1.0, 0.35, 0.3))
 
 
 ## Hochkant auf dem Handy: Hinweis zum Drehen (das Spiel ist für Querformat gebaut)

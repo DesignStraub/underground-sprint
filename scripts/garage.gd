@@ -66,10 +66,13 @@ func _build_scene() -> void:
 	env.ambient_light_color = Color(0.3, 0.3, 0.45)
 	env.ambient_light_energy = 0.3
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
-	env.glow_enabled = true
 	env.glow_intensity = 1.0
 	env.glow_hdr_threshold = 0.9
-	env.ssr_enabled = GameState.q()["ssr"] > 0
+	var apply_gfx := func():
+		env.glow_enabled = GameState.gv("bloom")
+		env.ssr_enabled = GameState.gfx_available("ssr") and GameState.gv("ssr") > 0
+	apply_gfx.call()
+	GameState.graphics_changed.connect(apply_gfx)
 	var we := WorldEnvironment.new()
 	we.environment = env
 	world.add_child(we)
@@ -420,7 +423,7 @@ func _process(dt: float) -> void:
 func _show_car(car_id: String, cfg: Dictionary) -> void:
 	if car_node:
 		car_node.queue_free()
-	car_node = Builder.build(car_id, cfg, false)
+	car_node = Builder.build(car_id, cfg, false, false)
 	turntable.add_child(car_node)
 	car_node.position.y = 0.06
 
@@ -478,36 +481,77 @@ func _show_main() -> void:
 	_focus_first()
 
 
+## Erklärung je Einstellung (unten im Infofeld)
+const SETTING_HINTS := {
+	"graphics": "Grafik wie in großen PC-Spielen: Voreinstellung wählen oder jede Option einzeln anpassen.",
+	"preset": "Niedrig: für Handy, Tablet und schwache Rechner. Mittel: ausgewogen. Hoch und Ultra: für starke Grafikkarten. Links/Rechts wechselt.",
+	"res": "Höchste Auflösung der 3D-Welt, darüber wird weich hochskaliert. Größter Hebel für die Bildrate.",
+	"dynres": "Senkt die 3D-Auflösung automatisch, wenn die Bildrate unter 60 fällt, und hebt sie danach wieder an.",
+	"view": "Wie weit du siehst. Weiter = mehr Häuser und Wahrzeichen im Bild, kostet Leistung.",
+	"detail": "Ab welcher Entfernung Kleinteile verschwinden und Autos vereinfacht gezeichnet werden.",
+	"lights": "Bis zu welcher Entfernung Laternen und Leuchtreklamen die Straße beleuchten.",
+	"aa": "Glättet Treppchen an Kanten. MSAA ist schärfer, kostet aber mehr.",
+	"bloom": "Leuchtreklamen, Scheinwerfer und Neon strahlen über.",
+	"ssr": "Spiegelungen auf nasser Straße. Teuer.",
+	"ssao": "Weiche Schatten in Ecken und unter Autos. Teuer.",
+	"fx": "Regen, Dampf aus Gullys und andere Partikel.",
+	"pixel": "Pixel-Look: die 3D-Welt grob gerastert wie ein Retro-Spiel. Spart zusätzlich Leistung.",
+	"vsync": "V-Sync: kein Bildreißen. Aus = mehr FPS, aber evtl. Tearing.",
+	"fps": "FPS-Limit: begrenzt die Bildrate (schont Akku und Lüfter).",
+	"show_fps": "Zeigt oben in der Mitte Bildrate und aktuelle 3D-Auflösung.",
+	"fullscreen": "Vollbild (auch F / F11).",
+	"language": "Sprache des Spiels. Titel, Orte und Schilder bleiben deutsch.",
+	"touch": "Touch-Knöpfe im Rennen. Auto: nur auf Handy und Tablet.",
+}
+
+
 ## Grafik, Vollbild, Spielstand: nicht auf der Startseite, sondern gesammelt hier
 func _show_settings() -> void:
 	_clear_menu()
 	_set_section("EINSTELLUNGEN")
-	var hints := {
-		"quality": "Niedrig: schnell, ohne Spiegelungen. Mittel: Spiegelungen auf nasser Straße. Hoch: alles, braucht eine starke Grafikkarte. Gilt ab dem nächsten Rennen.",
-		"pixel": "Pixel-Look: die 3D-Welt grob gerastert wie ein Retro-Spiel. Spart zusätzlich Leistung.",
-		"vsync": "V-Sync: kein Bildreißen. Aus = mehr FPS, aber evtl. Tearing.",
-		"fps": "FPS-Limit: begrenzt die Bildrate (schont Akku und Lüfter).",
-		"fullscreen": "Vollbild (auch F / F11).",
-		"language": "Sprache des Spiels. Titel, Orte und Schilder bleiben deutsch.",
-		"touch": "Touch-Knöpfe im Rennen. Auto: nur auf Handy und Tablet.",
-	}
-	for key in ["language", "quality", "pixel", "vsync", "fps", "fullscreen", "touch"]:
-		var k: String = key
-		var b := _button(GameState.setting_text(k), func(): pass)
-		b.pressed.connect(func():
-			if k == "language":
-				_show_language(false)
-				return
-			if k == "fullscreen":
-				GameState.toggle_fullscreen()
-			else:
-				GameState.cycle_setting(k)
-			b.text = GameState.setting_text(k))
-		b.focus_entered.connect(func(): info.text = tr(hints[k]))
+	var g := _button("Grafik  >", _show_graphics)
+	g.focus_entered.connect(func(): info.text = tr(SETTING_HINTS["graphics"]))
+	for key in ["language", "show_fps", "vsync", "fps", "fullscreen", "touch"]:
+		_setting_button(key)
 	_button("Spielstand zurücksetzen", _confirm_reset)
 	_button("< Zurück", _show_main)
-	info.text = tr(hints["language"])
+	info.text = tr(SETTING_HINTS["graphics"])
 	_focus_first()
+
+
+## Grafikmenü: Voreinstellung oben, darunter jede Option einzeln (Links/Rechts oder Klick schaltet um).
+## Optionen, die der Browser-Renderer nicht kann (Spiegelungen, Umgebungsverdeckung), fehlen dort.
+func _show_graphics() -> void:
+	_clear_menu()
+	_set_section("GRAFIK")
+	for key in ["preset"] + GameState.GFX_ORDER.filter(GameState.gfx_available) + ["pixel"]:
+		_setting_button(key)
+	_button("< Zurück", _show_settings)
+	info.text = tr(SETTING_HINTS["preset"])
+	_focus_first()
+
+
+func _setting_button(k: String) -> Button:
+	var b := _button(GameState.setting_text(k), func(): pass)
+	b.set_meta("setting", k)
+	var change := func(dir: int):
+		if k == "language":
+			_show_language(false)
+			return
+		if k == "fullscreen":
+			GameState.toggle_fullscreen()
+		else:
+			GameState.cycle_setting(k, dir)
+		Sfx.play("whoosh", -22.0, 1.6)
+		# Voreinstellung ändert alle Optionen, eine Option ggf. die Voreinstellung: alle Texte neu
+		for c in menu.get_children():
+			if c.has_meta("setting"):
+				c.text = GameState.setting_text(c.get_meta("setting")).to_upper()
+	b.pressed.connect(change.bind(1))
+	if k != "language":
+		b.gui_input.connect(func(ev): _lr_input(ev, change))
+	b.focus_entered.connect(func(): info.text = tr(SETTING_HINTS[k]))
+	return b
 
 
 ## Karriere wie in NFS: alle Events der Reihe nach, ein Sieg öffnet das nächste. Rechts die Deutschlandkarte.

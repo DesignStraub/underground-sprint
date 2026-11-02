@@ -156,7 +156,7 @@ Auf Handy und Tablet erscheinen Knöpfe, am Rechner nicht (Einstellungen → Tou
 das Gerät am Browser, auch iPads im Desktop-Modus): links Lenken (Daumen kann rüberrutschen), rechts Gas, Bremse, Handbremse, Nitro,
 im Drag Hoch-/Runterschalten statt Bremse; Pause oben in der Mitte, Drehzahlmesser klein oben rechts. Hochkant kommt
 ein Hinweis zum Drehen. Auf Handys werden in den Städten nur die Häuser nahe der Strecke gebaut, Grafik startet
-niedrig. Zum Testen am Rechner: `-- --touch`.
+auf „Niedrig“ mit dynamischer Auflösung. Zum Testen am Rechner: `-- --touch`.
 
 ## Sprachen
 Englisch und Deutsch: Beim ersten Start fragt das Spiel (Englisch vorausgewählt), später unter Einstellungen → Sprache.
@@ -170,11 +170,25 @@ D-DIN von Datto, SIL Open Font License 1.1 (`assets/fonts/COPYING.txt`). Alte en
 Spielstand automatisch umgeschrieben, der Spielstand aus „Underground Sprint“ wird beim ersten Start übernommen.
 
 ## Grafik
-Garage → Einstellungen (wird gespeichert):
-- **Grafik Niedrig / Mittel / Hoch:** 3D-Auflösung höchstens 720/900/1080 Zeilen (auf 4K-Bildschirmen wird
-  hochskaliert – spart sehr viel), Kantenglättung, Spiegelungen auf nasser Straße (ab Mittel), Schatten in Ecken
-  (Hoch), Sichtweite und Detailstufen. Gemessen bei 2560×1440: Niedrig ~140, Mittel/Hoch ~95 fps.
-- **Pixel-Look An/Aus**, **V-Sync**, **FPS-Limit**, **Vollbild**.
+Garage → Einstellungen → Grafik (wird gespeichert), aufgebaut wie in großen PC-Spielen: eine **Voreinstellung**
+(Niedrig / Mittel / Hoch / Ultra) setzt alle Optionen, jede lässt sich danach einzeln verstellen (Links/Rechts),
+dann steht „Benutzerdefiniert“ da. Werte in `GameState.GFX`.
+- **3D-Auflösung** 540p–1440p (höchstens so viele Zeilen, darüber weich hochskaliert), **Dynamische Auflösung**
+  (fällt die Bildrate unter 60, geht die 3D-Auflösung in Stufen bis 60 % herunter; bringt das nichts, weil der
+  Prozessor bremst, bleibt sie oben), **Sichtweite** 600–1400 m, **Detaildichte** (ab wann Kleinteile verschwinden
+  und Autos auf die Fernansicht wechseln), **Lichter** (Reichweite der Laternen), **Kantenglättung** (Aus, FXAA,
+  MSAA 2x/4x), **Glühen**, **Spiegelungen** und **Umgebungsverdeckung** (nur am Rechner, nicht im Browser),
+  **Effekte** (Regen, Dampf), **Pixel-Look**.
+- Einstellungen: **FPS anzeigen** (oben in der Mitte, mit aktueller 3D-Auflösung), **V-Sync**, **FPS-Limit**, **Vollbild**.
+- Erststart: Handy/Tablet „Niedrig“, sonst „Mittel“ (beide mit dynamischer Auflösung).
+- **Leistung:** Unbewegliche Teile der Strecke werden je Material und Rasterzelle zu einem Mesh verschmolzen
+  (`Track.batch_static`), Autos je Material und beweglichem Teil (Karosserie, Räder), dazu eine Fernansicht in
+  Vertexfarben mit wenigen Flächen (`CarBuilder._build_lod`). Das halbiert etwa die Draw Calls. Im Browser fährt
+  vor dem Start eine unsichtbare Kamera die Strecke ab, damit alle Shader übersetzt sind, bevor es losgeht
+  („Strecke wird vorbereitet“), sonst ruckelt es beim ersten Anblick jedes neuen Materials. Verkehr außer
+  Sichtweite wird ausgeblendet und nur zweimal pro Sekunde bewegt, der Motorsound rechnet auf Handy/Tablet mit
+  halber Abtastrate. Messmodus: `-- --race=N --drive --quit=32 --bench` (Bildzeit, Draw Calls, Ruckler,
+  was im Bild ist); `--nobatch` schaltet das Verschmelzen zum Vergleich ab.
 - Verkehr nach Schwierigkeit: 1 Stern ohne, 2 Sterne wenig, 3 Sterne voller Verkehr.
 - **Tempo-Stufe:** am Anfang fahren alle (auch Gegner) mit 72 % Höchsttempo, mit jedem Sieg mehr, ab 20 Siegen volles Tempo.
 - **Fahrgefühl:** alle Autos mit Heckantrieb; mit Gas in der Kurve schiebt das Heck raus, im Drift dreht das Auto
@@ -195,8 +209,8 @@ Garage → Einstellungen (wird gespeichert):
 Vorlagen für Windows, macOS, Linux und Web stehen in `export_presets.cfg` (Godot-Exportvorlagen 4.7.1 nötig).
 
 **Im Browser:** Die Web-Version (`builds/web`, ohne Threads, läuft auf itch.io ohne Sondereinstellungen) nutzt den
-einfacheren WebGL-Renderer: keine Spiegelungen auf der Straße, entfernte Kleinteile werden ausgeblendet,
-Pixel-Look startet auf „Mittel“. Deshalb gibt es keine Shader-Werte pro Objekt (Häuser sind zu Meshes je
+einfacheren WebGL-Renderer: keine Spiegelungen auf der Straße und keine Umgebungsverdeckung (fehlen dort im
+Grafikmenü), entfernte Kleinteile werden ausgeblendet. Deshalb gibt es keine Shader-Werte pro Objekt (Häuser sind zu Meshes je
 Stadtzelle zusammengefasst, ihre Werte stehen in den Vertexdaten). Lokal testen:
 `python3 -m http.server 8060 --directory builds/web`.
 Texte, Cover und Screenshots für die itch.io-Seite: `release/`.

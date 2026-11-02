@@ -84,7 +84,7 @@ const SHAPES := {
 }
 
 
-static func build(car_id: String, cfg: Dictionary, headlights := true) -> Node3D:
+static func build(car_id: String, cfg: Dictionary, headlights := true, lod := true) -> Node3D:
 	var spec: Dictionary = Catalog.CARS[car_id]
 	var S: Dictionary = SHAPES.get(car_id, SHAPES["kaizen"])
 	var P: Dictionary = Catalog.PARTS
@@ -466,6 +466,10 @@ static func build(car_id: String, cfg: Dictionary, headlights := true) -> Node3D
 				fronts.append(pivot)
 
 	body.position.y -= Catalog.part_of(cfg, "suspension")["drop"]
+	if not OS.get_cmdline_user_args().has("--nobatch"):
+		_merge_parts(root, body, fronts, spinners, flames)
+		if lod:
+			_build_lod(root, flames, GameState.car_lod_distance())
 	_set_layer(root)
 	root.set_meta("body", body)
 	root.set_meta("front_pivots", fronts)
@@ -475,6 +479,187 @@ static func build(car_id: String, cfg: Dictionary, headlights := true) -> Node3D
 	root.set_meta("width", W)
 	root.set_meta("eye", Vector3(0, S["roof"] - 0.1, zf + (S["cowl"] + 0.07) * L))
 	return root
+
+
+## Ein Auto hat 50 bis 70 Einzelteile, jedes wäre ein eigener Draw Call. Alles, was sich gemeinsam bewegt
+## (Karosserie, jeder Achsschenkel, jedes Rad), wird je Material zu einer Fläche verschmolzen.
+static func _merge_parts(root: Node3D, body: Node3D, fronts: Array, spinners: Array, flames: Array) -> void:
+	var stops := {body: true}
+	for n in fronts + spinners + flames:
+		stops[n] = true
+	var canon := {}
+	for g in [root, body] + fronts + spinners:
+		var buckets := {}
+		collect_static(g, Transform3D.IDENTITY, stops, canon, buckets, func(_mi, _xf): return 0)
+		merge_buckets(g, buckets)
+
+
+## Fernansicht: das ganze Auto als eine Fläche in Vertexfarben, dazu je eine Fläche für Leuchtteile. Ab dist
+## zeichnet die Grafikkarte nur das statt ~40 Einzelflächen; Räder und Neigung sieht man von dort ohnehin nicht.
+static func _build_lod(root: Node3D, flames: Array, dist: float) -> void:
+	var stops := {}
+	for f in flames:
+		stops[f] = true
+	var buckets := {}
+	collect_static(root, Transform3D.IDENTITY, stops, {}, buckets, func(_mi, _xf): return 0)
+	var mesh := ArrayMesh.new()
+	var pos := PackedVector3Array()
+	var nrm := PackedVector3Array()
+	var col := PackedColorArray()
+	for key in buckets:
+		var st := SurfaceTool.new()
+		for it in buckets[key]:
+			st.append_from(it[0], it[1], it[2])
+		var m: Material = key[0]
+		var plain: bool = m is StandardMaterial3D and not (m as StandardMaterial3D).emission_enabled \
+			and (m as StandardMaterial3D).albedo_texture == null and key[1][0]
+		if not plain:
+			st.commit(mesh)
+			mesh.surface_set_material(mesh.get_surface_count() - 1, m)
+			continue
+		st.deindex()
+		var arr := st.commit_to_arrays()
+		var n: int = arr[Mesh.ARRAY_VERTEX].size()
+		pos.append_array(arr[Mesh.ARRAY_VERTEX])
+		nrm.append_array(arr[Mesh.ARRAY_NORMAL])
+		var c := PackedColorArray()
+		c.resize(n)
+		c.fill((m as StandardMaterial3D).albedo_color)
+		col.append_array(c)
+	if not pos.is_empty():
+		var arrays := []
+		arrays.resize(Mesh.ARRAY_MAX)
+		arrays[Mesh.ARRAY_VERTEX] = pos
+		arrays[Mesh.ARRAY_NORMAL] = nrm
+		arrays[Mesh.ARRAY_COLOR] = col
+		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+		var lm := StandardMaterial3D.new()
+		lm.vertex_color_use_as_albedo = true
+		lm.vertex_color_is_srgb = true
+		lm.metallic = 0.35
+		lm.roughness = 0.4
+		mesh.surface_set_material(mesh.get_surface_count() - 1, lm)
+	# Nahansicht (alles mit Mesh außer Flammen und Lichtteppich) blendet ab dist aus, die Fernansicht ein
+	var near := [root]
+	while not near.is_empty():
+		var nd: Node = near.pop_back()
+		near.append_array(nd.get_children())
+		if nd is MeshInstance3D and not stops.has(nd) and (nd as MeshInstance3D).transparency == 0.0 \
+				and not ((nd as MeshInstance3D).material_override is BaseMaterial3D and (nd as MeshInstance3D).material_override.transparency):
+			(nd as GeometryInstance3D).visibility_range_end = dist
+			(nd as GeometryInstance3D).visibility_range_end_margin = 2.0
+	var mi := MeshInstance3D.new()
+	mi.name = "Lod"
+	mi.mesh = mesh
+	mi.visibility_range_begin = dist
+	mi.visibility_range_begin_margin = 2.0
+	root.add_child(mi)
+
+
+## Fasst alle unbeweglichen Teile unter n je Material zusammen (Verkehrsautos, Laternen und anderes Umfahrbares)
+static func merge_static(n: Node3D) -> void:
+	var buckets := {}
+	collect_static(n, Transform3D.IDENTITY, {}, {}, buckets, func(_mi, _xf): return 0)
+	merge_buckets(n, buckets)
+
+
+## Sammelt unbewegliche Mesh-Flächen unterhalb von n (nur durch einfache Node3D hindurch, ohne Skripte) in
+## Eimer [Material, Format, extra] -> [[Mesh, Fläche, Transform, Knoten]]. extra(mi, xf) teilt zusätzlich auf
+## (Rasterzelle, Detailstufe).
+static func collect_static(n: Node, xf: Transform3D, stops: Dictionary, canon: Dictionary, buckets: Dictionary, extra: Callable) -> void:
+	for c in n.get_children():
+		if stops.has(c) or not c is Node3D:
+			continue
+		var cxf: Transform3D = xf * (c as Node3D).transform
+		if c is MeshInstance3D:
+			var mi := c as MeshInstance3D
+			if mi.mesh == null or mi.get_script() != null or mi.get_child_count() > 0 or not mi.visible or mi.material_overlay \
+					or mi.transparency > 0.0 or mi.visibility_range_end > 0.0:
+				continue
+			var parts := []
+			for si in mi.mesh.get_surface_count():
+				var m: Material = mi.get_surface_override_material(si)
+				if m == null:
+					m = mi.material_override if mi.material_override else mi.mesh.surface_get_material(si)
+				var cm = merge_material(m, canon)
+				if cm == null or (mi.mesh is ArrayMesh and (mi.mesh as ArrayMesh).surface_get_primitive_type(si) != Mesh.PRIMITIVE_TRIANGLES):
+					parts = []
+					break
+				parts.append([cm, si])
+			for pt in parts:
+				var key := [pt[0], surface_format(mi.mesh, pt[1]), extra.call(mi, cxf)]
+				if not buckets.has(key):
+					buckets[key] = []
+				buckets[key].append([mi.mesh, pt[1], cxf, mi])
+		elif c.get_class() == "Node3D" and c.get_script() == null and (c as Node3D).visible:
+			collect_static(c, cxf, stops, canon, buckets, extra)
+
+
+## Verschmilzt jeden Eimer mit mindestens zwei Teilen zu einem Mesh unter parent und entfernt die Einzelteile.
+## Liefert die neuen MeshInstances.
+static func merge_buckets(parent: Node3D, buckets: Dictionary) -> Array:
+	var made := []
+	var gone := {}
+	for key in buckets:
+		var items: Array = buckets[key]
+		if items.size() < 2:
+			continue
+		var st := SurfaceTool.new()
+		for it in items:
+			st.append_from(it[0], it[1], it[2])
+			gone[it[3]] = true
+		var mi := MeshInstance3D.new()
+		mi.mesh = st.commit()
+		mi.material_override = key[0]
+		mi.set_meta("merge_extra", key[2])
+		parent.add_child(mi)
+		made.append(mi)
+	# Teile mit mehreren Flächen nur entfernen, wenn alle Flächen verschmolzen wurden
+	for key in buckets:
+		if buckets[key].size() < 2:
+			for it in buckets[key]:
+				gone.erase(it[3])
+	for old in gone:
+		if is_instance_valid(old):
+			old.get_parent().remove_child(old)
+			old.free()
+	return made
+
+
+## Material, das beim Verschmelzen stellvertretend für alle mit gleichen Werten steht, oder null, wenn es nicht geht
+## (durchsichtig, Billboard, Triplanar oder ein Shader, der Position/Instanz des Einzelobjekts braucht).
+static func merge_material(m: Material, canon: Dictionary):
+	if m == null:
+		return null
+	if canon.has(m):
+		return canon[m]
+	var res = null
+	if m is ShaderMaterial:
+		var code: String = (m as ShaderMaterial).shader.code if (m as ShaderMaterial).shader else "NODE_POSITION"
+		if not ("NODE_POSITION" in code or "INSTANCE" in code or "billboard" in code):
+			res = m
+	elif m is StandardMaterial3D:
+		var sm := m as StandardMaterial3D
+		if sm.transparency == BaseMaterial3D.TRANSPARENCY_DISABLED and sm.billboard_mode == BaseMaterial3D.BILLBOARD_DISABLED \
+				and not (sm.uv1_triplanar or sm.uv2_triplanar or sm.grow or sm.use_point_size or sm.fixed_size or sm.next_pass):
+			var key := []
+			for prop in sm.get_property_list():
+				if prop["usage"] & PROPERTY_USAGE_STORAGE and not prop["name"].begins_with("resource_"):
+					var v = sm.get(prop["name"])
+					key.append(v.get_instance_id() if v is Object else v)
+			var k := str(key)
+			if not canon.has(k):
+				canon[k] = sm
+			res = canon[k]
+	canon[m] = res
+	return res
+
+
+## Welche Vertex-Daten eine Fläche hat; nur Gleiches lässt sich verschmelzen
+static func surface_format(mesh: Mesh, si: int) -> Array:
+	var a := mesh.surface_get_arrays(si)
+	return [a[Mesh.ARRAY_NORMAL] != null, a[Mesh.ARRAY_TANGENT] != null, a[Mesh.ARRAY_TEX_UV] != null,
+		a[Mesh.ARRAY_COLOR] != null, a[Mesh.ARRAY_TEX_UV2] != null, a[Mesh.ARRAY_INDEX] != null]
 
 
 static func _set_layer(n: Node) -> void:

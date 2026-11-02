@@ -1,6 +1,8 @@
 extends Control
 ## Streckenkarte: Deutschland im Neon-Look, jede Stadt mit Events als Punkt. Gesperrt grau, frei grün, gewonnen gold,
 ## die gewählte Stadt pulsiert und trägt ihren Namen. Die Karriere-Route verbindet die freien Städte der Reihe nach.
+## Die Karte selbst zeichnet ein Kind-Element nur bei Größenänderung neu (die Umrisse sind teuer zu zerlegen),
+## jedes Bild nur der Puls.
 
 const MapData := preload("res://scripts/map_data.gd")
 const Catalog := preload("res://scripts/catalog.gd")
@@ -13,16 +15,25 @@ const K := 0.63  # cos(51°): Längengrade sind hier kürzer als Breitengrade
 var selected := ""  # Eventname
 var _t := 0.0
 var _font: Font
+var _map: Control
 
 
 func _ready() -> void:
 	_font = UI.font("cond", 0.12)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_map = Control.new()
+	_map.show_behind_parent = true
+	_map.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_map.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_map.draw.connect(_draw_map)
+	add_child(_map)
+	visibility_changed.connect(_map.queue_redraw)
 
 
 func _process(dt: float) -> void:
 	_t += dt
-	queue_redraw()
+	if is_visible_in_tree():
+		queue_redraw()
 
 
 func _to_px(lon: float, lat: float) -> Vector2:
@@ -33,14 +44,15 @@ func _to_px(lon: float, lat: float) -> Vector2:
 	return off + Vector2((lon - LON.x) * K, LAT.y - lat) * s
 
 
-func _draw() -> void:
-	draw_rect(Rect2(Vector2.ZERO, size), Color(0.01, 0.02, 0.04, 0.82))
-	draw_rect(Rect2(Vector2.ZERO, size), Color(UI.CYAN.r, UI.CYAN.g, UI.CYAN.b, 0.5), false, 1.0)
+func _draw_map() -> void:
+	var m := _map
+	m.draw_rect(Rect2(Vector2.ZERO, size), Color(0.01, 0.02, 0.04, 0.82))
+	m.draw_rect(Rect2(Vector2.ZERO, size), Color(UI.CYAN.r, UI.CYAN.g, UI.CYAN.b, 0.5), false, 1.0)
 	# Raster
 	for g in range(6, 16):
-		draw_line(_to_px(g, LAT.x), _to_px(g, LAT.y), Color(0.2, 0.4, 0.6, 0.08), 1.0)
+		m.draw_line(_to_px(g, LAT.x), _to_px(g, LAT.y), Color(0.2, 0.4, 0.6, 0.08), 1.0)
 	for g in range(48, 56):
-		draw_line(_to_px(LON.x, g), _to_px(LON.y, g), Color(0.2, 0.4, 0.6, 0.08), 1.0)
+		m.draw_line(_to_px(LON.x, g), _to_px(LON.y, g), Color(0.2, 0.4, 0.6, 0.08), 1.0)
 	for poly in MapData.GERMANY:
 		var pts := PackedVector2Array()
 		for i in range(0, poly.size(), 2):
@@ -48,9 +60,9 @@ func _draw() -> void:
 		if pts.size() >= 3:
 			var tri := Geometry2D.triangulate_polygon(pts)
 			if not tri.is_empty():
-				draw_colored_polygon(pts, Color(0.03, 0.08, 0.12, 0.95))
+				m.draw_colored_polygon(pts, Color(0.03, 0.08, 0.12, 0.95))
 			pts.append(pts[0])
-			draw_polyline(pts, Color(UI.CYAN.r, UI.CYAN.g, UI.CYAN.b, 0.85), 1.4, true)
+			m.draw_polyline(pts, Color(UI.CYAN.r, UI.CYAN.g, UI.CYAN.b, 0.85), 1.4, true)
 	# Städte: Stand je Stadt (gewonnen > frei > gesperrt)
 	var towns := {}  # Stadt -> [Position, Stand]
 	var route := PackedVector2Array()
@@ -64,18 +76,21 @@ func _draw() -> void:
 		var town: String = r.get("town", "")
 		towns[town] = [p, maxi(state, towns.get(town, [p, 0])[1])]
 	if route.size() >= 2:
-		draw_polyline(route, Color(UI.GREEN.r, UI.GREEN.g, UI.GREEN.b, 0.35), 1.0, true)
+		m.draw_polyline(route, Color(UI.GREEN.r, UI.GREEN.g, UI.GREEN.b, 0.35), 1.0, true)
+	for town in towns:
+		var p: Vector2 = towns[town][0]
+		var st: int = towns[town][1]
+		var col: Color = [Color(0.45, 0.48, 0.52), UI.GREEN, Color(1.0, 0.8, 0.25)][st]
+		m.draw_circle(p, 2.6, col)
+
+
+func _draw() -> void:
 	var sel_town := ""
 	var sel_pos := Vector2.ZERO
 	if selected != "":
 		var sr: Dictionary = Catalog.RACES[Catalog.race_index(selected)]
 		sel_town = sr.get("town", "")
 		sel_pos = _to_px(sr["geo"].y, sr["geo"].x)
-	for town in towns:
-		var p: Vector2 = towns[town][0]
-		var st: int = towns[town][1]
-		var col: Color = [Color(0.45, 0.48, 0.52), UI.GREEN, Color(1.0, 0.8, 0.25)][st]
-		draw_circle(p, 2.6, col)
 	if sel_town != "":
 		var pulse := 0.5 + 0.5 * sin(_t * 5.0)
 		draw_arc(sel_pos, 5.0 + pulse * 3.0, 0.0, TAU, 24, Color(UI.PINK.r, UI.PINK.g, UI.PINK.b, 0.9 - pulse * 0.5), 1.5, true)
