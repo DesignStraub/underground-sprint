@@ -6,6 +6,7 @@ const Catalog := preload("res://scripts/catalog.gd")
 const Builder := preload("res://scripts/car_builder.gd")
 const PixelView := preload("res://scripts/pixel_view.gd")
 const UI := preload("res://scripts/ui_style.gd")
+const I18n := preload("res://scripts/i18n.gd")
 
 ## Tipps wie auf den Ladebildschirmen von NFS Underground
 const TIPS := [
@@ -42,7 +43,10 @@ var _t := 0.0
 func _ready() -> void:
 	_build_scene()
 	_build_ui()
-	_show_main()
+	if GameState.language == "":
+		_show_language(true)  # erster Start: Sprache wählen (Englisch vorausgewählt)
+	else:
+		_show_main()
 
 
 func _build_scene() -> void:
@@ -235,7 +239,7 @@ func _build_ui() -> void:
 
 	var keys := _label(root, 9)
 	keys.label_settings.font = UI.font("bold", 0.12)
-	keys.text = "ENTER  Auswählen      ESC  Zurück      ←/→  Ändern      F11  Vollbild"
+	keys.text = tr("ENTER  Auswählen      ESC  Zurück      ←/→  Ändern      F11  Vollbild")
 	keys.anchor_top = 1.0
 	keys.anchor_bottom = 1.0
 	keys.offset_left = 14.0
@@ -254,7 +258,7 @@ func _build_ui() -> void:
 	music.set_meta("music", true)
 	_music_label = music
 	_tip_i = randi() % TIPS.size()
-	tip.text = "TIPP: " + TIPS[_tip_i]
+	tip.text = tr("TIPP: ") + tr(TIPS[_tip_i])
 
 
 ## Leistungsbalken wie im Autohaus (10 Segmente), Motor-Tuning eingerechnet
@@ -266,7 +270,7 @@ func _show_stats(car_id: String, cfg: Dictionary) -> void:
 	var head := _label(stats, 10, HORIZONTAL_ALIGNMENT_RIGHT)
 	head.label_settings.font = UI.font("cond", 0.2)
 	head.label_settings.font_color = UI.GREEN
-	head.text = "LEISTUNG"
+	head.text = tr("LEISTUNG")
 	for row in [["BESCHLEUNIGUNG", spec["accel"] * eng["accel"], 9.0, 14.5], ["TOPSPEED", spec["top_speed"] * eng["top"], 54.0, 82.0],
 			["GRIP", spec["grip"], 19.0, 30.0], ["DRIFT", spec.get("drift", 0.3), 0.0, 1.0]]:
 		var hb := HBoxContainer.new()
@@ -274,7 +278,7 @@ func _show_stats(car_id: String, cfg: Dictionary) -> void:
 		stats.add_child(hb)
 		var l := _label(hb, 8)
 		l.label_settings.font = UI.font("bold", 0.12)
-		l.text = row[0]
+		l.text = tr(row[0])
 		l.custom_minimum_size = Vector2(76, 0)
 		var n := int(round(clampf((row[1] - row[2]) / (row[3] - row[2]), 0.05, 1.0) * 10.0))
 		for k in 10:
@@ -290,7 +294,7 @@ func _show_stats(car_id: String, cfg: Dictionary) -> void:
 
 
 func _set_section(text: String, with_stats := false) -> void:
-	section.text = text
+	section.text = tr(text)
 	stats.get_parent().visible = with_stats
 	if with_stats:
 		_show_stats(preview_car, preview_cfg)
@@ -317,13 +321,13 @@ func _process(dt: float) -> void:
 	if _tip_t > 6.0:
 		_tip_t = 0.0
 		_tip_i = (_tip_i + 1) % TIPS.size()
-		tip.text = "TIPP: " + TIPS[_tip_i]
+		tip.text = tr("TIPP: ") + tr(TIPS[_tip_i])
 	turntable.rotation.y += dt * 0.3
 	var target := Vector3(-1.6, 0.55, 0)
 	cam.position = Vector3(4.6 + sin(_t * 0.2) * 0.2, 1.7 + sin(_t * 0.3) * 0.08, 5.6)
 	cam.look_at(target)
-	status.text = "RENNSIEGE %d   ·   DRIFTSIEGE %d   ·   %s" % [GameState.wins, GameState.drift_wins, Catalog.CARS[GameState.current_car]["name"].to_upper()]
-	_music_label.text = ("Musik: " + Music.current_title) if Music.current_title != "" else "Keine Musik: mp3/ogg in music/ legen"
+	status.text = tr("RENNSIEGE %d   ·   DRIFTSIEGE %d   ·   %s") % [GameState.wins, GameState.drift_wins, Catalog.CARS[GameState.current_car]["name"].to_upper()]
+	_music_label.text = (tr("Musik: ") + Music.current_title) if Music.current_title != "" else tr("Keine Musik: mp3/ogg in music/ legen")
 
 
 func _show_car(car_id: String, cfg: Dictionary) -> void:
@@ -344,7 +348,8 @@ func _clear_menu() -> void:
 
 func _button(text: String, cb: Callable, disabled := false) -> Button:
 	var b := Button.new()
-	b.text = text.to_upper()
+	b.text = tr(text).to_upper()
+	b.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
 	b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	b.disabled = disabled
 	b.focus_entered.connect(func(): Sfx.play("whoosh", -26.0, 2.4))
@@ -379,7 +384,7 @@ func _show_main() -> void:
 	_button("Einstellungen", _show_settings)
 	if not OS.has_feature("web"):  # im Browser schließt man einfach den Tab
 		_button("Beenden", func(): get_tree().quit())
-	info.text = Catalog.CARS[preview_car]["desc"] + "\nF / F11: Vollbild"
+	info.text = tr(Catalog.CARS[preview_car]["desc"]) + "\nF / F11: " + tr("Vollbild")
 	_focus_first()
 
 
@@ -393,20 +398,24 @@ func _show_settings() -> void:
 		"vsync": "V-Sync: kein Bildreißen. Aus = mehr FPS, aber evtl. Tearing.",
 		"fps": "FPS-Limit: begrenzt die Bildrate (schont Akku und Lüfter).",
 		"fullscreen": "Vollbild (auch F / F11).",
+		"language": "Sprache des Spiels. Titel, Orte und Schilder bleiben deutsch.",
 	}
-	for key in ["quality", "pixel", "vsync", "fps", "fullscreen"]:
+	for key in ["language", "quality", "pixel", "vsync", "fps", "fullscreen"]:
 		var k: String = key
 		var b := _button(GameState.setting_text(k), func(): pass)
 		b.pressed.connect(func():
+			if k == "language":
+				_show_language(false)
+				return
 			if k == "fullscreen":
 				GameState.toggle_fullscreen()
 			else:
 				GameState.cycle_setting(k)
 			b.text = GameState.setting_text(k))
-		b.focus_entered.connect(func(): info.text = hints[k])
+		b.focus_entered.connect(func(): info.text = tr(hints[k]))
 	_button("Spielstand zurücksetzen", _confirm_reset)
 	_button("< Zurück", _show_main)
-	info.text = hints["quality"]
+	info.text = tr(hints["language"])
 	_focus_first()
 
 
@@ -421,10 +430,10 @@ func _show_races() -> void:
 				n += 1
 		var t: String = type
 		var ty: Dictionary = Catalog.CITY_EVENTS if type == "city" else Catalog.EVENT_TYPES[type]
-		var b := _button("%s  (%d)" % [ty["label"], n], func(): _show_events(t))
-		b.focus_entered.connect(func(): info.text = ty["desc"])
+		var b := _button("%s  (%d)" % [tr(ty["label"]), n], func(): _show_events(t))
+		b.focus_entered.connect(func(): info.text = tr(ty["desc"]))
 	_button("< Zurück", _show_main)
-	info.text = "Fahr, worauf du Lust hast. Rennsiege schalten schnelle Autos frei, Driftsiege die Driftautos.\nTempo-Stufe: %d %% (steigt mit jedem Sieg)" % int(GameState.pace() * 100.0)
+	info.text = tr("Fahr, worauf du Lust hast. Rennsiege schalten schnelle Autos frei, Driftsiege die Driftautos.\nTempo-Stufe: %d %% (steigt mit jedem Sieg)") % int(GameState.pace() * 100.0)
 	_focus_first()
 
 
@@ -435,27 +444,28 @@ func _in_list(r: Dictionary, type: String) -> bool:
 
 func _show_events(type: String) -> void:
 	_clear_menu()
-	_set_section(str(Catalog.CITY_EVENTS["label"] if type == "city" else Catalog.EVENT_TYPES[type]["label"]).to_upper())
+	section.text = tr(str(Catalog.CITY_EVENTS["label"] if type == "city" else Catalog.EVENT_TYPES[type]["label"])).to_upper()
+	stats.get_parent().visible = false
 	for i in Catalog.RACES.size():
 		var r: Dictionary = Catalog.RACES[i]
 		if not _in_list(r, type):
 			continue
 		var rt: String = r["type"]
-		var txt: String = "%s  %s" % [r["name"], "*".repeat(r["tier"])]
+		var txt: String = "%s  %s" % [tr(r["name"]), "*".repeat(r["tier"])]
 		if GameState.best_times.has(r["name"]):
 			var best: float = GameState.best_times[r["name"]]
-			txt += "   " + ("%d Pkt" % int(best) if rt == "drift" else "%d:%05.2f" % [int(best) / 60, fmod(best, 60.0)])
+			txt += "   " + ("%d P" % int(best) if rt == "drift" else "%d:%05.2f" % [int(best) / 60, fmod(best, 60.0)])
 		var idx := i
 		var b := _button(txt, func(): _start_race(idx))
 		var extra := ""
 		if r.has("laps") and rt != "sprint":
-			extra = "%d Runden. " % r["laps"]
-		var desc: String = r.get("desc", Catalog.EVENT_TYPES[rt]["desc"])
+			extra = tr("%d Runden. ") % r["laps"]
+		var desc: String = tr(r.get("desc", Catalog.EVENT_TYPES[rt]["desc"]))
 		if r.has("city"):
-			extra = Catalog.EVENT_TYPES[rt]["label"] + ". " + extra
+			extra = tr(Catalog.EVENT_TYPES[rt]["label"]) + ". " + extra
 		b.focus_entered.connect(func(): info.text = extra + desc)
 	_button("< Zurück", _show_races)
-	info.text = Catalog.CITY_EVENTS["desc"] if type == "city" else Catalog.EVENT_TYPES[type]["desc"]
+	info.text = tr(Catalog.CITY_EVENTS["desc"] if type == "city" else Catalog.EVENT_TYPES[type]["desc"])
 	_focus_first()
 
 
@@ -484,8 +494,8 @@ func _refresh_tuning() -> void:
 			continue
 		var cat: String = b.get_meta("cat")
 		var opt: Dictionary = Catalog.PARTS[cat]["options"][preview_cfg[cat]]
-		var lock := "" if GameState.is_part_unlocked(cat, preview_cfg[cat]) else "  [GESPERRT]"
-		b.text = ("%s:  < %s >%s" % [Catalog.PARTS[cat]["label"], opt["name"], lock]).to_upper()
+		var lock := "" if GameState.is_part_unlocked(cat, preview_cfg[cat]) else tr("  [GESPERRT]")
+		b.text = ("%s:  < %s >%s" % [tr(Catalog.PARTS[cat]["label"]), tr(opt["name"]), lock]).to_upper()
 
 
 func _cycle_part(cat: String, dir: int) -> void:
@@ -504,10 +514,13 @@ func _part_info(cat: String) -> void:
 	var idx: int = preview_cfg[cat]
 	var opt: Dictionary = Catalog.PARTS[cat]["options"][idx]
 	if GameState.is_part_unlocked(cat, idx):
-		info.text = "%s: %s\nLinks/Rechts zum Wechseln." % [Catalog.PARTS[cat]["label"], opt["name"]]
+		info.text = tr("%s: %s\nLinks/Rechts zum Wechseln.") % [tr(Catalog.PARTS[cat]["label"]), tr(opt["name"])]
 	else:
 		var missing: int = opt["wins"] - GameState.total_wins()
-		info.text = "%s ist gesperrt.\nNoch %d Sieg%s nötig. (Nur Vorschau)" % [opt["name"], missing, "" if missing == 1 else "e"]
+		if missing == 1:
+			info.text = tr("%s ist gesperrt.\nNoch 1 Sieg nötig. (Nur Vorschau)") % tr(opt["name"])
+		else:
+			info.text = tr("%s ist gesperrt.\nNoch %d Siege nötig. (Nur Vorschau)") % [tr(opt["name"]), missing]
 
 
 func _show_cars() -> void:
@@ -533,12 +546,12 @@ func _cycle_car(dir: int) -> void:
 func _refresh_car() -> void:
 	var spec: Dictionary = Catalog.CARS[preview_car]
 	var unlocked := GameState.is_car_unlocked(preview_car)
-	menu.get_child(0).text = ("< %s >%s" % [spec["name"], "" if unlocked else "  [GESPERRT]"]).to_upper()
+	menu.get_child(0).text = ("< %s >%s" % [spec["name"], "" if unlocked else tr("  [GESPERRT]")]).to_upper()
 	_show_stats(preview_car, preview_cfg)
 	menu.get_child(1).disabled = not unlocked
-	info.text = spec["desc"] + "\nHöchstgeschwindigkeit ab Werk: %d km/h" % int(spec["top_speed"] * 3.6)
+	info.text = tr(spec["desc"]) + tr("\nHöchstgeschwindigkeit ab Werk: %d km/h") % int(spec["top_speed"] * 3.6)
 	if not unlocked:
-		info.text += "\nFreischalten: " + GameState.unlock_text(preview_car)
+		info.text += tr("\nFreischalten: ") + GameState.unlock_text(preview_car)
 
 
 func _stars(v: float, lo: float, hi: float) -> String:
@@ -553,10 +566,34 @@ func _choose_car() -> void:
 		_show_main()
 
 
+## Sprachwahl (erster Start und Einstellungen). Englisch steht oben und ist vorausgewählt.
+func _show_language(first: bool) -> void:
+	_clear_menu()
+	section.text = "LANGUAGE · SPRACHE"
+	stats.get_parent().visible = false
+	for lang in I18n.LANGS:
+		var l: String = lang
+		var b := Button.new()
+		b.text = I18n.NAMES[l].to_upper()
+		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		b.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
+		b.focus_entered.connect(func(): Sfx.play("whoosh", -26.0, 2.4))
+		b.pressed.connect(func():
+			GameState.set_language(l)
+			get_tree().reload_current_scene())  # alle Texte neu in der gewählten Sprache
+		menu.add_child(b)
+	if not first:
+		_button("< Zurück", _show_settings)
+	info.text = "Choose your language. Title, places and signs stay German.\nWähle deine Sprache. Titel, Orte und Schilder bleiben deutsch."
+	_focus_first()
+	if not first and GameState.language == "de":
+		menu.get_child(1).grab_focus.call_deferred()
+
+
 func _confirm_reset() -> void:
 	_clear_menu()
 	_set_section("ACHTUNG")
-	info.text = "Alle Siege und Tuningteile gehen verloren."
+	info.text = tr("Alle Siege und Tuningteile gehen verloren.")
 	_button("Ja, zurücksetzen", func(): GameState.reset_progress(); _show_main())
 	_button("Abbrechen", _show_main)
 	menu.get_child(1).grab_focus.call_deferred()
@@ -572,5 +609,5 @@ func _lr_input(ev: InputEvent, cb: Callable) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed("ui_cancel"):
+	if event.is_action_pressed("ui_cancel") and GameState.language != "":
 		_show_main()

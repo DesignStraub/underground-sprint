@@ -122,6 +122,11 @@ Im Stil von NFS Underground (`scripts/ui_style.gd`): schräge Leisten, Neongrün
 DIN-Schmalschrift, große Abschnittstitel (GARAGE, RENNEN, TUNING, AUTOHAUS), Leistungsbalken des Autos (mit
 Motor-Tuning), Tastenleiste unten, wechselnde Tipps oben rechts. Pause und Ergebnis im gleichen Look.
 
+## Sprachen
+Englisch und Deutsch: Beim ersten Start fragt das Spiel (Englisch vorausgewählt), später unter Einstellungen → Sprache.
+Übersetzungen in `scripts/i18n.gd` (Schlüssel sind die deutschen Texte, `tr()`); Titel, Ortsnamen, Läden und Schilder
+in der Welt bleiben deutsch.
+
 ## Schrift und Texte
 Alles auf Deutsch, im Ton von NFS Underground (KNAPP VORBEI +NITRO, DRIFT +NITRO, SPRUNG, Tuning-Marken auf den
 Dächern, Ladetipps im Menü). Schrift überall im Stil der deutschen Straßenschilder (DIN 1451):

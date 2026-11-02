@@ -143,6 +143,7 @@ static func build(race: Dictionary) -> Dictionary:
 	rng.seed = race["seed"]
 	var root := Node3D.new()
 	root.name = "Track"
+	root.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED  # Schilder in der Welt bleiben deutsch
 	_bb = {}
 
 	var type: String = race.get("type", "sprint")

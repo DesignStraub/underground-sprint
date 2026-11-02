@@ -50,3 +50,29 @@ Gamepad wird unterstützt.
 Ein Spiel von **ONE HUMANITY**.
 
 Musik: Tracks von Pixabay (Pixabay Content License). Kartendaten der Städte © OpenStreetMap-Mitwirkende (ODbL).
+
+
+## English description (to paste)
+
+**Need for Geschwindigkeit** – illegal street racing at night, in the spirit of the early 2000s.
+
+Race three rivals through wet, neon-lit streets – through a fictional big city and through real German towns:
+Aachen, Würzburg, Bad Kissingen, Tauberbischofsheim and Hammelburg, with cathedral, palace, fortress, graduation
+tower and old town gates in their real places.
+
+**Features**
+- 23 events: sprint, circuit, drag with manual shifting, drift – plus five tracks on real streets (OpenStreetMap)
+- Tunnels, elevated railway, rail crossing with train, bridges, shortcuts, two-way traffic
+- 9 cars and 8 tuning categories: paint, rims, spoiler, body kit, vinyl, underglow, engine, nitro
+- No money, no grind: wins unlock parts and cars
+- Start and finish scenes like back in the day: flag girl, cheering crowd, camera fly-in
+- Real-time engine sound – every car sounds different
+- English and German (choose at first start), retro pixel look, runs up to 4K and in the browser
+
+**Controls**
+W/S throttle/brake · A/D steer · Space handbrake · Shift nitro · E/Q shift (drag) · C camera · R reset · M music · F11 fullscreen · Esc pause
+Gamepad supported.
+
+Tagline: Illegal street racing at night through real German towns. Tuning, nitro, drift, drag. Free.
+
+Music: tracks from Pixabay (Pixabay Content License). Map data of the cities © OpenStreetMap contributors (ODbL).

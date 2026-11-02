@@ -1,0 +1,146 @@
+extends RefCounted
+## Sprachen: Deutsch und Englisch. Schlüssel sind die deutschen Texte im Code (tr("…")), hier stehen die englischen.
+## Ohne Eintrag bleibt der deutsche Text: Spieltitel, Orts- und Straßennamen, Läden und Schilder in der Welt.
+## Fallback-Sprache ist Deutsch (project.godot), sonst würde Deutsch auf die englische Tabelle zurückfallen.
+
+const LANGS := ["en", "de"]
+const NAMES := {"en": "English", "de": "Deutsch"}
+
+const EN := {
+	# --- Menü ---
+	"Rennen fahren": "Race", "Tuning": "Tuning", "Auto wechseln": "Change car", "Einstellungen": "Settings",
+	"Beenden": "Quit", "Spielstand zurücksetzen": "Reset progress", "< Zurück": "< Back", "< Fertig": "< Done",
+	"Dieses Auto fahren": "Drive this car", "Ja, zurücksetzen": "Yes, reset", "Abbrechen": "Cancel",
+	"GARAGE": "GARAGE", "RENNEN": "RACES", "AUTOHAUS": "CAR LOT", "EINSTELLUNGEN": "SETTINGS", "ACHTUNG": "WARNING",
+	"SPRACHE": "LANGUAGE",
+	"ENTER  Auswählen      ESC  Zurück      ←/→  Ändern      F11  Vollbild": "ENTER  Select      ESC  Back      ←/→  Change      F11  Fullscreen",
+	"Musik: ": "Music: ", "Keine Musik: mp3/ogg in music/ legen": "No music: put mp3/ogg files into music/",
+	"Keine Musik: mp3/ogg in den Ordner music/ legen": "No music: put mp3/ogg files into music/",
+	"TIPP: ": "TIP: ",
+	"RENNSIEGE %d   ·   DRIFTSIEGE %d   ·   %s": "RACE WINS %d   ·   DRIFT WINS %d   ·   %s",
+	"LEISTUNG": "PERFORMANCE", "BESCHLEUNIGUNG": "ACCELERATION", "TOPSPEED": "TOP SPEED", "GRIP": "GRIP", "DRIFT": "DRIFT",
+	"  [GESPERRT]": "  [LOCKED]",
+	"%s: %s\nLinks/Rechts zum Wechseln.": "%s: %s\nLeft/Right to change.",
+	"%s ist gesperrt.\nNoch 1 Sieg nötig. (Nur Vorschau)": "%s is locked.\n1 more win needed. (Preview only)",
+	"%s ist gesperrt.\nNoch %d Siege nötig. (Nur Vorschau)": "%s is locked.\n%d more wins needed. (Preview only)",
+	"\nHöchstgeschwindigkeit ab Werk: %d km/h": "\nFactory top speed: %d km/h",
+	"\nFreischalten: ": "\nUnlock: ",
+	"%d Rennsieg": "%d race win", "%d Rennsiege": "%d race wins", "%d Driftsieg": "%d drift win", "%d Driftsiege": "%d drift wins",
+	" oder ": " or ",
+	"Alle Siege und Tuningteile gehen verloren.": "All wins and tuning parts will be lost.",
+	"Fahr, worauf du Lust hast. Rennsiege schalten schnelle Autos frei, Driftsiege die Driftautos.\nTempo-Stufe: %d %% (steigt mit jedem Sieg)":
+		"Race whatever you like. Race wins unlock fast cars, drift wins unlock drift cars.\nPace level: %d %% (rises with every win)",
+	"%d Runden. ": "%d laps. ",
+	"Niedrig: schnell, ohne Spiegelungen. Mittel: Spiegelungen auf nasser Straße. Hoch: alles, braucht eine starke Grafikkarte. Gilt ab dem nächsten Rennen.":
+		"Low: fast, no reflections. Medium: reflections on wet roads. High: everything, needs a strong graphics card. Applies from the next race.",
+	"Pixel-Look: die 3D-Welt grob gerastert wie ein Retro-Spiel. Spart zusätzlich Leistung.":
+		"Pixel look: the 3D world rendered in coarse pixels like a retro game. Also saves performance.",
+	"V-Sync: kein Bildreißen. Aus = mehr FPS, aber evtl. Tearing.": "V-Sync: no screen tearing. Off = more FPS, but possible tearing.",
+	"FPS-Limit: begrenzt die Bildrate (schont Akku und Lüfter).": "FPS limit: caps the frame rate (easier on battery and fans).",
+	"Vollbild (auch F / F11).": "Fullscreen (also F / F11).",
+	"Sprache des Spiels. Titel, Orte und Schilder bleiben deutsch.": "Game language. Title, places and signs stay German.",
+	"Grafik: ": "Graphics: ", "Pixel-Look: ": "Pixel look: ", "V-Sync: ": "V-Sync: ", "FPS-Limit: ": "FPS limit: ",
+	"Vollbild: ": "Fullscreen: ", "Sprache: ": "Language: ", "An": "On", "Aus": "Off",
+	"Niedrig": "Low", "Mittel": "Medium", "Hoch": "High",
+	# Ladetipps
+	"Gib kurz vor LOS Gas: Drehzahl im grünen Bereich gibt einen perfekten Start.": "Hit the throttle just before GO: revs in the green zone give a perfect start.",
+	"Knapp am Verkehr vorbei füllt dein Nitro.": "Near misses with traffic refill your nitro.",
+	"Im Drag im grünen Bereich schalten: perfekter Schaltvorgang, mehr Schub.": "In drag races, shift in the green zone for a perfect shift and extra push.",
+	"Abkürzungen sparen Zeit, aber dort kommt dir Verkehr entgegen.": "Shortcuts save time, but traffic comes the other way.",
+	"Handbremse und Lenken stellen das Auto quer. Drift-Ketten bringen Multiplikator.": "Handbrake and steering get you sideways. Drift chains build a multiplier.",
+	"Siege schalten neue Teile und Autos frei.": "Wins unlock new parts and cars.",
+	"Spar dir Nitro für die letzte Gerade.": "Save some nitro for the final straight.",
+	"Über die Rampe am Bahnübergang springst du über die Gleise.": "Hit the ramp at the rail crossing to jump the tracks.",
+	"Motor-Tuning steigert Beschleunigung und Höchstgeschwindigkeit.": "Engine tuning raises acceleration and top speed.",
+	"Im Drag nicht im Begrenzer bleiben: der Motor überhitzt.": "In drag races, stay off the rev limiter or the engine overheats.",
+	# --- Autos ---
+	"Kompakter Keil-Sportler. Leicht, wendig, verzeiht viel.": "Compact wedge-shaped sports car. Light, nimble, forgiving.",
+	"Heckantrieb-Coupé. Liebt Drifts.": "Rear-wheel-drive coupé. Loves to drift.",
+	"Turbo-Limousine. Brutal auf der Geraden.": "Turbo sedan. Brutal on the straights.",
+	"Leichter Hecktriebler. Gebaut zum Querfahren.": "Light rear-wheel drive. Built to go sideways.",
+	"Drift-Monster mit V8-Swap. Steht quer, wann immer du willst.": "Drift monster with a V8 swap. Goes sideways whenever you want.",
+	"Leichtes 80er-Fließheck mit Heckantrieb. Wenig Leistung, viel Gefühl.": "Light 80s hatchback with rear-wheel drive. Little power, lots of feel.",
+	"Offener Zweisitzer mit langer Haube. Flink und präzise.": "Open two-seater with a long hood. Quick and precise.",
+	"Rallye-Limousine mit Allrad-Gefühl. Klebt auf der Straße.": "Rally sedan with an all-wheel-drive feel. Sticks to the road.",
+	"Langes Biturbo-Coupé mit Bügelflügel. Das schnellste Auto der Stadt.": "Long twin-turbo coupé with a big wing. The fastest car in town.",
+	"Auto: ": "Car: ",
+	# --- Tuning ---
+	"Lack": "Paint", "Felgen": "Rims", "Spoiler": "Spoiler", "Bodykit": "Body kit", "Folierung": "Vinyl",
+	"Unterbodenneon": "Underglow", "Motor": "Engine", "Nitro": "Nitro",
+	"Silber": "Silver", "Schwarz": "Black", "Rot": "Red", "Gelb": "Yellow", "Giftgrün": "Toxic Green", "Candyblau": "Candy Blue",
+	"Neonpink": "Neon Pink", "Serie": "Stock", "Fünfspeichen": "Five-spoke", "Gitter Gold": "Mesh Gold",
+	"Tiefbett Schwarz": "Deep Dish Black", "Keiner": "None", "Lippe": "Lip", "GT-Flügel": "GT Wing", "Monster-Flügel": "Monster Wing",
+	"Seitenschweller": "Side skirts", "Breitbau": "Widebody", "Keins": "None", "Rennstreifen": "Racing stripes",
+	"Seitenstreifen": "Side stripes", "Blau": "Blue", "Pink": "Pink", "Grün": "Green", "Stufe 1": "Stage 1", "Stufe 2": "Stage 2",
+	"Stufe 3": "Stage 3",
+	# --- Events ---
+	"Sprint": "Sprint", "Rundkurs": "Circuit", "Drag": "Drag", "Drift": "Drift", "Städte": "Cities",
+	"Von A nach B gegen 3 Gegner. Gabelungen und Abkürzungen: du entscheidest. * ohne Verkehr, ** wenig, *** voll.":
+		"Point to point against 3 rivals. Forks and shortcuts: your call. * no traffic, ** light, *** heavy.",
+	"2 Runden gegen 3 Gegner. Wer die beste Linie findet, gewinnt. * ohne Verkehr, ** wenig, *** voll.":
+		"2 laps against 3 rivals. Best line wins. * no traffic, ** light, *** heavy.",
+	"Allein auf der Strecke. Querfahren gibt Punkte, Ketten geben Multiplikator, Crash kostet die Kette.":
+		"Alone on the track. Going sideways scores points, chains build a multiplier, a crash costs the chain.",
+	"Geradeaus gegen 3 Gegner. A/D wechselt die Spur, E/Q schaltet: im grünen Bereich perfekt. Zu lange im Begrenzer: Motorschaden. Crash mit Verkehr: Totalschaden.":
+		"Straight line against 3 rivals. A/D changes lanes, E/Q shifts: perfect in the green zone. Too long on the limiter: blown engine. Hit traffic: totaled.",
+	"Echte Straßen aus Aachen, Würzburg, Bad Kissingen, Tauberbischofsheim und Hammelburg, die Wahrzeichen stehen an ihrem Platz. Kartendaten © OpenStreetMap-Mitwirkende.":
+		"Real streets from Aachen, Würzburg, Bad Kissingen, Tauberbischofsheim and Hammelburg, landmarks in their real places. Map data © OpenStreetMap contributors.",
+	"Bankenviertel-Sprint": "Financial District Sprint", "Prachtallee-Sprint": "Boulevard Sprint", "Hafenrunde": "Harbor Run",
+	"Chinatown-Express": "Chinatown Express", "Schnellstraßen-Sprint": "Highway Sprint", "Innenstadtring": "City Ring",
+	"Hafenring": "Harbor Ring", "Nachtschicht": "Night Shift", "Chinatown-Drift": "Chinatown Drift", "Hafen-Drift": "Harbor Drift",
+	"Stadion-Drift": "Stadium Drift", "Hafenmeile": "Harbor Mile", "Neon-Gerade": "Neon Straight", "Schnellstraßen-Drag": "Highway Drag",
+	"Altstadt-Hügel": "Old Town Hills", "Hafen-Sprint": "Harbor Sprint", "Chinatown-Runde": "Chinatown Loop", "Altstadtring": "Old Town Ring",
+	"Würzburg Mainufer": "Würzburg Riverside", "Bad Kissingen Kurmeile": "Bad Kissingen Spa Mile",
+	"Tauberbischofsheim Altstadt": "Tauberbischofsheim Old Town",
+	"Über den Grabenring am SuperC der RWTH, am Elisenbrunnen und am Theater vorbei. In der Mitte Dom und Rathaus.":
+		"Around the Grabenring past the RWTH SuperC, the Elisenbrunnen and the theatre, with the cathedral and town hall in the middle.",
+	"Rennweg an der Residenz, über die Ludwigsbrücke, unter der Festung Marienberg entlang, über die Friedensbrücke zum Alten Kranen.":
+		"Past the Residenz palace, across the Ludwigsbrücke, below Marienberg Fortress and back over the Friedensbrücke to the Alter Kranen.",
+	"Vom Regentenbau am Kurgarten über die Saale, dann am Fluss entlang zum Gradierbau der Oberen Saline.":
+		"From the Regentenbau in the spa gardens across the Saale, then along the river to the graduation tower of the Obere Saline.",
+	"Rund um die Altstadt der Fechterstadt, Türmersturm, Rathaus und St. Martin immer im Blick.":
+		"Around the old town of the fencing city, with the Türmersturm, town hall and St. Martin always in view.",
+	"Über die Bahnlinie in die Altstadt, am Rathaus mit Marktbrunnen vorbei, über die Saale hinauf zu Schloss Saaleck.":
+		"Over the railway into the old town, past the town hall and market fountain, across the Saale and up to Saaleck Castle.",
+	# --- Rennen ---
+	"%s   ·   %s   ·   Gas/Enter: los": "%s   ·   %s   ·   Throttle/Enter: go",
+	"%s   ·   %s   ·   Karte © OpenStreetMap-Mitwirkende   ·   Gas/Enter: los": "%s   ·   %s   ·   Map © OpenStreetMap contributors   ·   Throttle/Enter: go",
+	"SPRINT": "SPRINT", "RUNDKURS · %d RUNDEN": "CIRCUIT · %d LAPS", "DRIFT · %d RUNDEN": "DRIFT · %d LAPS",
+	"DRAG · E/Q SCHALTEN": "DRAG · E/Q TO SHIFT", "ALLEIN": "SOLO", "4 FAHRER": "4 DRIVERS",
+	"W/S Gas/Bremse  A/D Lenken\nLeertaste Handbremse  Shift Nitro\nC Kamera  R Zurücksetzen  M Musik\nF Vollbild  Esc Pause":
+		"W/S Throttle/Brake  A/D Steer\nSpace Handbrake  Shift Nitro\nC Camera  R Reset  M Music\nF Fullscreen  Esc Pause",
+	"W Gas  E/Q hoch-/runterschalten\nA/D Spur wechseln  Shift Nitro\nC Kamera  F Vollbild  Esc Pause":
+		"W Throttle  E/Q Shift up/down\nA/D Change lane  Shift Nitro\nC Camera  F Fullscreen  Esc Pause",
+	"LOS!": "GO!", "Gas kurz vor LOS = perfekter Start": "Throttle just before GO = perfect start",
+	"BANKENVIERTEL": "FINANCIAL DISTRICT", "MARKTVIERTEL": "MARKET DISTRICT", "PRACHTALLEE": "BOULEVARD", "ALTSTADT": "OLD TOWN",
+	"HAFEN": "HARBOR", "CHINATOWN": "CHINATOWN", "SCHNELLSTRASSE": "HIGHWAY", "INNENSTADT": "CITY CENTER",
+	"KURVIERTEL": "SPA QUARTER", "CAMPUS": "CAMPUS", "VORSTADT": "SUBURBS",
+	"BANDE! KETTE VERLOREN": "BARRIER! CHAIN LOST", "WAND-BONUS": "WALL BONUS", "PERFEKTER START": "PERFECT START",
+	"ZU VIEL GAS": "WHEELSPIN", "KNAPP VORBEI  +NITRO": "NEAR MISS  +NITRO", "RUNDE %d": "LAP %d", "LETZTE RUNDE": "FINAL LAP",
+	"%s   RUNDE %d/%d": "%s   LAP %d/%d", "DRIFT  +NITRO": "DRIFT  +NITRO", "SPRUNG": "AIR", "SPRUNG  %.1f s": "AIR  %.1f s",
+	"Platz %d: %d": "Place %d: %d", "ABKÜRZUNG!": "SHORTCUT!", "ALTSTADT · GEGENVERKEHR!": "OLD TOWN · ONCOMING TRAFFIC!",
+	"Kamera: ": "Camera: ", "Verfolger": "Chase", "Stoßstange": "Bumper", "Motorhaube": "Hood",
+	"PERFEKT GESCHALTET": "PERFECT SHIFT", "GUT GESCHALTET": "GOOD SHIFT", "ZU FRÜH GESCHALTET": "EARLY SHIFT",
+	"MOTOR ÜBERHITZT – SCHALTEN!": "ENGINE OVERHEATING – SHIFT!", "MOTORSCHADEN": "ENGINE BLOWN", "TOTALSCHADEN": "TOTALED",
+	"SIEG!": "WINNER!", "2. PLATZ": "2ND PLACE", "3. PLATZ": "3RD PLACE", "4. PLATZ": "4TH PLACE",
+	"Zeit  %s%s": "Time  %s%s", "   NEUE BESTZEIT": "   NEW BEST TIME", "Ausgefallen: ": "Did not finish: ",
+	"Punkte  %d%s": "Points  %d%s", "   NEUER REKORD": "   NEW RECORD",
+	"Platz 3: %d   Platz 2: %d   Platz 1: %d": "3rd: %d   2nd: %d   1st: %d",
+	"Driftsiege gesamt: %d": "Total drift wins: %d", "Rennsiege gesamt: %d": "Total race wins: %d",
+	"FREIGESCHALTET:\n": "UNLOCKED:\n", "Nur Platz 1 schaltet neue Teile frei.": "Only 1st place unlocks new parts.",
+	"NOCHMAL": "RETRY", "PAUSE": "PAUSE", "Weiter": "Resume", "Vollbild": "Fullscreen", "Neustart": "Restart", "Garage": "Garage",
+	"x1000 U/min": "x1000 rpm",
+}
+
+static var _added := false
+
+
+static func setup(lang: String) -> void:
+	if not _added:
+		var t := Translation.new()
+		t.locale = "en"
+		for k in EN:
+			t.add_message(k, EN[k])
+		TranslationServer.add_translation(t)
+		_added = true
+	TranslationServer.set_locale(lang if lang in LANGS else "en")

@@ -66,7 +66,7 @@ func _draw() -> void:
 	# Digitale Anzeige
 	draw_string(font, c + Vector2(-40, 30), str(speed_kmh), HORIZONTAL_ALIGNMENT_CENTER, 80, 22, Color.WHITE)
 	draw_string(font, c + Vector2(-20, 41), "km/h", HORIZONTAL_ALIGNMENT_CENTER, 40, 8, Color(0.7, 0.75, 0.85))
-	draw_string(font, c + Vector2(-25, -16), "x1000 U/min", HORIZONTAL_ALIGNMENT_CENTER, 50, 6, Color(0.6, 0.65, 0.75))
+	draw_string(font, c + Vector2(-25, -16), tr("x1000 U/min"), HORIZONTAL_ALIGNMENT_CENTER, 50, 6, Color(0.6, 0.65, 0.75))
 	var gb := Rect2(c + Vector2(18, -8), Vector2(16, 18))
 	draw_rect(gb, Color(0, 0, 0, 0.6))
 	draw_rect(gb, Color(1, 0.6, 0.15), false, 1.0)

@@ -2,6 +2,7 @@ extends Node
 ## Spielstand: Siege, aktuelles Auto, Tuning pro Auto. Kein Geld, nur Freischalten über Siege.
 
 const Catalog := preload("res://scripts/catalog.gd")
+const I18n := preload("res://scripts/i18n.gd")
 const SAVE_PATH := "user://save.json"
 ## D-DIN (Datto, SIL Open Font License 1.1, siehe assets/fonts/COPYING.txt)
 const FONT := preload("res://assets/fonts/D-DIN-Bold.otf")
@@ -22,6 +23,8 @@ signal graphics_changed
 ## Grafik-Einstellungen (werden gespeichert)
 var quality := 0 if OS.has_feature("web") else 1
 var pixel_look := false
+## "" = noch nicht gewählt (beim ersten Start fragt die Garage), sonst "en" oder "de"
+var language := ""
 var vsync := true
 var fps_limit := 0
 var fullscreen := false
@@ -39,6 +42,7 @@ func _ready() -> void:
 	ThemeDB.fallback_font = FONT
 	_setup_input()
 	load_game()
+	I18n.setup(language if language != "" else "en")
 	_init_window()
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--race="):
@@ -147,18 +151,26 @@ func cycle_setting(key: String) -> void:
 	save_game()
 
 
+func set_language(lang: String) -> void:
+	language = lang
+	I18n.setup(lang)
+	save_game()
+
+
 func setting_text(key: String) -> String:
 	match key:
 		"quality":
-			return "Grafik: " + q()["name"]
+			return tr("Grafik: ") + tr(q()["name"])
 		"pixel":
-			return "Pixel-Look: " + ("An" if pixel_look else "Aus")
+			return tr("Pixel-Look: ") + tr("An" if pixel_look else "Aus")
 		"vsync":
-			return "V-Sync: " + ("An" if vsync else "Aus")
+			return tr("V-Sync: ") + tr("An" if vsync else "Aus")
 		"fps":
-			return "FPS-Limit: " + (str(FPS_LIMITS[fps_limit]) if FPS_LIMITS[fps_limit] > 0 else "Aus")
+			return tr("FPS-Limit: ") + (str(FPS_LIMITS[fps_limit]) if FPS_LIMITS[fps_limit] > 0 else tr("Aus"))
 		"fullscreen":
-			return "Vollbild: " + ("An" if fullscreen else "Aus")
+			return tr("Vollbild: ") + tr("An" if fullscreen else "Aus")
+		"language":
+			return tr("Sprache: ") + I18n.NAMES.get(language if language != "" else "en", "English")
 	return key
 
 
@@ -206,10 +218,10 @@ func unlock_text(car_id: String) -> String:
 	var req: Dictionary = Catalog.CARS[car_id]["unlock"]
 	var parts := []
 	if req.has("race"):
-		parts.append("%d Rennsieg%s" % [req["race"], "" if req["race"] == 1 else "e"])
+		parts.append(tr("%d Rennsieg" if req["race"] == 1 else "%d Rennsiege") % req["race"])
 	if req.has("drift"):
-		parts.append("%d Driftsieg%s" % [req["drift"], "" if req["drift"] == 1 else "e"])
-	return " oder ".join(parts)
+		parts.append(tr("%d Driftsieg" if req["drift"] == 1 else "%d Driftsiege") % req["drift"])
+	return tr(" oder ").join(parts)
 
 
 func is_part_unlocked(category: String, index: int) -> bool:
@@ -246,11 +258,11 @@ func register_win(event_type: String) -> Array:
 	var unlocked := []
 	for car_id in Catalog.CAR_ORDER:
 		if not is_car_unlocked(car_id, rw0, dw0) and is_car_unlocked(car_id):
-			unlocked.append("Auto: " + Catalog.CARS[car_id]["name"])
+			unlocked.append(tr("Auto: ") + Catalog.CARS[car_id]["name"])
 	for cat in Catalog.PART_ORDER:
 		for opt in Catalog.PARTS[cat]["options"]:
 			if opt["wins"] > before and opt["wins"] <= total_wins():
-				unlocked.append(Catalog.PARTS[cat]["label"] + ": " + opt["name"])
+				unlocked.append(tr(Catalog.PARTS[cat]["label"]) + ": " + tr(opt["name"]))
 	save_game()
 	return unlocked
 
@@ -275,6 +287,7 @@ func save_game() -> void:
 		"wins": wins, "drift_wins": drift_wins, "current_car": current_car, "race_index": race_index,
 		"best_times": best_times, "car_configs": car_configs,
 		"gfx": {"quality": quality, "pixel": pixel_look, "vsync": vsync, "fps": fps_limit, "fullscreen": fullscreen},
+		"language": language,
 	}, "\t"))
 
 
@@ -300,6 +313,7 @@ func load_game() -> void:
 	quality = clampi(int(gfx.get("quality", quality)), 0, QUALITY.size() - 1)
 	# alter Spielstand: Pixel-Stufe Stark/Mittel = Pixel-Look an
 	pixel_look = bool(gfx.get("pixel", int(data.get("pixel_mode_v2", 2)) <= 1))
+	language = str(data.get("language", ""))
 	vsync = bool(gfx.get("vsync", true))
 	fps_limit = clampi(int(gfx.get("fps", 0)), 0, FPS_LIMITS.size() - 1)
 	fullscreen = bool(gfx.get("fullscreen", false))

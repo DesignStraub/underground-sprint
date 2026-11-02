@@ -25,6 +25,10 @@ window/stretch/aspect="expand"
 
 theme/custom_font="res://assets/fonts/D-DIN-Bold.otf"
 
+[internationalization]
+
+locale/fallback="de"
+
 [rendering]
 
 textures/canvas_textures/default_texture_filter=0

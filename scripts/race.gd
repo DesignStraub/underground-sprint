@@ -313,18 +313,18 @@ func _build_title() -> void:
 	bar.offset_top = -64
 	root.add_child(bar)
 	var t := _label(root, 30, HORIZONTAL_ALIGNMENT_CENTER)
-	t.text = race["name"].to_upper()
+	t.text = tr(race["name"]).to_upper()
 	t.anchor_top = 1.0
 	t.anchor_right = 1.0
 	t.anchor_bottom = 1.0
 	t.offset_top = -62
 	t.offset_bottom = -26
-	var kind := {"sprint": "SPRINT", "circuit": "RUNDKURS · %d RUNDEN" % track["laps"], "drift": "DRIFT · %d RUNDEN" % track["laps"],
-		"drag": "DRAG · E/Q SCHALTEN"}
+	var kind := {"sprint": tr("SPRINT"), "circuit": tr("RUNDKURS · %d RUNDEN") % track["laps"], "drift": tr("DRIFT · %d RUNDEN") % track["laps"],
+		"drag": tr("DRAG · E/Q SCHALTEN")}
 	var sub := _label(root, 11, HORIZONTAL_ALIGNMENT_CENTER)
-	sub.text = "%s   ·   %s   ·   Gas/Enter: los" % [kind.get(event_type, "SPRINT"), "ALLEIN" if event_type == "drift" else "4 FAHRER"]
+	sub.text = tr("%s   ·   %s   ·   Gas/Enter: los") % [kind.get(event_type, "SPRINT"), tr("ALLEIN" if event_type == "drift" else "4 FAHRER")]
 	if race.has("city"):
-		sub.text = "%s   ·   %s   ·   Karte © OpenStreetMap-Mitwirkende   ·   Gas/Enter: los" % [race.get("town", "").to_upper(), kind.get(event_type, "SPRINT")]
+		sub.text = tr("%s   ·   %s   ·   Karte © OpenStreetMap-Mitwirkende   ·   Gas/Enter: los") % [race.get("town", "").to_upper(), kind.get(event_type, "SPRINT")]
 	sub.modulate = Color(0.6, 0.85, 1.0)
 	sub.anchor_top = 1.0
 	sub.anchor_right = 1.0
@@ -386,17 +386,17 @@ func _build_hud() -> void:
 	hud["time"].position = Vector2(12, 40)
 	hud["race"] = _label(root, 10)
 	hud["race"].position = Vector2(12, 58)
-	hud["race"].text = race["name"].to_upper()
+	hud["race"].text = tr(race["name"]).to_upper()
 	hud["music"] = _label(root, 10)
 	hud["music"].position = Vector2(12, 342)
 	hud["help"] = _label(root, 9, HORIZONTAL_ALIGNMENT_RIGHT)
 	hud["help"].set_anchors_preset(Control.PRESET_TOP_RIGHT)
 	hud["help"].position = Vector2(-250, 6)
 	hud["help"].size = Vector2(240, 60)
-	hud["help"].text = "W/S Gas/Bremse  A/D Lenken\nLeertaste Handbremse  Shift Nitro\nC Kamera  R Zurücksetzen  M Musik\nF Vollbild  Esc Pause"
+	hud["help"].text = tr("W/S Gas/Bremse  A/D Lenken\nLeertaste Handbremse  Shift Nitro\nC Kamera  R Zurücksetzen  M Musik\nF Vollbild  Esc Pause")
 	hud["help"].modulate.a = 0.7
 	if event_type == "drag":
-		hud["help"].text = "W Gas  E/Q hoch-/runterschalten\nA/D Spur wechseln  Shift Nitro\nC Kamera  F Vollbild  Esc Pause"
+		hud["help"].text = tr("W Gas  E/Q hoch-/runterschalten\nA/D Spur wechseln  Shift Nitro\nC Kamera  F Vollbild  Esc Pause")
 
 	# Drehzahlmesser unten rechts
 	var tacho := Control.new()
@@ -467,7 +467,7 @@ func _process(dt: float) -> void:
 		State.COUNTDOWN:
 			countdown -= dt
 			var n := int(ceil(countdown - 1.0))
-			hud["center"].text = str(n) if n > 0 else "LOS!"
+			hud["center"].text = str(n) if n > 0 else tr("LOS!")
 			if countdown <= 1.0 and not player.controls_enabled:
 				player.controls_enabled = true
 				_launch_check()
@@ -548,7 +548,7 @@ func _update_world(dt: float) -> void:
 		var di := clampi(int(player.progress / Track.DISTRICT_LEN), 0, arr.size() - 1)
 		if di != _district_i:
 			if _district_i < 0 or arr[di] != arr[_district_i]:
-				_show_area(Track.DISTRICTS[arr[di]]["name"])
+				_show_area(tr(Track.DISTRICTS[arr[di]]["name"]))
 			_district_i = di
 	if _area_t > 0.0:
 		_area_t -= dt
@@ -593,7 +593,7 @@ func _update_drift(dt: float) -> void:
 		_last_crashes = player.crashes
 		_last_walls = player.wall_hits
 		if drift_chain > 0.0:
-			_flash("BANDE! KETTE VERLOREN", Color(1.0, 0.3, 0.3))
+			_flash(tr("BANDE! KETTE VERLOREN"), Color(1.0, 0.3, 0.3))
 		drift_chain = 0.0
 		drift_chain_t = 0.0
 	var kmh := player.velocity.length() * 3.6
@@ -603,7 +603,7 @@ func _update_drift(dt: float) -> void:
 		var wall_dist := Track.hw(track, player.progress) + 0.1 - absf(player.lateral) - 1.0
 		var bonus := wall_dist < 2.0
 		if bonus and not _wall_bonus:
-			_flash("WAND-BONUS", Color(0.4, 0.9, 1.0))
+			_flash(tr("WAND-BONUS"), Color(0.4, 0.9, 1.0))
 		_wall_bonus = bonus
 		drift_chain += (ang - 10.0) * kmh / 100.0 * dt * (1.6 if bonus else 1.0)
 		drift_chain_t += dt
@@ -620,9 +620,9 @@ func _launch_check() -> void:
 	if player.rpm > 5400.0 and player.rpm < 6900.0:
 		player.velocity += fwd * 9.0
 		player.nitro = minf(player.nitro + 0.15, 1.0)
-		_flash("PERFEKTER START", Color(0.4, 1.0, 0.5))
+		_flash(tr("PERFEKTER START"), Color(0.4, 1.0, 0.5))
 	elif player.rpm >= 6900.0:
-		_flash("ZU VIEL GAS", Color(1.0, 0.5, 0.2))
+		_flash(tr("ZU VIEL GAS"), Color(1.0, 0.5, 0.2))
 
 
 ## Near Miss: knapp an Verkehr vorbei (seitlich 1,7–3,4 m) bei hohem Tempo gibt Nitro, wie in Underground
@@ -643,7 +643,7 @@ func _check_near_miss() -> void:
 		if fast and absf(along) < 2.5 and side > 1.7 and side < 3.4 and not _near.has(id):
 			_near[id] = true
 			player.nitro = minf(player.nitro + 0.12, 1.0)
-			_flash("KNAPP VORBEI  +NITRO", Color(1.0, 0.85, 0.2))
+			_flash(tr("KNAPP VORBEI  +NITRO"), Color(1.0, 0.85, 0.2))
 			Sfx.play("whoosh", -12.0, randf_range(1.1, 1.3))
 
 
@@ -667,9 +667,9 @@ func _update_hud() -> void:
 		hud["pos"].text = "%d" % int(drift_score)
 	if track["loop"]:
 		var lap := clampi(player.lap + 1, 1, track["laps"])
-		hud["race"].text = "%s   RUNDE %d/%d" % [race["name"].to_upper(), lap, track["laps"]]
+		hud["race"].text = tr("%s   RUNDE %d/%d") % [tr(race["name"]).to_upper(), lap, track["laps"]]
 		if player.lap != _last_lap and player.lap > 0 and player.lap < track["laps"]:
-			_flash("LETZTE RUNDE" if player.lap == track["laps"] - 1 else "RUNDE %d" % (player.lap + 1), Color(0.4, 1.0, 0.5))
+			_flash(tr("LETZTE RUNDE") if player.lap == track["laps"] - 1 else tr("RUNDE %d") % (player.lap + 1), Color(0.4, 1.0, 0.5))
 		_last_lap = player.lap
 	hud["time"].text = _fmt(race_time)
 	var tacho = hud["tacho"]
@@ -680,9 +680,9 @@ func _update_hud() -> void:
 	tacho.heat = player.engine_heat
 	tacho.nitro_on = player.nitro_on
 	hud["progress"].size.x = 198.0 * clampf((player_progress - track["start"]) / (track["finish"] - track["start"]), 0.0, 1.0)
-	hud["drift"].text = "DRIFT  +NITRO" if player.drifting else ("SPRUNG" if player.airborne else "")
+	hud["drift"].text = tr("DRIFT  +NITRO") if player.drifting else (tr("SPRUNG") if player.airborne else "")
 	if state == State.COUNTDOWN:
-		hud["drift"].text = "Gas kurz vor LOS = perfekter Start"
+		hud["drift"].text = tr("Gas kurz vor LOS = perfekter Start")
 	if event_type == "drift":
 		if drift_chain > 0.0:
 			hud["drift"].text = "x%d   %d" % [_drift_mult(), int(drift_chain)]
@@ -690,25 +690,25 @@ func _update_hud() -> void:
 			var next := ""
 			for i in drift_targets.size():
 				if drift_score < drift_targets[i]:
-					next = "Platz %d: %d" % [3 - i, drift_targets[i]]
+					next = tr("Platz %d: %d") % [3 - i, drift_targets[i]]
 					break
 			hud["drift"].text = next
 	# Kurze Einblendungen: Abkürzung, Sprungweite, Kamera
 	if player.path_id != _last_path:
 		var kind: String = track["paths"][player.path_id]["kind"]
 		if kind == "alley" or kind == "lake":
-			_flash("ABKÜRZUNG!", Color(1.0, 0.6, 0.1))
+			_flash(tr("ABKÜRZUNG!"), Color(1.0, 0.6, 0.1))
 		elif kind == "fork":
-			_flash("ALTSTADT · GEGENVERKEHR!", Color(1.0, 0.75, 0.2))
+			_flash(tr("ALTSTADT · GEGENVERKEHR!"), Color(1.0, 0.75, 0.2))
 		_last_path = player.path_id
 	if player.landings != _last_landings:
 		_last_landings = player.landings
 		if player.last_air > 0.5:
-			_flash("SPRUNG  %.1f s" % player.last_air, Color(0.4, 0.85, 1.0))
+			_flash(tr("SPRUNG  %.1f s") % player.last_air, Color(0.4, 0.85, 1.0))
 	if _flash_t > 0.0:
 		_flash_t -= get_process_delta_time()
 		hud["flash"].modulate.a = clampf(_flash_t / 0.4, 0.0, 1.0)
-	hud["music"].text = ("Musik: " + Music.current_title) if Music.current_title != "" else "Keine Musik: mp3/ogg in den Ordner music/ legen"
+	hud["music"].text = (tr("Musik: ") + Music.current_title) if Music.current_title != "" else tr("Keine Musik: mp3/ogg in den Ordner music/ legen")
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -717,7 +717,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if event.is_action_pressed("camera"):
 		player.toggle_camera()
-		_flash("Kamera: " + player.CAM_NAMES[player.cam_mode], Color(0.85, 0.9, 1.0))
+		_flash(tr("Kamera: ") + tr(player.CAM_NAMES[player.cam_mode]), Color(0.85, 0.9, 1.0))
 	elif event.is_action_pressed("reset_car") and state == State.RACING and event_type != "drag":
 		var loc := Track.locate(track, player.global_position)
 		var p: Dictionary = loc["path"]
@@ -734,15 +734,15 @@ var _heat_warned := false
 func _update_drag() -> void:
 	match player.shift_result:
 		"perfect":
-			_flash("PERFEKT GESCHALTET", Color(0.4, 1.0, 0.5))
+			_flash(tr("PERFEKT GESCHALTET"), Color(0.4, 1.0, 0.5))
 		"good":
-			_flash("GUT GESCHALTET", Color(1.0, 0.9, 0.4))
+			_flash(tr("GUT GESCHALTET"), Color(1.0, 0.9, 0.4))
 		"early":
-			_flash("ZU FRÜH GESCHALTET", Color(1.0, 0.55, 0.2))
+			_flash(tr("ZU FRÜH GESCHALTET"), Color(1.0, 0.55, 0.2))
 	player.shift_result = ""
 	if player.engine_heat > 0.6 and not _heat_warned:
 		_heat_warned = true
-		_flash("MOTOR ÜBERHITZT – SCHALTEN!", Color(1.0, 0.3, 0.2))
+		_flash(tr("MOTOR ÜBERHITZT – SCHALTEN!"), Color(1.0, 0.3, 0.2))
 	elif player.engine_heat < 0.3:
 		_heat_warned = false
 	if state == State.RACING and (player.totaled or player.blown):
@@ -755,7 +755,7 @@ func _on_player_dnf(reason: String) -> void:
 	player.finished = true
 	hud["center"].label_settings = hud["center"].label_settings.duplicate()
 	hud["center"].label_settings.font_size = 40
-	hud["center"].text = reason
+	hud["center"].text = tr(reason)
 	show.finish(false, false)
 	get_tree().create_timer(3.0).timeout.connect(_show_result.bind(4, false, [], reason))
 
@@ -784,7 +784,7 @@ func _on_player_finished() -> void:
 		if new_best:
 			GameState.best_times[key] = race_time
 	GameState.save_game()
-	hud["center"].text = "SIEG!" if place == 1 else "%d. PLATZ" % place
+	hud["center"].text = tr("SIEG!") if place == 1 else tr("%d. PLATZ" % place)
 	# Zielszene: Verkehr in der Nähe verschwindet (sonst fährt er durch die Fans), Kamera kreist, Fans kommen
 	for t in traffic.duplicate():
 		if t.global_position.distance_to(player.global_position) < 180.0:
@@ -809,28 +809,28 @@ func _show_result(place: int, new_best: bool, unlocked: Array, dnf := "") -> voi
 	var vb := VBoxContainer.new()
 	panel.add_child(vb)
 	var t := _label(vb, 14, HORIZONTAL_ALIGNMENT_CENTER)
-	t.text = "Zeit  %s%s" % [_fmt(race_time), "   NEUE BESTZEIT" if new_best else ""]
+	t.text = tr("Zeit  %s%s") % [_fmt(race_time), tr("   NEUE BESTZEIT") if new_best else ""]
 	if dnf != "":
-		t.text = "Ausgefallen: " + dnf.capitalize()
+		t.text = tr("Ausgefallen: ") + tr(dnf).capitalize()
 	if event_type == "drift":
-		t.text = "Punkte  %d%s" % [int(drift_score), "   NEUER REKORD" if new_best else ""]
+		t.text = tr("Punkte  %d%s") % [int(drift_score), tr("   NEUER REKORD") if new_best else ""]
 		var tg := _label(vb, 10, HORIZONTAL_ALIGNMENT_CENTER)
-		tg.text = "Platz 3: %d   Platz 2: %d   Platz 1: %d" % drift_targets
+		tg.text = tr("Platz 3: %d   Platz 2: %d   Platz 1: %d") % drift_targets
 	if place == 1:
 		var w := _label(vb, 11, HORIZONTAL_ALIGNMENT_CENTER)
-		w.text = ("Driftsiege gesamt: %d" % GameState.drift_wins) if event_type == "drift" else ("Rennsiege gesamt: %d" % GameState.wins)
+		w.text = (tr("Driftsiege gesamt: %d") % GameState.drift_wins) if event_type == "drift" else (tr("Rennsiege gesamt: %d") % GameState.wins)
 		if unlocked.size() > 0:
 			var u := _label(vb, 11, HORIZONTAL_ALIGNMENT_CENTER)
-			u.text = "FREIGESCHALTET:\n" + "\n".join(unlocked)
+			u.text = tr("FREIGESCHALTET:\n") + "\n".join(unlocked)
 			u.modulate = Color(0.4, 1.0, 0.5)
 	else:
 		var w := _label(vb, 11, HORIZONTAL_ALIGNMENT_CENTER)
-		w.text = "Nur Platz 1 schaltet neue Teile frei."
+		w.text = tr("Nur Platz 1 schaltet neue Teile frei.")
 	var hb := HBoxContainer.new()
 	hb.alignment = BoxContainer.ALIGNMENT_CENTER
 	vb.add_child(hb)
 	var again := Button.new()
-	again.text = "NOCHMAL"
+	again.text = tr("NOCHMAL")
 	again.pressed.connect(func(): get_tree().reload_current_scene())
 	hb.add_child(again)
 	var back := Button.new()
@@ -857,7 +857,8 @@ func _build_pause(root: Control) -> void:
 			["Neustart", func(): _unpause(); get_tree().reload_current_scene()],
 			["Garage", func(): _unpause(); get_tree().change_scene_to_file("res://scenes/garage.tscn")]]:
 		var b := Button.new()
-		b.text = entry[0].to_upper()
+		b.text = tr(entry[0]).to_upper()
+		b.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		b.pressed.connect(entry[1])
 		pause_panel.add_child(b)
