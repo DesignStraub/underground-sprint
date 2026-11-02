@@ -289,7 +289,7 @@ func _cover(r: Control, s: Vector2, bg: Texture2D) -> void:
 	_shade(r, s, Color(0, 0, 0, 0), Color(0.02, 0.01, 0.05, 0.7), 0.72, 1.0)
 	_neon(r, "NEED FOR", heavy, 104, Color.WHITE, CYAN, Rect2(0, 30, s.x, 130))
 	_neon(r, "GESCHWINDIGKEIT", cond, 168, CYAN, PINK, Rect2(0, 140, s.x, 200))
-	_neon(r, "STRASSENRENNEN BEI NACHT  ·  KOSTENLOS  ·  OHNE TÜV", wide, 30, GREEN, GREEN, Rect2(0, 346, s.x, 50), HORIZONTAL_ALIGNMENT_CENTER, 0.6)
+	_neon(r, "ILLEGALE STRASSENRENNEN BEI NACHT  ·  KOSTENLOS", wide, 30, GREEN, GREEN, Rect2(0, 346, s.x, 50), HORIZONTAL_ALIGNMENT_CENTER, 0.6)
 	_brand(r, Vector2(s.x - 420, s.y - 104), 84, 30)
 
 

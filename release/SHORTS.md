@@ -1,98 +1,99 @@
 # Shorts: Need for Geschwindigkeit
 
-Hochkant (9:16), 15 bis 30 Sekunden. Jede Idee: Texteinblendungen in Reihenfolge, Titel, Beschreibung.
+Hochkant (9:16), 15 bis 30 Sekunden, Ton wie die alten NFS-Underground-Trailer: kurz, hart, nachts.
+Jede Idee: Texteinblendungen in Reihenfolge, Titel, Beschreibung.
 Am Ende jedes Shorts dieselbe Abspanntafel: **NEED FOR GESCHWINDIGKEIT · Jetzt kostenlos auf itch.io**.
 
-Hashtags für alle: `#needforgeschwindigkeit #indiegame #rennspiel #streetracing #retrogaming #gamedev #madeingermany`
+Hashtags für alle: `#needforgeschwindigkeit #indiegame #rennspiel #streetracing #nfsunderground #gamedev #madeingermany`
 
 ---
 
-## 1. Würzburg bei Nacht
-Szene: Ludwigsbrücke, Festung Marienberg angestrahlt, dann am Main entlang.
-1. „Der letzte Bus ist weg.“
-2. „Also fährst du halt selbst durch Würzburg.“
-3. „Festung Marienberg: ✔ · Tempolimit: ✘“
+## 1. Die Stadt gehört uns
+Szene: Kamerafahrt übers Startfeld, Starterin, LOS, Start mit Nitro.
+1. „Die Stadt schläft.“
+2. „Wir nicht.“
+3. „Vier Autos. Ein Sieger.“
 
-Titel: Würzburg um 2 Uhr nachts, aber mit Lachgas
-Beschreibung: Echte Straßen, echte Mainbrücken, echte Festung. Wer erkennt die Ecke? `#würzburg #unterfranken`
+Titel: Die Stadt schläft. Wir nicht.
+Beschreibung: Illegale Straßenrennen bei Nacht durch echte deutsche Städte. Kostenlos spielbar.
 
-## 2. Lachgas statt NOS
-Szene: Nitro zünden im Bankenviertel, Speedlines.
-1. „Andere Rennspiele: NOS“
-2. „Wir: LACHGAS“
-3. „Nebenwirkung: Grinsen“
+## 2. Würzburg
+Szene: Ludwigsbrücke, Festung Marienberg angestrahlt, dann am Main entlang zum Alten Kranen.
+1. „Würzburg. 2 Uhr nachts.“
+2. „Zwei Brücken. Eine Festung.“
+3. „Kein Tempolimit.“
 
-Titel: Wir haben NOS übersetzt
-Beschreibung: Knapp am Verkehr vorbei gibt Nachschub. Zu knapp gibt Totalschaden.
+Titel: Würzburg bei Nacht – Sprint über den Main
+Beschreibung: Echte Straßen, echte Mainbrücken, die Festung Marienberg über der Strecke. `#würzburg #unterfranken`
 
-## 3. Teilnahmeurkunde
-Szene: Zieleinfahrt, „4. PLATZ · TEILNAHMEURKUNDE“ im Bild.
-1. „Platz 1: Sieg“
-2. „Platz 4: …“
-3. „Bundesjugendspiele-Flashback inklusive“
+## 3. Aachen
+Szene: Grabenring, Templergraben am SuperC vorbei, Dom im Hintergrund.
+1. „Aachen Grabenring.“
+2. „Zwei Runden. Der Dom im Blick.“
+3. „Wer bremst, verliert.“
 
-Titel: Das einzige Rennspiel mit Teilnahmeurkunde
-Beschreibung: Dabei sein ist alles. Gewinnen ist trotzdem schöner.
+Titel: Aachen Grabenring – Rundkurs um den Dom
+Beschreibung: SuperC, Elisenbrunnen, Theater, der Dom in der Mitte. `#aachen`
 
 ## 4. Bad Kissingen
 Szene: Start am Regentenbau, dann an der Saale entlang zum Gradierbau.
-1. „Bad Kissingen ist ein Kurort.“
-2. „Wir haben ‚Kurvenort‘ verstanden.“
-3. „Ziel: Gradierbau. Tief einatmen.“
+1. „Bad Kissingen.“
+2. „Vom Regentenbau bis zur Saline.“
+3. „Drei Kilometer Vollgas.“
 
-Titel: Kurort? Kurvenort.
-Beschreibung: Vom Regentenbau an der Fränkischen Saale entlang bis zur Saline. Welterbe mit Vollgas. `#badkissingen`
+Titel: Bad Kissingen – Sprint durchs Kurviertel
+Beschreibung: Regentenbau, Arkadenbau, Fränkische Saale, Gradierbau. `#badkissingen`
 
-## 5. Aachen Grabenring
-Szene: Kamerafahrt übers Startfeld, Starterin, dann Templergraben am SuperC vorbei.
-1. „Zwei Runden um den Dom.“
-2. „Karl der Große wäre stolz.“
-3. „Oder würde einen Strafzettel schreiben.“
+## 5. Tauberbischofsheim
+Szene: Altstadtring, Türmersturm im Hintergrund.
+1. „Tauberbischofsheim.“
+2. „Drei Runden um die Altstadt.“
+3. „Jede Kurve zählt.“
 
-Titel: Aachener Grabenring, Kaiser-Edition
-Beschreibung: SuperC, Elisenbrunnen, Theater, Dom in der Mitte. Öcher wissen, wo das ist. `#aachen`
+Titel: Tauberbischofsheim – Altstadtring bei Nacht
+Beschreibung: Türmersturm, Rathaus, St. Martin. `#tauberbischofsheim #taubertal`
 
-## 6. Drag-Rennen
+## 6. Hammelburg
+Szene: Rathaus mit Marktbrunnen, über die Saale, den Schlossberg hoch, Zielszene mit Fans.
+1. „Hammelburg.“
+2. „Über die Saale. Den Berg hinauf.“
+3. „Ziel: Schloss Saaleck.“
+
+Titel: Hammelburg – Sprint hinauf nach Saaleck
+Beschreibung: Rathaus, Marktbrunnen, Fränkische Saale, Weinberge, Schloss Saaleck. `#hammelburg #unterfranken`
+
+## 7. Nitro
+Szene: Bankenviertel, Nitro zünden, Speedlines, knapp am Verkehr vorbei.
+1. „Knapp vorbei.“
+2. „Nitro voll.“
+3. „Zünden.“
+
+Titel: Knapp vorbei. Nitro voll.
+Beschreibung: Wer knapp am Verkehr vorbeizieht, füllt sein Nitro.
+
+## 8. Drag
 Szene: Drehzahlmesser, „PERFEKT GESCHALTET“, Viertelmeile.
-1. „Viertelmeile ohne Tempolimit“
-2. „Im grünen Bereich schalten“
-3. „Zu spät? Motorschaden. Wie im echten Leben, nur billiger.“
+1. „Viertelmeile.“
+2. „Schalten im grünen Bereich.“
+3. „Zu spät, und der Motor ist hin.“
 
-Titel: Schalten ist wie Mülltrennung: einfach richtig machen
-Beschreibung: Handschaltung mit E und Q, Spurwechsel mit A und D. Wer im Begrenzer bleibt, kocht den Motor.
-
-## 7. Hammelburg
-Szene: Rathaus mit Marktbrunnen, über die Saale, den Schlossberg hoch, Zielszene mit Fans, Schloss Saaleck oben.
-1. „Hammelburg: älteste Weinstadt Frankens.“
-2. „Wir nehmen trotzdem nur den Berg mit.“
-3. „Ziel: Schloss Saaleck. Fans: schon da.“
-
-Titel: Den Weinberg hoch, aber mit Lachgas
-Beschreibung: Rathaus, Marktbrunnen, Fränkische Saale, Schloss Saaleck. `#hammelburg #unterfranken`
-
-## 8. Tauberbischofsheim
-Szene: Runden um die Altstadt, Türmersturm im Hintergrund.
-1. „Tauberbischofsheim: Fechterstadt.“
-2. „Wir fechten lieber mit 200 km/h.“
-3. „Drei Runden um den Türmersturm. En garde.“
-
-Titel: Fechten, aber auf vier Rädern
-Beschreibung: Altstadtring mit Türmersturm, Rathaus und St. Martin. `#tauberbischofsheim #taubertal`
+Titel: Drag-Rennen – perfekt schalten oder verlieren
+Beschreibung: Handschaltung mit E und Q, Spurwechsel mit A und D. Wer im Begrenzer bleibt, überhitzt den Motor.
 
 ## 9. Drift
-Szene: Chinatown-Drift, Kette x5.
-1. „Quer ist das neue Gerade.“
-2. „Bande berührt? Kette weg.“
-3. „Wie beim Einparken. Nur mit Punkten.“
+Szene: Chinatown-Drift, Kette bis x5.
+1. „Drift-Wertung.“
+2. „Ketten bis x5.“
+3. „Eine Bande, und alles ist weg.“
 
-Titel: Quer ist das neue Gerade
-Beschreibung: Driften gibt Punkte, Ketten geben Multiplikator, die Bande gibt Ärger.
+Titel: Drift bis x5
+Beschreibung: Querfahren gibt Punkte, Ketten geben Multiplikator, jede Berührung mit der Bande kostet die Kette.
 
-## 10. Welche Stadt fehlt?
+## 10. Echte Städte
 Szene: Schnitt durch alle fünf Städte, jeweils mit gelbem Ortsschild.
-1. „Aachen ✔ Würzburg ✔ Bad Kissingen ✔“
-2. „Tauberbischofsheim ✔ Hammelburg ✔“
-3. „Und deine Stadt? Ab in die Kommentare.“
+1. „Aachen. Würzburg. Bad Kissingen.“
+2. „Tauberbischofsheim. Hammelburg.“
+3. „Echte Städte. Echte Straßen.“
 
 Titel: Echte deutsche Städte als Rennstrecke
 Beschreibung: Straßen aus OpenStreetMap, Wahrzeichen an ihrem Platz. Kartendaten © OpenStreetMap-Mitwirkende.

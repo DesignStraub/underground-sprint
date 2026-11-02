@@ -8,7 +8,7 @@ Alles, was du auf der neuen itch.io-Seite eintragen musst (das Spiel hieß früh
 |---|---|
 | Title | Need for Geschwindigkeit |
 | Project URL | wie beim Anlegen gewählt, z. B. `need-for-geschwindigkeit` (für `push_itch.sh` als 3. Angabe) |
-| Short description / tagline | Straßenrennen bei Nacht durch echte deutsche Städte. Lachgas statt NOS, TÜV erst nächstes Jahr. Kostenlos. |
+| Short description / tagline | Illegale Straßenrennen bei Nacht durch echte deutsche Städte. Tunen, Nitro, Drift, Drag. Kostenlos. |
 | Classification | Games |
 | Kind of project | Downloadable + HTML |
 | Release status | In development |

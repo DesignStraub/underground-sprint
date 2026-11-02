@@ -123,8 +123,8 @@ DIN-Schmalschrift, große Abschnittstitel (GARAGE, RENNEN, TUNING, AUTOHAUS), Le
 Motor-Tuning), Tastenleiste unten, wechselnde Tipps oben rechts. Pause und Ergebnis im gleichen Look.
 
 ## Schrift und Texte
-Alles auf Deutsch, mit Augenzwinkern (Lachgas statt NOS, Flugmodus bei Sprüngen, Teilnahmeurkunde für Platz 4,
-Dachwerbung wie „TÜV? NÄCHSTES JAHR.“). Schrift überall im Stil der deutschen Straßenschilder (DIN 1451):
+Alles auf Deutsch, im Ton von NFS Underground (KNAPP VORBEI +NITRO, DRIFT +NITRO, SPRUNG, Tuning-Marken auf den
+Dächern, Ladetipps im Menü). Schrift überall im Stil der deutschen Straßenschilder (DIN 1451):
 D-DIN von Datto, SIL Open Font License 1.1 (`assets/fonts/COPYING.txt`). Alte englische Eventnamen werden im
 Spielstand automatisch umgeschrieben, der Spielstand aus „Underground Sprint“ wird beim ersten Start übernommen.
 

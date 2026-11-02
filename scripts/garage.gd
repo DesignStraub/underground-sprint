@@ -7,19 +7,18 @@ const Builder := preload("res://scripts/car_builder.gd")
 const PixelView := preload("res://scripts/pixel_view.gd")
 const UI := preload("res://scripts/ui_style.gd")
 
-## Ladetipps wie früher, nur ehrlicher
+## Tipps wie auf den Ladebildschirmen von NFS Underground
 const TIPS := [
-	"Lachgas ist kein Partygas. Shift drücken.",
-	"Im grünen Bereich schalten. Wie Mülltrennung: einfach richtig machen.",
-	"Blitzer gibt es hier keine. Glauben wir.",
-	"Gas kurz vor LOS, sonst qualmen nur die Reifen.",
-	"Knapp am Verkehr vorbei gibt Lachgas. Nicht zu knapp.",
-	"Auf Platz 4 gibt es eine Teilnahmeurkunde. Immerhin.",
-	"Handbremse plus Lenken gleich quer. Quer gleich Punkte.",
-	"Der TÜV kommt nächstes Jahr. Bis dahin: Vollgas.",
-	"In Würzburg nicht in den Main fahren. Der ist nass.",
-	"Abkürzungen sparen Zeit. Gegenverkehr kostet Nerven.",
-	"Baustellen sind hier Dauerzustand. Wie im echten Leben.",
+	"Gib kurz vor LOS Gas: Drehzahl im grünen Bereich gibt einen perfekten Start.",
+	"Knapp am Verkehr vorbei füllt dein Nitro.",
+	"Im Drag im grünen Bereich schalten: perfekter Schaltvorgang, mehr Schub.",
+	"Abkürzungen sparen Zeit, aber dort kommt dir Verkehr entgegen.",
+	"Handbremse und Lenken stellen das Auto quer. Drift-Ketten bringen Multiplikator.",
+	"Siege schalten neue Teile und Autos frei.",
+	"Spar dir Nitro für die letzte Gerade.",
+	"Über die Rampe am Bahnübergang springst du über die Gleise.",
+	"Motor-Tuning steigert Beschleunigung und Höchstgeschwindigkeit.",
+	"Im Drag nicht im Begrenzer bleiben: der Motor überhitzt.",
 ]
 
 var world: SubViewport
@@ -379,7 +378,7 @@ func _show_main() -> void:
 	_button("Auto wechseln", _show_cars)
 	_button("Einstellungen", _show_settings)
 	if not OS.has_feature("web"):  # im Browser schließt man einfach den Tab
-		_button("Feierabend", func(): get_tree().quit())
+		_button("Beenden", func(): get_tree().quit())
 	info.text = Catalog.CARS[preview_car]["desc"] + "\nF / F11: Vollbild"
 	_focus_first()
 
@@ -557,7 +556,7 @@ func _choose_car() -> void:
 func _confirm_reset() -> void:
 	_clear_menu()
 	_set_section("ACHTUNG")
-	info.text = "Alle Siege und Tuningteile gehen verloren. Wie beim TÜV: weg ist weg."
+	info.text = "Alle Siege und Tuningteile gehen verloren."
 	_button("Ja, zurücksetzen", func(): GameState.reset_progress(); _show_main())
 	_button("Abbrechen", _show_main)
 	menu.get_child(1).grab_focus.call_deferred()

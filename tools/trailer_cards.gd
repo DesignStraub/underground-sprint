@@ -11,12 +11,12 @@ const BG := Color(0.03, 0.025, 0.07)
 
 ## name -> [Zeilen [Text, Schrift, Größe, Farbe, y]] ; deckend = Hintergrund
 const SPRUECHE := {
-	"lachgas": ["LACHGAS STATT NOS", "Knapp am Verkehr vorbei gibt's Nachschub"],
-	"drag": ["VIERTELMEILE OHNE TEMPOLIMIT", "E/Q schalten – im Grünen ist's perfekt"],
-	"drift": ["QUER IST DAS NEUE GERADE", "Drift-Ketten bis x5"],
-	"bahn": ["BAHNÜBERGANG?", "Flugmodus an."],
+	"nitro": ["ZÜNDE DAS NITRO", "Knapp am Verkehr vorbei füllt den Tank"],
+	"drag": ["DRAG-RENNEN", "Handschaltung · im grünen Bereich perfekt schalten"],
+	"drift": ["DRIFT-WERTUNG", "Ketten bis x5 · jede Bande kostet"],
+	"bahn": ["SPRING ÜBER DIE GLEISE", "Bevor die Schranke unten ist"],
 	"staedte": ["ECHTE STÄDTE. ECHTE STRASSEN.", "Kartendaten © OpenStreetMap-Mitwirkende"],
-	"tuev": ["TÜV? NÄCHSTES JAHR.", "9 Autos, 8 Tuning-Kategorien, kein Grind"],
+	"tuning": ["TUNE DEIN AUTO", "9 Autos · 8 Tuning-Kategorien · Siege schalten frei"],
 }
 const ORTE := {
 	"aachen": ["Aachen", "Städteregion Aachen"],
@@ -100,7 +100,7 @@ func _title_card() -> Control:
 	var r := _base(true)
 	_text(r, "NEED FOR", wide, 92, Color.WHITE, Rect2(0, 150, SIZE.x, 120), CYAN)
 	_text(r, "GESCHWINDIGKEIT", cond, 172, CYAN, Rect2(0, 250, SIZE.x, 200), PINK)
-	_text(r, "STRASSENRENNEN BEI NACHT  ·  OHNE TÜV", bold, 34, GREEN, Rect2(0, 470, SIZE.x, 60), GREEN)
+	_text(r, "ILLEGALE STRASSENRENNEN BEI NACHT", bold, 34, GREEN, Rect2(0, 470, SIZE.x, 60), GREEN)
 	return r
 
 

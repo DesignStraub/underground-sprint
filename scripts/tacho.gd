@@ -94,4 +94,4 @@ func _draw() -> void:
 	if nitro > 0.01:
 		var ncol := Color(0.5, 0.85, 1.0) if nitro_on else Color(0.15, 0.5, 1.0)
 		draw_arc(c, R + 1.0, n0, lerpf(n0, n1, nitro), 16, ncol, 5.0, true)
-	draw_string(font, c + Vector2(-25, R + 16.0), "LACHGAS", HORIZONTAL_ALIGNMENT_CENTER, 50, 8, Color(0.4, 0.7, 1.0))
+	draw_string(font, c + Vector2(-25, R + 16.0), "NITRO", HORIZONTAL_ALIGNMENT_CENTER, 50, 8, Color(0.4, 0.7, 1.0))
