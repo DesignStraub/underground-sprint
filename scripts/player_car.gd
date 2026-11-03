@@ -32,6 +32,17 @@ const DRAG_LIMIT := 8000.0  # Begrenzer im Drag
 const PERFECT_SHIFT := Vector2(7100.0, 7650.0)  # grüner Bereich zum Hochschalten
 const GOOD_SHIFT := 6200.0
 const CAM_NAMES := ["Verfolger", "Stoßstange", "Motorhaube"]
+## Sprungkamera wie in NFSU: bei hohen, langen Sprüngen schneidet das Bild auf eine feste Kamera knapp über dem
+## Boden schräg vor der Landestelle. Sie schaut dem Auto nach und zoomt so, dass es etwa gleich groß bleibt; dazu
+## Zeitlupe. Kurz nach dem Aufsetzen geht es zurück zur Fahrerkamera.
+const JUMP_CAM_PEAK := 1.6  # ab dieser vorhergesagten Höhe über dem Boden (m)
+const JUMP_CAM_TIME := 0.6  # und dieser Flugdauer (s); Kuppen bleiben darunter, Seesprung und Bahnrampe nicht
+const JC_AHEAD := 8.0  # Kamera so weit hinter der Landestelle
+const JC_SIDE := 6.0  # und so weit seitlich der Flugbahn (schräg von vorn statt frontal)
+const JC_HEIGHT := 1.3
+const JC_FRAME := 2.4  # halbe Bildhöhe am Auto (m): kleiner = näher heran
+const SLOW_REAL := 2.4  # Zeitlupe so stark, dass ein Sprung etwa so lange dauert (s, Echtzeit) ...
+const SLOW_RANGE := Vector2(0.45, 0.7)  # ... aber nur leicht: Zeitfaktor in diesem Bereich
 
 var controls_enabled := false
 var finished := false
@@ -126,6 +137,14 @@ var _slope_roll := 0.0
 var _cam_yaw := 0.0
 var _cam_pos := Vector3.ZERO
 var _cam_init := false
+var jump_cam := false
+var _jc_pos := Vector3.ZERO
+var _jc_look := Vector3.ZERO
+var _jc_landed := false
+var _jc_hold := 0.0  # Echtzeit seit dem Aufsetzen
+var _slowmo := 1.0  # Zeitfaktor, weich ein- und ausgeblendet
+var _jc_slow := 1.0  # Ziel-Zeitfaktor dieses Sprungs
+var _jc_light: OmniLight3D  # Aufhelllicht auf der Kameraseite: nachts von vorn wäre das Auto sonst fast schwarz
 var _respawn_xf := Transform3D.IDENTITY
 var _last_prog := 0.0
 
@@ -649,6 +668,8 @@ func _update_vertical(dt: float) -> void:
 			_air_roll_v = clampf(-speed_lat * 0.15, -1.2, 1.2) if drop and absf(speed_lat) > 1.5 else 0.0
 		if not drop and not tumbling:
 			Sfx.play("whoosh", -8.0 + clampf(vy, 0.0, 8.0), randf_range(0.9, 1.1))
+		if not tumbling:
+			_jump_cam_check()
 		return
 	if g["water"]:
 		_splash()
@@ -672,6 +693,7 @@ func _update_vertical(dt: float) -> void:
 
 func _land(gh: float, water: bool) -> void:
 	var impact := -vy
+	_jc_landed = true
 	position.y = gh
 	if water:
 		airborne = false
@@ -728,6 +750,7 @@ func start_tumble(push: Vector3, strength: float) -> void:
 	if OS.get_cmdline_user_args().has("--tumblelog"):
 		print("UEBERSCHLAG v=%s quer=%.1f stärke=%.1f luft=%s %s" % [velocity, velocity.dot(global_basis.x), strength, airborne, get_stack()[1]["function"]])
 	tumbling = true
+	_jc_landed = true
 	rollovers += 1
 	crashes += 1
 	airborne = true
@@ -860,6 +883,9 @@ func _update_sinking(dt: float) -> void:
 
 
 func _update_camera(dt: float, sf: float) -> void:
+	if jump_cam:
+		_update_jump_cam(dt)
+		return
 	var base := 58.0 if cam_mode == 0 else 70.0
 	var target_fov := base + (14.0 if cam_mode == 0 else 24.0) * sf + (8.0 if nitro_on else 0.0)
 	_fov = lerpf(_fov, target_fov, dt * (6.0 if nitro_on else 2.5))
@@ -907,6 +933,7 @@ func place(xform: Transform3D) -> void:
 	airborne = false
 	vy = 0.0
 	sinking = 0.0
+	_end_jump_cam()
 	_cam_init = false
 	_base_ok = false
 	_curb_y = 0.0
@@ -1040,3 +1067,154 @@ func _describe(c: KinematicCollision3D) -> String:
 		return "Wand %s-%s bei %s" % [f[bi].snapped(Vector3.ONE * 0.1), f[bi + 1].snapped(Vector3.ONE * 0.1), p.snapped(Vector3.ONE * 0.1)]
 	return str(cs.shape)
 
+
+## Zeitlupe weich ein- und ausblenden, in Echtzeit (dt ist selbst schon verlangsamt). Nach dem Aufsetzen läuft sie
+## aus; bei Überschlag oder Wasser bleibt sie, bis die Kamera zurückschneidet.
+func _process(dt: float) -> void:
+	var real := dt / maxf(Engine.time_scale, 0.01)
+	var want := _jc_slow if jump_cam and GameState.jump_cam == 0 and (not _jc_landed or tumbling or sinking > 0.0) else 1.0
+	if _slowmo >= 1.0 and want >= 1.0:
+		return
+	_slowmo = move_toward(_slowmo, want, real * (4.0 if want < _slowmo else 2.5))
+	Engine.time_scale = _slowmo
+
+
+func _exit_tree() -> void:
+	Engine.time_scale = 1.0
+
+
+## Beim Absprung: wird der Sprung hoch und lang genug und gibt es einen Standort mit freier Sicht, Sprungkamera an
+func _jump_cam_check() -> void:
+	if jump_cam or GameState.jump_cam == 2 or drag_mode or not controls_enabled or track.is_empty():
+		return
+	var f := _predict_flight()
+	if OS.get_cmdline_user_args().has("--jumplog"):
+		print("SPRUNG vorhergesagt t=%.2f s höhe=%.1f m v=%.0f km/h" % [f["time"], f["peak"], velocity.length() * 3.6])
+	if f["peak"] < JUMP_CAM_PEAK or f["time"] < JUMP_CAM_TIME or f["loc"].is_empty():
+		return
+	var spot = _jump_cam_spot(f)
+	if OS.get_cmdline_user_args().has("--jumplog"):
+		print("SPRUNGKAMERA %s" % (str(spot) if spot != null else "kein freier Standort"))
+	if spot == null:
+		return
+	jump_cam = true
+	_jc_slow = clampf(f["time"] / SLOW_REAL, SLOW_RANGE.x, SLOW_RANGE.y)
+	_jc_landed = false
+	_jc_hold = 0.0
+	_jc_pos = spot
+	_jc_look = global_position + Vector3(0, 0.55, 0)
+	cam.top_level = true
+	cam.rotation = Vector3.ZERO
+	if _jc_light == null:
+		_jc_light = OmniLight3D.new()
+		_jc_light.top_level = true
+		_jc_light.omni_range = 6.0
+		_jc_light.light_energy = 1.4
+		_jc_light.light_color = Color(0.85, 0.9, 1.0)
+		add_child(_jc_light)
+	_jc_light.visible = true
+
+
+func _end_jump_cam() -> void:
+	if not jump_cam:
+		return
+	jump_cam = false
+	_jc_light.visible = false
+	_apply_cam()
+	cam.fov = _fov
+
+
+## Flugbahn vorausrechnen (geradeaus, ohne Luftwiderstand): Dauer, größte Höhe über dem Boden, Scheitel und
+## Landepunkt mit Lage auf der Strecke
+func _predict_flight() -> Dictionary:
+	var hv := Vector3(velocity.x, 0.0, velocity.z)
+	var p := global_position
+	var v := vy
+	var peak := 0.0
+	var apex := p
+	var t := 0.0
+	var step := 1.0 / 15.0
+	while t < 4.0:
+		t += step
+		v -= GRAVITY * step
+		p += hv * step
+		p.y += v * step
+		var l := Track.locate(track, p)
+		var g := Track.ground(track, l, p)
+		var floor_y: float = g["base"] - 0.5 if g["water"] else g["h"]
+		if p.y <= floor_y and v < 0.0:
+			return {"time": t, "peak": peak, "apex": apex, "land": Vector3(p.x, floor_y, p.z), "loc": l}
+		if p.y - g["h"] > peak:
+			peak = p.y - g["h"]
+			apex = p
+	return {"time": t, "peak": peak, "apex": apex, "land": p, "loc": {}}
+
+
+## Kamerastandort: ein Stück hinter der Landestelle, seitlich versetzt (zur Straßenmitte hin, sonst zur anderen
+## Seite, notfalls näher), knapp über dem Boden; nur wenn von dort Absprung, Scheitel und Landung frei zu sehen sind
+func _jump_cam_spot(f: Dictionary) -> Variant:
+	var l: Dictionary = f["loc"]
+	var p: Dictionary = l["path"]
+	var c: Curve3D = p["curve"]
+	var fr := Track.frame_at(c, l["d"])
+	var d: float = l["d"] + JC_AHEAD * (1.0 if velocity.dot(fr["fwd"]) >= 0.0 else -1.0)
+	var fc := Track.frame_at(c, d)
+	var main: bool = p["id"] == 0
+	# Hauptstraße: bis auf den Gehweg; Nebenwege: innerhalb ihrer (unsichtbaren) Randmauern
+	var reach: float = Track.hw(track, d) + Track.WALK - 1.2 if main else p["half_w"] - 0.4
+	var lat: float = l["lat"]
+	var first := -signf(lat) if absf(lat) > 0.3 else 1.0
+	var space := get_world_3d().direct_space_state
+	# erst weit seitlich (tief, dann höher über Geländer und Mauern hinweg), dann näher an der Flugbahn
+	for c2 in [[JC_SIDE, JC_HEIGHT], [-JC_SIDE, JC_HEIGHT], [JC_SIDE, 2.6], [-JC_SIDE, 2.6], [JC_SIDE * 0.6, JC_HEIGHT], [-JC_SIDE * 0.6, JC_HEIGHT]]:
+		var cl := clampf(lat + c2[0] * first, -reach, reach)
+		if absf(cl - lat) < 2.0:
+			continue
+		var g := Track.ground_path(track, p["id"], d, cl, absf(cl) - Track.hw(track, d) if main else -1.0)
+		var pos: Vector3 = fc["pos"] + fc["right"] * cl
+		pos.y = g["h"] + c2[1]
+		var ok := _sight(space, pos, global_position + Vector3(0, 1.0, 0)) and _sight(space, pos, f["apex"] + Vector3(0, 0.6, 0)) \
+				and _sight(space, pos, f["land"] + Vector3(0, 1.0, 0)) and _free(space, pos)
+		if OS.get_cmdline_user_args().has("--jumplog"):
+			print("  quer %.1f -> %.1f höhe %.1f: %s" % [lat, cl, c2[1], "frei" if ok else "verdeckt"])
+		if ok:
+			return pos
+	return null
+
+
+func _sight(space: PhysicsDirectSpaceState3D, a: Vector3, b: Vector3) -> bool:
+	var q := PhysicsRayQueryParameters3D.create(a, b)
+	q.exclude = [get_rid()]
+	return space.intersect_ray(q).is_empty()
+
+
+func _free(space: PhysicsDirectSpaceState3D, pos: Vector3) -> bool:
+	var q := PhysicsShapeQueryParameters3D.new()
+	var sph := SphereShape3D.new()
+	sph.radius = 0.5
+	q.shape = sph
+	q.transform = Transform3D(Basis(), pos)
+	q.exclude = [get_rid()]
+	return space.intersect_shape(q, 1).is_empty()
+
+
+func _update_jump_cam(dt: float) -> void:
+	var real := dt / maxf(Engine.time_scale, 0.01)
+	if _jc_landed:
+		_jc_hold += real
+		if _jc_hold > (1.4 if tumbling or sinking > 0.0 else 0.45):
+			_end_jump_cam()
+			return
+	var target := global_position + Vector3(0, 0.55, 0)
+	_jc_look = _jc_look.lerp(target, 1.0 - exp(-real * 14.0))
+	var dist := _jc_pos.distance_to(_jc_look)
+	cam.global_position = _jc_pos
+	if dist > 0.5:
+		cam.look_at(_jc_look, Vector3.UP)
+	cam.fov = clampf(rad_to_deg(2.0 * atan(JC_FRAME / maxf(dist, 0.1))), 9.0, 60.0)
+	_jc_light.global_position = target + (_jc_pos - target).normalized() * 3.0 + Vector3(0, 1.0, 0)
+	_shake_t += real
+	var amp := _shake * 0.06
+	cam.h_offset = sin(_shake_t * 41.0) * amp
+	cam.v_offset = sin(_shake_t * 53.0 + 1.3) * amp
+	_shake = move_toward(_shake, 0.0, real * 3.0)

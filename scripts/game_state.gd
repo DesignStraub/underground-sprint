@@ -39,6 +39,9 @@ var show_fps := false
 var pixel_look := false
 ## Touch-Knöpfe im Rennen: 0 Auto (nur Handy/Tablet), 1 immer, 2 nie
 var touch_mode := 0
+## Sprungkamera bei hohen Sprüngen: 0 an (mit Zeitlupe), 1 ohne Zeitlupe, 2 aus
+var jump_cam := 0
+const JUMP_CAM_NAMES := ["An", "Ohne Zeitlupe", "Aus"]
 ## "" = noch nicht gewählt (beim ersten Start fragt die Garage), sonst "en" oder "de"
 var language := ""
 var vsync := true
@@ -216,6 +219,8 @@ func cycle_setting(key: String, dir := 1) -> void:
 			fps_limit = (fps_limit + 1) % FPS_LIMITS.size()
 		"touch":
 			touch_mode = (touch_mode + 1) % 3
+		"jumpcam":
+			jump_cam = posmod(jump_cam + dir, 3)
 		"show_fps":
 			show_fps = not show_fps
 	apply_display()
@@ -284,6 +289,8 @@ func setting_text(key: String) -> String:
 			return tr("Sprache: ") + I18n.NAMES.get(language if language != "" else "en", "English")
 		"touch":
 			return tr("Touch-Steuerung: ") + tr(["Auto", "An", "Aus"][touch_mode])
+		"jumpcam":
+			return tr("Sprungkamera: ") + tr(JUMP_CAM_NAMES[jump_cam])
 	if GFX.has(key):
 		return tr(GFX[key]["label"]) + ": " + tr(GFX[key]["levels"][gfx[key]])
 	return key
@@ -402,7 +409,7 @@ func save_game() -> void:
 		"wins": wins, "drift_wins": drift_wins, "current_car": current_car, "race_index": race_index,
 		"best_times": best_times, "car_configs": car_configs, "won_events": won_events,
 		"gfx": {"preset": preset, "opts": gfx, "pixel": pixel_look, "vsync": vsync, "fps": fps_limit, "fullscreen": fullscreen,
-			"touch": touch_mode, "show_fps": show_fps},
+			"touch": touch_mode, "show_fps": show_fps, "jump_cam": jump_cam},
 		"language": language,
 	}, "\t"))
 
@@ -447,6 +454,7 @@ func load_game() -> void:
 	fps_limit = clampi(int(g.get("fps", 0)), 0, FPS_LIMITS.size() - 1)
 	fullscreen = bool(g.get("fullscreen", false))
 	touch_mode = clampi(int(g.get("touch", 0)), 0, 2)
+	jump_cam = clampi(int(g.get("jump_cam", 0)), 0, 2)
 	car_configs = {}
 	var cc: Dictionary = data.get("car_configs", {})
 	for car_id in cc:

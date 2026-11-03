@@ -178,6 +178,9 @@ const EN := {
 	"Unter der Hochbahn der U1 durch die Skalitzer Straße, über die Oberbaumbrücke, an der East Side Gallery entlang und über die Schillingbrücke zurück zum Kotti.":
 		"Under the elevated U1 along Skalitzer Straße, over the Oberbaumbrücke, past the East Side Gallery and back over the Schillingbrücke to Kotti.",
 	"Touch-Knöpfe im Rennen. Auto: nur auf Handy und Tablet.": "On-screen buttons in races. Auto: only on phones and tablets.",
+	"Sprungkamera: ": "Jump camera: ", "Ohne Zeitlupe": "No slow motion",
+	"Bei hohen Sprüngen schaut eine Kamera schräg von vorn zu, wie in NFS Underground, dazu Zeitlupe.":
+		"On big jumps a camera watches from ahead at an angle, like in NFS Underground, in slow motion.",
 }
 
 static var _added := false

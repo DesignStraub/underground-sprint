@@ -54,6 +54,9 @@ var pause_panel: Control
 var env: Environment
 var moon: DirectionalLight3D
 var _reverb: AudioEffectReverb
+var _lowpass: AudioEffectLowPassFilter  # Zeitlupe: Motor und Effekte klingen dumpf
+var _bars: Array[ColorRect] = []  # Kino-Balken bei der Sprungkamera
+var _bars_k := 0.0
 var _tunnel_k := 0.0
 var _in_tunnel := false
 var _district_i := -1
@@ -355,11 +358,21 @@ func _setup_hall() -> void:
 		AudioServer.add_bus_effect(idx, rv)
 	_reverb = AudioServer.get_bus_effect(idx, 0)
 	_reverb.wet = 0.0
+	for i in AudioServer.get_bus_effect_count(idx):
+		if AudioServer.get_bus_effect(idx, i) is AudioEffectLowPassFilter:
+			_lowpass = AudioServer.get_bus_effect(idx, i)
+	if _lowpass == null:
+		_lowpass = AudioEffectLowPassFilter.new()
+		AudioServer.add_bus_effect(idx, _lowpass)
+	_lowpass.cutoff_hz = 20000.0
 
 
 func _exit_tree() -> void:
 	if _reverb:
 		_reverb.wet = 0.0
+	if _lowpass:
+		_lowpass.cutoff_hz = 20000.0
+	Engine.time_scale = 1.0
 
 
 var mood: Dictionary = {}
@@ -493,6 +506,15 @@ func _build_hud() -> void:
 	fx_mat.shader = SPEED_FX
 	fx.material = fx_mat
 	fx_layer.add_child(fx)
+	for top in [true, false]:
+		var bar := ColorRect.new()
+		bar.color = Color.BLACK
+		bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		bar.anchor_right = 1.0
+		bar.anchor_top = 0.0 if top else 1.0
+		bar.anchor_bottom = bar.anchor_top
+		fx_layer.add_child(bar)
+		_bars.append(bar)
 
 	var layer := CanvasLayer.new()
 	layer.layer = 1
@@ -653,6 +675,7 @@ func _process(dt: float) -> void:
 
 	_update_world(dt)
 	_update_hud()
+	_update_cinema(dt)
 
 
 ## Tunnel: dunkler, Hall an, Wusch beim Reinfahren. Viertel: Name einblenden.
@@ -1021,6 +1044,8 @@ func _build_pause(root: Control) -> void:
 func _toggle_pause() -> void:
 	var p := not get_tree().paused
 	get_tree().paused = p
+	if p:
+		Engine.time_scale = 1.0  # Menü nicht in Zeitlupe; die Sprungkamera stellt sie danach wieder ein
 	pause_panel.visible = p
 	if p:
 		(pause_panel.get_child(1) as Button).grab_focus()
@@ -1033,6 +1058,21 @@ func _unpause() -> void:
 func _fmt(t: float) -> String:
 	return "%d:%05.2f" % [int(t) / 60, fmod(t, 60.0)]
 
+
+
+## Sprungkamera: schwarze Balken oben und unten einfahren, Tempolinien aus, Ton in der Zeitlupe dumpf
+func _update_cinema(dt: float) -> void:
+	var real := dt / maxf(Engine.time_scale, 0.01)
+	_bars_k = move_toward(_bars_k, 1.0 if player.jump_cam else 0.0, real * 5.0)
+	var h := get_viewport().get_visible_rect().size.y * 0.09 * smoothstep(0.0, 1.0, _bars_k)
+	_bars[0].offset_bottom = h
+	_bars[1].offset_top = -h
+	if _bars_k > 0.0:
+		fx_mat.set_shader_parameter("lines", 0.0)
+		fx_mat.set_shader_parameter("blur", 0.0)
+	if _lowpass:
+		var slow := clampf((1.0 - Engine.time_scale) / 0.5, 0.0, 1.0)
+		_lowpass.cutoff_hz = lerpf(20000.0, 900.0, slow)
 
 
 func _flash(text: String, col: Color) -> void:
