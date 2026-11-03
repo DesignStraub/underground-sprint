@@ -894,7 +894,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		var p: Dictionary = loc["path"]
 		var half: float = p["half_w"] - 2.0
 		player.place(Track.xform_at(p["curve"], loc["d"], clampf(loc["lat"], -half, half)))
-	elif event.is_action_pressed("pause") and state != State.FINISHED:
+	elif event.is_action_pressed("pause", false, true) and state != State.FINISHED:  # genau: Alt+Enter ist Vollbild
 		_toggle_pause()
 
 

@@ -19,7 +19,8 @@ Ordner in Godot 4.7 öffnen (Import), dann F5. Das Spiel startet mit dem ONE-HUM
 | C | Y | Kamera: Verfolger (Standard) / Stoßstange / Motorhaube |
 | R | Back | Auto auf die Straße zurücksetzen |
 | M | | Nächster Musiktrack |
-| Esc | Start | Pause |
+| Esc / Enter / P | Start | Pause (im Browser-Vollbild beendet Esc nur das Vollbild, dann Enter oder P) |
+| ↑↓←→ / W A S D, Enter, Esc / Rücktaste | Steuerkreuz, A, B | Menüs: wählen, ändern, bestätigen, zurück |
 | F11 / Alt+Enter | | Vollbild an/aus |
 
 Nitro lädt sich langsam von selbst auf und schneller beim Driften.

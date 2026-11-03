@@ -13,7 +13,7 @@ const EN := {
 	"Dieses Auto fahren": "Drive this car", "Ja, zurücksetzen": "Yes, reset", "Abbrechen": "Cancel",
 	"GARAGE": "GARAGE", "RENNEN": "RACES", "AUTOHAUS": "CAR LOT", "EINSTELLUNGEN": "SETTINGS", "ACHTUNG": "WARNING",
 	"SPRACHE": "LANGUAGE",
-	"ENTER  Auswählen      ESC  Zurück      ←/→  Ändern      F11  Vollbild": "ENTER  Select      ESC  Back      ←/→  Change      F11  Fullscreen",
+	"ENTER  Auswählen      ESC  Zurück      ←/→ A/D  Ändern      F11  Vollbild": "ENTER  Select      ESC  Back      ←/→ A/D  Change      F11  Fullscreen",
 	"Musik: ": "Music: ", "Keine Musik: mp3/ogg in music/ legen": "No music: put mp3/ogg files into music/",
 	"Keine Musik: mp3/ogg in den Ordner music/ legen": "No music: put mp3/ogg files into music/",
 	"TIPP: ": "TIP: ",

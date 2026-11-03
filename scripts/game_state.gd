@@ -92,13 +92,19 @@ func _setup_input() -> void:
 	_add_action("shift_down", [KEY_Q], [JOY_BUTTON_LEFT_SHOULDER], [])
 	_add_action("camera", [KEY_C], [JOY_BUTTON_Y], [])
 	_add_action("reset_car", [KEY_R], [JOY_BUTTON_BACK], [])
-	_add_action("pause", [KEY_ESCAPE, KEY_P], [JOY_BUTTON_START], [])
+	# Pause auch mit Enter: im Browser beendet Esc im Vollbild nur das Vollbild und kommt nicht im Spiel an
+	_add_action("pause", [KEY_ESCAPE, KEY_P, KEY_ENTER, KEY_KP_ENTER], [JOY_BUTTON_START], [])
 	_add_action("next_track", [KEY_M], [], [])
 	_add_action("fullscreen", [KEY_F11, KEY_F], [], [])  # F: auf dem Mac ist F11 "Schreibtisch anzeigen"
 	var alt_enter := InputEventKey.new()
 	alt_enter.physical_keycode = KEY_ENTER
 	alt_enter.alt_pressed = true
 	InputMap.action_add_event("fullscreen", alt_enter)
+	# Menüs auch mit W/A/S/D wie beim Fahren; Zurück auch mit der Rücktaste (Esc siehe oben)
+	for pair in [["ui_up", KEY_W], ["ui_down", KEY_S], ["ui_left", KEY_A], ["ui_right", KEY_D], ["ui_cancel", KEY_BACKSPACE]]:
+		var ev := InputEventKey.new()
+		ev.physical_keycode = pair[1]
+		InputMap.action_add_event(pair[0], ev)
 
 
 ## Startet im Fenster, ca. 75 % der Bildschirmgröße in 16:9, zentriert.

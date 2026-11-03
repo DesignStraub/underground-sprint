@@ -52,7 +52,7 @@ Berlin-Kreuzberg, mit Dom, Residenz, Festung, Oberbaumbrücke und Hochbahn an ih
 - Englisch und Deutsch, Retro-Pixel-Look (einstellbar), läuft bis 4K und im Browser, auch auf Handy und Tablet
 
 **Steuerung**
-W/S Gas/Bremse · A/D Lenken · Leertaste Handbremse · Shift Nitro · E/Q Schalten (Drag) · C Kamera · R Zurücksetzen · M Musik · F11 Vollbild · Esc Pause
+W/S Gas/Bremse · A/D Lenken · Leertaste Handbremse · Shift Nitro · E/Q Schalten (Drag) · C Kamera · R Zurücksetzen · M Musik · F11 Vollbild · Esc/Enter/P Pause · Menüs auch mit WASD, zurück mit Esc oder Rücktaste
 Gamepad wird unterstützt.
 
 **macOS-Hinweis:** Das Spiel ist nicht von Apple signiert. Beim ersten Start Rechtsklick auf die App → „Öffnen“.
@@ -86,7 +86,7 @@ cathedral, palace, fortress, Oberbaum Bridge and elevated U-Bahn in their real p
 - English and German (choose at first start), retro pixel look, runs up to 4K and in the browser, also on phones and tablets
 
 **Controls**
-W/S throttle/brake · A/D steer · Space handbrake · Shift nitro · E/Q shift (drag) · C camera · R reset · M music · F11 fullscreen · Esc pause
+W/S throttle/brake · A/D steer · Space handbrake · Shift nitro · E/Q shift (drag) · C camera · R reset · M music · F11 fullscreen · Esc/Enter/P pause · menus also with WASD, back with Esc or Backspace
 Gamepad supported.
 
 Tagline: Illegal street racing at night through real German towns. Tuning, nitro, drift, drag. Free.

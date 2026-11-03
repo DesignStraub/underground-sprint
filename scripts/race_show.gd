@@ -183,7 +183,7 @@ func _update_finish(dt: float) -> void:
 		if k >= 1.0 and not fan[4]:
 			fan[4] = true
 			var cd: Color = mi.material_override.get_shader_parameter("custom")
-			cd.b = (People.DANCE if _won or randf() < 0.3 else People.CLAP) / 10.0
+			cd.b = (People.DANCE if _won else People.CLAP) / 10.0  # getanzt wird nur für den Sieger
 			mi.material_override.set_shader_parameter("custom", cd)
 
 
