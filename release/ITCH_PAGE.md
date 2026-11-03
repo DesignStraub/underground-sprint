@@ -43,6 +43,7 @@ Berlin-Kreuzberg, mit Dom, Residenz, Festung, Oberbaumbrücke und Hochbahn an ih
 - Tunnel, Hochbahn, Bahnübergang mit Zug, Brücken, Abkürzungen, Verkehr in beide Richtungen
 - Abkürzungen als Lichttunnel aus Neonbögen, Sprünge mit echter Flugphase, Überschläge bei harten Crashs, umfahrbare Laternen und Schilder
 - Sprungkamera wie in Underground: Bei großen Sprüngen fängt dich eine Kamera schräg von vorn ein, in leichter Zeitlupe
+- Asphalt wie damals: körnig, mit Rissen, Teerfugen und Radspuren, nass spiegeln sich Laternen und Rücklichter; Gehwege aus Betonplatten
 - 9 Autos, Tuning wie in NFS: Optik (Lack, Felgen, Spoiler, Bodykit, Folierung, Neon, Scheiben) und Leistung (Motor, Turbo, Nitro, Fahrwerk, Reifen)
 - Kein Geld, kein Grind: Siege schalten Teile und Autos frei
 - Start- und Zielszene wie damals: Starterin, jubelnde Fans, Kamerafahrt
@@ -76,6 +77,7 @@ cathedral, palace, fortress, Oberbaum Bridge and elevated U-Bahn in their real p
 - Tunnels, elevated railway, rail crossing with train, bridges, shortcuts, two-way traffic
 - Shortcuts as neon light tunnels, jumps with real air time, rollovers in hard crashes, lamps and signs you can knock over
 - Jump camera like in Underground: big jumps cut to a camera watching you from ahead at an angle, in slight slow motion
+- Asphalt like back then: grainy, with cracks, tar seams and wheel ruts, street lights and tail lights reflecting when wet; concrete-slab sidewalks
 - 9 cars, NFS-style tuning: visual (paint, rims, spoiler, body kit, vinyl, underglow, tint) and performance (engine, turbo, nitro, suspension, tires)
 - No money, no grind: wins unlock parts and cars
 - Start and finish scenes like back in the day: flag girl, cheering crowd, camera fly-in

@@ -13,6 +13,9 @@ const Builder := preload("res://scripts/car_builder.gd")
 const Knockable := preload("res://scripts/knockable.gd")
 const RailCrossing := preload("res://scripts/rail_crossing.gd")
 const ROAD_SHADER := preload("res://shaders/road.gdshader")
+const PAVEMENT_SHADER := preload("res://shaders/pavement.gdshader")
+const ASPHALT_TEX := preload("res://assets/textures/asphalt.png")  # tools/gen_ground_tex.gd
+const ASPHALT_N := preload("res://assets/textures/asphalt_n.png")
 const BUILDING_SHADER := preload("res://shaders/building.gdshader")
 const WATER_SHADER := preload("res://shaders/water.gdshader")
 const RAMP_SHADER := preload("res://shaders/ramp.gdshader")
@@ -885,11 +888,26 @@ static func _road_mesh(root: Node3D, st: SurfaceTool, lanes: float, width: float
 		m.set_shader_parameter("lanes", lanes)
 		m.set_shader_parameter("road_w", width)
 		m.set_shader_parameter("cobble", cobble)
+		m.set_shader_parameter("detail", ASPHALT_TEX)
+		m.set_shader_parameter("detail_n", ASPHALT_N)
 		_road_mats[key] = m
 	mi.material_override = _road_mats[key]
 	mi.position.y = y
 	root.add_child(mi)
 	return mi
+
+
+## Gehweg-Material (Betonplatten, Bordsteine) für eine Gehwegbreite; liegt bei den Fahrbahn-Materialien, damit
+## die Stimmung (nass/trocken) beide erreicht
+static func _walk_mat(width: float) -> ShaderMaterial:
+	var key := Vector3(-1.0, width, 0.0)
+	if not _road_mats.has(key):
+		var m := ShaderMaterial.new()
+		m.shader = PAVEMENT_SHADER
+		m.set_shader_parameter("walk_w", width)
+		m.set_shader_parameter("detail", ASPHALT_TEX)
+		_road_mats[key] = m
+	return _road_mats[key]
 
 
 ## Detailstufen je nach Grafik-Einstellung: Kleinteile und mittlere Teile ab einer Entfernung nicht mehr zeichnen,
@@ -986,7 +1004,7 @@ static func _build_road(root: Node3D, track: Dictionary) -> void:
 	grass.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var walls := StaticBody3D.new()
 	root.add_child(walls)
-	var walk_m := Builder.mat(Color(0.16, 0.16, 0.17), 0.0, 0.7)
+	var walk_m := _walk_mat(WALK)
 	var grass_m := Builder.mat(Color(0.05, 0.11, 0.05), 0.0, 0.95)
 	var trough := SurfaceTool.new()  # Trogmauern vor und hinter den Tunneln
 	trough.begin(Mesh.PRIMITIVE_TRIANGLES)
@@ -1059,9 +1077,9 @@ static func _build_road(root: Node3D, track: Dictionary) -> void:
 				_trough_wedge(root, walls, track, cur["d"] if cur["tr"] > 0 else prev["d"], -1.0 if cur["tr"] > 0 else 1.0)
 			if in_tr:
 				# Seitenstreifen auf Fahrbahnhöhe bis zur Trog-/Tunnelwand
-				_strip(walk, prev["lt"] + up, prev["l"] + up, cur["lt"] + up, cur["l"] + up, 0.0, 0.0)
+				_strip(walk, prev["lt"] + up, prev["l"] + up, cur["lt"] + up, cur["l"] + up, prev["d"], d)
 				_strip_v(walk, prev["l"], cur["l"], CURB_H, true)
-				_strip(walk, prev["r"] + up, prev["rt"] + up, cur["r"] + up, cur["rt"] + up, 0.0, 0.0)
+				_strip(walk, prev["r"] + up, prev["rt"] + up, cur["r"] + up, cur["rt"] + up, prev["d"], d)
 				_strip_v(walk, prev["r"], cur["r"], CURB_H, false)
 				for sd in [-1.0, 1.0]:
 					var kt := "lt" if sd < 0.0 else "rt"
@@ -1084,9 +1102,9 @@ static func _build_road(root: Node3D, track: Dictionary) -> void:
 							_strip(trough, at, ac, bt, bc, 0.0, 0.0)
 						_wall_quad(trough, prev[kc] + up, cur[kc] + up, top, top, sd > 0.0)
 						if sd < 0.0:
-							_strip(walk, prev[ko] + up, prev[kc] + up, cur[ko] + up, cur[kc] + up, 0.0, 0.0)
+							_strip(walk, prev[ko] + up, prev[kc] + up, cur[ko] + up, cur[kc] + up, prev["d"], d)
 						else:
-							_strip(walk, prev[kc] + up, prev[ko] + up, cur[kc] + up, cur[ko] + up, 0.0, 0.0)
+							_strip(walk, prev[kc] + up, prev[ko] + up, cur[kc] + up, cur[ko] + up, prev["d"], d)
 						# Leitlichter in der Mauer
 						if int(d / step) % 2 == 0 and cur["y"] < -1.0:
 							var gp: Vector3 = cur[kt] - cur["dir"] * sd * 0.02 + Vector3(0, 1.1, 0)
@@ -1095,10 +1113,10 @@ static func _build_road(root: Node3D, track: Dictionary) -> void:
 			else:
 				# Gehweg und Wand nur dort, wo keine Nebenstraße abzweigt
 				if _branch_clearance(track, (prev["lm"] + cur["lm"]) / 2) > WALK * 0.5 + 0.5:
-					_strip(walk, prev["lo"] + up, prev["l"] + up, cur["lo"] + up, cur["l"] + up, 0.0, 0.0)
+					_strip(walk, prev["lo"] + up, prev["l"] + up, cur["lo"] + up, cur["l"] + up, prev["d"], d)
 					_strip_v(walk, prev["l"], cur["l"], CURB_H, true)
 				if _branch_clearance(track, (prev["rm"] + cur["rm"]) / 2) > WALK * 0.5 + 0.5:
-					_strip(walk, prev["r"] + up, prev["ro"] + up, cur["r"] + up, cur["ro"] + up, 0.0, 0.0)
+					_strip(walk, prev["r"] + up, prev["ro"] + up, cur["r"] + up, cur["ro"] + up, prev["d"], d)
 					_strip_v(walk, prev["r"], cur["r"], CURB_H, false)
 			for side in ["lw", "rw"]:
 				if _branch_clearance(track, (prev[side] + cur[side]) / 2, true) > 1.0 and not (cur["tr"] == 2 and prev["tr"] == 2):
@@ -1358,7 +1376,7 @@ static func _build_branch(root: Node3D, track: Dictionary, p: Dictionary, rng: R
 				for sd in [["lo", "l", true], ["r", "ro", false]]:
 					var outer: Vector3 = (prev[sd[0]] + cur[sd[0]]) / 2.0 if sd[2] else (prev[sd[1]] + cur[sd[1]]) / 2.0
 					if _main_clearance(track, outer) > 0.5:
-						_strip(walk, prev[sd[0]] + up, prev[sd[1]] + up, cur[sd[0]] + up, cur[sd[1]] + up, 0.0, 0.0)
+						_strip(walk, prev[sd[0]] + up, prev[sd[1]] + up, cur[sd[0]] + up, cur[sd[1]] + up, prev["d"], d)
 						_strip_v(walk, prev["l" if sd[2] else "r"], cur["l" if sd[2] else "r"], CURB_H, sd[2])
 						n_walk += 1
 			for side in ["lw", "rw"]:
@@ -1384,7 +1402,7 @@ static func _build_branch(root: Node3D, track: Dictionary, p: Dictionary, rng: R
 	var lanes := 2.0 if kind == "spur" or kind == "fork" else 0.0
 	_road_mesh(root, road, lanes, half * 2.0, 1.0 if kind == "alley" else 0.0, 0.012)
 	if n_walk > 0:
-		_flush(root, walk, Builder.mat(Color(0.16, 0.16, 0.17), 0.0, 0.7))
+		_flush(root, walk, _walk_mat(walk_w))
 	if n_ret > 0:
 		_flush(root, ret, concrete)
 
