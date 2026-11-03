@@ -417,8 +417,8 @@ func _setup_environment() -> void:
 	env.ssr_enabled = GameState.gfx_available("ssr") and GameState.gv("ssr") > 0
 	env.ssr_max_steps = maxi(GameState.gv("ssr"), 8)
 	env.ssao_enabled = GameState.gfx_available("ssao") and GameState.gv("ssao")
-	# günstige Varianten: Spiegelungen ohne Unschärfe-Berechnung, Umgebungsverdeckung in halber Auflösung
-	RenderingServer.environment_set_ssr_roughness_quality(RenderingServer.ENV_SSR_ROUGHNESS_QUALITY_DISABLED)
+	# günstige Variante: Umgebungsverdeckung in halber Auflösung (die Rauheits-Stufe der Spiegelungen gibt es seit
+	# Godot 4.7 nicht mehr)
 	RenderingServer.environment_set_ssao_quality(RenderingServer.ENV_SSAO_QUALITY_LOW, true, 0.5, 2, 50.0, 300.0)
 	env.ssao_radius = 1.5
 	env.ssao_intensity = 1.6

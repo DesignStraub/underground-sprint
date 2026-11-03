@@ -12,6 +12,9 @@ extends Node
 ##   -- --block=d:spur     Spieler steht ab dem Start bei Strecke d auf Spur 0–3 und blockiert; gibt Abstände der
 ##                         Gegner zum Spieler und untereinander aus (Schiebe-Logik)
 ##   -- --bench            misst während des Rennens Bildzeit, GPU-Zeit und Draw Calls, gibt am Ende "BENCH ..." aus
+##   -- --fulltest         Autopilot fährt das ganze Rennen; meldet Hänger, Stürze, Fahrten neben der Strecke, Ruckler,
+##                         hängende Gegner und das Ergebnis ("FT ..."), beendet sich 3 s nach dem Ziel
+##   -- --branches         Autopilot nimmt jede Abkürzung (See, Gasse, Gabelung)
 
 const Track := preload("res://scripts/track_builder.gd")
 const Catalog := preload("res://scripts/catalog.gd")
@@ -46,6 +49,10 @@ var _crash_done := false
 var _block: PackedStringArray = []
 var _block_done := false
 var _added := {}  # in diesem Bild neu hinzugefügte Knoten nach Art (Ruckler-Suche)
+var fulltest := false
+var branches := false
+var _ft := {"last_d": 0.0, "last_t": 0.0, "stuck": 0, "fall": 0, "off": 0, "spikes": 0, "hits": 0, "resets": 0,
+	"end_t": -1.0, "us": 0, "ai_last": [], "ai_stuck": 0, "off_t": -10.0, "fall_t": -10.0, "spike_t": -10.0}
 
 
 func _ready() -> void:
@@ -57,6 +64,11 @@ func _ready() -> void:
 			drive = true
 		elif a == "--bench":
 			bench = true
+		elif a == "--fulltest":
+			fulltest = true
+			drive = true
+		elif a == "--branches":
+			branches = true
 		elif a.begins_with("--crash="):
 			_crash = a.substr(8).split(":")
 		elif a.begins_with("--block="):
@@ -199,6 +211,12 @@ func _process(dt: float) -> void:
 		var dl: float = pl.loc["d"] + 14.0 + absf(pl.speed_fwd) * 0.3
 		var f := Track.frame_at(p["curve"], dl)
 		var tgt: Vector3 = f["pos"] + f["right"] * (Track.lane_lat(race.track, dl, _lane) if on_main else (2.4 if p["kind"] == "fork" else 0.0))
+		if branches and on_main:
+			# kurz vor der Einmündung auf den Seitenweg zielen
+			for q in race.track["paths"]:
+				if q["kind"] in ["lake", "alley", "fork"] and pl.progress > q["from"] - 35.0 and pl.progress < q["from"] + 10.0:
+					var fq := Track.frame_at(q["curve"], maxf(14.0 + absf(pl.speed_fwd) * 0.3 - (q["from"] - pl.progress), 3.0))
+					tgt = fq["pos"] + fq["right"] * (2.4 if q["kind"] == "fork" else 0.0)
 		var side: float = (tgt - pl.global_position).dot(pl.global_basis.x)
 		Input.action_release("steer_left")
 		Input.action_release("steer_right")
@@ -231,6 +249,12 @@ func _process(dt: float) -> void:
 				if _drift_t > 1.3:
 					_drift_t = -1.0
 				return
+		Input.action_release("brake")
+		if fulltest and bend > 0.5:
+			# wie ein Mensch: je enger die Kurve, desto langsamer, und dafür auch bremsen
+			limit = clampf(limit - (bend - 0.5) * 16.0, 17.0, limit)
+			if pl.speed_fwd > limit + 3.0:
+				Input.action_press("brake")
 		if bend > 0.5 and pl.speed_fwd > limit:
 			Input.action_release("accelerate")
 		else:
@@ -244,6 +268,8 @@ func _process(dt: float) -> void:
 		var rel: float = pl.progress - race.track["crossing_d"]
 		if rel > -30.0 and rel < 30.0:
 			print("rel=%.1f lat=%.1f y=%.2f vy=%.1f v=%.1f air=%s path=%d train=%s" % [rel, pl.lateral, pl.position.y, pl.vy, pl.speed_fwd, pl.airborne, pl.path_id, race.track["crossing"].train.global_position])
+	if fulltest and race and "curve" in race and race.player:
+		_fulltest(race)
 	if race and "curve" in race and race.player and (OS.get_cmdline_user_args().has("--trace") or OS.get_cmdline_user_args().has("--handling")):
 		race.player.debug_hits = true
 	if race and "curve" in race and race.player and race.player.last_hit != "":
@@ -271,6 +297,7 @@ func _process(dt: float) -> void:
 			pl.wall_hits, Engine.get_frames_per_second(), race.ais.map(func(a): return int(a.total))])
 	if prefix != "" and _i < times.size() and _t >= times[_i]:
 		get_viewport().get_texture().get_image().save_png("%s_%d.png" % [prefix, _i])
+		_ft["us"] = Time.get_ticks_usec()  # Speichern zählt nicht als Ruckler
 		_i += 1
 		if _i == times.size() and quit_after <= 0.0:
 			get_tree().quit()
@@ -440,6 +467,81 @@ func _bench_report(race) -> void:
 		race.race["name"], GameState.preset, _bench.size(), sums[0] / n, med, worst[int(n * 0.99) - 1], sums[1] / n, sums[2] / n,
 		sums[6] / n, sums[7] / n, int(sums[3] / n), int(sums[4] / n), int(sums[5] / n / 1000.0), counts])
 	print("BENCH spikes=%d %s" % [spikes.size(), " ".join(spikes.slice(0, 40))])
+
+
+## --fulltest: Rennen mit dem Autopiloten durchfahren und alles Auffällige melden. Hängt das Auto, wird es wie mit
+## der Rücksetz-Taste zurück auf die Straße gesetzt, damit das Rennen weiterläuft.
+func _fulltest(race) -> void:
+	var pl = race.player
+	var tr: Dictionary = race.track
+	pl.debug_hits = true
+	if pl.last_hit != "":
+		_ft["hits"] += 1
+	var now := Time.get_ticks_usec()
+	var real_ms: float = (now - _ft["us"]) / 1000.0 if _ft["us"] > 0 else 0.0
+	_ft["us"] = now
+	if race.state == 2:
+		if _ft["end_t"] < 0.0:
+			_ft["end_t"] = _t
+			print("FT ZIEL rennzeit=%.1f platz=%d ki_ziel=%s" % [race.race_time, race._place(),
+				race.ais.map(func(a): return snappedf(a.finish_time, 0.1))])
+		elif _t - _ft["end_t"] > 3.0:
+			print("FT ENDE hänger=%d stürze=%d neben=%d ruckler=%d treffer=%d wand=%d crashes=%d ki_hänger=%d" % [_ft["stuck"], _ft["fall"],
+				_ft["off"], _ft["spikes"], _ft["hits"], pl.wall_hits, pl.crashes, _ft["ai_stuck"]])
+			get_tree().quit()
+		return
+	if race.state != 1 or pl.loc.is_empty():
+		return
+	var where := "t=%.1f d=%.0f pfad=%d(%s) quer=%.1f pos=(%.0f,%.1f,%.0f) v=%.1f" % [race.race_time, pl.progress, pl.path_id,
+		tr["paths"][pl.path_id]["kind"], pl.loc["lat"], pl.global_position.x, pl.global_position.y, pl.global_position.z, pl.velocity.length()]
+	# Ruckler: echte Bildzeit über 60 ms
+	if real_ms > 60.0 and race.race_time > 2.0:
+		_ft["spikes"] += 1
+		if _t - _ft["spike_t"] > 1.0:
+			print("FT RUCKLER %dms %s" % [int(real_ms), where])
+		_ft["spike_t"] = _t
+	# unter dem Boden (nicht im See)
+	var g: Dictionary = Track.ground_path(tr, pl.path_id, pl.loc["d"], pl.loc["lat"], pl.loc["score"])
+	if pl.global_position.y < g["base"] - 1.5 and pl.sinking <= 0.0 and _t - _ft["fall_t"] > 2.0:
+		_ft["fall"] += 1
+		_ft["fall_t"] = _t
+		print("FT UNTER BODEN boden=%.1f %s" % [g["base"], where])
+	# neben der Strecke: weiter draußen als Fahrbahn + Gehweg
+	var out: float = pl.loc["score"] - (Track.WALK if pl.path_id == 0 else 0.0)
+	if out > 1.0 and _t - _ft["off_t"] > 2.0:
+		_ft["off"] += 1
+		_ft["off_t"] = _t
+		print("FT NEBEN STRASSE %.1f m %s" % [out, where])
+	# Hänger: in 4 s kaum vorangekommen
+	if race.race_time - _ft["last_t"] >= 4.0:
+		var moved: float = pl.total - _ft["last_d"]
+		if moved < 10.0 and race.race_time > 5.0 and pl.sinking <= 0.0 and race.event_type != "drag":
+			_ft["stuck"] += 1
+			print("FT HÄNGT %.1f m in 4 s %s" % [moved, where])
+			var half: float = tr["paths"][pl.path_id]["half_w"] - 2.0
+			pl.place(Track.xform_at(tr["paths"][pl.path_id]["curve"], pl.loc["d"], clampf(pl.loc["lat"], -half, half)))
+		var last: Array = _ft["ai_last"]
+		for i in race.ais.size():
+			var a = race.ais[i]
+			if i < last.size() and a.finish_time < 0.0 and a.total - last[i] < 10.0 and race.race_time > 6.0:
+				_ft["ai_stuck"] += 1
+				var near := ""
+				for t in race.traffic:
+					if t.path_id == a.path["id"] and absf(t.progress - a.d) < 25.0:
+						near += " verkehr(%+.0f,%.1f,v=%.0f%s)" % [t.progress - a.d, t.lateral(), t.speed, ",wrack" if t.wrecked else ""]
+				for b in race.ais:
+					if b != a and b.global_position.distance_to(a.global_position) < 12.0:
+						near += " ki(%.0fm)" % b.global_position.distance_to(a.global_position)
+				if pl.global_position.distance_to(a.global_position) < 12.0:
+					near += " spieler(%.0fm)" % pl.global_position.distance_to(a.global_position)
+				if a.crossing and a.crossing.is_blocked() and absf(a.crossing.d_cross - a.d) < 60.0:
+					near += " schranke(%+.0f)" % (a.crossing.d_cross - a.d)
+				print("FT KI HÄNGT ki=%d d=%.0f weg=%s spur=%.1f→%.1f v=%.1f stun=%.1f block=%.1f pos=(%.0f,%.1f,%.0f) t=%.1f%s" % [i, a.progress,
+					a.path["kind"], a.lane, a.lane_target, a.speed, a.stun, a._blocked_t, a.global_position.x, a.global_position.y,
+					a.global_position.z, race.race_time, near])
+		_ft["ai_last"] = race.ais.map(func(a): return a.total)
+		_ft["last_t"] = race.race_time
+		_ft["last_d"] = pl.total
 
 
 ## Drag-Autopilot: Vollgas, schaltet im grünen Bereich (--lateshift: erst im Begrenzer), weicht Verkehr per

@@ -313,7 +313,7 @@ static func _auto_collide(root: Node3D, track: Dictionary) -> void:
 
 
 static func _auto_box(mi: MeshInstance3D, xf: Transform3D, track: Dictionary, body: StaticBody3D) -> void:
-	if mi.mesh == null or not mi.visible:
+	if mi.mesh == null or not mi.visible or mi.has_meta("no_collide"):
 		return
 	var m := mi.material_override
 	if m is BaseMaterial3D and (m as BaseMaterial3D).transparency != BaseMaterial3D.TRANSPARENCY_DISABLED:
@@ -811,8 +811,10 @@ static func _plan_shortcut(track: Dictionary, b: Dictionary, rng: RandomNumberGe
 		var r1 := sc.get_closest_offset(p0 + du * (0.535 * a))
 		var g1 := sc.get_closest_offset(p0 + du * (0.68 * a))
 		track["ramps"].append({"path": path["id"], "d0": r0, "d1": r1, "lat0": -half, "lat1": half, "h": RAMP_H})
-		track["lakes"].append({"path": path["id"], "center": p0 + du * (0.6 * a) + dv * vb * 10.0,
-			"au": du, "av": dv * vb, "hu": 0.24 * a, "hv": 38.0, "gap0": r1, "gap1": g1})
+		# Der See bleibt im Dreieck zwischen Abkürzung und Hauptstraße (die Ecken mit gut 16 m Abstand zu deren Mitte),
+		# sonst stünde an der Ausfahrt die Hauptstraße unter Wasser
+		track["lakes"].append({"path": path["id"], "center": p0 + du * (0.52 * a) + dv * vb * 6.0,
+			"au": du, "av": dv * vb, "hu": 0.22 * a, "hv": 29.0, "gap0": r1, "gap1": g1})
 		track["parks"].append([p0, b["p1"], b["p2"]])
 
 
@@ -1382,9 +1384,13 @@ static func _build_branch(root: Node3D, track: Dictionary, p: Dictionary, rng: R
 			for side in ["lw", "rw"]:
 				var wm: Vector3 = (prev[side] + cur[side]) / 2
 				# Sackgassen: Wände erst hinter der durchlaufenden Randmauer der Hauptstraße (keine Kante in deren Linie)
-				if _main_clearance(track, wm) < WALK + (1.6 if kind == "spur" else 0.4) or (d > gap0 - 1.0 and prev["d"] < gap1 + 1.0):
+				if _main_clearance(track, wm) < WALK + (1.6 if kind == "spur" else 0.4):
 					continue
 				_wall_shape(walls, prev[side], cur[side])
+				# Über der Sprunglücke nur unsichtbar: wer in der Luft seitlich abtreibt, schrammt daran entlang, statt
+				# frontal gegen den Anfang der Wand hinter der Lücke zu prallen
+				if d > gap0 - 1.0 and prev["d"] < gap1 + 1.0:
+					continue
 				var seg: Vector3 = cur[side] - prev[side]
 				var basis := Basis.looking_at(seg.normalized(), Vector3.UP)
 				if kind == "alley":
@@ -1978,9 +1984,11 @@ static func _build_ramps(root: Node3D, track: Dictionary) -> void:
 		Builder._add(n, _wedge(w, l, r["h"]), rm, Vector3.ZERO)
 		for s in [-1.0, 1.0]:
 			Builder._add(n, Builder.box(Vector3(0.15, 0.15, 0.15)), lamp, Vector3(s * w / 2.0, r["h"] + 0.08, -l))
-		# Stützen unter der Abrisskante
+		# Stützen unter der Abrisskante; ohne Kollision, ihre Box reichte bis an die Kante und stoppte jeden, der
+		# am Rand der Rampe absprang
 		for s in [-1.0, 1.0]:
-			Builder._add(n, Builder.box(Vector3(0.12, r["h"], 0.12)), Builder.mat(Color(0.1, 0.1, 0.1), 0.6, 0.4), Vector3(s * (w / 2.0 - 0.2), r["h"] / 2.0, -l - 0.1))
+			Builder._add(n, Builder.box(Vector3(0.12, r["h"], 0.12)), Builder.mat(Color(0.1, 0.1, 0.1), 0.6, 0.4),
+				Vector3(s * (w / 2.0 - 0.2), r["h"] / 2.0, -l - 0.1)).set_meta("no_collide", true)
 
 
 # --- Baustellen ----------------------------------------------------------------
@@ -3581,7 +3589,20 @@ static func _build_steam(root: Node3D, track: Dictionary, rng: RandomNumberGener
 	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	m.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
 	m.vertex_color_use_as_albedo = true
-	m.albedo_color = Color(0.75, 0.8, 0.9, 0.09)
+	m.albedo_color = Color(0.75, 0.8, 0.9, 0.14)
+	# weiche, runde Schwaden statt harter Quadrate
+	var puff := GradientTexture2D.new()
+	puff.width = 64
+	puff.height = 64
+	puff.fill = GradientTexture2D.FILL_RADIAL
+	puff.fill_from = Vector2(0.5, 0.5)
+	puff.fill_to = Vector2(1.0, 0.5)
+	var pg := Gradient.new()
+	pg.set_color(0, Color(1, 1, 1, 1))
+	pg.set_color(1, Color(1, 1, 1, 0))
+	pg.add_point(0.45, Color(1, 1, 1, 0.5))
+	puff.gradient = pg
+	m.albedo_texture = puff
 	quad.material = m
 	var cover := Builder.mat(Color(0.08, 0.08, 0.08), 0.6, 0.5)
 	var d := rng.randf_range(80.0, 160.0)

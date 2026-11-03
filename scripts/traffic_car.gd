@@ -105,6 +105,12 @@ func _physics_process(dt: float) -> void:
 		rotate_y(_wreck_spin * dt)
 		_wreck_spin = move_toward(_wreck_spin, 0.0, 2.5 * dt)
 		velocity_vec = _wreck_vel
+		if _wreck_vel.length_squared() > 0.01:
+			# Lage für KI und Verkehr nachführen, damit sie um das Wrack herumfahren, wo es wirklich liegt
+			progress = curve.get_closest_offset(global_position)
+			var f := Track.frame_at(curve, progress)
+			var lat: float = (global_position - f["pos"]).dot(f["right"])
+			_lane_cur = Track.logical_lat(track, progress, lat) if path_id == 0 else lat
 		if _wreck_roll_v != 0.0 or global_position.y > _wreck_ground + 0.01:
 			_wreck_vy -= 18.0 * dt
 			global_position.y += _wreck_vy * dt

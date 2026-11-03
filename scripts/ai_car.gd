@@ -176,6 +176,12 @@ func _physics_process(dt: float) -> void:
 						var t_gap: float = t.progress - d
 						if t_gap > 0.0 and t_gap < 16.0 + speed * 0.4:
 							target = minf(target, t.speed * 0.9)
+				for t in traffic:
+					# Wrack auf der eigenen Spur: über die Gegenfahrbahn vorbei
+					if t.path_id == path["id"] and t.wrecked and absf(t.lateral() - 2.4) < 2.4:
+						var w_gap: float = t.progress - d
+						if w_gap > -(t.length + length) * 0.5 - 1.0 and w_gap < 20.0 + speed * 0.6:
+							lane_target = -2.4
 			else:
 				target = minf(target, 30.0)  # enge Gasse
 	var acc := accel
@@ -314,7 +320,8 @@ func _push(o: Node, dv: Vector3) -> void:
 
 func _check_traffic_crash() -> void:
 	for t in traffic:
-		if t.path_id != path["id"]:
+		# Wracks nicht noch einmal: wer darin steckt, käme sonst nie wieder frei (Zusammenstoß, Benommenheit, wieder ...)
+		if t.path_id != path["id"] or t.wrecked:
 			continue
 		if absf(t.lateral() - lane) < 2.0 and absf(t.progress - d) < (t.length + length) / 2.0 and not airborne:
 			if stun <= 0.0:
