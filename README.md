@@ -1,8 +1,28 @@
 # Need for Geschwindigkeit
 
+![Need for Geschwindigkeit](release/itch_seite/need_for_geschwindigkeit_banner_960x320.png)
+
 Nächtliches Straßenrennen im Stil der frühen 2000er (früher „Underground Sprint“), Low-Poly-3D mit Pixel-Look (Godot 4.7).
 
-Ein Spiel von **ONE HUMANITY** – kostenlos auf itch.io.
+Ein Spiel von **ONE HUMANITY** – kostenlos auf [itch.io](https://onehumanity.itch.io/need-for-geschwindigkeit) für
+Windows, macOS, Linux und im Browser.
+
+![Würzburg Mainufer im Kitsune 18S](release/screenshots/12_wuerzburg_kitsune.jpg)
+
+<table>
+<tr>
+<td width="50%"><img src="release/screenshots/13_kreuzberg_shiden.jpg" alt="Berlin Kreuzberg"><br>Berlin Kreuzberg im Shiden NX-1</td>
+<td width="50%"><img src="release/screenshots/14_drag_ryujin.jpg" alt="Drag-Rennen"><br>Drag auf der Schnellstraße im Ryujin 30Z</td>
+</tr>
+<tr>
+<td><img src="release/screenshots/16_garage.jpg" alt="Garage"><br>Garage mit Klasse und Leistungsindex</td>
+<td><img src="release/screenshots/17_tuning_motor.jpg" alt="Tuning"><br>Tuning wie in NFS: Motor des Hayate R8</td>
+</tr>
+<tr>
+<td><img src="release/screenshots/15_bankenviertel_hayate.jpg" alt="Bankenviertel"><br>Bankenviertel-Sprint in Frankfurt</td>
+<td><img src="release/screenshots/11_drift.png" alt="Drift"><br>Drift-Event</td>
+</tr>
+</table>
 
 ## Starten
 Ordner in Godot 4.7 öffnen (Import), dann F5. Das Spiel startet mit dem ONE-HUMANITY-Intro (überspringbar) und dann in der Garage.
@@ -60,9 +80,23 @@ Ronin DR, Shiden NX-1, Ryujin 30Z, Kaze TT) sind gleich stark (Leistungsindex ~4
 Charakter: Grip, Antritt, Lenkung, Drift oder Endtempo. Die Garage zeigt Klasse und Leistungsindex (mit Tuning bis
 ~770). Wer mit den alten Schwellen (bis 2.10) schon ein Auto hatte, behält es.
 
+![Alle 15 Autos von vorn](update_bilder/autos_alle_15_vorn.jpg)
+![Alle 15 Autos von hinten](update_bilder/autos_alle_15_heck.jpg)
+
+Alle 15 Autos ab Werk, in der Reihenfolge des Freischaltens: Kaizen Rally S, Hachi Touge, Sakura D2, Hayate R8,
+Kitsune 18S (oben) · Tsubame Spyder, Mirai 240R, Tenshi MR-T, Kumo JX6, Raijin RS-4 (Mitte) · Vortex GT-R, Ronin DR,
+Shiden NX-1, Ryujin 30Z, Kaze TT (unten, Klasse S).
+
 ## Städte (echte Orte)
 Die Strecken folgen echten Straßen, die Wahrzeichen stehen an ihrem Platz, die Häuser hinter der Straßenfront
 haben die echten Grundrisse. Kartendaten © OpenStreetMap-Mitwirkende (ODbL, openstreetmap.org/copyright).
+
+<table>
+<tr>
+<td width="50%"><img src="release/screenshots/06_aachen_dom.png" alt="Aachen"><br>Aachen: Dom und Rathaus in der Mitte des Grabenrings</td>
+<td width="50%"><img src="release/screenshots/05_wuerzburg_mainbruecke.png" alt="Würzburg"><br>Würzburg: Alte Mainbrücke und Festung Marienberg</td>
+</tr>
+</table>
 - **Aachen Grabenring** (Rundkurs, 2 Runden, 2,8 km): Templergraben am SuperC der RWTH vorbei, Seilgraben,
   Friedrich-Wilhelm-Platz am Elisenbrunnen, Theater, Kapuzinergraben, Löhergraben, Karlsgraben. In der Mitte Dom
   (Oktogon mit Faltkuppel, gläserne Chorhalle, Westturm) und Rathaus mit Granusturm, Marktturm und Karlsbrunnen.
@@ -171,6 +205,8 @@ satte Farben), **Mitternacht** (tiefblau, Sterne, Mond), **Natrium** (orange Str
 Dunst), **Dämmerung** (oranger Horizont, letzte Helligkeit), **Kiez** (Magenta und Violett). Dazu Kopfsteinpflaster
 in den Altstädten und Graffiti an den Altbauten im Kiez.
 
+<img src="update_bilder/stimmungen.jpg" alt="Stimmungen" width="480">
+
 ## Musik und Sounds
 Musik (`music/`) und Intro-Sound (`assets/intro_sound.mp3`) sind lizenzfreie Tracks von Pixabay.
 Weitere mp3/ogg-Dateien in `music/` laufen automatisch mit, in zufälliger Reihenfolge.
@@ -198,6 +234,10 @@ Motor-Tuning), Tastenleiste unten, wechselnde Tipps oben rechts. Pause und Ergeb
   Nitro leuchtet er blau und das Instrument zittert. Im Drag kommen der grüne Schaltbereich, ein Schaltlicht und
   eine Temperaturleiste dazu.
 - **Sonstiges:** Die Tastenhilfe blendet nach 12 s aus, der Musiktitel nach einem Wechsel nach 6 s.
+
+<img src="update_bilder/anzeigen_vorher_nachher.jpg" alt="Anzeigen vorher und nachher" width="480">
+
+Oben die alten Anzeigen, unten die neuen seit 2.10 (Minimap, Drehzahlmesser, Platz, Fortschrittsbalken).
 - **Leistung im Browser:** Alles Feste wird nur einmal gezeichnet; Nadel, Karte und Marken werden pro Bild nur
   gedreht oder verschoben. Die Karte liegt in Weltkoordinaten, `shaders/minimap_clip.gdshader` schneidet sie am
   Kreis ab. Zeit und Tempo werden Zeichen für Zeichen ohne Textformung gezeichnet.
@@ -291,6 +331,28 @@ dann steht „Benutzerdefiniert“ da. Werte in `GameState.GFX`.
 - **Gehweg** (`shaders/pavement.gdshader`): Betonplatten 1,5 x 1,5 m mit Fugen, je Platte etwas anders getönt,
   Flecken und Kaugummi-Punkte, an beiden Rändern eine Reihe heller Bordsteine, Bordsteinkanten aus hellem Beton.
   Wo kein Haus die Streckenbegrenzung verdeckt, steht ein Zaun.
+
+## Entwicklung in Bildern
+Vergleichsbilder aus der Entwicklung liegen in `update_bilder/` (Godot ignoriert den Ordner, sie landen nicht im
+Spiel). Die wichtigsten:
+
+- **2.11 – Startwagen von hinten:** links vorher (Keile an den Ecken plus ein zweites Band innen), rechts nachher
+  (ein Leuchtenband um die Ecken).
+  <br><img src="update_bilder/startwagen_heck_vorher_nachher.jpg" alt="Startwagen Heck" width="640">
+- **Häuserschluchten im deutschen Stil:** oben vorher, unten nachher (Kamerafahrt über Bankenviertel, Marktviertel
+  und Prachtallee).
+  <br><img src="update_bilder/muenchen_vorher_nachher.jpg" alt="Häuserschluchten" width="640">
+- **Asphalt und Gehwege im Underground-Stil:** je Reihe der alte und der neue Boden an derselben Stelle.
+  <br><img src="update_bilder/boden_vorher_nachher.jpg" alt="Asphalt und Gehwege" width="480">
+- **Lichttunnel, Abkürzungen, Sprünge und Überschläge:**
+  <br><img src="update_bilder/fallphysik_abkuerzungen.jpg" alt="Abkürzungen und Fallphysik" width="640">
+- **Erste Fassung des JDM-Startwagens** und der Stand mit neun Autos:
+  <br><img src="update_bilder/startwagen_kaizen.jpg" alt="Startwagen erste Fassung" width="640">
+  <br><img src="update_bilder/autos_alle_neun.png" alt="Neun Autos" width="640">
+- **Karriere mit Deutschlandkarte** (frühe Liste) und die erste Fassung von Berlin-Kreuzberg:
+  <br><img src="update_bilder/karriere_karte.png" alt="Karriere" width="480"> <img src="update_bilder/kreuzberg.jpg" alt="Kreuzberg" width="300">
+- **Früher Überblick:** Strecken, Bahnübergang, Startaufstellung mit Publikum und Siegertanz:
+  <br><img src="update_bilder/update_ueberblick.jpg" alt="Überblick" width="640">
 
 ## Export
 Vorlagen für Windows, macOS, Linux und Web stehen in `export_presets.cfg` (Godot-Exportvorlagen 4.7.1 nötig).

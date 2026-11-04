@@ -79,6 +79,9 @@ func _ready() -> void:
 			pixel_look = a.substr(8) == "1"
 		elif a.begins_with("--car=") and Catalog.CARS.has(a.substr(6)):  # nur für Tests: mit diesem Auto fahren
 			current_car = a.substr(6)
+		elif a.begins_with("--lang="):  # nur für Tests und Bilder: Sprache (de/en)
+			language = a.substr(7)
+			I18n.setup(language)
 	apply_display()
 	_build_fps_overlay()
 	for a in OS.get_cmdline_user_args():

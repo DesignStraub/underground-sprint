@@ -7,6 +7,7 @@ extends Node
 ##   -- --at=lake|crossing|alley|fork|tunnel|el|stadium|<viertel>|d:<meter>   setzt das Auto nach dem Start direkt vor die Stelle
 ##   -- --race=2           wählt die Strecke (Index in Catalog.RACES)
 ##   -- --car=shiden       fährt mit diesem Auto (auch in der Garage vorausgewählt)
+##   -- --lang=de          Sprache für Bilder (de/en)
 ##   -- --times=1.5,4,8    Zeitpunkte für Screenshots
 ##   -- --crash=30:90[:d]  (oder 30:q quer rutschend, 30:k auf die nächste Laterne) setzt das Auto (bei Strecke d) mit 30 m/s im Winkel 90° nach rechts auf die Wand zu,
 ##                         gibt den Verlauf aus (Überschlag, Flug, Höhe) – Test der Fallphysik
