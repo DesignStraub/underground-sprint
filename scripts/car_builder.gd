@@ -625,7 +625,7 @@ static func collect_static(n: Node, xf: Transform3D, stops: Dictionary, canon: D
 		if c is MeshInstance3D:
 			var mi := c as MeshInstance3D
 			if mi.mesh == null or mi.get_script() != null or mi.get_child_count() > 0 or not mi.visible or mi.material_overlay \
-					or mi.transparency > 0.0 or mi.visibility_range_end > 0.0:
+					or mi.transparency > 0.0 or mi.visibility_range_end > 0.0 or mi.has_meta("no_merge"):
 				continue
 			var parts := []
 			for si in mi.mesh.get_surface_count():

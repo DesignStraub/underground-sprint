@@ -80,20 +80,24 @@ const DISTRICTS := {
 		"tints": [Color(0.08, 0.09, 0.11), Color(0.13, 0.14, 0.17), Color(0.05, 0.07, 0.1)], "lit": 0.45,
 		"trees": 0.1, "billboard": 0.3, "neon_edge": 0.3, "lamp": Color(0.8, 0.88, 1.0), "lamp_kind": "modern",
 		"screens": 0.35, "gantry": 0.5, "props": [0, 3, 7, 8, 9, 10, 11, 12, 13], "median": 0.35},
-	"shops": {"name": "MARKTVIERTEL", "shop": 0.8, "low": [5.0, 9.0], "tall": [12.0, 26.0], "tall_p": 0.35, "styles": [0, 4],
-		"tints": [Color(0.22, 0.12, 0.09), Color(0.17, 0.16, 0.14), Color(0.11, 0.11, 0.13)], "lit": 0.5,
+	"shops": {"name": "MARKTVIERTEL", "shop": 0.8, "low": [10.0, 16.0], "tall": [16.0, 24.0], "tall_p": 0.3, "styles": [6, 6, 4, 0],
+		"tints": [Color(0.3, 0.25, 0.2), Color(0.26, 0.25, 0.23), Color(0.3, 0.16, 0.11), Color(0.2, 0.21, 0.23)], "lit": 0.5,
+		"roof": 0.55, "gable": 0.15, "roof_tints": [Color(0.12, 0.13, 0.15), Color(0.3, 0.12, 0.08), Color(0.22, 0.1, 0.07)],
 		"trees": 0.35, "billboard": 0.15, "neon_edge": 0.1, "lamp": Color(1.0, 0.68, 0.35), "lamp_kind": "classic",
 		"blade": 0.3, "bulbs": true, "props": [0, 1, 2, 4, 5, 6, 8, 9, 11, 12]},
-	"boulevard": {"name": "PRACHTALLEE", "shop": 0.45, "low": [10.0, 16.0], "tall": [22.0, 46.0], "tall_p": 0.45, "styles": [0, 1, 4],
-		"tints": [Color(0.24, 0.2, 0.17), Color(0.16, 0.16, 0.18), Color(0.3, 0.26, 0.2)], "lit": 0.55,
+	"boulevard": {"name": "PRACHTALLEE", "shop": 0.45, "low": [14.0, 20.0], "tall": [22.0, 46.0], "tall_p": 0.35, "styles": [6, 6, 1, 0],
+		"tints": [Color(0.32, 0.27, 0.21), Color(0.24, 0.23, 0.24), Color(0.36, 0.3, 0.22)], "lit": 0.55,
+		"roof": 0.6, "gable": 0.0, "roof_tints": [Color(0.11, 0.12, 0.14), Color(0.15, 0.16, 0.19)],
 		"trees": 0.7, "billboard": 0.15, "neon_edge": 0.1, "lamp": Color(1.0, 0.82, 0.55), "lamp_kind": "classic",
 		"median": 1.0, "blade": 0.15, "props": [0, 4, 5, 8, 9, 10, 13]},
-	"residential": {"name": "ALTSTADT", "shop": 0.2, "low": [9.0, 16.0], "tall": [16.0, 30.0], "tall_p": 0.3, "styles": [4, 4, 0],
-		"tints": [Color(0.28, 0.13, 0.08), Color(0.3, 0.25, 0.18), Color(0.22, 0.2, 0.18)], "lit": 0.55,
+	"residential": {"name": "ALTSTADT", "shop": 0.25, "low": [9.0, 15.0], "tall": [15.0, 21.0], "tall_p": 0.2, "styles": [6, 5, 4, 6],
+		"tints": [Color(0.36, 0.31, 0.24), Color(0.3, 0.14, 0.09), Color(0.34, 0.28, 0.2), Color(0.28, 0.27, 0.25)], "lit": 0.55,
 		"trees": 0.6, "billboard": 0.0, "neon_edge": 0.0, "lamp": Color(1.0, 0.75, 0.45), "lamp_kind": "classic",
-		"fire_escape": 0.5, "props": [0, 4, 5, 6, 8, 13, 14]},
-	"industrial": {"name": "HAFEN", "shop": 0.05, "low": [7.0, 12.0], "tall": [12.0, 22.0], "tall_p": 0.2, "styles": [2, 2, 0],
-		"tints": [Color(0.15, 0.17, 0.18), Color(0.2, 0.18, 0.14), Color(0.1, 0.14, 0.15)], "lit": 0.3,
+		"roof": 0.95, "gable": 0.4, "roof_tints": [Color(0.32, 0.12, 0.07), Color(0.26, 0.1, 0.07), Color(0.13, 0.14, 0.16)],
+		"props": [0, 4, 5, 6, 8, 13, 14]},
+	"industrial": {"name": "HAFEN", "shop": 0.05, "low": [7.0, 12.0], "tall": [12.0, 22.0], "tall_p": 0.25, "styles": [2, 2, 4, 4],
+		"tints": [Color(0.15, 0.17, 0.18), Color(0.28, 0.12, 0.08), Color(0.24, 0.11, 0.07), Color(0.1, 0.14, 0.15)], "lit": 0.3,
+		"roof": 0.3, "gable": 0.5, "roof_tints": [Color(0.1, 0.11, 0.12), Color(0.16, 0.2, 0.18)],
 		"trees": 0.0, "billboard": 0.1, "neon_edge": 0.0, "lamp": Color(1.0, 0.62, 0.3), "lamp_kind": "sodium",
 		"containers": true, "cranes": 0.14, "stacks": 0.35, "overpass": 0.5, "props": [2, 2, 6, 7, 14, 15]},
 	"chinatown": {"name": "CHINATOWN", "shop": 0.75, "low": [7.0, 13.0], "tall": [14.0, 26.0], "tall_p": 0.2, "styles": [4, 0, 4],
@@ -146,6 +150,10 @@ static var _road_mats := {}
 ## Orts-Strecken: Ladennamen der Stadt (vor den allgemeinen deutschen), leer = Namen des Viertels
 static var _city_names: Array = []
 static var _box_arrays: Array = []
+## Prüfwerkzeug (tools/track_check.gd --buildings): Array = Häuserquader mitschreiben [Transform, Haus-Nr., Art]
+static var box_log = null
+static var _box_id := 0
+static var _box_tag := ""
 
 
 static func build(race: Dictionary) -> Dictionary:
@@ -250,9 +258,12 @@ static func build(race: Dictionary) -> Dictionary:
 		_build_hills(root, track, rng)
 	var occupied := _build_city_landmarks(root, track) if not city.is_empty() else _build_landmarks(root, track, rng)
 	occupied.append_array(_build_structures(root, track, rng))
+	_box_tag = "zeile"
 	var buildings := _build_city(root, track, rng, occupied)
+	_box_tag = "osm"
 	if not city.is_empty():
 		buildings.append_array(_build_osm_buildings(root, track, rng, occupied + buildings))
+	_box_tag = ""
 	if type != "drift":
 		_build_fences(root, track, buildings + occupied)
 	_build_lamps(root, track)
@@ -1791,6 +1802,15 @@ static func _build_fences(root: Node3D, track: Dictionary, blockers: Array) -> v
 	var rails := []
 	var mesh_panels := []
 	var lines := []  # [Weg, Querabstand-Funktion, Bedingung]
+	var bgrid := {}  # Rasterzelle -> Häuser/Wahrzeichen (nur die nahen prüfen)
+	var bmax := 0.0
+	for b in blockers:
+		var k := Vector2i(floori(b["pos"].x / LOT_CELL), floori(b["pos"].z / LOT_CELL))
+		if not bgrid.has(k):
+			bgrid[k] = []
+		bgrid[k].append(b)
+		bmax = maxf(bmax, b["r"])
+	var breach := int(ceil((bmax * 0.85 + 1.5) / LOT_CELL))
 	for p in track["paths"]:
 		if p["id"] == 0 or p["kind"] == "fork" or p["kind"] == "spur":
 			lines.append(p)
@@ -1813,9 +1833,16 @@ static func _build_fences(root: Node3D, track: Dictionary, blockers: Array) -> v
 				elif _main_clearance(track, pos) < WALK + 0.4:
 					continue
 				var hidden := false
-				for b in blockers:
-					if _flat(pos - b["pos"]).length() < b["r"] * 0.85 + 1.5:
-						hidden = true
+				var pk := Vector2i(floori(pos.x / LOT_CELL), floori(pos.z / LOT_CELL))
+				for gx in range(pk.x - breach, pk.x + breach + 1):
+					for gz in range(pk.y - breach, pk.y + breach + 1):
+						for b in bgrid.get(Vector2i(gx, gz), []):
+							if _flat(pos - b["pos"]).length() < b["r"] * 0.85 + 1.5:
+								hidden = true
+								break
+						if hidden:
+							break
+					if hidden:
 						break
 				if hidden:
 					continue
@@ -2350,6 +2377,43 @@ static func _river_clearance(track: Dictionary, pos: Vector3) -> float:
 	return best
 
 
+## Wie _river_clearance, aber nur bis limit genau (darüber kommt limit zurück): sucht über ein Raster der Flussabschnitte
+static func _river_near(track: Dictionary, pos: Vector3, limit: float) -> float:
+	if not track.has("river_cells"):
+		var cells := {}
+		for rv in track["rivers"]:
+			var rp: PackedVector2Array = rv["pts"]
+			var rh: PackedFloat32Array = rv["hw"]
+			for i in rp.size() - 1:
+				var hr := maxf(rh[i], rh[i + 1])
+				if hr < 1.5:
+					continue
+				var lo := Vector2(minf(rp[i].x, rp[i + 1].x), minf(rp[i].y, rp[i + 1].y)) - Vector2(hr, hr)
+				var hi := Vector2(maxf(rp[i].x, rp[i + 1].x), maxf(rp[i].y, rp[i + 1].y)) + Vector2(hr, hr)
+				for gx in range(floori(lo.x / LOT_CELL), floori(hi.x / LOT_CELL) + 1):
+					for gz in range(floori(lo.y / LOT_CELL), floori(hi.y / LOT_CELL) + 1):
+						var k := Vector2i(gx, gz)
+						if not cells.has(k):
+							cells[k] = []
+						cells[k].append([rp[i], rp[i + 1], rh[i], rh[i + 1]])
+		track["river_cells"] = cells
+	var cells: Dictionary = track["river_cells"]
+	var p := Vector2(pos.x, pos.z)
+	var best := limit
+	var reach := int(ceil(limit / LOT_CELL))
+	var key := Vector2i(floori(p.x / LOT_CELL), floori(p.y / LOT_CELL))
+	for gx in range(key.x - reach, key.x + reach + 1):
+		for gz in range(key.y - reach, key.y + reach + 1):
+			for sg in cells.get(Vector2i(gx, gz), []):
+				var a: Vector2 = sg[0]
+				var ab: Vector2 = sg[1] - a
+				var t := clampf((p - a).dot(ab) / maxf(ab.length_squared(), 0.001), 0.0, 1.0)
+				var hr := lerpf(sg[2], sg[3], t)
+				if hr >= 1.5:
+					best = minf(best, p.distance_to(a + ab * t) - hr)
+	return best
+
+
 static func _in_river(track: Dictionary, pos: Vector3, margin: float) -> bool:
 	return not track["rivers"].is_empty() and _river_clearance(track, pos) < margin
 
@@ -2679,10 +2743,7 @@ static func _build_osm_buildings(root: Node3D, track: Dictionary, rng: RandomNum
 	var placed := []
 	var grid := {}
 	for o in blockers:
-		var key := Vector2i(floori(o["pos"].x / 50.0), floori(o["pos"].z / 50.0))
-		if not grid.has(key):
-			grid[key] = []
-		grid[key].append(o)
+		_grid_add(grid, o)
 	for i in range(0, data.size(), 6):
 		var pos := Vector3(data[i], 0, data[i + 1])
 		var L: float = data[i + 2]
@@ -2691,25 +2752,21 @@ static func _build_osm_buildings(root: Node3D, track: Dictionary, rng: RandomNum
 		var h: float = data[i + 5]
 		var r := Vector2(L, W).length() * 0.5
 		var mc := _main_clearance(track, pos)
-		if mc < WALK + 14.0 + W * 0.5 or _branch_clearance(track, pos) < r * 0.7 + 2.0:
+		if mc < WALK + 4.0 + W * 0.5:
 			continue
 		if mobile and mc > 110.0:
 			continue  # Handy: nur die Häuser nahe der Strecke
-		if _in_river(track, pos, r * 0.5) or (not track["hills"].is_empty() and hill_h(track, pos) > 0.5):
+		if not track["hills"].is_empty() and hill_h(track, pos) > 0.5:
 			continue
-		var blocked := false
-		var gk := Vector2i(floori(pos.x / 50.0), floori(pos.z / 50.0))
-		for gx in range(gk.x - 2, gk.x + 3):
-			for gz in range(gk.y - 2, gk.y + 3):
-				for o in grid.get(Vector2i(gx, gz), []):
-					if _flat(pos - o["pos"]).length() < o["r"] + r * 0.6:
-						blocked = true
-						break
-		if blocked:
-			continue
-		var dist := _district_at(track, curve.get_closest_offset(pos))
 		var along := Vector3(cos(ang), 0, sin(ang))
 		var basis := Basis(Vector3.UP.cross(along), Vector3.UP, along)
+		var foot := _foot(pos, basis, W, L)
+		# echte Grundrisse als umschließende Rechtecke überlappen sich (Winkelbauten): bis 2,5 m ist das ein Häuserblock,
+		# mehr hieße, ein Haus steckt im anderen; an der Straßenfront und am Wasser zählt jeder Meter
+		if not _lot_free(track, foot, grid, WALK + 4.0, 0.3, 2.5):
+			continue
+		var dist := _district_at(track, curve.get_closest_offset(pos))
+		_box_id += 1
 		var styles: Array = dist["styles"]
 		var tints: Array = dist["tints"]
 		var style: float = styles[rng.randi() % styles.size()]
@@ -2725,7 +2782,9 @@ static func _build_osm_buildings(root: Node3D, track: Dictionary, rng: RandomNum
 			var rc: Color = rt[rng.randi() % rt.size()]
 			var rk := rng.randf_range(0.8, 1.15)
 			_bb_roof(pos, basis, L, W, h, false, Vector3(rc.r * rk, rc.g * rk, rc.b * rk), tv, style, seed, lit)
-		placed.append({"pos": pos, "r": r * 0.8})
+		var bl := {"pos": pos, "r": r * 0.8, "foot": foot, "soft": true}
+		placed.append(bl)
+		_grid_add(grid, bl)
 	return placed
 
 
@@ -2875,7 +2934,12 @@ static func _district_at(track: Dictionary, d: float) -> Dictionary:
 
 
 static func _build_city(root: Node3D, track: Dictionary, rng: RandomNumberGenerator, occupied: Array) -> Array:
-	var placed := []  # [{pos, r}]
+	var placed := []  # [{pos, r, foot}]
+	var grid := {}  # Rasterzelle -> Grundrisse und belegte Kreise (schnelle Nachbarsuche)
+	for o in occupied:
+		_grid_add(grid, o)
+	for b in track.get("el_blocks", []):
+		_grid_add(grid, {"pos": Vector3(b[0].x, 0, b[0].y), "r": 0.0, "foot": b})
 	# Häuserzeilen: an der Hauptstraße beidseitig, an den Abkürzungen ebenfalls
 	var frontages := []
 	for side in [-1.0, 1.0]:
@@ -2899,35 +2963,43 @@ static func _build_city(root: Node3D, track: Dictionary, rng: RandomNumberGenera
 			var depth := rng.randf_range(10.0, 16.0) if not tall else rng.randf_range(14.0, 24.0)
 			var hr: Array = dist["tall"] if tall else dist["low"]
 			var h := rng.randf_range(hr[0], hr[1])
-			if shop:
-				h = rng.randf_range(5.0, 9.0)
+			if shop and rng.randf() < 0.25:
+				h = rng.randf_range(5.0, 8.0)  # flacher Laden (Imbiss, Markt); sonst Wohn- und Geschäftshaus mit Läden unten
 			var f := frame_at(c, d)
 			var gap := rng.randf_range(0.4, 2.0)
-			var center: Vector3 = f["pos"] + f["right"] * side * (edge + gap + depth / 2)
-			var radius := Vector2(w, depth).length() / 2
-			var ok: bool = _flat(center - c.get_closest_point(center)).length() > edge + radius * 0.7
-			ok = ok and _main_clearance(track, center) > WALK + radius * 0.75
-			ok = ok and _branch_clearance(track, center) > 1.0 + radius * 0.7
-			ok = ok and not _in_lake(track, center, radius * 0.7)
-			ok = ok and _rail_clearance(track, center) > 5.0 + radius * 0.7
-			ok = ok and not _in_river(track, center, radius * 0.6)
-			# am Fuß eines Hügels (Festung, Weinberg) keine Häuser: der Hang soll von der Straße aus zu sehen sein
-			ok = ok and (track["hills"].is_empty() or hill_h(track, center + f["right"] * side * 50.0) < 6.0)
-			if ok:
-				for o in occupied + placed:
-					if _flat(center - o["pos"]).length() < o["r"] + radius * 0.65:
-						ok = false
+			var basis := Basis.looking_at(f["fwd"], Vector3.UP)
+			# passt das Haus nicht (Kurveninnenseite, Einmündung, Ufer), erst ein schmaleres und flacheres versuchen
+			var center := Vector3.ZERO
+			var ok := false
+			for attempt in 3:
+				if attempt > 0:
+					w *= 0.7
+					depth = maxf(depth * 0.8, 8.0)
+					if w < 6.0:
 						break
-			if ok and dist.has("cranes") and p["id"] == 0 and rng.randf() < dist["cranes"] \
+				center = f["pos"] + f["right"] * side * (edge + gap + depth / 2)
+				# am Fuß eines Hügels (Festung, Weinberg) keine Häuser: der Hang soll von der Straße aus zu sehen sein
+				ok = (track["hills"].is_empty() or hill_h(track, center + f["right"] * side * 50.0) < 6.0) \
+					and _lot_free(track, _foot(center, basis, depth, w), grid, WALK + 0.2, 0.25)
+				if ok:
+					break
+			if not ok:
+				d += 4.0
+				continue
+			var radius := Vector2(w, depth).length() / 2
+			if dist.has("cranes") and p["id"] == 0 and rng.randf() < dist["cranes"] \
 					and _main_clearance(track, center + f["right"] * side * 10.0) > 20.0:
 				_crane(root, center + f["right"] * side * 10.0, -f["right"] * side, rng)
-				placed.append({"pos": center + f["right"] * side * 10.0, "r": 13.0})
+				var cr := {"pos": center + f["right"] * side * 10.0, "r": 13.0}
+				placed.append(cr)
+				_grid_add(grid, cr)
 				d += 14.0
-			elif ok and dist.has("containers") and f["y"] < 0.3 and rng.randf() < 0.3:
-				_containers(root, center, Basis.looking_at(f["fwd"], Vector3.UP), rng)
-				placed.append({"pos": center, "r": radius * 0.8})
-			elif ok:
-				var basis := Basis.looking_at(f["fwd"], Vector3.UP)
+			elif dist.has("containers") and f["y"] < 0.3 and rng.randf() < 0.3:
+				_containers(root, center, basis, rng)
+				var ct := {"pos": center, "r": radius * 0.8, "foot": _foot(center, basis, depth, w)}
+				placed.append(ct)
+				_grid_add(grid, ct)
+			else:
 				var face_dir: Vector3 = -f["right"] * side  # zeigt zur Straße
 				var lift: float = f["y"] + CURB_H if f["y"] > 0.3 else 0.0
 				# am Hang: Haus steht auf Straßenhöhe, darunter reicht es mit dunklen Geschossen bis zum Boden
@@ -2935,14 +3007,189 @@ static func _build_city(root: Node3D, track: Dictionary, rng: RandomNumberGenera
 				if lift > 0.0:
 					_bb_box(Transform3D(basis * Basis.from_scale(Vector3(depth, lift + 0.1, w)), center + Vector3(0, lift / 2.0, 0)),
 						Vector3(0.1, 0.1, 0.11), 0.15, rng.randf() * 100.0, 4.0, 0.0)
-				placed.append({"pos": center, "r": radius * 0.8})
+				var bl := {"pos": center, "r": radius * 0.8, "foot": _foot(center, basis, depth, w)}
+				placed.append(bl)
+				_grid_add(grid, bl)
 			d += w + rng.randf_range(0.5, 3.5)
+	# Orts-Strecken: dahinter stehen die echten Häuser (OpenStreetMap). Sonst zwei Reihen dahinter, damit man wie in
+	# einer Häuserschlucht fährt und zwischen den Häusern Stadt sieht statt leerer Fläche
+	if track["city"].is_empty():
+		for side in [-1.0, 1.0]:
+			for row in [1, 2]:
+				_back_row(root, track, rng, grid, placed, side, row)
 	return placed
+
+
+## Hintere Häuserreihe (row 1: direkt hinter der Straßenfront, row 2: noch eine dahinter): ohne Läden und Schilder,
+## Türme im Bankenviertel überragen die Front wie eine Skyline
+static func _back_row(root: Node3D, track: Dictionary, rng: RandomNumberGenerator, grid: Dictionary, placed: Array,
+		side: float, row: int) -> void:
+	var c: Curve3D = track["curve"]
+	var len: float = track["length"]
+	var d := rng.randf_range(0.0, 12.0)
+	while d < len:
+		var dist := _district_at(track, d)
+		var f := frame_at(c, d)
+		var tall: bool = rng.randf() < dist["tall_p"] * (1.0 + 0.3 * row)
+		var w := rng.randf_range(10.0, 18.0) if not tall else rng.randf_range(14.0, 24.0)
+		var depth := rng.randf_range(10.0, 16.0) if not tall else rng.randf_range(14.0, 22.0)
+		var hr: Array = dist["tall"] if tall else dist["low"]
+		var h := rng.randf_range(hr[0], hr[1])
+		var basis := Basis.looking_at(f["fwd"], Vector3.UP)
+		var lat: float = hw(track, d) + WALK + dist.get("setback", 0.0) + [0.0, 18.0, 38.0][row] + rng.randf_range(0.0, 3.0)
+		var center := Vector3.ZERO
+		var ok := false
+		for attempt in 4:
+			center = f["pos"] + f["right"] * side * (lat + attempt * 4.0 + depth / 2.0)
+			ok = _lot_free(track, _foot(center, basis, depth, w), grid, WALK + 6.0, 0.25)
+			if ok:
+				break
+		if not ok:
+			d += 5.0
+			continue
+		var lift: float = f["y"] + CURB_H if f["y"] > 0.3 else 0.0
+		_building(root, center + Vector3(0, lift, 0), basis, w, depth, h, tall, false, dist, -f["right"] * side, f["right"] * side, rng, true)
+		if lift > 0.0:
+			_bb_box(Transform3D(basis * Basis.from_scale(Vector3(depth, lift + 0.1, w)), center + Vector3(0, lift / 2.0, 0)),
+				Vector3(0.1, 0.1, 0.11), 0.15, rng.randf() * 100.0, 4.0, 0.0)
+		var bl := {"pos": center, "r": Vector2(w, depth).length() * 0.4, "foot": _foot(center, basis, depth, w)}
+		placed.append(bl)
+		_grid_add(grid, bl)
+		d += w + rng.randf_range(1.0, 4.0)
+
+
+## Grundriss eines Hauses: [Mitte 2D, Achse quer (x), Achse entlang (z), halbe Tiefe, halbe Breite]
+static func _foot(center: Vector3, basis: Basis, depth: float, w: float) -> Array:
+	return [Vector2(center.x, center.z), Vector2(basis.x.x, basis.x.z).normalized(), Vector2(basis.z.x, basis.z.z).normalized(),
+		depth / 2.0, w / 2.0]
+
+
+const LOT_CELL := 40.0
+
+
+## Raster für die Platzsuche: Grundrisse ("feet", mit Umkreis fr) und belegte Kreise ("circ") getrennt, damit die
+## Suche nur so weit reicht wie der größte Eintrag seiner Art
+static func _grid_add(grid: Dictionary, o: Dictionary) -> void:
+	if grid.is_empty():
+		grid.merge({"feet": {}, "circ": {}, "fmax": 0.0, "cmax": 0.0})
+	var key := Vector2i(floori(o["pos"].x / LOT_CELL), floori(o["pos"].z / LOT_CELL))
+	var kind := "feet" if o.has("foot") else "circ"
+	if kind == "feet":
+		o["fr"] = Vector2(o["foot"][3], o["foot"][4]).length()
+		grid["fmax"] = maxf(grid["fmax"], o["fr"])
+	else:
+		grid["cmax"] = maxf(grid["cmax"], o["r"])
+	var cells: Dictionary = grid[kind]
+	if not cells.has(key):
+		cells[key] = []
+	cells[key].append(o)
+
+
+## Abstand zur Fahrbahnkante der Hauptstraße (wie _main_clearance, eine Suche statt zwei)
+static func _main_clear_fast(track: Dictionary, pos: Vector3) -> float:
+	var c: Curve3D = track["curve"]
+	var off := c.get_closest_offset(pos)
+	return _flat(pos - c.sample_baked(off)).length() - hw(track, off)
+
+
+## Eindringtiefe zweier gedrehter Rechtecke (Trennachsen-Test), 0 wenn getrennt
+static func _foot_pen(a: Array, b: Array) -> float:
+	var best := 1e9
+	for ax in [a[1], a[2], b[1], b[2]]:
+		var ra: float = a[3] * absf(ax.dot(a[1])) + a[4] * absf(ax.dot(a[2]))
+		var rb: float = b[3] * absf(ax.dot(b[1])) + b[4] * absf(ax.dot(b[2]))
+		var pen: float = ra + rb - absf((b[0] - a[0]).dot(ax))
+		if pen <= 0.0:
+			return 0.0
+		best = minf(best, pen)
+	return best
+
+
+## Darf hier ein Haus stehen? Der ganze Rand des Grundrisses (Ecken, Kantenpunkte) muss hinter dem Gehweg der
+## Hauptstraße (walk = Mindestabstand zur Fahrbahnkante) liegen, neben Nebenstraßen, außerhalb von Flüssen, Seen,
+## Parks und Bahngelände; Wahrzeichen (Kreise) und andere Häuser (mehr als overlap Meter Überschneidung) sind tabu.
+static func _lot_free(track: Dictionary, foot: Array, grid: Dictionary, walk: float, overlap: float, soft := -1.0) -> bool:
+	var c2: Vector2 = foot[0]
+	var c := Vector3(c2.x, 0, c2.y)
+	var r := Vector2(foot[3], foot[4]).length()
+	var key := Vector2i(floori(c.x / LOT_CELL), floori(c.z / LOT_CELL))
+	if not grid.is_empty():
+		var reach := int(ceil((r + grid["fmax"]) / LOT_CELL))
+		var cells: Dictionary = grid["feet"]
+		for gx in range(key.x - reach, key.x + reach + 1):
+			for gz in range(key.y - reach, key.y + reach + 1):
+				for o in cells.get(Vector2i(gx, gz), []):
+					if c2.distance_to(o["foot"][0]) < r + o["fr"] \
+							and _foot_pen(foot, o["foot"]) > (soft if soft >= 0.0 and o.has("soft") else overlap):
+						return false
+		reach = int(ceil((r + grid["cmax"]) / LOT_CELL))
+		cells = grid["circ"]
+		for gx in range(key.x - reach, key.x + reach + 1):
+			for gz in range(key.y - reach, key.y + reach + 1):
+				for o in cells.get(Vector2i(gx, gz), []):
+					if _flat(c - o["pos"]).length() < o["r"] + r * 0.65:
+						return false
+	var pts := []
+	for su in [-1.0, 0.0, 1.0]:
+		for sv in [-1.0, -0.5, 0.0, 0.5, 1.0]:
+			if su != 0.0 or absf(sv) == 1.0:
+				var q: Vector2 = c2 + foot[1] * foot[3] * su + foot[2] * foot[4] * sv
+				pts.append(Vector3(q.x, 0, q.y))
+	pts.append(c)
+	var curve: Curve3D = track["curve"]
+	var d0 := curve.get_closest_offset(c)
+	if _flat(c - curve.sample_baked(d0)).length() - hw(track, d0) < r + walk + 1.0:
+		var corner := [0, 4, 5, 9]  # Ecken: Suche über die ganze Strecke (falls ein anderer Teil der Straße nahe kommt)
+		var L: float = curve.get_baked_length()
+		for i in pts.size():
+			var q: Vector3 = pts[i]
+			var dq := d0
+			if i in corner:
+				dq = curve.get_closest_offset(q)
+			else:
+				# Kantenpunkte: zwei Newton-Schritte entlang der Straße vom Hausmittelpunkt aus
+				for it in 2:
+					var a := curve.sample_baked(maxf(dq - 1.0, 0.0))
+					var b := curve.sample_baked(minf(dq + 1.0, L))
+					var tg := _flat(b - a).normalized()
+					dq = clampf(dq + _flat(q - curve.sample_baked(dq)).dot(tg), 0.0, L)
+			if _flat(q - curve.sample_baked(dq)).length() - hw(track, dq) < walk:
+				return false
+	if _branch_clearance(track, c) < r + 4.0:
+		for pth in track["paths"]:
+			if pth["id"] == 0:
+				continue
+			var need: float = {"fork": 3.0, "spur": 1.0}.get(pth["kind"], 0.3)
+			for q in pts:
+				if _flat(q - (pth["curve"] as Curve3D).get_closest_point(q)).length() - pth["half_w"] < need:
+					return false
+	if not track["rivers"].is_empty() and _river_near(track, c, r + 1.0) < r + 1.0:
+		for q in pts:
+			if _river_near(track, q, 1.0) < 1.0:
+				return false
+	for lk in track["lakes"]:
+		var au: Vector3 = lk["au"]
+		var av: Vector3 = lk["av"]
+		var lf := [Vector2(lk["center"].x, lk["center"].z), Vector2(au.x, au.z).normalized(), Vector2(av.x, av.z).normalized(),
+			lk["hu"] + 0.5, lk["hv"] + 0.5]
+		if _foot_pen(foot, lf) > 0.0:
+			return false
+	if _rail_clearance(track, c) < r + 2.5:
+		for q in pts:
+			if _rail_clearance(track, q) < 2.0:
+				return false
+	for tri in track["parks"]:
+		for q in pts:
+			if Geometry2D.point_is_inside_triangle(Vector2(q.x, q.z), Vector2(tri[0].x, tri[0].z), Vector2(tri[1].x, tri[1].z),
+					Vector2(tri[2].x, tri[2].z)):
+				return false
+	return true
 
 
 ## Ein Gebäude mit Fassade, ggf. Sockel + Turm + Krone, Dachaufbauten, Werbung, Laden
 static func _building(root: Node3D, center: Vector3, basis: Basis, w: float, depth: float, h: float,
-		tall: bool, shop: bool, dist: Dictionary, face_dir: Vector3, away: Vector3, rng: RandomNumberGenerator) -> void:
+		tall: bool, shop: bool, dist: Dictionary, face_dir: Vector3, away: Vector3, rng: RandomNumberGenerator, back := false) -> void:
+	_box_id += 1
 	var styles: Array = dist["styles"]
 	var tints: Array = dist["tints"]
 	var style: float = styles[rng.randi() % styles.size()]
@@ -2964,7 +3211,9 @@ static func _building(root: Node3D, center: Vector3, basis: Basis, w: float, dep
 		top_center = center + away * depth * 0.1
 		_box_building(root, top_center, basis, top_w, top_d, h, style, tv, seed, 0.0, lit)
 	else:
-		_box_building(root, center, basis, w, depth, h, style, tv, seed, 1.0 if not tall or rng.randf() < 0.7 else 0.0, lit)
+		# Schaufenster im Erdgeschoss: im Marktviertel fast überall, im Hafen selten (Speicher, Hallen)
+		_box_building(root, center, basis, w, depth, h, style, tv, seed,
+			1.0 if not back and (shop or rng.randf() < 0.2 + 0.6 * dist["shop"]) else 0.0, lit)
 	if tall and h > 45.0 and rng.randf() < 0.45:
 		# Krone
 		var ch := rng.randf_range(5.0, 12.0)
@@ -2980,6 +3229,8 @@ static func _building(root: Node3D, center: Vector3, basis: Basis, w: float, dep
 		var rk := rng.randf_range(0.85, 1.15)
 		_bb_roof(center, basis, w, depth, top_h, rng.randf() < dist.get("gable", 0.0), Vector3(rc.r * rk, rc.g * rk, rc.b * rk),
 			tv, style, seed, lit)
+	if back:
+		return  # hintere Reihe: nur der Baukörper (im Häuser-Batch), keine Einzelteile
 	var grey := Builder.mat(Color(0.25, 0.25, 0.27), 0.5, 0.5)
 	var eaves: bool = not tall and h < 15.0 and rng.randf() < dist.get("eaves", 0.0)
 	if eaves:
@@ -3006,18 +3257,6 @@ static func _building(root: Node3D, center: Vector3, basis: Basis, w: float, dep
 	for i in (0 if eaves or pitched else rng.randi_range(0, 3)):
 		var off := basis * Vector3(rng.randf_range(-top_d, top_d) * 0.3, 0, rng.randf_range(-top_w, top_w) * 0.3)
 		Builder._add(root, Builder.box(Vector3(1.6, 1.0, 1.2)), grey, top_center + off + Vector3(0, roof_y + 0.5, 0)).basis = basis
-	if not tall and not eaves and not pitched and rng.randf() < 0.35:
-		# Wassertank auf Stelzen
-		var tank := CylinderMesh.new()
-		tank.top_radius = 1.2
-		tank.bottom_radius = 1.2
-		tank.height = 2.2
-		tank.radial_segments = 10
-		var tp := top_center + away * top_d * 0.2 + Vector3(0, roof_y + 2.6, 0)
-		Builder._add(root, tank, Builder.mat(Color(0.3, 0.2, 0.12), 0.0, 0.8), tp)
-		for k in 4:
-			var o := Vector3(cos(k * PI / 2) * 0.9, -1.6, sin(k * PI / 2) * 0.9)
-			Builder._add(root, Builder.box(Vector3(0.1, 1.2, 0.1)), grey, tp + o)
 	if not shop and rng.randf() < dist.get("stacks", 0.0):
 		# Fabrikschornstein mit rot-weißem Kopf und Blinklicht
 		var sh := rng.randf_range(16.0, 32.0)
@@ -3070,7 +3309,7 @@ static func _building(root: Node3D, center: Vector3, basis: Basis, w: float, dep
 		root.add_child(aw)
 		if rng.randf() < 0.35:
 			var open := Label3D.new()
-			open.text = "OPEN"
+			open.text = "GEÖFFNET"
 			open.font_size = 32
 			open.pixel_size = 0.012
 			open.modulate = Color(3.0, 0.4, 1.5)
@@ -3148,6 +3387,8 @@ static func _box_building(root: Node3D, center: Vector3, basis: Basis, w: float,
 static func _bb_box(xf: Transform3D, tint := Vector3(0.08, 0.08, 0.1), lit := 0.4, seed := 0.0, style := 0.0, shop_glass := 1.0) -> void:
 	if _box_arrays.is_empty():
 		_box_arrays = BoxMesh.new().get_mesh_arrays()
+	if box_log != null and _box_tag != "":
+		box_log.append([xf, _box_id, _box_tag])
 	var verts: PackedVector3Array = _box_arrays[Mesh.ARRAY_VERTEX]
 	var norms: PackedVector3Array = _box_arrays[Mesh.ARRAY_NORMAL]
 	var idx: PackedInt32Array = _box_arrays[Mesh.ARRAY_INDEX]
@@ -3223,6 +3464,7 @@ static func _bb_flush(root: Node3D) -> void:
 		var mi := MeshInstance3D.new()
 		mi.mesh = (_bb[key] as SurfaceTool).commit()
 		mi.material_override = m
+		mi.set_meta("no_merge", true)  # schon je Zelle ein Mesh: nicht noch einmal zusammenfassen
 		root.add_child(mi)
 	_bb = {}
 
@@ -3250,6 +3492,8 @@ static func _billboard(root: Node3D, pos: Vector3, face_dir: Vector3, roof_y: fl
 	l.shaded = false
 	l.position = Vector3(0, 4.2, 0.17)
 	n.add_child(l)
+	if rng.randf() < 0.5:
+		return  # nur jede zweite Tafel mit Strahler (Lichter sind im Browser teuer)
 	var sl := SpotLight3D.new()
 	sl.position = Vector3(0, 2.4, 1.5)
 	sl.rotation_degrees.x = 60
@@ -4179,6 +4423,9 @@ static func _build_el(root: Node3D, track: Dictionary, rng: RandomNumberGenerato
 			_box_building(root, f["pos"] + f["right"] * side * (lo + hi) / 2.0, Basis.looking_at(f["fwd"], Vector3.UP), 14.0,
 				hi - lo, rng.randf_range(9.0, 16.0), dist["styles"][0], Vector3(tint.r, tint.g, tint.b), rng.randf() * 100.0, 0.0,
 				dist["lit"], EL_H - 0.6)
+			if not track.has("el_blocks"):
+				track["el_blocks"] = []
+			track["el_blocks"].append(_foot(f["pos"] + f["right"] * side * (lo + hi) / 2.0, Basis.looking_at(f["fwd"], Vector3.UP), hi - lo, 14.0))
 			for k in [-4.5, 4.5]:
 				var pf := frame_at(curve, d + k)
 				var base: Vector3 = pf["pos"] + pf["right"] * side * (HALF_W + 1.0)

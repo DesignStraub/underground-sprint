@@ -136,8 +136,9 @@ func _ready() -> void:
 		# Gummiband: liegst du hinten, werden sie etwas langsamer; führst du, holen sie auf Leicht gar nicht,
 		# auf Normal etwas und nur auf Schwer stark auf
 		ai.rubber = [Vector2(0.82, 1.0), Vector2(0.88, 1.07), Vector2(0.9, 1.15)][diff]
-		# Abkürzungen sparen bis zu einem Fünftel der Zeit: auf Leicht nehmen Gegner sie selten
-		ai.shortcut_k = [0.3, 0.8, 1.0][diff]
+		# Abkürzungen sparen bis zu einem Fünftel der Zeit: in den ersten Rennen (1 Stern) kennen die Gegner
+		# sie noch nicht, danach nehmen sie sie auf Leicht selten
+		ai.shortcut_k = 0.0 if tier <= 1 else [0.3, 0.8, 1.0][diff]
 		ai.accel *= 0.8 + 0.2 * GameState.pace()
 		ais.append(ai)
 

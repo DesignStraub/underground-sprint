@@ -35,6 +35,9 @@ const DEMO_STEPS := [[5.4, "ui_down"], [6.0, "ui_accept"], [6.9, "ui_right"], [7
 	[8.3, "ui_down"], [8.8, "ui_right"], [9.5, "ui_right"], [10.2, "ui_down"], [10.7, "ui_right"],
 	[11.4, "ui_right"], [12.4, "ui_cancel"], [13.2, "ui_accept"], [14.0, "ui_accept"]]
 var _step := 0
+var sweep: PackedStringArray = []  # --sweep=schritt[:hoch]  Kamera fährt die Hauptstraße in Schritten ab, je Schritt ein Bild nach links und rechts
+var _sw_i := 0
+var _sw_f := 0
 var view: PackedStringArray = []  # --view=pfad:d:quer:höhe:ziel_d:ziel_quer:ziel_höhe  feste Kamera (Weg 0 = Hauptstraße)
 var _menu_done := false
 var look: PackedStringArray = []  # --look=wahrzeichen:höhe:blickhöhe:abstand[:d]  Kamera von der Straße auf ein Wahrzeichen (Orts-Strecken)
@@ -83,6 +86,8 @@ func _ready() -> void:
 		elif a.begins_with("--at="):
 			at = a.substr(5)
 			drive = true
+		elif a.begins_with("--sweep="):
+			sweep = a.substr(8).split(":")
 		elif a.begins_with("--view="):
 			view = a.substr(7).split(":")
 		elif a.begins_with("--look="):
@@ -130,6 +135,9 @@ func _process(dt: float) -> void:
 			elif which != "main":
 				race._show_races()
 				race._show_events(which)
+	if not sweep.is_empty() and race and "curve" in race and race.world and race.track:
+		_sweep(race)
+		return
 	if view.size() >= 7 and race and "curve" in race and race.world:
 		if _vcam == null:
 			_vcam = Camera3D.new()
@@ -504,6 +512,10 @@ func _fulltest(race) -> void:
 		return
 	if race.state != 1 or pl.loc.is_empty():
 		return
+	for a in race.ais:
+		if a.path["id"] != 0 and not _ft.has("ki_ab_%d" % a.path["id"]):
+			_ft["ki_ab_%d" % a.path["id"]] = true
+			print("FT KI-ABKÜRZUNG %s #%d t=%.1f" % [a.path["kind"], a.path["id"], race.race_time])
 	if not _ft.has("ki_info"):
 		_ft["ki_info"] = true
 		print("FT KI-STÄRKE schwierigkeit=%d spieler_top=%.1f | %s" % [GameState.difficulty, pl.top_speed,
@@ -727,3 +739,51 @@ func _handling(race, dt: float) -> void:
 		print("  t=%.1f v=%.1f winkel=%.1f drift=%s halt=%.2f wand=%d crash=%d stun=%.2f lat=%.1f kam=%.3f/%.3f" % [_h_t, pl.velocity.length(),
 			pl.drift_angle, pl.drifting, pl._slip_hold, pl.wall_hits, pl.crashes, pl.stun, pl.lateral, pl.cam.h_offset, pl.cam.v_offset])
 
+
+
+## Gebäude-Rundgang: alle schritt Meter ein Bild je Straßenseite, schräg nach vorn auf die Häuserzeile
+func _sweep(race) -> void:
+	if _vcam == null:
+		_vcam = Camera3D.new()
+		_vcam.fov = 70.0
+		_vcam.far = 2000.0
+		race.world.add_child(_vcam)
+		for ch in race.get_children():
+			if ch is CanvasLayer and ch.layer >= 0:
+				ch.visible = false
+		var cl := CanvasLayer.new()
+		cl.layer = 100
+		var lb := Label.new()
+		lb.name = "SweepLabel"
+		lb.add_theme_font_size_override("font_size", 36)
+		lb.add_theme_color_override("font_color", Color(1, 1, 0))
+		lb.add_theme_color_override("font_outline_color", Color(0, 0, 0))
+		lb.add_theme_constant_override("outline_size", 8)
+		lb.position = Vector2(12, 8)
+		cl.add_child(lb)
+		add_child(cl)
+	var step := float(sweep[0])
+	var high := sweep.size() > 1 and sweep[1] == "hoch"
+	var t: Dictionary = race.track
+	var d := 20.0 + (_sw_i / 2) * step
+	if d > t["length"] - 10.0:
+		get_tree().quit()
+		return
+	var side := -1.0 if _sw_i % 2 == 0 else 1.0
+	var c: Curve3D = t["curve"]
+	var fa := Track.frame_at(c, d)
+	var fb := Track.frame_at(c, minf(d + (40.0 if high else 22.0), t["length"]))
+	var hwd := Track.hw(t, d)
+	if high:
+		_vcam.global_position = fa["pos"] - fa["right"] * side * (hwd + 6.0) + Vector3(0, 22.0 + fa["y"], 0)
+		_vcam.look_at(fb["pos"] + fb["right"] * side * (Track.hw(t, d) + Track.WALK + 14.0) + Vector3(0, 4.0, 0), Vector3.UP)
+	else:
+		_vcam.global_position = fa["pos"] + fa["right"] * side * (hwd - 2.0) + Vector3(0, 1.5 + fa["y"], 0)
+		_vcam.look_at(fb["pos"] + fb["right"] * side * (Track.hw(t, d) + Track.WALK + 6.0) + Vector3(0, 6.5, 0), Vector3.UP)
+	_vcam.make_current()
+	(find_child("SweepLabel", true, false) as Label).text = "%d m %s %s" % [int(d), "L" if side < 0.0 else "R", Track._district_at(t, d)["name"]]
+	_sw_f += 1
+	if _sw_f >= 4:
+		_sw_f = 0
+		get_viewport().get_texture().get_image().save_png("%s_%05d_%s.png" % [prefix, int(d), "L" if side < 0.0 else "R"])
+		_sw_i += 1
