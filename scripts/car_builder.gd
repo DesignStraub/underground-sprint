@@ -30,20 +30,20 @@ const SHAPES := {
 		# langes Dach, steile Heckscheibe, fast senkrechte Klappe mit umlaufenden Rückleuchten, dicker Endtopf
 		"nose": 0.6, "hood": 0.82, "cowl": 0.3, "rf": 0.49, "rr": 0.66, "ge": 0.935, "cp": 0.85,
 		"roof": 1.29, "deck": 0.99, "tail": 0.95, "belt": 0.8, "fender": 0.0, "hips": 0.02,
-		"round_f": 0.22, "round_r": 0.08, "tumble": 0.15, "hl": {6: 0.085, 5: 0.025}, "tl": {6: 0.957, 5: 0.962},
+		"round_f": 0.22, "round_r": 0.08, "tumble": 0.15, "hl": {}, "tl": {},
 		"doors": [0.315, 0.62], "intake": Vector2(0.48, 0.06), "pipes": [0.46], "pipe_r": 0.085, "trim_low": true,
 		"drop": 0.035,  # ab Werk etwas tiefer
 	},
 	"mirai": {  # 350Z: lange Haube, Dachbogen fließt ins kurze Heck, breite Hüften
 		"nose": 0.6, "hood": 0.86, "cowl": 0.42, "rf": 0.56, "rr": 0.64, "ge": 0.89, "cp": 0.71,
 		"roof": 1.22, "deck": 0.95, "tail": 0.96, "belt": 0.85, "fender": 0.04, "hips": 0.055,
-		"round_f": 0.14, "round_r": 0.12, "tumble": 0.21, "hl": {6: 0.14, 5: 0.05}, "tl": {5: 0.945, 6: 0.96},
+		"round_f": 0.14, "round_r": 0.12, "tumble": 0.21, "hl": {6: 0.14, 5: 0.05}, "tl": {},
 		"doors": [0.435, 0.68], "intake": Vector2(0.5, 0.12),
 	},
 	"sakura": {  # Silvia-Coupé: schmale Scheinwerfer, Stufenheck mit kurzem Kofferraum
 		"nose": 0.6, "hood": 0.84, "cowl": 0.38, "rf": 0.54, "rr": 0.67, "ge": 0.81, "cp": 0.69,
 		"roof": 1.22, "deck": 0.93, "tail": 0.94, "belt": 0.84, "fender": 0.02, "hips": 0.025,
-		"round_f": 0.12, "round_r": 0.07, "tumble": 0.16, "hl": {6: 0.09, 5: 0.035}, "tl": {5: 0.968},
+		"round_f": 0.12, "round_r": 0.07, "tumble": 0.16, "hl": {6: 0.09, 5: 0.035}, "tl": {},
 		"doors": [0.395, 0.67], "intake": Vector2(0.56, 0.09),
 	},
 	"vortex": {  # GT-R-Limousine: kantiger, höheres Dach, Stufenheck, vier Türen
@@ -67,13 +67,13 @@ const SHAPES := {
 	"raijin": {  # Rallye-Limousine (Evo/Impreza): kantig, breite Backen, Hutze, riesiger Flügel, Schmutzfänger
 		"nose": 0.66, "hood": 0.9, "cowl": 0.355, "rf": 0.495, "rr": 0.685, "ge": 0.825, "cp": 0.745,
 		"roof": 1.28, "deck": 0.99, "tail": 1.0, "belt": 0.88, "fender": 0.055, "hips": 0.06,
-		"round_f": 0.06, "round_r": 0.04, "tumble": 0.12, "hl": {6: 0.075, 5: 0.06}, "tl": {6: 0.972, 5: 0.976},
+		"round_f": 0.06, "round_r": 0.04, "tumble": 0.12, "hl": {6: 0.075, 5: 0.06}, "tl": {},
 		"doors": [0.37, 0.545, 0.725], "intake": Vector2(0.62, 0.17), "pipes": [0.42], "pipe_r": 0.072,
 	},
 	"tsubame": {  # Roadster (S2000/MX-5): lange Haube, kleines Stoffverdeck weit hinten, kurzes Heck
 		"nose": 0.57, "hood": 0.8, "cowl": 0.465, "rf": 0.585, "rr": 0.655, "ge": 0.765, "cp": 0.71,
 		"roof": 1.1, "deck": 0.9, "tail": 0.92, "belt": 0.82, "fender": 0.05, "hips": 0.055,
-		"round_f": 0.19, "round_r": 0.13, "tumble": 0.27, "hl": {6: 0.125, 5: 0.045}, "tl": {5: 0.962, 6: 0.972},
+		"round_f": 0.19, "round_r": 0.13, "tumble": 0.27, "hl": {6: 0.125, 5: 0.045}, "tl": {},
 		"doors": [0.47, 0.695], "intake": Vector2(0.42, 0.1), "pipes": [-0.32, 0.32], "softtop": true,
 	},
 	"hachi": {  # 80er-Fließheck (AE86): kantig, Klappscheinwerfer, schwarze Stoßfänger, breites Leuchtenband
@@ -82,6 +82,48 @@ const SHAPES := {
 		"round_f": 0.05, "round_r": 0.04, "tumble": 0.15, "hl": {}, "tl": {},
 		"doors": [0.385, 0.66], "intake": Vector2(0.7, 0.05), "pipes": [-0.46], "pipe_r": 0.04,
 		"tire_w": 0.2, "black_bumpers": true, "trim_low": true,
+	},
+	"hayate": {  # 90er-Coupé (Integra-Gefühl): flache Nase mit vier runden Scheinwerfern, lange schräge
+		# Heckklappe, Eckleuchten, hoher Flügel auf der Klappe
+		"nose": 0.6, "hood": 0.83, "cowl": 0.37, "rf": 0.51, "rr": 0.62, "ge": 0.9, "cp": 0.79,
+		"roof": 1.25, "deck": 0.97, "tail": 0.96, "belt": 0.81, "fender": 0.01, "hips": 0.03,
+		"round_f": 0.17, "round_r": 0.07, "tumble": 0.17, "hl": {}, "tl": {},
+		"doors": [0.375, 0.64], "intake": Vector2(0.56, 0.1), "pipes": [0.44], "pipe_r": 0.062,
+	},
+	"kitsune": {  # Fließheck-Coupé mit Klappscheinwerfern (180SX-Gefühl): lange flache Haube, flaches Dach, Heckscheibe bis
+		# fast ans Ende, Leuchten über die ganze Klappe, kleiner Bürzel
+		"nose": 0.58, "hood": 0.8, "cowl": 0.4, "rf": 0.53, "rr": 0.61, "ge": 0.925, "cp": 0.75,
+		"roof": 1.22, "deck": 0.96, "tail": 0.95, "belt": 0.8, "fender": 0.015, "hips": 0.03,
+		"round_f": 0.15, "round_r": 0.06, "tumble": 0.19, "hl": {}, "tl": {},
+		"doors": [0.405, 0.665], "intake": Vector2(0.62, 0.08), "pipes": [0.42], "pipe_r": 0.07,
+	},
+	"tenshi": {  # Mittelmotor (MR2-Gefühl): kurze flache Nase mit Klappscheinwerfern, Kabine weit vorn, steiles kleines
+		# Heckfenster, lange Motorhaube hinten, breite Hüften mit Lufteinlässen, Bürzel
+		"nose": 0.56, "hood": 0.76, "cowl": 0.335, "rf": 0.47, "rr": 0.575, "ge": 0.665, "cp": 0.65,
+		"roof": 1.18, "deck": 0.99, "tail": 0.97, "belt": 0.8, "fender": 0.03, "hips": 0.07,
+		"round_f": 0.2, "round_r": 0.1, "tumble": 0.21, "hl": {}, "tl": {},
+		"doors": [0.355, 0.58], "intake": Vector2(0.45, 0.07), "pipes": [-0.36, 0.36], "mid": true,
+	},
+	"kumo": {  # Viertürer mit Heckantrieb (Chaser-Gefühl): lange Haube, hohes Glashaus, langer Kofferraum, große eckige
+		# Leuchten, Chrom
+		"nose": 0.66, "hood": 0.86, "cowl": 0.35, "rf": 0.485, "rr": 0.69, "ge": 0.805, "cp": 0.75,
+		"roof": 1.33, "deck": 0.99, "tail": 0.99, "belt": 0.87, "fender": 0.0, "hips": 0.015,
+		"round_f": 0.07, "round_r": 0.05, "tumble": 0.12, "hl": {}, "tl": {},
+		"doors": [0.365, 0.545, 0.725], "intake": Vector2(0.6, 0.11), "pipes": [-0.45, 0.45], "pipe_r": 0.055,
+	},
+	"shiden": {  # Mittelmotor-Supersportler (NSX-Gefühl): sehr flach, Kanzel weit vorn, lange flache Heckpartie,
+		# Klappscheinwerfer, schwarzes Band über das ganze Heck, Flügel aus einem Stück mit den Flanken
+		"nose": 0.54, "hood": 0.72, "cowl": 0.33, "rf": 0.455, "rr": 0.585, "ge": 0.72, "cp": 0.7,
+		"roof": 1.14, "deck": 0.97, "tail": 0.99, "belt": 0.79, "fender": 0.035, "hips": 0.06,
+		"round_f": 0.21, "round_r": 0.07, "tumble": 0.24, "hl": {}, "tl": {},
+		"doors": [0.36, 0.6], "intake": Vector2(0.55, 0.07), "pipes": [-0.3, -0.2, 0.2, 0.3], "pipe_r": 0.045, "mid": true,
+	},
+	"ryujin": {  # Breites Biturbo-Coupé (300ZX-Gefühl): flache Keilnase mit schmalen liegenden Scheinwerfern, Glasdach mit
+		# Mittelsteg, kurzes hohes Heck mit Leuchtenband über die ganze Breite
+		"nose": 0.57, "hood": 0.8, "cowl": 0.39, "rf": 0.525, "rr": 0.62, "ge": 0.845, "cp": 0.72,
+		"roof": 1.2, "deck": 0.96, "tail": 0.98, "belt": 0.82, "fender": 0.03, "hips": 0.07,
+		"round_f": 0.17, "round_r": 0.06, "tumble": 0.23, "hl": {6: 0.13}, "tl": {},
+		"doors": [0.42, 0.67], "intake": Vector2(0.4, 0.07), "pipes": [-0.42, 0.42], "pipe_r": 0.06,
 	},
 }
 
@@ -162,13 +204,24 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 		"sakura":
 			for s in [-1, 1]:
 				_add(fb, box(Vector3(0.09, 0.04, 0.012)), amber, Vector3(s * (fw - 0.07), CLEARANCE + 0.14, zf - 0.004))
-		"kaizen":  # JDM: schmaler Grill mit rotem Emblem, Blinker an den Ecken, roter Abschlepphaken
-			var gy: float = S["nose"] - 0.085
-			_add(fb, box(Vector3(fw * 0.9, 0.045, 0.02)), dark, Vector3(0, gy, zf + 0.012))
-			_add(fb, box(Vector3(0.075, 0.034, 0.012)), mat(Color(0.85, 0.02, 0.03), 0.3, 0.3, Color(0.9, 0.0, 0.05), 0.6), Vector3(0, gy, zf + 0.001))
+		"kaizen":  # EG-Gefühl: breite flache Scheinwerfer, um die Ecke gezogen, außen Blinker; dazwischen schmaler Grill
+			# mit rotem Emblem; Blinker unten in der Schürze, roter Abschlepphaken
+			var f_belt: float = front[6].y
+			var y0 := front[5].y - 0.03
+			var y1 := f_belt + 0.012
+			var ym := (y0 + y1) / 2.0
+			_lamp(fb, S, W, L, flare, dark, y0 - 0.012, y1 + 0.01, 0.17, 0.115, 0.0, 0.004)
+			_lamp(fb, S, W, L, flare, amber, y0, y1, 99.0, 0.105, 0.0, 0.006)
+			_lamp(fb, S, W, L, flare, head_m, y0, y1, 0.19, 0.07, 0.0, 0.008)
+			_lamp(fb, S, W, L, flare, dark, ym - 0.004, ym + 0.004, 0.19, 0.07, 0.0, 0.01)
+			_add(fb, box(Vector3(0.34, y1 - y0 - 0.012, 0.012)), dark, Vector3(0, ym, zf - 0.006))
+			for k in 3:
+				_add(fb, box(Vector3(0.32, 0.005, 0.012)), mat(Color(0.3, 0.3, 0.32), 0.7, 0.4), Vector3(0, y0 + 0.012 + k * 0.016, zf - 0.009))
+			_add(fb, box(Vector3(0.07, 0.032, 0.012)), mat(Color(0.85, 0.02, 0.03), 0.3, 0.3, Color(0.9, 0.0, 0.05), 0.6), Vector3(0, ym, zf - 0.013))
 			for s in [-1, 1]:
-				_add(fb, box(Vector3(0.11, 0.035, 0.012)), amber, Vector3(s * (fw - 0.1), gy - 0.05, zf + 0.03))
+				_add(fb, box(Vector3(0.12, 0.035, 0.012)), amber, Vector3(s * (fw - 0.14), CLEARANCE + 0.2, zf - 0.006))
 			_add(fb, box(Vector3(0.05, 0.05, 0.1)), mat(Color(0.85, 0.05, 0.04), 0.4, 0.4), Vector3(-fw * 0.55, CLEARANCE + 0.09, zf - 0.02))
+			hy = ym
 		"kaze":  # großes Maul in der Mitte, außen kleine Einlässe, Blinker unter den Scheinwerfern
 			for s in [-1, 1]:
 				_add(fb, box(Vector3(0.15, 0.06, 0.012)), dark, Vector3(s * (fw - 0.14), CLEARANCE + 0.13, zf - 0.004))
@@ -197,6 +250,75 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 			_add(fb, box(Vector3(front[4].x * 2.0 + 0.02, 0.18, 0.1)), mats["trim"], Vector3(0, CLEARANCE + 0.15, zf + 0.025))
 			_add(fb, box(Vector3(fw * 1.1, 0.035, 0.012)), mat(Color(0.18, 0.18, 0.19), 0.6, 0.4), Vector3(0, CLEARANCE + 0.15, zf - 0.03))
 			hy = CLEARANCE + 0.31
+		"hayate":  # vier runde Scheinwerfer in einem dunklen Band, das um die Ecke läuft, schmaler Grillschlitz
+			var y0 := front[5].y - 0.075
+			var y1 := front[6].y + 0.02
+			var ym := (y0 + y1) / 2.0
+			var r := (y1 - y0) / 2.0 - 0.008
+			_lamp(fb, S, W, L, flare, dark, y0, y1, 0.2, 0.075, 0.0, 0.004)
+			_lamp(fb, S, W, L, flare, amber, ym - 0.02, ym + 0.02, 99.0, 0.07, 0.0, 0.007)
+			var ring_m := mat(Color(0.3, 0.3, 0.32), 0.8, 0.3)
+			for s in [-1, 1]:
+				for x in [fw - 0.12, fw - 0.12 - 2.25 * r]:
+					_add(fb, _disc(r, 0.01), ring_m, Vector3(s * x, ym, zf - 0.006)).rotation_degrees.x = 90
+					_add(fb, _disc(r * 0.82, 0.012), head_m, Vector3(s * x, ym, zf - 0.009)).rotation_degrees.x = 90
+			_add(fb, box(Vector3(0.36, 0.03, 0.012)), dark, Vector3(0, ym, zf - 0.006))
+			for s in [-1, 1]:
+				_add(fb, box(Vector3(0.1, 0.03, 0.012)), amber, Vector3(s * (fw - 0.1), CLEARANCE + 0.24, zf - 0.006))
+			hy = ym
+		"kitsune":  # Klappscheinwerfer (zu), darunter ein schmales Lichtband über die ganze Front: außen Standlicht, Ecken Blinker
+			_popups(body, S, W, L, flare, mats["seam"], 0.47, 0.4, 0.2, 0.5)
+			var y0 := front[5].y - 0.025
+			var y1 := front[6].y + 0.008
+			_lamp(fb, S, W, L, flare, dark, y0 - 0.008, y1 + 0.008, 0.0, 0.09, 0.0, 0.004)
+			_lamp(fb, S, W, L, flare, amber, y0, y1, 99.0, 0.085, 0.0, 0.006)
+			_lamp(fb, S, W, L, flare, head_m, y0, y1, fw - 0.3, 0.04, 0.0, 0.008)
+			for s in [-1, 1]:
+				_add(fb, box(Vector3(0.16, 0.04, 0.012)), dark, Vector3(s * (fw - 0.16), CLEARANCE + 0.15, zf - 0.005))
+			hy = (y0 + y1) / 2.0
+		"tenshi":  # Klappscheinwerfer (zu), flache Nase, Blinker an den Ecken, runde Nebelscheinwerfer unten
+			_popups(body, S, W, L, flare, mats["seam"], 0.48, 0.34, 0.16, 0.42)
+			var y0 := front[5].y - 0.035
+			var y1 := front[6].y
+			_lamp(fb, S, W, L, flare, dark, y0 - 0.008, y1 + 0.008, fw - 0.34, 0.1, 0.0, 0.004)
+			_lamp(fb, S, W, L, flare, amber, y0, y1, fw - 0.2, 0.095, 0.0, 0.006)
+			_lamp(fb, S, W, L, flare, head_m, y0, y1, fw - 0.32, 0.0, 0.0, 0.008)
+			for s in [-1, 1]:
+				_add(fb, box(Vector3(0.15, 0.08, 0.012)), dark, Vector3(s * (fw - 0.17), CLEARANCE + 0.14, zf - 0.005))
+				_add(fb, _disc(0.033, 0.012), head_m, Vector3(s * (fw - 0.17), CLEARANCE + 0.14, zf - 0.009)).rotation_degrees.x = 90
+			hy = (y0 + y1) / 2.0
+		"kumo":  # breite eckige Scheinwerfer um die Ecke, Blinker außen, Chromgrill mit Emblem dazwischen
+			var y0 := front[5].y - 0.04
+			var y1 := front[6].y + 0.01
+			var ym := (y0 + y1) / 2.0
+			var chrome_g := mat(Color(0.75, 0.75, 0.78), 0.9, 0.2)
+			_lamp(fb, S, W, L, flare, dark, y0 - 0.012, y1 + 0.01, 0.27, 0.075, 0.0, 0.004)
+			_lamp(fb, S, W, L, flare, amber, y0, y1, 99.0, 0.07, 0.0, 0.006)
+			_lamp(fb, S, W, L, flare, head_m, y0, y1, 0.29, 0.045, 0.0, 0.008)
+			_lamp(fb, S, W, L, flare, dark, ym - 0.004, ym + 0.004, 0.29, 0.045, 0.0, 0.01)
+			_add(fb, box(Vector3(0.5, y1 - y0, 0.014)), dark, Vector3(0, ym, zf - 0.006))
+			for k in 4:
+				_add(fb, box(Vector3(0.48, 0.006, 0.012)), chrome_g, Vector3(0, y0 + 0.012 + k * (y1 - y0 - 0.024) / 3.0, zf - 0.01))
+			_add(fb, box(Vector3(0.5, 0.012, 0.016)), chrome_g, Vector3(0, y1 + 0.004, zf - 0.008))
+			_add(fb, _disc(0.026, 0.012), chrome_g, Vector3(0, ym, zf - 0.016)).rotation_degrees.x = 90
+			for s in [-1, 1]:
+				_add(fb, _disc(0.035, 0.012), head_m, Vector3(s * (fw - 0.16), CLEARANCE + 0.16, zf - 0.008)).rotation_degrees.x = 90
+			hy = ym
+		"shiden":  # Klappscheinwerfer (zu), breites flaches Lichtband mit Blinkern, großer schwarzer Einlass
+			_popups(body, S, W, L, flare, mats["seam"], 0.5, 0.36, 0.17, 0.43)
+			var y0 := front[5].y - 0.03
+			var y1 := front[6].y
+			_lamp(fb, S, W, L, flare, dark, y0 - 0.008, y1 + 0.006, 0.0, 0.11, 0.0, 0.004)
+			_lamp(fb, S, W, L, flare, amber, y0, y1, fw - 0.14, 0.1, 0.0, 0.006)
+			_lamp(fb, S, W, L, flare, head_m, y0, y1, fw - 0.36, 0.0, 0.0, 0.008)
+			for s in [-1, 1]:
+				_add(fb, box(Vector3(0.2, 0.06, 0.012)), dark, Vector3(s * (fw - 0.2), CLEARANCE + 0.15, zf - 0.005))
+			hy = (y0 + y1) / 2.0
+		"ryujin":  # schmale, flach liegende Scheinwerfer (Hautband an der Haubenkante), Blinker und Einlässe unten
+			for s in [-1, 1]:
+				_add(fb, box(Vector3(0.22, 0.035, 0.012)), amber, Vector3(s * (fw - 0.17), CLEARANCE + 0.27, zf - 0.005))
+				_add(fb, box(Vector3(0.22, 0.06, 0.012)), dark, Vector3(s * (fw - 0.17), CLEARANCE + 0.17, zf - 0.005))
+			hy = S["nose"] - 0.06
 		_:
 			pass
 	if headlights:
@@ -215,6 +337,12 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 	var rev_m := mat(Color(0.85, 0.85, 0.85), 0, 0.3, Color(1, 1, 1), 0.35)
 	var rw: float = rear[6].x
 	var ty: float = S["tail"] - 0.2
+	# Höhen auf der Heckfläche: Gürtellinie und Flankenmitte; Leuchten liegen dazwischen und laufen um die Ecke
+	var r_belt: float = rear[6].y
+	var r_mid: float = rear[5].y
+	var lens := mat(Color(0.25, 0.02, 0.02), 0.2, 0.25, Color(0.5, 0.0, 0.0), 0.5)  # Blende: dunkelrot, glimmt
+	var lamp := func(m: Material, y0: float, y1: float, x_in: float, t_wrap: float, off: float) -> void:
+		_lamp(rbm, S, W, L, flare, m, y0, y1, x_in, t_wrap, 1.0, off)
 	_add(rbm, box(Vector3(0.33, 0.165, 0.01)), mat(Color(0.85, 0.85, 0.8), 0.0, 0.5), Vector3(0, CLEARANCE + 0.3, zr + 0.004))
 	_add(rbm, box(Vector3(rw * 1.1, 0.07, 0.05)), dark, Vector3(0, CLEARANCE + 0.04, zr - 0.01))
 	for k in 5:  # Diffusor-Finnen
@@ -229,14 +357,20 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 			for s in [-1, 1]:
 				for k in 2:
 					_add(rbm, _disc(0.068, 0.012), tail_m, Vector3(s * (rw - 0.14 - k * 0.19), ty, zr + 0.006)).rotation_degrees.x = 90
-		"mirai":  # hochkant an den Ecken (Bumerang)
+		"mirai":  # Bumerang: hohe Leuchte an der Ecke, weit in die Flanke gezogen, schräg geteilt, innen Rückfahrlicht
+			lamp.call(dark, r_mid - 0.005, r_belt + 0.01, rw - 0.3, 0.948, 0.004)
+			lamp.call(tail_m, r_mid + 0.005, r_belt, rw - 0.22, 0.952, 0.006)
+			lamp.call(dark, (r_mid + r_belt) / 2.0 - 0.004, (r_mid + r_belt) / 2.0 + 0.004, rw - 0.22, 0.952, 0.009)
 			for s in [-1, 1]:
-				_add(rbm, box(Vector3(0.09, 0.22, 0.01)), tail_m, Vector3(s * (rw - 0.06), ty - 0.04, zr + 0.004))
-				_add(rbm, box(Vector3(0.22, 0.06, 0.01)), tail_m, Vector3(s * (rw - 0.17), ty + 0.04, zr + 0.004))
-		"sakura":  # flaches Band, Mitte dunkel
-			_add(rbm, box(Vector3(rw * 2.0 - 0.1, 0.07, 0.01)), dark, Vector3(0, ty + 0.02, zr + 0.003))
+				_add(rbm, box(Vector3(0.06, r_belt - r_mid - 0.02, 0.012)), rev_m, Vector3(s * (rw - 0.26), (r_mid + r_belt) / 2.0, zr + 0.009))
+		"sakura":  # flaches Band über das ganze Heck, außen rot um die Ecke, Mitte dunkle Blende
+			var y0 := r_mid + 0.025
+			var y1 := r_belt - 0.04
+			lamp.call(dark, y0 - 0.012, y1 + 0.012, 0.0, 0.962, 0.004)
+			lamp.call(tail_m, y0, y1, rw - 0.42, 0.966, 0.006)
+			lamp.call(mats["seam"], (y0 + y1) / 2.0 - 0.004, (y0 + y1) / 2.0 + 0.004, rw - 0.42, 0.966, 0.009)
 			for s in [-1, 1]:
-				_add(rbm, box(Vector3(0.4, 0.075, 0.01)), tail_m, Vector3(s * (rw - 0.25), ty + 0.02, zr + 0.006))
+				_add(rbm, box(Vector3(0.07, y1 - y0 - 0.02, 0.012)), rev_m, Vector3(s * (rw - 0.38), (y0 + y1) / 2.0, zr + 0.01))
 		"kaze":  # dunkle Felder an den Ecken, darin je zwei große runde Leuchten
 			for s in [-1, 1]:
 				_add(rbm, box(Vector3(0.44, 0.17, 0.01)), dark, Vector3(s * (rw - 0.25), ty, zr + 0.003))
@@ -244,24 +378,94 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 					_add(rbm, _disc(0.066, 0.012), tail_m, Vector3(s * (rw - 0.13 - k * 0.18), ty, zr + 0.007)).rotation_degrees.x = 90
 				_add(rbm, _disc(0.028, 0.012), rev_m, Vector3(s * (rw - 0.43), ty, zr + 0.007)).rotation_degrees.x = 90
 		"raijin":  # breite Leuchten, um die Ecken gezogen, innen Rückfahrlicht
+			var y0 := r_mid + 0.02
+			var y1 := r_belt - 0.02
+			lamp.call(dark, y0 - 0.012, y1 + 0.012, rw - 0.47, 0.958, 0.004)
+			lamp.call(tail_m, y0, y1, rw - 0.35, 0.962, 0.006)
 			for s in [-1, 1]:
-				_add(rbm, box(Vector3(0.34, 0.13, 0.01)), tail_m, Vector3(s * (rw - 0.17), ty, zr + 0.004))
-				_add(rbm, box(Vector3(0.09, 0.05, 0.01)), rev_m, Vector3(s * (rw - 0.39), ty - 0.035, zr + 0.004))
+				_add(rbm, box(Vector3(0.1, y1 - y0, 0.012)), rev_m, Vector3(s * (rw - 0.41), (y0 + y1) / 2.0, zr + 0.009))
 		"tsubame":  # schmale Leuchten über die Ecken, innen ein heller Streifen
+			var y0 := r_belt - 0.085
+			var y1 := r_belt - 0.02
+			lamp.call(dark, y0 - 0.01, y1 + 0.01, rw - 0.38, 0.958, 0.004)
+			lamp.call(tail_m, y0, y1, rw - 0.28, 0.962, 0.006)
 			for s in [-1, 1]:
-				_add(rbm, box(Vector3(0.28, 0.07, 0.01)), tail_m, Vector3(s * (rw - 0.14), ty + 0.04, zr + 0.004))
-				_add(rbm, box(Vector3(0.09, 0.07, 0.01)), rev_m, Vector3(s * (rw - 0.325), ty + 0.04, zr + 0.004))
+				_add(rbm, box(Vector3(0.09, y1 - y0, 0.012)), rev_m, Vector3(s * (rw - 0.33), (y0 + y1) / 2.0, zr + 0.009))
 		"hachi":  # Leuchtenband über das ganze Heck, Stoßfängerleiste aus schwarzem Kunststoff
 			_add(rbm, box(Vector3(rear[4].x * 2.0 + 0.02, 0.18, 0.1)), mats["trim"], Vector3(0, CLEARANCE + 0.12, zr - 0.025))
 			_add(rbm, box(Vector3(rw * 2.0 - 0.04, 0.13, 0.01)), dark, Vector3(0, ty, zr + 0.003))
 			for s in [-1, 1]:
 				_add(rbm, box(Vector3(0.4, 0.1, 0.01)), tail_m, Vector3(s * (rw - 0.22), ty, zr + 0.006))
 				_add(rbm, box(Vector3(0.09, 0.1, 0.01)), amber, Vector3(s * (rw - 0.47), ty, zr + 0.006))
-		"kaizen":  # durchgehendes Leuchtenband über die ganze Klappe, außen Rückfahrlicht
-			_add(rbm, box(Vector3(rw * 2.0 - 0.04, 0.12, 0.01)), tail_m, Vector3(0, ty, zr + 0.004))
-			_add(rbm, box(Vector3(rw * 0.8, 0.03, 0.012)), dark, Vector3(0, ty, zr + 0.006))
+		"kaizen":  # EG-Fließheck: ein Leuchtenband über die ganze Klappe. Außen rote Leuchten, um die Ecke gezogen und
+			# zweigeteilt, dazwischen dunkelrote Blende, innen Rückfahrlicht; darunter die Kante der Stoßstange
+			var y0 := r_mid + 0.012
+			var y1 := r_belt - 0.022
+			var ym := (y0 + y1) / 2.0
+			var xi := rw - 0.36
+			lamp.call(dark, y0 - 0.014, y1 + 0.014, 0.0, 0.956, 0.004)
+			lamp.call(tail_m, y0, y1, xi, 0.962, 0.006)
+			lamp.call(dark, ym - 0.005, ym + 0.005, xi, 0.962, 0.009)
+			_add(rbm, box(Vector3(xi * 2.0 - 0.04, y1 - y0 - 0.03, 0.012)), lens, Vector3(0, ym, zr + 0.008))
 			for s in [-1, 1]:
-				_add(rbm, box(Vector3(0.08, 0.05, 0.012)), rev_m, Vector3(s * (rw - 0.3), ty - 0.03, zr + 0.006))
+				_add(rbm, box(Vector3(0.075, ym - y0 - 0.01, 0.012)), rev_m, Vector3(s * (xi + 0.05), (y0 + ym) / 2.0, zr + 0.011))
+			lamp.call(mats["seam"], CLEARANCE + 0.43, CLEARANCE + 0.442, 0.0, REAR_SEAM + 0.004, 0.004)
+		"hayate":  # Eckleuchten, oben rot, unten Blinker und Rückfahrlicht, dazwischen lackierte Klappe
+			var y0 := r_mid + 0.01
+			var y1 := r_belt - 0.01
+			var ym := (y0 + y1) / 2.0 + 0.01
+			lamp.call(dark, y0 - 0.012, y1 + 0.012, rw - 0.4, 0.956, 0.004)
+			lamp.call(tail_m, ym, y1, rw - 0.38, 0.96, 0.006)
+			lamp.call(amber, y0, ym - 0.006, rw - 0.16, 0.96, 0.006)
+			for s in [-1, 1]:
+				_add(rbm, box(Vector3(0.2, ym - y0 - 0.014, 0.012)), rev_m, Vector3(s * (rw - 0.27), (y0 + ym) / 2.0 - 0.003, zr + 0.009))
+		"kitsune":  # Leuchten über die ganze Klappe, mit Rippen; in der Mitte dunkelrote Blende
+			var y0 := r_mid + 0.015
+			var y1 := r_belt - 0.015
+			lamp.call(dark, y0 - 0.012, y1 + 0.012, 0.0, 0.958, 0.004)
+			lamp.call(tail_m, y0, y1, rw - 0.46, 0.962, 0.006)
+			for k in 2:
+				var yk := y0 + (y1 - y0) * (k + 1) / 3.0
+				lamp.call(dark, yk - 0.004, yk + 0.004, rw - 0.46, 0.962, 0.009)
+			_add(rbm, box(Vector3((rw - 0.48) * 2.0, y1 - y0 - 0.02, 0.012)), lens, Vector3(0, (y0 + y1) / 2.0, zr + 0.008))
+			for s in [-1, 1]:
+				_add(rbm, box(Vector3(0.08, y1 - y0 - 0.02, 0.012)), rev_m, Vector3(s * (rw - 0.42), (y0 + y1) / 2.0, zr + 0.011))
+		"tenshi":  # dunkles Band über das ganze Heck, darin je zwei runde Leuchten, Blinker um die Ecke
+			var y0 := r_mid + 0.01
+			var y1 := r_belt
+			var ym := (y0 + y1) / 2.0
+			lamp.call(dark, y0, y1, 0.0, 0.955, 0.004)
+			lamp.call(amber, y0 + 0.012, y1 - 0.012, 99.0, 0.96, 0.006)
+			for s in [-1, 1]:
+				for k in 2:
+					_add(rbm, _disc((y1 - y0) / 2.0 - 0.012, 0.012), tail_m, Vector3(s * (rw - 0.13 - k * 0.17), ym, zr + 0.009)).rotation_degrees.x = 90
+				_add(rbm, _disc(0.03, 0.012), rev_m, Vector3(s * (rw - 0.47), ym, zr + 0.009)).rotation_degrees.x = 90
+		"kumo":  # große eckige Leuchten um die Ecke, innen rundes Rückfahrlicht, Chromleiste über den Kofferraum
+			var y0 := r_mid - 0.02
+			var y1 := r_belt - 0.005
+			var ym := (y0 + y1) / 2.0
+			lamp.call(dark, y0 - 0.012, y1 + 0.012, rw - 0.5, 0.955, 0.004)
+			lamp.call(tail_m, y0, y1, rw - 0.48, 0.958, 0.006)
+			lamp.call(amber, y0, ym - 0.03, rw - 0.2, 0.958, 0.008)
+			for s in [-1, 1]:
+				_add(rbm, _disc(0.04, 0.012), rev_m, Vector3(s * (rw - 0.38), ym + 0.01, zr + 0.011)).rotation_degrees.x = 90
+			_add(rbm, box(Vector3((rw - 0.5) * 2.0, 0.025, 0.014)), mat(Color(0.75, 0.75, 0.78), 0.9, 0.2), Vector3(0, y1 - 0.02, zr + 0.006))
+		"shiden":  # schwarzes Band über das ganze Heck und um die Ecken, darin außen die roten Leuchten
+			var y0 := r_mid + 0.005
+			var y1 := r_belt + 0.01
+			lamp.call(dark, y0 - 0.01, y1 + 0.01, 0.0, 0.95, 0.004)
+			lamp.call(tail_m, y0 + 0.012, y1 - 0.012, rw - 0.34, 0.956, 0.007)
+			lamp.call(amber, y0 + 0.012, y0 + 0.04, rw - 0.12, 0.956, 0.009)
+			for s in [-1, 1]:
+				_add(rbm, box(Vector3(0.08, y1 - y0 - 0.03, 0.012)), rev_m, Vector3(s * (rw - 0.4), (y0 + y1) / 2.0, zr + 0.009))
+		"ryujin":  # schmales rotes Leuchtenband über die ganze Breite, hoch unter der Heckkante
+			var y1 := r_belt + 0.01
+			var y0 := y1 - 0.08
+			lamp.call(dark, y0 - 0.012, y1 + 0.012, 0.0, 0.955, 0.004)
+			lamp.call(tail_m, y0, y1, 0.0, 0.96, 0.006)
+			lamp.call(dark, (y0 + y1) / 2.0 - 0.003, (y0 + y1) / 2.0 + 0.003, 0.0, 0.96, 0.009)
+			for s in [-1, 1]:
+				_add(rbm, box(Vector3(0.1, 0.035, 0.012)), rev_m, Vector3(s * 0.22, y0 - 0.04, zr + 0.006))
 		_:
 			_add(rbm, box(Vector3(rw * 2.0 - 0.3, 0.1, 0.01)), dark, Vector3(0, ty, zr + 0.003))
 			for s in [-1, 1]:
@@ -302,10 +506,36 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 				_add(body, box(Vector3(0.22, 0.2, 0.012)), flap, Vector3(s * (W / 2.0 - 0.18), CLEARANCE + 0.04, zi * (L / 2.0 - AXLE) + WHEEL_R + 0.1))
 
 	if int(cfg.get("engine", 0)) >= 3 and car_id != "vortex" and car_id != "raijin":
-		var hv: PackedVector2Array = _section(S, 0.24, W, L, flare)["p"]
+		var lt: float = (S["ge"] + 1.0) / 2.0 - 0.03 if S.get("mid", false) else 0.24  # Mittelmotor: Lamellen hinten
+		var hv: PackedVector2Array = _section(S, lt, W, L, flare)["p"]
 		for sx in [-1, 1]:
 			for k in 4:
-				_add(body, box(Vector3(0.2, 0.008, 0.018)), dark, Vector3(sx * 0.3, _top_y(hv, 0.3 / hv[7].x) + 0.004, zf + 0.24 * L - 0.06 + k * 0.04))
+				_add(body, box(Vector3(0.2, 0.008, 0.018)), dark, Vector3(sx * 0.3, _top_y(hv, 0.3 / hv[7].x) + 0.004, zf + lt * L - 0.06 + k * 0.04))
+
+	# Mittelmotor: Lufteinlässe in den Flanken hinter den Türen
+	if S.get("mid", false):
+		var doors_m: Array = S["doors"]
+		var tk: float = doors_m[-1] + 0.06
+		var sy: float = S["belt"] - 0.07
+		var sxk := _side_x(S, tk, sy, W, L, flare)
+		for s in [-1, 1]:
+			# Lufthutze: dunkle Öffnung, vorn schmal, nach hinten höher (der Flanke entlang leicht nach innen gedreht)
+			var scoop := _add(body, tapered_box(Vector2(0.03, 0.26), Vector2(0.03, 0.2), 0.15, 0.03), dark,
+				Vector3(s * (sxk - 0.008), sy - 0.1, zf + tk * L))
+			scoop.rotation_degrees.y = -s * 5.0
+
+	# Ryujin: Glasdach mit Mittelsteg (T-Bar)
+	if car_id == "ryujin":
+		var rt0: float = S["rf"] + 0.01
+		var rt1: float = S["rr"] - 0.005
+		var tm := (rt0 + rt1) / 2.0
+		var rp: PackedVector2Array = _section(S, tm, W, L, flare)["p"]
+		var px := 0.22
+		var slope := 2.0 * (rp[7].y - rp[10].y) * px / (rp[7].x * rp[7].x)
+		for s in [-1, 1]:
+			# Glasdeckel liegen auf der gewölbten Dachfläche (quer geneigt), dazwischen bleibt der lackierte Steg
+			var gp := _add(body, box(Vector3(0.3, 0.006, (rt1 - rt0) * L)), mats["glass"], Vector3(s * px, _top_y(rp, px / rp[7].x), zf + tm * L))
+			gp.rotation.z = s * atan(slope)
 
 	# Bodykit: Schweller, Frontlippe
 	if kit >= 1:
@@ -333,6 +563,22 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 			_add(body, box(Vector3(0.035, 0.16, 0.38)), paint, Vector3(s * (W / 2.0 - 0.07), deck_y + 0.28, wz))
 		_add(body, box(Vector3(W - 0.14, 0.04, 0.36)), paint, Vector3(0, deck_y + 0.26, wz))
 		_add(body, box(Vector3(W - 0.14, 0.03, 0.14)), paint, Vector3(0, deck_y + 0.33, wz + 0.12)).rotation_degrees.x = -14
+	elif sp == 0 and car_id == "hayate":
+		# Serienflügel: hoch auf der Klappe, zwei Stützen
+		for s in [-1, 1]:
+			_add(body, box(Vector3(0.04, 0.13, 0.1)), paint, Vector3(s * (W / 2.0 - 0.36), deck_y + 0.06, wz + 0.04))
+		_add(body, box(Vector3(W - 0.36, 0.035, 0.22)), paint, Vector3(0, deck_y + 0.14, wz + 0.06)).rotation_degrees.x = -6
+	elif sp == 0 and (car_id == "kitsune" or car_id == "tenshi" or car_id == "kumo" or car_id == "ryujin"):
+		# Serien-Bürzel: flache Abrisskante an der Heckkante
+		var bt := 1.0 - 0.07 / L
+		var bp: PackedVector2Array = _section(S, bt, W, L, flare)["p"]
+		_add(body, box(Vector3(bp[7].x * 2.0 - 0.06, 0.035, 0.12)), paint, Vector3(0, bp[10].y + 0.018, zf + bt * L - 0.02)).rotation_degrees.x = -10
+	elif sp == 0 and car_id == "shiden":
+		# Serienflügel aus einem Stück mit den Flanken: zwei Finnen an den Heckecken, Blatt über die ganze Breite
+		var fy: float = deck_y
+		for s in [-1, 1]:
+			_add(body, tapered_box(Vector2(0.06, 0.4), Vector2(0.05, 0.26), 0.11, 0.06), paint, Vector3(s * (W / 2.0 - 0.13), fy - 0.02, wz + 0.02))
+		_add(body, box(Vector3(W - 0.18, 0.035, 0.24)), paint, Vector3(0, fy + 0.1, wz + 0.08)).rotation_degrees.x = -4
 	elif sp == 1:
 		_add(body, box(Vector3(W - 0.4, 0.045, 0.16)), paint, Vector3(0, deck_y + 0.02, zr - 0.12))
 	elif sp >= 2:
@@ -511,7 +757,12 @@ static func _kaizen_extras(body: Node3D, S: Dictionary, W: float, L: float, mats
 	var p0 := Vector3(0, _top_c(S, t0), (t0 - 0.5) * L)
 	var p1 := Vector3(0, _top_c(S, t1) + 0.06, (t1 - 0.5) * L)
 	var sb := Basis.looking_at(p1 - p0, Vector3.UP)
-	_add(body, box(Vector3(roof_w * 0.9, 0.028, (p1 - p0).length() + 0.06)), mats["paint"], (p0 + p1) / 2.0 + Vector3(0, 0.02, 0)).basis = sb
+	var sl := (p1 - p0).length() + 0.06
+	var sm := (p0 + p1) / 2.0 + Vector3(0, 0.006, 0)
+	_add(body, box(Vector3(roof_w * 0.9, 0.03, sl)), mats["paint"], sm).basis = sb
+	# Seitenwangen bis auf die Scheibe: der Spoiler sitzt auf, statt über dem Dach zu schweben
+	for s in [-1, 1]:
+		_add(body, box(Vector3(0.035, 0.07, sl * 0.85)), mats["paint"], sm + Vector3(s * roof_w * 0.43, -0.03, 0.0)).basis = sb
 	var ta: float = S["rf"] - 0.05
 	var tb: float = S["rf"] - 0.008
 	var a := Vector3(0, _top_c(S, ta), (ta - 0.5) * L)
@@ -538,6 +789,15 @@ static func _merge_parts(root: Node3D, body: Node3D, fronts: Array, spinners: Ar
 	var stops := {body: true}
 	for n in fronts + spinners + flames:
 		stops[n] = true
+	# Anbauteile der Schürzen (Leuchten, Grill, Kennzeichen) hängen an den Schürzen-Meshes. Die Sammlung steigt nicht in
+	# Meshes hinab: ohne Umhängen blieben sie ~25 einzelne Draw Calls je Auto und fehlten in der Fernansicht.
+	for bn in ["FrontBumper", "RearBumper"]:
+		var b := body.get_node_or_null(bn) as Node3D
+		if b:
+			for c in b.get_children():
+				b.remove_child(c)
+				(c as Node3D).transform = b.transform * (c as Node3D).transform
+				body.add_child(c)
 	var canon := {}
 	for g in [root, body] + fronts + spinners:
 		var buckets := {}
@@ -813,6 +1073,82 @@ static func _top_y(p: PackedVector2Array, f: float) -> float:
 	return p[10].y + (p[7].y - p[10].y) * f * f
 
 
+## Geschlossene Klappscheinwerfer: Fugen eines Deckels je Seite auf der Haube (Mitte x_c, Breite w, von z0 bis z1 ab Bug)
+static func _popups(body: Node3D, S: Dictionary, W: float, L: float, flare: float, seam_m: Material,
+		x_c: float, w: float, z0: float, z1: float) -> void:
+	var zf := -L / 2.0
+	for s in [-1, 1]:
+		for z in [z0, z1]:
+			var ps: PackedVector2Array = _section(S, z / L, W, L, flare)["p"]
+			_add(body, box(Vector3(w, 0.008, 0.008)), seam_m, Vector3(s * x_c, _top_y(ps, x_c / ps[7].x) + 0.004, zf + z))
+		var zm := (z0 + z1) / 2.0
+		var pm: PackedVector2Array = _section(S, zm / L, W, L, flare)["p"]
+		for x in [x_c - w / 2.0, x_c + w / 2.0]:
+			_add(body, box(Vector3(0.008, 0.008, z1 - z0)), seam_m, Vector3(s * x, _top_y(pm, x / pm[7].x) + 0.004, zf + zm))
+
+
+## x der Flanke in Höhe y beim Querschnitt t (zwischen Schweller und Schulter)
+static func _side_x(S: Dictionary, t: float, y: float, W: float, L: float, flare: float) -> float:
+	var p: PackedVector2Array = _section(S, t, W, L, flare)["p"]
+	if y <= p[3].y:
+		return p[3].x
+	for j in range(3, 7):
+		if y <= p[j + 1].y:
+			return lerpf(p[j].x, p[j + 1].x, (y - p[j].y) / maxf(p[j + 1].y - p[j].y, 1e-4))
+	return p[7].x
+
+
+## Leuchte (oder Zierleiste) aus einem Stück: ein Feld auf der Stirnfläche von x_in bis zur Kante und ein Streifen,
+## der der Flanke bis t_wrap um die Ecke folgt, Ober- und Unterkante auf gleicher Höhe (y0..y1). Beide Seiten.
+## end = 1: Heck, end = 0: Bug. x_in = 0: durchgehend über die ganze Breite.
+static func _lamp(parent: Node3D, S: Dictionary, W: float, L: float, flare: float, m: Material,
+		y0: float, y1: float, x_in: float, t_wrap: float, end := 1.0, off := 0.006) -> MeshInstance3D:
+	var dz := 1.0 if end > 0.5 else -1.0
+	var ze := (end - 0.5) * L + dz * off
+	var n := 7 if absf(t_wrap - end) > 1e-4 else 0  # ohne Streifen um die Ecke: nur das Feld vorn bzw. hinten
+	var ring := []
+	for i in n + 1:
+		var t := lerpf(end, t_wrap, float(i) / n) if n > 0 else end
+		ring.append([_side_x(S, t, y0, W, L, flare), _side_x(S, t, y1, W, L, flare), (t - 0.5) * L])
+	# Außennormale der Flanke je Ring (in der Draufsicht), daran wird der Streifen etwas abgehoben
+	var nrm := []
+	for i in n + 1:
+		var a: Array = ring[maxi(i - 1, 0)]
+		var b: Array = ring[mini(i + 1, n)]
+		var tx: float = (b[0] + b[1]) / 2.0 - (a[0] + a[1]) / 2.0
+		var tz: float = b[2] - a[2]
+		var v := Vector3(tz, 0.0, -tx).normalized()
+		if v.dot(Vector3(1.0, 0.0, dz)) < 0.0:
+			v = -v
+		nrm.append(v)
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for side in [1.0, -1.0]:
+		var sx := Vector3(side, 1.0, 1.0)
+		var fz := Vector3(0, 0, dz)
+		var r0: Array = ring[0]
+		if x_in < minf(r0[0], r0[1]):
+			var q := [Vector3(x_in, y0, ze), Vector3(r0[0], y0, ze), Vector3(r0[1], y1, ze), Vector3(x_in, y1, ze)]
+			_tri(st, q[0] * sx, q[1] * sx, q[2] * sx, fz, fz, fz, fz)
+			_tri(st, q[0] * sx, q[2] * sx, q[3] * sx, fz, fz, fz, fz)
+		for i in n:
+			var p := []
+			var pn := []
+			for k in [i, i + 1]:
+				var r: Array = ring[k]
+				var o: Vector3 = nrm[k] * off
+				p.append_array([Vector3(r[0], y0, r[2]) + o, Vector3(r[1], y1, r[2]) + o])
+				pn.append_array([nrm[k], nrm[k]])
+			var fn: Vector3 = ((nrm[i] + nrm[i + 1]) * sx).normalized()
+			_tri(st, p[0] * sx, p[2] * sx, p[3] * sx, pn[0] * sx, pn[2] * sx, pn[3] * sx, fn)
+			_tri(st, p[0] * sx, p[3] * sx, p[1] * sx, pn[0] * sx, pn[3] * sx, pn[1] * sx, fn)
+	var mi := MeshInstance3D.new()
+	mi.mesh = st.commit()
+	mi.material_override = m
+	parent.add_child(mi)
+	return mi
+
+
 ## Material eines Hautstücks (Band b zwischen Punkt b und b+1) bei t
 static func _skin(S: Dictionary, b: int, t: float, g: float, seam: bool, vinyl: int) -> String:
 	if b <= 2:
@@ -928,6 +1264,8 @@ static func _shell(body: Node3D, S: Dictionary, W: float, L: float, flare: float
 			var key := _skin(S, j, tm, gm, is_seam, vinyl)
 			if key == "paint" and part != "Shell" and j == 4 and S.get("black_bumpers", false):
 				key = "trim"
+			elif key == "trim" and part == "RearBumper" and not S.get("black_bumpers", false):
+				key = "paint"  # sonst wirken die schwarzen Ecken der Heckschürze wie ein Rahmen um das Heck
 			var st: SurfaceTool = get_st.call(part, key)
 			var q := [[i, j], [i, j + 1], [i + 1, j + 1], [i + 1, j]]
 			var pos := []
@@ -1098,7 +1436,9 @@ static func showcase(car: Node3D, car_id: String, cfg: Dictionary, mode: String)
 	var chrome := mat(Color(0.78, 0.78, 0.8), 0.95, 0.15)
 	var t0: float
 	var t1: float
-	if mode == "engine":
+	# Mittelmotor: Motor hinten unter dem Heckdeckel, Nitro vorn im Kofferraum
+	var at_front: bool = (mode == "engine") != S.get("mid", false)
+	if at_front:
 		t0 = 0.1
 		t1 = S["cowl"] - 0.035
 	else:
@@ -1120,11 +1460,17 @@ static func showcase(car: Node3D, car_id: String, cfg: Dictionary, mode: String)
 	var hinge := Node3D.new()
 	sc.add_child(hinge)
 	var lid := box(Vector3(half * 2.0 + 0.06, 0.025, depth + 0.04))
-	if mode == "engine":
+	if at_front:
 		hinge.position = Vector3(0, y1 + 0.03, zf + t1 * L)
 		hinge.rotation_degrees.x = 62.0
 		_add(hinge, lid, paint, Vector3(0, 0, -(depth + 0.04) / 2.0))
 		_add(hinge, box(Vector3(half * 2.0 - 0.1, 0.01, depth - 0.1)), bay, Vector3(0, -0.018, -(depth + 0.04) / 2.0))
+	else:
+		hinge.position = Vector3(0, y0 + 0.03, zf + t0 * L)
+		hinge.rotation_degrees.x = -64.0
+		_add(hinge, lid, paint, Vector3(0, 0, (depth + 0.04) / 2.0))
+		_add(hinge, box(Vector3(half * 2.0 - 0.1, 0.01, depth - 0.1)), bay, Vector3(0, -0.018, (depth + 0.04) / 2.0))
+	if mode == "engine":
 		var stage := int(cfg.get("engine", 0))
 		var turbo := int(cfg.get("turbo", 0))
 		var cover_cols := [Color(0.45, 0.45, 0.47), Color(0.8, 0.08, 0.06), Color(0.1, 0.3, 0.9), Color(0.85, 0.65, 0.15)]
@@ -1168,10 +1514,6 @@ static func showcase(car: Node3D, car_id: String, cfg: Dictionary, mode: String)
 		_add(plate, box(Vector3(0.14, 0.12, 0.12)), mat(Color(0.05, 0.05, 0.06), 0.1, 0.7), Vector3(-half + 0.12, 0.07, depth / 2.0 - 0.14))
 		_add(plate, box(Vector3(0.03, 0.02, 0.03)), mat(Color(0.8, 0.05, 0.05), 0, 0.5), Vector3(-half + 0.08, 0.14, depth / 2.0 - 0.12))
 	else:
-		hinge.position = Vector3(0, y0 + 0.03, zf + t0 * L)
-		hinge.rotation_degrees.x = -64.0
-		_add(hinge, lid, paint, Vector3(0, 0, (depth + 0.04) / 2.0))
-		_add(hinge, box(Vector3(half * 2.0 - 0.1, 0.01, depth - 0.1)), bay, Vector3(0, -0.018, (depth + 0.04) / 2.0))
 		# Nitroflaschen quer im Kofferraum, mit Halteschellen und Ventilen
 		var stage := int(cfg.get("nitro", 0))
 		var n := 1 + mini(stage, 1)

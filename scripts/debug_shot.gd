@@ -6,6 +6,7 @@ extends Node
 ##   -- --demo             klickt sich nach dem Intro durchs Menü (Tuning zeigen, Rennen starten)
 ##   -- --at=lake|crossing|alley|fork|tunnel|el|stadium|<viertel>|d:<meter>   setzt das Auto nach dem Start direkt vor die Stelle
 ##   -- --race=2           wählt die Strecke (Index in Catalog.RACES)
+##   -- --car=shiden       fährt mit diesem Auto (auch in der Garage vorausgewählt)
 ##   -- --times=1.5,4,8    Zeitpunkte für Screenshots
 ##   -- --crash=30:90[:d]  (oder 30:q quer rutschend, 30:k auf die nächste Laterne) setzt das Auto (bei Strecke d) mit 30 m/s im Winkel 90° nach rechts auf die Wand zu,
 ##                         gibt den Verlauf aus (Überschlag, Flug, Höhe) – Test der Fallphysik
@@ -125,11 +126,13 @@ func _process(dt: float) -> void:
 			_menu_done = true  # Test: Tuning-Teileliste einer Kategorie öffnen (z. B. --tune=engine), Kamera fährt hin
 			var cat := a.substr(7)
 			var grp := "optik" if cat in Catalog.PART_GROUPS["optik"] else "leistung"
+			race._show_main()
 			race._show_tuning()
 			race._show_parts(cat, grp)
 		if a.begins_with("--menu=") and race and race.has_method("_show_events") and _t > 0.8 and not _menu_done:
 			_menu_done = true  # Test: Garage direkt auf einer Event-Liste öffnen (z. B. --menu=city, --menu=tuning, --menu=cars, --menu=main)
 			var which := a.substr(7)
+			race._show_main()  # erst Hauptmenü (lädt das Auto), auch wenn noch die Sprachwahl offen ist
 			if race.has_method("_show_" + which):
 				race.call("_show_" + which)  # tuning, cars, settings, races
 			elif which != "main":

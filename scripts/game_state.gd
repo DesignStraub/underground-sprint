@@ -58,6 +58,7 @@ var race_index := 0
 var best_times := {}  # Rennname -> Sekunden
 var won_events: Array = []  # gewonnene Events (Karriere: ein Sieg öffnet das nächste)
 var car_configs := {}  # car_id -> {category: option_index}
+var kept_cars: Array = []  # schon mit den alten Schwellen (bis 2.10) freigeschaltete Autos bleiben frei
 
 
 func _ready() -> void:
@@ -76,6 +77,8 @@ func _ready() -> void:
 			apply_preset(clampi(int(a.substr(10)), 0, PRESETS.size() - 1))
 		elif a.begins_with("--pixel="):
 			pixel_look = a.substr(8) == "1"
+		elif a.begins_with("--car=") and Catalog.CARS.has(a.substr(6)):  # nur für Tests: mit diesem Auto fahren
+			current_car = a.substr(6)
 	apply_display()
 	_build_fps_overlay()
 	for a in OS.get_cmdline_user_args():
@@ -341,11 +344,21 @@ func pace() -> float:
 
 func is_car_unlocked(car_id: String, race_w := -1, drift_w := -1) -> bool:
 	var req: Dictionary = Catalog.CARS[car_id]["unlock"]
-	if req.is_empty():
+	if req.is_empty() or car_id in kept_cars:
 		return true
 	var rw := wins if race_w < 0 else race_w
 	var dw := drift_wins if drift_w < 0 else drift_w
 	return (req.has("race") and rw >= req["race"]) or (req.has("drift") and dw >= req["drift"])
+
+
+## Spielstand von vor 2.11: was nach den alten Schwellen schon frei war, bleibt frei
+static func legacy_cars(race_w: int, drift_w: int) -> Array:
+	var out := []
+	for id in Catalog.LEGACY_UNLOCK:
+		var req: Dictionary = Catalog.LEGACY_UNLOCK[id]
+		if (req.has("race") and race_w >= req["race"]) or (req.has("drift") and drift_w >= req["drift"]):
+			out.append(id)
+	return out
 
 
 ## "2 Rennsiege oder 1 Driftsieg"
@@ -420,7 +433,7 @@ func save_game() -> void:
 		return
 	f.store_string(JSON.stringify({
 		"wins": wins, "drift_wins": drift_wins, "current_car": current_car, "race_index": race_index,
-		"best_times": best_times, "car_configs": car_configs, "won_events": won_events,
+		"best_times": best_times, "car_configs": car_configs, "won_events": won_events, "kept_cars": kept_cars,
 		"gfx": {"preset": preset, "opts": gfx, "pixel": pixel_look, "vsync": vsync, "fps": fps_limit, "fullscreen": fullscreen,
 			"touch": touch_mode, "show_fps": show_fps, "jump_cam": jump_cam},
 		"language": language, "difficulty": difficulty,
@@ -436,6 +449,10 @@ func load_game() -> void:
 		return
 	wins = int(data.get("wins", 0))
 	drift_wins = int(data.get("drift_wins", 0))
+	if data.has("kept_cars"):
+		kept_cars = Array(data["kept_cars"]).filter(func(id): return Catalog.CARS.has(id))
+	else:
+		kept_cars = legacy_cars(wins, drift_wins)
 	current_car = str(data.get("current_car", "kaizen"))
 	if not Catalog.CARS.has(current_car):
 		current_car = "kaizen"
@@ -489,6 +506,7 @@ func reset_progress() -> void:
 	best_times = {}
 	car_configs = {}
 	won_events = []
+	kept_cars = []
 	save_game()
 
 

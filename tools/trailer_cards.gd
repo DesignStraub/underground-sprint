@@ -16,7 +16,7 @@ const SPRUECHE := {
 	"drift": ["DRIFT-WERTUNG", "Ketten bis x5 · jede Bande kostet"],
 	"bahn": ["SPRING ÜBER DIE GLEISE", "Bevor die Schranke unten ist"],
 	"staedte": ["ECHTE STÄDTE. ECHTE STRASSEN.", "Kartendaten © OpenStreetMap-Mitwirkende"],
-	"tuning": ["TUNE DEIN AUTO", "9 Autos · 8 Tuning-Kategorien · Siege schalten frei"],
+	"tuning": ["TUNE DEIN AUTO", "15 Autos · 8 Tuning-Kategorien · Siege schalten frei"],
 }
 const ORTE := {
 	"aachen": ["Aachen", "Städteregion Aachen"],

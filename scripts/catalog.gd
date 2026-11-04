@@ -4,82 +4,138 @@ extends RefCounted
 ## Teile: "wins" = so viele Siege insgesamt (Rennen + Drift).
 ## "drift" (0..1): wie willig das Auto quer geht und im Drift bleibt.
 
+## Leistung: Jedes Auto, das du freischaltest, ist ein Stück stärker (Klasse D bis A). Die letzten fünf (Klasse S) haben
+## die gleiche Grundleistung (Leistungsindex ~456) und unterscheiden sich nur im Charakter: Grip, Antritt, Endtempo,
+## Lenkung, Drift. "class" steht in der Garage, rating() rechnet den Index aus.
 const CARS := {
 	"kaizen": {
-		"name": "Kaizen Rally S", "style": "hatch", "unlock": {}, "drift": 0.35, "paint": Color(0.92, 0.92, 0.89),
+		"name": "Kaizen Rally S", "style": "hatch", "class": "D", "unlock": {}, "drift": 0.35, "paint": Color(0.92, 0.92, 0.89),
 		"length": 4.05, "width": 1.72,
 		"accel": 9.5, "top_speed": 58.0, "grip": 26.0, "steer": 2.3,
 		"desc": "JDM-Fließheck mit Hochdrehzahl-Motor. Leicht, wendig, verzeiht viel.",
 		# Hochdrehender Sauger-Vierzylinder
 		"sound": {"cyl": 4, "harm": [1.0, 0.45, 0.2, 0.08], "sub": 0.3, "turbo": 0.0, "rough": 0.2},
 	},
-	"mirai": {
-		"name": "Mirai 240R", "style": "coupe", "unlock": {"race": 2, "drift": 1}, "drift": 0.65,
-		"length": 4.35, "width": 1.82,
-		"accel": 11.0, "top_speed": 66.0, "grip": 22.0, "steer": 2.2,
-		"desc": "Heckantrieb-Coupé. Liebt Drifts.",
-		# Bollernder Turbo-Vierzylinder
-		"sound": {"cyl": 4, "harm": [1.0, 0.6, 0.3, 0.1], "sub": 0.55, "turbo": 0.7, "rough": 0.35},
-	},
-	"vortex": {
-		"name": "Vortex GT-R", "style": "sedan", "unlock": {"race": 5}, "drift": 0.3,
-		"length": 4.6, "width": 1.8,
-		"accel": 12.5, "top_speed": 74.0, "grip": 28.0, "steer": 2.05,
-		"desc": "Turbo-Limousine. Brutal auf der Geraden.",
-		# Seidiger Reihensechser mit großem Turbo
-		"sound": {"cyl": 6, "harm": [1.0, 0.5, 0.3, 0.15], "sub": 0.12, "turbo": 1.0, "rough": 0.12},
-	},
-	"sakura": {
-		"name": "Sakura D2", "style": "hatch", "unlock": {"drift": 1}, "drift": 0.9,
-		"length": 4.3, "width": 1.72,
-		"accel": 10.2, "top_speed": 60.0, "grip": 21.0, "steer": 2.5,
-		"desc": "Leichter Hecktriebler. Gebaut zum Querfahren.",
-		# Kurzhubiger Turbo-Vierzylinder
-		"sound": {"cyl": 4, "harm": [1.0, 0.55, 0.28, 0.12], "sub": 0.4, "turbo": 0.5, "rough": 0.28},
-	},
-	"ronin": {
-		"name": "Ronin DR", "style": "coupe", "unlock": {"drift": 3}, "drift": 1.0,
-		"length": 4.3, "width": 1.78,
-		"accel": 12.2, "top_speed": 69.0, "grip": 20.0, "steer": 2.45,
-		"desc": "Drift-Monster mit V8-Swap. Steht quer, wann immer du willst.",
-		# Tiefer, grollender V8
-		"sound": {"cyl": 8, "harm": [1.0, 0.7, 0.35, 0.15], "sub": 0.6, "turbo": 0.0, "rough": 0.4},
-	},
 	"hachi": {
-		"name": "Hachi Touge", "style": "hatch", "unlock": {"race": 1, "drift": 1}, "drift": 0.85,
+		"name": "Hachi Touge", "style": "hatch", "class": "D", "unlock": {"race": 1, "drift": 1}, "drift": 0.85,
 		"length": 4.2, "width": 1.66,
-		"accel": 9.0, "top_speed": 56.0, "grip": 22.0, "steer": 2.6,
+		"accel": 10.1, "top_speed": 58.0, "grip": 24.0, "steer": 2.6,
 		"desc": "Leichtes 80er-Fließheck mit Heckantrieb. Wenig Leistung, viel Gefühl.",
 		# Kleiner, drehfreudiger Sauger-Vierzylinder
 		"sound": {"cyl": 4, "harm": [1.0, 0.5, 0.26, 0.12], "sub": 0.22, "turbo": 0.0, "rough": 0.3},
 	},
+	"sakura": {
+		"name": "Sakura D2", "style": "coupe", "class": "C", "unlock": {"race": 2, "drift": 1}, "drift": 0.9,
+		"length": 4.3, "width": 1.72,
+		"accel": 10.5, "top_speed": 60.5, "grip": 23.0, "steer": 2.5,
+		"desc": "Leichter Hecktriebler. Gebaut zum Querfahren.",
+		# Kurzhubiger Turbo-Vierzylinder
+		"sound": {"cyl": 4, "harm": [1.0, 0.55, 0.28, 0.12], "sub": 0.4, "turbo": 0.5, "rough": 0.28},
+	},
+	"hayate": {
+		"name": "Hayate R8", "style": "coupe", "class": "C", "unlock": {"race": 3}, "drift": 0.3, "paint": Color(0.72, 0.04, 0.05),
+		"length": 4.38, "width": 1.7,
+		"accel": 10.2, "top_speed": 61.5, "grip": 28.0, "steer": 2.45,
+		"desc": "Leichtes Coupé, dreht bis 8.000/min. Klebt in Kurven, driftet ungern.",
+		# Schreiender Sauger-Vierzylinder mit Nockenwellen-Umschaltung
+		"sound": {"cyl": 4, "harm": [1.0, 0.36, 0.34, 0.22], "sub": 0.1, "turbo": 0.0, "rough": 0.1},
+	},
+	"kitsune": {
+		"name": "Kitsune 18S", "style": "hatch", "class": "C", "unlock": {"race": 4, "drift": 1}, "drift": 0.85, "paint": Color(0.95, 0.42, 0.06),
+		"length": 4.54, "width": 1.69,
+		"accel": 11.2, "top_speed": 62.0, "grip": 23.0, "steer": 2.45,
+		"desc": "Fließheck mit Klappscheinwerfern, Turbo und Heckantrieb. Liebling der Drift-Szene.",
+		# Turbo-Vierzylinder mit Abblasventil
+		"sound": {"cyl": 4, "harm": [1.0, 0.58, 0.3, 0.12], "sub": 0.45, "turbo": 0.8, "rough": 0.3},
+	},
 	"tsubame": {
-		"name": "Tsubame Spyder", "style": "roadster", "unlock": {"race": 3}, "drift": 0.6,
+		"name": "Tsubame Spyder", "style": "roadster", "class": "B", "unlock": {"race": 5}, "drift": 0.6,
 		"length": 4.1, "width": 1.75,
-		"accel": 10.6, "top_speed": 62.0, "grip": 25.0, "steer": 2.55,
+		"accel": 11.0, "top_speed": 64.0, "grip": 27.0, "steer": 2.55,
 		"desc": "Offener Zweisitzer mit langer Haube. Flink und präzise.",
 		# Kreischender Hochdrehzahl-Sauger
 		"sound": {"cyl": 4, "harm": [1.0, 0.38, 0.3, 0.16], "sub": 0.12, "turbo": 0.0, "rough": 0.12},
 	},
+	"mirai": {
+		"name": "Mirai 240R", "style": "coupe", "class": "B", "unlock": {"race": 6, "drift": 2}, "drift": 0.65,
+		"length": 4.35, "width": 1.82,
+		"accel": 11.4, "top_speed": 66.0, "grip": 23.5, "steer": 2.25,
+		"desc": "Heckantrieb-Coupé. Liebt Drifts.",
+		# Bollernder Turbo-Vierzylinder
+		"sound": {"cyl": 4, "harm": [1.0, 0.6, 0.3, 0.1], "sub": 0.55, "turbo": 0.7, "rough": 0.35},
+	},
+	"tenshi": {
+		"name": "Tenshi MR-T", "style": "coupe", "class": "B", "unlock": {"race": 7}, "drift": 0.5, "paint": Color(0.92, 0.7, 0.06),
+		"length": 4.17, "width": 1.7,
+		"accel": 11.8, "top_speed": 65.0, "grip": 27.5, "steer": 2.6,
+		"desc": "Mittelmotor mit Turbo. Lenkt messerscharf ein, will aber sauber gefahren werden.",
+		# Turbo-Vierzylinder direkt hinter dir
+		"sound": {"cyl": 4, "harm": [1.0, 0.5, 0.32, 0.14], "sub": 0.35, "turbo": 0.85, "rough": 0.25},
+	},
+	"kumo": {
+		"name": "Kumo JX6", "style": "sedan", "class": "A", "unlock": {"race": 8, "drift": 2}, "drift": 0.85, "paint": Color(0.3, 0.32, 0.36),
+		"length": 4.72, "width": 1.75,
+		"accel": 12.4, "top_speed": 68.0, "grip": 23.5, "steer": 2.3,
+		"desc": "Viertürer mit Turbo-Reihensechser und Heckantrieb. Unauffällig, bis er quer steht.",
+		# Seidiger Turbo-Reihensechser
+		"sound": {"cyl": 6, "harm": [1.0, 0.52, 0.3, 0.14], "sub": 0.18, "turbo": 0.9, "rough": 0.14},
+	},
 	"raijin": {
-		"name": "Raijin RS-4", "style": "sedan", "unlock": {"race": 7}, "drift": 0.25,
+		"name": "Raijin RS-4", "style": "sedan", "class": "A", "unlock": {"race": 9}, "drift": 0.25,
 		"length": 4.45, "width": 1.8,
-		"accel": 12.6, "top_speed": 70.0, "grip": 29.0, "steer": 2.15,
+		"accel": 12.6, "top_speed": 67.0, "grip": 29.5, "steer": 2.2,
 		"desc": "Rallye-Limousine mit Allrad-Gefühl. Klebt auf der Straße.",
 		# Rauer Turbo-Vierzylinder mit Ladedruck-Zischen
 		"sound": {"cyl": 4, "harm": [1.0, 0.65, 0.4, 0.2], "sub": 0.6, "turbo": 0.9, "rough": 0.5},
 	},
+	"vortex": {
+		"name": "Vortex GT-R", "style": "sedan", "class": "S", "unlock": {"race": 10}, "drift": 0.3,
+		"length": 4.6, "width": 1.8,
+		"accel": 12.9, "top_speed": 72.5, "grip": 29.5, "steer": 2.05,
+		"desc": "Schwere Turbo-Limousine. Liegt satt, viel Grip, zieht aus jeder Kurve.",
+		# Seidiger Reihensechser mit großem Turbo
+		"sound": {"cyl": 6, "harm": [1.0, 0.5, 0.3, 0.15], "sub": 0.12, "turbo": 1.0, "rough": 0.12},
+	},
+	"ronin": {
+		"name": "Ronin DR", "style": "coupe", "class": "S", "unlock": {"race": 11, "drift": 3}, "drift": 1.0,
+		"length": 4.3, "width": 1.78,
+		"accel": 13.6, "top_speed": 72.0, "grip": 25.0, "steer": 2.5,
+		"desc": "Drift-Monster mit V8-Swap. Steht quer, wann immer du willst.",
+		# Tiefer, grollender V8
+		"sound": {"cyl": 8, "harm": [1.0, 0.7, 0.35, 0.15], "sub": 0.6, "turbo": 0.0, "rough": 0.4},
+	},
+	"shiden": {
+		"name": "Shiden NX-1", "style": "coupe", "class": "S", "unlock": {"race": 12}, "drift": 0.45, "paint": Color(0.36, 0.1, 0.56),
+		"length": 4.43, "width": 1.81,
+		"accel": 13.2, "top_speed": 71.0, "grip": 31.0, "steer": 2.65,
+		"desc": "Flacher Mittelmotor-Sportwagen. Die präziseste Lenkung und der meiste Grip im Spiel.",
+		# Kreischender V6-Sauger
+		"sound": {"cyl": 6, "harm": [1.0, 0.42, 0.36, 0.2], "sub": 0.12, "turbo": 0.0, "rough": 0.1},
+	},
+	"ryujin": {
+		"name": "Ryujin 30Z", "style": "coupe", "class": "S", "unlock": {"race": 13}, "drift": 0.4, "paint": Color(0.04, 0.3, 0.3),
+		"length": 4.52, "width": 1.8,
+		"accel": 13.2, "top_speed": 73.0, "grip": 25.5, "steer": 2.05,
+		"desc": "Breites Biturbo-Coupé. Schiebt brutal an und bleibt bei Höchsttempo ruhig.",
+		# V6 mit zwei Turbos
+		"sound": {"cyl": 6, "harm": [1.0, 0.62, 0.38, 0.16], "sub": 0.35, "turbo": 1.0, "rough": 0.22},
+	},
 	"kaze": {
-		"name": "Kaze TT", "style": "coupe", "unlock": {"race": 9, "drift": 4}, "drift": 0.55,
+		"name": "Kaze TT", "style": "coupe", "class": "S", "unlock": {"race": 14, "drift": 4}, "drift": 0.55,
 		"length": 4.5, "width": 1.81,
-		"accel": 12.8, "top_speed": 76.0, "grip": 25.0, "steer": 2.1,
+		"accel": 12.4, "top_speed": 75.5, "grip": 26.0, "steer": 2.15,
 		"desc": "Langes Biturbo-Coupé mit Bügelflügel. Das schnellste Auto der Stadt.",
 		# Reihensechser mit zwei Turbos
 		"sound": {"cyl": 6, "harm": [1.0, 0.55, 0.32, 0.14], "sub": 0.2, "turbo": 1.0, "rough": 0.15},
 	},
 }
 
-const CAR_ORDER := ["kaizen", "hachi", "mirai", "sakura", "tsubame", "vortex", "raijin", "ronin", "kaze"]
+## Reihenfolge in der Garage = Reihenfolge des Freischaltens
+const CAR_ORDER := ["kaizen", "hachi", "sakura", "hayate", "kitsune", "tsubame", "mirai", "tenshi", "kumo", "raijin",
+	"vortex", "ronin", "shiden", "ryujin", "kaze"]
+## Bis Version 2.10 galten andere Schwellen: wer damit schon ein Auto freigeschaltet hatte, behält es
+const LEGACY_UNLOCK := {"hachi": {"race": 1, "drift": 1}, "mirai": {"race": 2, "drift": 1}, "sakura": {"drift": 1},
+	"tsubame": {"race": 3}, "vortex": {"race": 5}, "raijin": {"race": 7}, "ronin": {"drift": 3}, "kaze": {"race": 9, "drift": 4}}
 
 ## Jede Kategorie: Liste von Optionen {name, wins, ...}.
 const PARTS := {
@@ -221,6 +277,13 @@ static func stats(car_id: String, cfg: Dictionary) -> Dictionary:
 		"steer": spec["steer"] + sus["steer"],
 		"drift": clampf(spec.get("drift", 0.3) + tir["drift"], 0.0, 1.0),
 	}
+
+## Leistungsindex (wie in NFS): Endtempo, Beschleunigung und Kurvengrip zu einer Zahl, mit Tuning. Kaizen ab Werk
+## ~243, Klasse S ab Werk ~456, voll getunt ~770. Lenkung und Drift sind Charakter und zählen nicht mit.
+static func rating(car_id: String, cfg: Dictionary) -> int:
+	var st := stats(car_id, cfg)
+	var corner := sqrt(14.0 + st["grip"] * 0.42)  # Kurventempo wächst mit der Wurzel der Querbeschleunigung
+	return roundi((st["top"] * 5.0 + st["accel"] * 16.0 + corner * 42.0 - 500.0) * 1.6)
 
 ## Events: werden aus dem Seed prozedural erzeugt. Alle sind von Anfang an fahrbar.
 ## type: "sprint" (A nach B), "circuit" (Rundkurs, laps Runden), "drift" (Rundkurs allein, Punkte fürs Querfahren),

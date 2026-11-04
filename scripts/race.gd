@@ -115,7 +115,7 @@ func _ready() -> void:
 	var tier: int = race.get("tier", 1)
 	var diff: int = GameState.difficulty
 	var difficulty: float = [0.0, 0.84, 0.88, 0.92][tier] + [-0.11, 0.0, 0.05][diff] + minf(GameState.total_wins(), 10) * 0.004
-	var pool: Array = Catalog.CAR_ORDER.filter(func(id): return Catalog.CARS[id]["top_speed"] <= [0.0, 62.0, 70.0, 99.0][mini(tier + (1 if diff == 2 else 0), 3)])
+	var pool: Array = Catalog.CAR_ORDER.filter(func(id): return Catalog.CARS[id]["top_speed"] <= [0.0, 61.0, 70.0, 99.0][mini(tier + (1 if diff == 2 else 0), 3)])
 	if event_type == "drift":
 		# Drift: allein, Zielpunkte je nach Stufe, Schwierigkeit und Zahl der Kurven
 		var k: float = [1.0, 1.0, 1.35, 1.7][tier] * [0.65, 0.85, 1.0][diff] * track["laps"] * race.get("corners", 12) / 24.0

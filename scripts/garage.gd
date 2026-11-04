@@ -304,7 +304,12 @@ func _show_stats(car_id: String, cfg: Dictionary, base := {}) -> void:
 	var head := _label(stats, 10, HORIZONTAL_ALIGNMENT_RIGHT)
 	head.label_settings.font = UI.font("cond", 0.2)
 	head.label_settings.font_color = UI.GREEN
-	head.text = tr("LEISTUNG")
+	# Klasse und Leistungsindex: zeigt, dass die Autos der Klasse S gleich stark sind; Tuning-Vorschau mit Zuwachs
+	var pi := Catalog.rating(car_id, cfg)
+	var pi0 := Catalog.rating(car_id, base if not base.is_empty() else cfg)
+	head.text = tr("KLASSE %s  ·  LEISTUNG %d") % [Catalog.CARS[car_id].get("class", "-"), pi]
+	if pi != pi0:
+		head.text += "  (%+d)" % (pi - pi0)
 	for row in [["BESCHLEUNIGUNG", "accel", 9.0, 17.0], ["TOPSPEED", "top", 54.0, 90.0], ["GRIP", "grip", 19.0, 38.0],
 			["DRIFT", "drift", 0.0, 1.0]]:
 		var hb := HBoxContainer.new()
@@ -355,6 +360,9 @@ func _view_for(cat: String) -> Array:
 	var L: float = spec["length"]
 	var W: float = spec["width"]
 	var fz := -(L / 2.0 - 0.78)
+	# Mittelmotor: Motor hinten, Kofferraum (Nitro) vorn
+	if Builder.SHAPES.get(preview_car, {}).get("mid", false) and cat in ["engine", "turbo", "nitro"]:
+		cat = "nitro" if cat != "nitro" else "engine"
 	match cat:
 		"paint":
 			return [Vector3(3.4, 1.35, -3.4), Vector3(0.2, 0.55, 0.0)]

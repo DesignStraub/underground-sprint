@@ -53,8 +53,12 @@ links und rechts jubelt Publikum auf den Gehwegen, zwischen den Autos steht die 
 bei GO runter. Im Ziel bleibt das Auto stehen, die Kamera kreist, Fans laufen auf die Straße und tanzen (nach einem
 Sieg) oder klatschen. Sonst steht niemand an der Strecke.
 
-**Freischalten:** Rennsiege (Sprint + Rundkurs) und Driftsiege werden getrennt gezählt. Driftautos (Sakura D2,
-Ronin DR) gibt es für Driftsiege, schnelle Autos für Rennsiege, Teile für Siege insgesamt.
+**Freischalten:** Rennsiege (Sprint + Rundkurs) und Driftsiege werden getrennt gezählt. Mit jedem Rennsieg bis zum
+14. kommt ein Auto dazu, jedes ein Stück stärker (Klasse D, C, B, A). Driftautos (Hachi, Sakura, Kitsune, Mirai,
+Kumo, Ronin) gibt es auch für Driftsiege, Teile für Siege insgesamt. Die letzten fünf (Klasse S: Vortex GT-R,
+Ronin DR, Shiden NX-1, Ryujin 30Z, Kaze TT) sind gleich stark (Leistungsindex ~456) und unterscheiden sich nur im
+Charakter: Grip, Antritt, Lenkung, Drift oder Endtempo. Die Garage zeigt Klasse und Leistungsindex (mit Tuning bis
+~770). Wer mit den alten Schwellen (bis 2.10) schon ein Auto hatte, behält es.
 
 ## Städte (echte Orte)
 Die Strecken folgen echten Straßen, die Wahrzeichen stehen an ihrem Platz, die Häuser hinter der Straßenfront
@@ -251,7 +255,7 @@ dann steht „Benutzerdefiniert“ da. Werte in `GameState.GFX`.
 - Verkehr nach Schwierigkeit: 1 Stern ohne, 2 Sterne wenig, 3 Sterne voller Verkehr.
 - **Tempo-Stufe:** am Anfang fahren alle (auch Gegner) mit 72 % Höchsttempo, mit jedem Sieg mehr, ab 20 Siegen volles Tempo.
 - **Gegner-Stärke** wie in NFSU mit dem Spiel wachsend: Gegner fahren Autos passend zur Stufe des Events (1 Stern:
-  Kaizen, Hachi, Sakura, Tsubame; 2 Sterne bis Raijin; 3 Sterne alle), mit 84 / 88 / 92 % Können je Stufe, dazu
+  Kaizen, Hachi, Sakura; 2 Sterne bis Klasse A; 3 Sterne alle), mit 84 / 88 / 92 % Können je Stufe, dazu
   0,4 % je Sieg (bis 10 Siege). Schwierigkeit **Leicht** −11 % (zum Kennenlernen der Strecken), **Schwer** +5 % und
   Autos eine Stufe höher. Gummiband: liegst du weit vorn, holen sie auf Leicht gar nicht, auf Normal höchstens 7 %,
   auf Schwer 15 % auf; liegst du weit hinten, fahren sie mit 82 / 88 / 90 % (Leicht / Normal / Schwer).
@@ -265,13 +269,18 @@ dann steht „Benutzerdefiniert“ da. Werte in `GameState.GFX`.
   Handbremse dreht bei 80 km/h in 0,8 s um gut 90°. Bremsen ~2,4 g, Gegenlenken geht schneller als Einlenken.
   Karosserie wankt nach der echten Querbeschleunigung, taucht beim Bremsen ein; die Verfolgerkamera dreht leicht
   verzögert mit und bleibt nah am Auto (im Stand 4,7 m, bei Tempo knapp 7 m, Blickwinkel 58°–80°). Messwerte aller Autos: `tools/handling_lab.tscn`.
-- **Autos** (9) sind aus Querschnitten gebaut (Radhäuser, Kotflügel-Buckel, Hüften, eingezogenes Glashaus), lose
-  angelehnt an RX-7, 350Z, Civic EG, Silvia, Skyline, AE86, S2000/MX-5, Lancer Evo/Impreza und Supra. Der Startwagen
+- **Autos** (15) sind aus Querschnitten gebaut (Radhäuser, Kotflügel-Buckel, Hüften, eingezogenes Glashaus), lose
+  angelehnt an RX-7, 350Z, Civic EG, Silvia, Skyline, AE86, S2000/MX-5, Lancer Evo/Impreza, Supra, Integra (vier runde
+  Scheinwerfer, Flügel auf der Klappe), 180SX (Klappscheinwerfer, Fließheck), MR2 und NSX (Mittelmotor: Kabine vorn,
+  Lufteinlässe in den Flanken, Motor in der Garage hinten), Chaser (Viertürer mit Chrom) und 300ZX (Glasdach mit
+  Mittelsteg, Leuchtenband über die ganze Breite). Der Startwagen
   Kaizen ist ein JDM-Fließheck: langes Dach, steile Heckscheibe, schmale Scheinwerfer, durchgehendes Leuchtenband,
   Dachspoiler, Sonnenstreifen mit Schriftzug, rotes Emblem und Abschlepphaken, unten schwarz abgesetzt, ab Werk tiefer
   und in Championship-Weiß (Lack-Stufe „Werkslack“ ist je Auto eigen, `CARS.paint`). Front- und
-  Heckschürze sind eigene Teile, Scheinwerfer und Rückleuchten sitzen in der Haut, Türfugen, Spiegel, Griffe,
-  Kennzeichen. Unterbodenneon ist ein Lichtteppich auf der Straße.
+  Heckschürze sind eigene Teile. Leuchten sind je ein Stück (`_lamp`): ein Feld auf der Stirnfläche und ein Streifen,
+  der der Flanke auf gleicher Höhe um die Ecke folgt, so sitzen Rücklicht-Ecke und Band nie versetzt (vorher wirkte das
+  wie ein Auto im Auto). Türfugen, Spiegel, Griffe, Kennzeichen; Anbauteile der Schürzen werden mit der Karosserie
+  verschmolzen (~15 Draw Calls weniger je Auto) und sind auch in der Fernansicht zu sehen. Unterbodenneon ist ein Lichtteppich auf der Straße.
 - **Straße wie in Underground** (`shaders/road.gdshader`): dunkler, körniger Asphalt mit Splitt, Flecken, Rissen und
   Teerfugen aus einer nahtlosen Detail-Textur samt Normal-Map (8 x 8 m, eine zweite, gedrehte Lage gegen sichtbare
   Kachelung). Immer etwas feucht glänzend, bei Regen deutlich; das Relief bricht trocken die Lichtreflexe in Körnung
