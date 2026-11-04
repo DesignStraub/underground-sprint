@@ -32,6 +32,20 @@ static func font(kind := "cond", slant := 0.2) -> Font:
 	return fv
 
 
+## Zahlen ohne Textformung Zeichen für Zeichen zeichnen (für Anzeigen, die sich jedes Bild ändern: Zeit, Tempo).
+## Rechtsbündig bis right_x, gibt die linke Kante zurück.
+static func digits_right(ci: CanvasItem, f: Font, right_x: float, base_y: float, text: String, size: int, col: Color) -> float:
+	var w := 0.0
+	for ch in text:
+		w += f.get_char_size(ch.unicode_at(0), size).x
+	var x := right_x - w
+	var left := x
+	var rid := ci.get_canvas_item()
+	for ch in text:
+		x += f.draw_char(rid, Vector2(x, base_y), ch.unicode_at(0), size, col)
+	return left
+
+
 static func _box(bg: Color, border := Color(0, 0, 0, 0), left := 0, glow := Color(0, 0, 0, 0)) -> StyleBoxFlat:
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = bg

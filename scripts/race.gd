@@ -8,6 +8,9 @@ const PlayerCar := preload("res://scripts/player_car.gd")
 const AICar := preload("res://scripts/ai_car.gd")
 const SPEED_FX := preload("res://shaders/speed_fx.gdshader")
 const TACHO := preload("res://scripts/tacho.gd")
+const MINIMAP := preload("res://scripts/minimap.gd")
+const HUD_INFO := preload("res://scripts/hud_info.gd")
+const Builder := preload("res://scripts/car_builder.gd")
 const PixelView := preload("res://scripts/pixel_view.gd")
 const Traffic := preload("res://scripts/traffic_car.gd")
 const SKY_SHADER := preload("res://shaders/night_sky.gdshader")
@@ -50,6 +53,7 @@ var _last_path := 0
 var _last_landings := 0
 var _last_rollovers := 0
 var _flash_t := 0.0
+var _music_t := 0.0
 var pause_panel: Control
 var env: Environment
 var moon: DirectionalLight3D
@@ -140,6 +144,7 @@ func _ready() -> void:
 		# sie noch nicht, danach nehmen sie sie auf Leicht selten
 		ai.shortcut_k = 0.0 if tier <= 1 else [0.3, 0.8, 1.0][diff]
 		ai.accel *= 0.8 + 0.2 * GameState.pace()
+		ai.set_meta("hud_col", _hud_col(Builder.paint_color(id, cfg)))
 		ais.append(ai)
 
 	for ai in ais:
@@ -491,18 +496,23 @@ func _label(parent: Node, size: int, align := HORIZONTAL_ALIGNMENT_LEFT) -> Labe
 	return l
 
 
-func _bar(parent: Node, pos: Vector2, size: Vector2, col: Color) -> ColorRect:
-	var bg := ColorRect.new()
-	bg.color = Color(0, 0, 0, 0.55)
-	bg.position = pos
-	bg.size = size
-	parent.add_child(bg)
-	var fg := ColorRect.new()
-	fg.color = col
-	fg.position = Vector2(1, 1)
-	fg.size = size - Vector2(2, 2)
-	bg.add_child(fg)
-	return fg
+## Drehzahlmesser rechts: unten (Tastatur) oder oben (Handy, unten liegen die Knöpfe), skaliert um k
+func _place_tacho(tacho: Control, k: float, top: bool) -> void:
+	tacho.scale = Vector2(k, k)
+	tacho.anchor_left = 1.0
+	tacho.anchor_right = 1.0
+	tacho.anchor_top = 0.0 if top else 1.0
+	tacho.anchor_bottom = tacho.anchor_top
+	var s: float = TACHO.SIZE
+	tacho.offset_left = -s * k - 4.0
+	tacho.offset_right = tacho.offset_left + s
+	tacho.offset_top = 4.0 if top else -s * k - 2.0
+	tacho.offset_bottom = tacho.offset_top + s
+
+
+## Lackfarbe für Radar und Fortschritt: dunkle Lacke (Schwarz, Candyblau) aufgehellt, damit man sie sieht
+static func _hud_col(c: Color) -> Color:
+	return Color.from_hsv(c.h, minf(c.s, 0.85), maxf(c.v, 0.8))
 
 
 func _build_hud() -> void:
@@ -535,15 +545,38 @@ func _build_hud() -> void:
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	layer.add_child(root)
 
-	hud["pos"] = _label(root, 26)
-	hud["pos"].position = Vector2(12, 6)
-	hud["time"] = _label(root, 14)
-	hud["time"].position = Vector2(12, 40)
-	hud["race"] = _label(root, 10)
-	hud["race"].position = Vector2(12, 58)
-	hud["race"].text = tr(race["name"]).to_upper()
-	hud["music"] = _label(root, 10)
-	hud["music"].position = Vector2(12, 342)
+	# Platz, Zeit, Runde oben links, Fortschritt mit allen Fahrern oben mittig
+	var info := HUD_INFO.new()
+	info.drift = event_type == "drift"
+	info.racers = ais.size() + 1
+	info.laps = track["laps"]
+	info.bar_laps = track["laps"] if track["loop"] else 1
+	info.title = tr(race["name"]).to_upper()
+	info.show_bar = event_type != "drag"
+	root.add_child(info)
+	hud["info"] = info
+	# Radar unten links (im Drag nicht, da geht es nur geradeaus)
+	if event_type != "drag":
+		var mm := MINIMAP.new()
+		root.add_child(mm)
+		mm.setup(track, player, ais)
+		mm.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+		mm.offset_left = 8.0
+		mm.offset_right = 8.0 + MINIMAP.SIZE
+		mm.offset_top = -MINIMAP.SIZE - 8.0
+		mm.offset_bottom = -8.0
+		hud["map"] = mm
+	# Musiktitel unten mittig, blendet nach ein paar Sekunden aus
+	hud["music"] = _label(root, 10, HORIZONTAL_ALIGNMENT_CENTER)
+	hud["music"].label_settings.font = UI.font("cond", 0.2)
+	hud["music"].anchor_left = 0.5
+	hud["music"].anchor_right = 0.5
+	hud["music"].anchor_top = 1.0
+	hud["music"].anchor_bottom = 1.0
+	hud["music"].offset_left = -160
+	hud["music"].offset_right = 160
+	hud["music"].offset_top = -17
+	hud["music"].offset_bottom = -3
 	hud["help"] = _label(root, 9, HORIZONTAL_ALIGNMENT_RIGHT)
 	hud["help"].set_anchors_preset(Control.PRESET_TOP_RIGHT)
 	hud["help"].position = Vector2(-250, 6)
@@ -556,20 +589,12 @@ func _build_hud() -> void:
 	# Drehzahlmesser unten rechts
 	var tacho := Control.new()
 	tacho.set_script(TACHO)
-	tacho.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-	tacho.position = Vector2(-158, -168)
-	tacho.size = Vector2(150, 150)
 	tacho.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(tacho)
 	hud["tacho"] = tacho
-	if event_type == "drag":
-		# Drag: größerer Drehzahlmesser unten rechts mit grünem Schaltbereich und Temperatur
-		tacho.drag = true
-		tacho.scale = Vector2(1.2, 1.2)
-		tacho.offset_left = -186.0
-		tacho.offset_right = -36.0
-		tacho.offset_top = -186.0
-		tacho.offset_bottom = -36.0
+	tacho.drag = event_type == "drag"
+	# Drag: größer, mit grünem Schaltbereich und Temperatur
+	_place_tacho(tacho, 1.1 if event_type == "drag" else 1.0, false)
 
 	if GameState.touch_ui():
 		# Handy/Tablet: Knöpfe links und rechts unten, Drehzahlmesser klein oben rechts (unten wäre das Auto
@@ -578,20 +603,19 @@ func _build_hud() -> void:
 		tc.drag = event_type == "drag"
 		add_child(tc)
 		hud["help"].visible = false
-		tacho.scale = Vector2(0.72, 0.72) * (1.15 if event_type == "drag" else 1.0)
-		tacho.anchor_left = 1.0
-		tacho.anchor_right = 1.0
-		tacho.anchor_top = 0.0
-		tacho.anchor_bottom = 0.0
-		tacho.offset_left = -150.0 * tacho.scale.x - 8.0
-		tacho.offset_right = tacho.offset_left + 150.0
-		tacho.offset_top = 6.0
-		tacho.offset_bottom = 156.0
-
-	# Fortschritt oben mittig
-	hud["progress"] = _bar(root, Vector2(220, 10), Vector2(200, 6), Color(0.9, 0.9, 1.0))
+		_place_tacho(tacho, 0.64 * (1.15 if event_type == "drag" else 1.0), true)
+		# Radar links unter der Platzanzeige (unten links liegen die Lenkknöpfe)
+		if hud.has("map"):
+			var mm: Control = hud["map"]
+			mm.scale = Vector2(0.8, 0.8)
+			mm.set_anchors_preset(Control.PRESET_TOP_LEFT)
+			mm.offset_left = 10.0
+			mm.offset_top = 112.0
+			mm.offset_right = mm.offset_left + MINIMAP.SIZE
+			mm.offset_bottom = mm.offset_top + MINIMAP.SIZE
 
 	hud["center"] = _label(root, 64, HORIZONTAL_ALIGNMENT_CENTER)
+	hud["center"].label_settings.font = UI.font("wide", 0.2)
 	hud["center"].anchor_left = 0.5
 	hud["center"].anchor_right = 0.5
 	hud["center"].anchor_top = 0.5
@@ -602,9 +626,11 @@ func _build_hud() -> void:
 	hud["center"].offset_bottom = 0
 
 	hud["drift"] = _label(root, 14, HORIZONTAL_ALIGNMENT_CENTER)
+	hud["drift"].label_settings.font = UI.font("cond", 0.2)
 	hud["drift"].position = Vector2(220, 300)
 	hud["drift"].size = Vector2(200, 20)
 	hud["flash"] = _label(root, 22, HORIZONTAL_ALIGNMENT_CENTER)
+	hud["flash"].label_settings.font = UI.font("wide", 0.2)
 	hud["flash"].anchor_left = 0.5
 	hud["flash"].anchor_right = 0.5
 	hud["flash"].offset_left = -180
@@ -613,14 +639,21 @@ func _build_hud() -> void:
 	hud["flash"].offset_bottom = 74
 	# Ortsname (Viertel, Tunnel) oben mittig
 	hud["area"] = _label(root, 13, HORIZONTAL_ALIGNMENT_CENTER)
+	hud["area"].label_settings.font = UI.font("cond", 0.2)
 	hud["area"].anchor_left = 0.5
 	hud["area"].anchor_right = 0.5
 	hud["area"].offset_left = -160
 	hud["area"].offset_right = 160
-	hud["area"].offset_top = 20
-	hud["area"].offset_bottom = 38
+	hud["area"].offset_top = 24
+	hud["area"].offset_bottom = 42
 	hud["area"].label_settings.font_color = Color(0.85, 0.9, 1.0)
 	hud["area"].modulate.a = 0.0
+	if GameState.touch_ui():
+		# oben mittig liegt der Pausenknopf: Einblendungen darunter
+		hud["area"].offset_top = 62
+		hud["area"].offset_bottom = 80
+		hud["flash"].offset_top = 84
+		hud["flash"].offset_bottom = 114
 
 	_build_pause(root)
 
@@ -838,16 +871,23 @@ func _update_hud() -> void:
 	fx_mat.set_shader_parameter("blur", 1.0 if player.nitro_on else sf * 0.25)
 	fx_mat.set_shader_parameter("nitro", 1.0 if player.nitro_on else 0.0)
 
-	hud["pos"].text = "%d/4" % _place()
-	if event_type == "drift":
-		hud["pos"].text = "%d" % int(drift_score)
+	var info = hud["info"]
+	info.place = _place()
+	info.points = int(drift_score)
 	if track["loop"]:
-		var lap := clampi(player.lap + 1, 1, track["laps"])
-		hud["race"].text = tr("%s   RUNDE %d/%d") % [tr(race["name"]).to_upper(), lap, track["laps"]]
+		info.lap = clampi(player.lap + 1, 1, track["laps"])
 		if player.lap != _last_lap and player.lap > 0 and player.lap < track["laps"]:
 			_flash(tr("LETZTE RUNDE") if player.lap == track["laps"] - 1 else tr("RUNDE %d") % (player.lap + 1), Color(0.4, 1.0, 0.5))
 		_last_lap = player.lap
-	hud["time"].text = _fmt(race_time)
+	info.time_text = _fmt(race_time)
+	var span: float = track["finish"] - track["start"]
+	info.bar_player = (player_progress - track["start"]) / span
+	info.bar_cars.clear()
+	for ai in ais:
+		info.bar_cars.append([(ai.total - track["start"]) / span, ai.get_meta("hud_col")])
+	# Tastenhilfe nur am Anfang, Musiktitel nur kurz nach dem Wechsel
+	if state == State.RACING:
+		hud["help"].modulate.a = 0.7 * clampf((12.0 - race_time) / 1.5, 0.0, 1.0)
 	var tacho = hud["tacho"]
 	tacho.rpm = player.rpm
 	tacho.speed_kmh = int(absf(player.speed_fwd) * 3.6)
@@ -855,7 +895,6 @@ func _update_hud() -> void:
 	tacho.nitro = player.nitro
 	tacho.heat = player.engine_heat
 	tacho.nitro_on = player.nitro_on
-	hud["progress"].size.x = 198.0 * clampf((player_progress - track["start"]) / (track["finish"] - track["start"]), 0.0, 1.0)
 	hud["drift"].text = tr("DRIFT  +NITRO") if player.drifting else (tr("SPRUNG") if player.airborne and not player.tumbling else "")
 	if state == State.COUNTDOWN:
 		hud["drift"].text = tr("Gas kurz vor LOS = perfekter Start")
@@ -887,7 +926,12 @@ func _update_hud() -> void:
 	if _flash_t > 0.0:
 		_flash_t -= get_process_delta_time()
 		hud["flash"].modulate.a = clampf(_flash_t / 0.4, 0.0, 1.0)
-	hud["music"].text = (tr("Musik: ") + Music.current_title) if Music.current_title != "" else tr("Keine Musik: mp3/ogg in den Ordner music/ legen")
+	var mt: String = (tr("Musik: ") + Music.current_title) if Music.current_title != "" else tr("Keine Musik: mp3/ogg in den Ordner music/ legen")
+	if mt != hud["music"].text:
+		hud["music"].text = mt
+		_music_t = 6.0
+	_music_t = maxf(_music_t - get_process_delta_time(), 0.0)
+	hud["music"].modulate.a = clampf(_music_t / 0.8, 0.0, 1.0)
 
 
 func _unhandled_input(event: InputEvent) -> void:

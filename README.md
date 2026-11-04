@@ -179,6 +179,25 @@ Im Stil von NFS Underground (`scripts/ui_style.gd`): schräge Leisten, Neongrün
 DIN-Schmalschrift, große Abschnittstitel (GARAGE, RENNEN, TUNING, AUTOHAUS), Leistungsbalken des Autos (mit
 Motor-Tuning), Tastenleiste unten, wechselnde Tipps oben rechts. Pause und Ergebnis im gleichen Look.
 
+**Anzeigen im Rennen** im selben Stil:
+- **Oben links (`scripts/hud_info.gd`):** Platz groß und kursiv mit „/4“ (leuchtet bei Platzgewinn grün, bei
+  Verlust rot), darunter Zeit, Runde und Rennname auf schrägen Glasleisten; im Drift die Punkte.
+- **Oben mittig:** ein Fortschrittsbalken mit allen Fahrern: du als gelbes Dreieck, die Gegner als Punkte in ihrer
+  Lackfarbe, Rundenstriche und eine Zielflagge.
+- **Unten links (`scripts/minimap.gd`):** Radar-Minimap, die sich mit der Kamera dreht. Du bist der gelbe Pfeil, die
+  Gegner sind Punkte in Lackfarbe (außer Sicht kleiner am Rand). Abkürzungen sind orange, gesperrte Seitenstraßen
+  grau, Flüsse und Seen blau, das Ziel eine Schachbrettflagge (außer Sicht am Rand, zeigt so die Richtung), dazu
+  ein Nordzeiger. Je schneller du fährst, desto weiter zoomt sie heraus. Im Drag gibt es keine Minimap.
+- **Unten rechts (`scripts/tacho.gd`):** Drehzahlmesser mit LED-Bogen aus 40 Segmenten (Cyan, Weiß, Orange, roter
+  Bereich) mit Leuchtschein und spitzer Nadel. Der Gang steht neongrün in der Nabe, das Tempo groß in einem
+  schrägen Feld mit blassen führenden Nullen, Nitro als Segmentbogen. Am Begrenzer blinkt der Rand rot, mit
+  Nitro leuchtet er blau und das Instrument zittert. Im Drag kommen der grüne Schaltbereich, ein Schaltlicht und
+  eine Temperaturleiste dazu.
+- **Sonstiges:** Die Tastenhilfe blendet nach 12 s aus, der Musiktitel nach einem Wechsel nach 6 s.
+- **Leistung im Browser:** Alles Feste wird nur einmal gezeichnet; Nadel, Karte und Marken werden pro Bild nur
+  gedreht oder verschoben. Die Karte liegt in Weltkoordinaten, `shaders/minimap_clip.gdshader` schneidet sie am
+  Kreis ab. Zeit und Tempo werden Zeichen für Zeichen ohne Textformung gezeichnet.
+
 ## Tuning wie in NFS
 Garage → Tuning → **Optik** (Lack, Felgen, Spoiler, Bodykit, Folierung, Unterbodenneon, Scheiben) oder **Leistung**
 (Motor, Turbo, Nitro, Fahrwerk, Reifen) → Teil wählen: die Kamera fährt an das Teil (Felge, Heck, Unterboden …),
@@ -193,7 +212,8 @@ mit Motor Stufe 3.
 ## Handy und Tablet (Browser)
 Auf Handy und Tablet erscheinen Knöpfe, am Rechner nicht (Einstellungen → Touch-Steuerung: Auto/An/Aus; Auto erkennt
 das Gerät am Browser, auch iPads im Desktop-Modus): links Lenken (Daumen kann rüberrutschen), rechts Gas, Bremse, Handbremse, Nitro,
-im Drag Hoch-/Runterschalten statt Bremse; Pause oben in der Mitte, Drehzahlmesser klein oben rechts. Hochkant kommt
+im Drag Hoch-/Runterschalten statt Bremse; Pause oben in der Mitte, Drehzahlmesser klein oben rechts, Minimap links
+unter der Platzanzeige. Hochkant kommt
 ein Hinweis zum Drehen. Auf Handys werden in den Städten nur die Häuser nahe der Strecke gebaut, Grafik startet
 auf „Niedrig“ mit dynamischer Auflösung. Zum Testen am Rechner: `-- --touch`.
 
