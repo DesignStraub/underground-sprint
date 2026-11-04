@@ -2,7 +2,7 @@ extends CharacterBody3D
 ## Arcade-Fahrphysik mit Heckantrieb: Gänge mit Drehmomentkurve, Grip, der die Fahrtrichtung zur Fahrzeugachse zieht
 ## (ohne Tempo zu verschenken), mit Handbremse oder viel Gas in engen Kurven kommt das Heck; der Rutschzustand ist
 ## stufenlos (kein Umschalten zwischen Grip und Drift). Im Drift dreht das Auto um die Vorderachse (Heck schwenkt).
-## Wände wie in NFSU: man schrammt entlang und wird parallel gestellt, Verkehr bestraft deutlich härter.
+## Wände wie in NFSU: man schrammt entlang und dreht weich parallel zur Wand, Verkehr bestraft deutlich härter.
 ## Handbremse für Drifts, Nitro, Sprünge über Rampen (in der Luft keine Lenkung, Nitro schiebt weiter).
 ## Kamera: Verfolger (Standard), Stoßstange, Motorhaube – Taste C schaltet durch.
 ## Drag-Modus wie in NFSU: gelenkt wird automatisch, links/rechts wechselt die Spur, geschaltet wird von Hand
@@ -28,6 +28,7 @@ const TRIP_MIN_SPEED := 14.0
 const PIVOT := Vector3(0, 0.7, 0)  # Schwerpunkt: um ihn dreht sich das Auto in der Luft und beim Überschlag
 const MIN_RADIUS := 5.2  # kleinster Wendekreis (Radius) bei voll eingeschlagener Lenkung
 const BRAKE := 22.0  # m/s² Vollbremsung (gut 2 g: kräftig, aber nicht wie gegen eine Wand)
+const WALL_TURN_RATE := 4.0  # rad/s: so schnell dreht die Wand das Auto höchstens parallel (kein Sprung im Bild)
 const DRAG_LIMIT := 8000.0  # Begrenzer im Drag
 const PERFECT_SHIFT := Vector2(7100.0, 7650.0)  # grüner Bereich zum Hochschalten
 const GOOD_SHIFT := 6200.0
@@ -92,6 +93,8 @@ var _slip_hold := 0.0  # 0..1: wie sehr das Heck gerade gelöst ist (Handbremse 
 var _cam_drift := 0.0  # wie weit die Kamera im Drift in Fahrtrichtung schaut (geglättet)
 var _shake_t := 0.0
 var _wall_cool := 0.0
+var _wall_turn := 0.0  # Restdrehung parallel zur Wand (rad), wird über einige Bilder abgebaut
+var _wall_t := 10.0  # Zeit seit dem letzten Wandkontakt (kurz danach zählt Rutschen nicht als Drift)
 var debug_hits := false  # nur für Tests (--handling, --trace): merkt sich, woran das Auto angeeckt ist
 var last_hit := ""
 var _collider_name := ""
@@ -304,6 +307,14 @@ func _physics_process(dt: float) -> void:
 			thr = 0.0
 			want_nitro = false
 
+	# Wandkontakt: das Auto dreht über einige Bilder parallel zur Wand (Schrammen), statt auf einen Schlag
+	# umzuspringen. Ohne neuen Kontakt klingt die Restdrehung aus.
+	var walling := absf(_wall_turn) > 0.03
+	_wall_t += dt
+	if absf(_wall_turn) > 0.0005:
+		var turn := clampf(_wall_turn * (1.0 - exp(-dt * 10.0)), -WALL_TURN_RATE * dt, WALL_TURN_RATE * dt)
+		_rotate_front(turn, 0.0)
+		_wall_turn = (_wall_turn - turn) * exp(-dt * 1.5)
 	var fwd := -global_basis.z
 	fwd.y = 0
 	fwd = fwd.normalized()
@@ -460,6 +471,8 @@ func _physics_process(dt: float) -> void:
 				gk *= 0.4  # im Drift-Modus bricht das Heck leichter aus
 			if stun > 0.0:
 				gk *= 0.25
+			if walling:
+				gk *= 0.35  # an der Wand entlang schrammend: die Reifen ziehen das Auto nicht wieder hinein
 			var l_new := l2 * exp(-gk * dt)
 			# Betrag der Geschwindigkeit bleibt (nur das Rutschen radiert ab), die Richtung dreht zur Fahrzeugachse
 			var vs := sqrt(f2 * f2 + l2 * l2)
@@ -469,9 +482,10 @@ func _physics_process(dt: float) -> void:
 			f2 = minf(f_new, maxf(eff_top, speed_fwd))
 			l2 = l_new
 			var ang := rad_to_deg(atan2(absf(l2), maxf(absf(f2), 0.1)))
-			drifting = spd > 10.0 and ang > (6.0 if drifting else 10.0)  # Schwelle mit Puffer: kein Flackern
+			# Schwelle mit Puffer: kein Flackern; Schrammen an der Wand ist kein Drift (keine Punkte, kein Nitro)
+			drifting = spd > 10.0 and ang > (6.0 if drifting else 10.0) and _wall_t > 0.5
 			drift_angle = ang if drifting else 0.0
-			if drift_mode and spd > 10.0 and ang > 9.0 and f2 > 0.0:
+			if drift_mode and spd > 10.0 and ang > 9.0 and f2 > 0.0 and _wall_t > 0.5:
 				_sliding = true
 				_slide_out = 0.0
 		else:
@@ -750,6 +764,7 @@ func start_tumble(push: Vector3, strength: float) -> void:
 	if OS.get_cmdline_user_args().has("--tumblelog"):
 		print("UEBERSCHLAG v=%s quer=%.1f stärke=%.1f luft=%s %s" % [velocity, velocity.dot(global_basis.x), strength, airborne, get_stack()[1]["function"]])
 	tumbling = true
+	_wall_turn = 0.0
 	_jc_landed = true
 	rollovers += 1
 	crashes += 1
@@ -928,6 +943,7 @@ func place(xform: Transform3D) -> void:
 	speed_fwd = 0.0
 	steer = 0.0
 	_spin = 0.0
+	_wall_turn = 0.0
 	_slip_hold = 0.0
 	stun = 0.0
 	airborne = false
@@ -965,31 +981,35 @@ func _handle_collisions(pre: Vector3) -> void:
 			walled = true
 			if debug_hits:
 				_collider_name = _describe(c)
-			_hit_wall(pre, n)
+			_hit_wall(pre, n, _is_small(c))
 
 
-## Wand/Bande wie in NFSU: je flacher der Winkel, desto weniger Tempoverlust; das Auto wird parallel zur Wand
-## gestellt und schrammt entlang. Nur frontal (fast rechtwinklig) prallt es ab.
-func _hit_wall(pre: Vector3, n: Vector3) -> void:
+## Wand/Bande wie in NFSU: je flacher der Winkel, desto weniger Tempoverlust; das Auto schrammt entlang und dreht
+## dabei weich parallel zur Wand (_wall_turn, über einige Bilder). Steil oder frontal prallt es ab. An kleinen
+## Hindernissen (Poller, Pfosten, Bank) wird es kaum gedreht: deren Ecken haben schräge Normalen.
+func _hit_wall(pre: Vector3, n: Vector3, small := false) -> void:
 	var spd := pre.length()
 	var vn := -pre.dot(n)  # Tempo in die Wand hinein
 	if spd < 0.5 or vn < 0.2:
 		return
+	_wall_t = 0.0
+	# Überschlag nach der Lage beim Aufprall beurteilen (vor jeder Drehung durch die Wand)
+	var trip := _trips(pre, n, pre) and not drag_mode and not drift_mode and not tumbling
 	var head_on := clampf(vn / spd, 0.0, 1.0)  # Sinus des Aufprallwinkels
 	var tang := pre + n * vn
-	var keep := 1.0 - 0.7 * head_on * head_on
+	var keep := 1.0 - 0.55 * head_on * head_on
 	var new_v := n * vn * (0.08 + 0.15 * head_on * head_on)
 	if tang.length() > 0.1:
 		new_v += tang.normalized() * spd * keep * (1.0 - pow(head_on, 4.0))
 	new_v = new_v.move_toward(Vector3.ZERO, 3.0 * get_physics_process_delta_time())  # Schleifen kostet etwas
 	velocity = Vector3(new_v.x, 0.0, new_v.z)
-	# Parallel zur Wand drehen (bei streifenden Treffern fast ganz, frontal gar nicht)
-	if tang.length() > 0.5:
+	# Parallel zur Wand drehen: streifend ganz, schräg teilweise, frontal gar nicht (dort Abprall)
+	if tang.length() > 0.5 and not tumbling:
 		var fwd := -global_basis.z
 		fwd.y = 0.0
 		var along := tang.normalized() * signf(tang.dot(fwd) + 0.001)
 		var ang := fwd.normalized().signed_angle_to(along, Vector3.UP)
-		_rotate_front(ang * (1.0 - smoothstep(0.75, 0.97, head_on)), 0.0)
+		_wall_turn = ang * (1.0 - smoothstep(0.6, 0.92, head_on)) * (0.25 if small else 1.0)
 	if vn > 1.5 and _wall_cool <= 0.0:
 		_wall_cool = 0.4
 		if debug_hits:
@@ -999,13 +1019,13 @@ func _hit_wall(pre: Vector3, n: Vector3) -> void:
 		_shake = minf(_shake + vn * 0.025, 0.8)
 	if drift_mode and head_on > 0.5:
 		_sliding = false
-	if _trips(pre, n, pre) and not drag_mode and not drift_mode:
+	if trip:
 		start_tumble(n, absf(pre.dot(global_basis.x)))
 	elif vn > 14.0 and head_on > 0.75 and _crash_cooldown <= 0.0:
 		crashes += 1
-		stun = 0.35
+		stun = 0.3
 		_crash_cooldown = 0.5
-		_spin = signf(pre.dot(global_basis.x) + 0.01) * 0.8
+		_spin = signf(pre.dot(global_basis.x) + 0.01) * 0.6
 
 
 ## Verkehr: frontal oder deutliches Auffahren ist ein Crash wie in NFS (fast Stillstand, Dreher, kurz keine
@@ -1044,6 +1064,15 @@ func _hit_traffic(other: Node, pre: Vector3, n: Vector3) -> void:
 		if hit > 8.0:
 			crashes += 1
 			stun = 0.2
+
+
+## Kleines Hindernis (Poller, Pfosten, Bank, Mülltonne): Kiste, die waagerecht nirgends über 2,5 m misst
+func _is_small(c: KinematicCollision3D) -> bool:
+	var cs := c.get_collider_shape() as CollisionShape3D
+	if cs == null or not cs.shape is BoxShape3D:
+		return false
+	var sz: Vector3 = (cs.shape as BoxShape3D).size * cs.global_basis.get_scale()
+	return maxf(sz.x, sz.z) < 2.5
 
 
 ## Nur für Tests: beschreibt, woran das Auto gestoßen ist (Form, Lage, nächste Wandfläche)

@@ -46,6 +46,7 @@ Berlin-Kreuzberg, mit Dom, Residenz, Festung, Oberbaumbrücke und Hochbahn an ih
 - Asphalt wie damals: körnig, mit Rissen, Teerfugen und Radspuren, nass spiegeln sich Laternen und Rücklichter; Gehwege aus Betonplatten
 - 9 Autos, Tuning wie in NFS: Optik (Lack, Felgen, Spoiler, Bodykit, Folierung, Neon, Scheiben) und Leistung (Motor, Turbo, Nitro, Fahrwerk, Reifen)
 - Kein Geld, kein Grind: Siege schalten Teile und Autos frei
+- Schwierigkeit Leicht / Normal / Schwer: Leicht zum entspannten Kennenlernen der Städte
 - Start- und Zielszene wie damals: Starterin, jubelnde Fans, Kamerafahrt
 - Motorsound in Echtzeit erzeugt – jedes Auto klingt anders
 - Grafikmenü wie in großen PC-Spielen: Voreinstellungen Niedrig bis Ultra, dynamische Auflösung, Sichtweite, Details, Kantenglättung, FPS-Anzeige
@@ -80,6 +81,7 @@ cathedral, palace, fortress, Oberbaum Bridge and elevated U-Bahn in their real p
 - Asphalt like back then: grainy, with cracks, tar seams and wheel ruts, street lights and tail lights reflecting when wet; concrete-slab sidewalks
 - 9 cars, NFS-style tuning: visual (paint, rims, spoiler, body kit, vinyl, underglow, tint) and performance (engine, turbo, nitro, suspension, tires)
 - No money, no grind: wins unlock parts and cars
+- Difficulty Easy / Normal / Hard: Easy for exploring the cities at your own pace
 - Start and finish scenes like back in the day: flag girl, cheering crowd, camera fly-in
 - Real-time engine sound – every car sounds different
 - Graphics menu like big PC games: Low to Ultra presets, dynamic resolution, view distance, detail, anti-aliasing, FPS counter

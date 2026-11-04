@@ -51,6 +51,8 @@ const EN := {
 	"Über die Rampe am Bahnübergang springst du über die Gleise.": "Hit the ramp at the rail crossing to jump the tracks.",
 	"Motor-Tuning steigert Beschleunigung und Höchstgeschwindigkeit.": "Engine tuning raises acceleration and top speed.",
 	"Im Drag nicht im Begrenzer bleiben: der Motor überhitzt.": "In drag races, stay off the rev limiter or the engine overheats.",
+	"Zu schwer? Einstellungen > Schwierigkeit: Leicht": "Too hard? Settings > Difficulty: Easy",
+	"Zu schwer? Einstellungen > Schwierigkeit: Leicht. Dann lernst du die Strecken in Ruhe kennen.": "Too hard? Settings > Difficulty: Easy. Then you can get to know the tracks at your own pace.",
 	# --- Autos ---
 	"JDM-Fließheck mit Hochdrehzahl-Motor. Leicht, wendig, verzeiht viel.": "JDM hatchback with a high-revving engine. Light, nimble, forgiving.",
 	"Heckantrieb-Coupé. Liebt Drifts.": "Rear-wheel-drive coupé. Loves to drift.",
@@ -178,6 +180,9 @@ const EN := {
 	"Unter der Hochbahn der U1 durch die Skalitzer Straße, über die Oberbaumbrücke, an der East Side Gallery entlang und über die Schillingbrücke zurück zum Kotti.":
 		"Under the elevated U1 along Skalitzer Straße, over the Oberbaumbrücke, past the East Side Gallery and back over the Schillingbrücke to Kotti.",
 	"Touch-Knöpfe im Rennen. Auto: nur auf Handy und Tablet.": "On-screen buttons in races. Auto: only on phones and tablets.",
+	"Schwierigkeit: ": "Difficulty: ", "Leicht": "Easy", "Normal": "Normal", "Schwer": "Hard",
+	"Wie stark die Gegner fahren. Leicht: zum Kennenlernen der Strecken. Schwer: schnellere Autos, und wer führt, wird gejagt.":
+		"How strong the rivals drive. Easy: for getting to know the tracks. Hard: faster cars, and whoever leads gets hunted.",
 	"Sprungkamera: ": "Jump camera: ", "Ohne Zeitlupe": "No slow motion",
 	"Bei hohen Sprüngen schaut eine Kamera schräg von vorn zu, wie in NFS Underground, dazu Zeitlupe.":
 		"On big jumps a camera watches from ahead at an angle, like in NFS Underground, in slow motion.",

@@ -122,7 +122,8 @@ Skript), schreibt `scripts/city_data.gd`.
   zurück zur Fahrerkamera, bei Überschlag oder Platsch erst etwas später. Einstellungen → Sprungkamera: An / Ohne
   Zeitlupe / Aus.
 - **Überschlag** wie in echt: nur wer quer rutschend (ab 36 km/h Querfahrt, Schräglage über gut 30°, mindestens
-  50 km/h) mit der Flanke gegen Wand oder Auto kracht, kippt darüber, oder wer schief landet. Frontal oder streifend
+  50 km/h) mit der Flanke gegen Wand oder Auto kracht, kippt darüber, oder wer schief landet. Beurteilt wird die Lage
+  im Moment des Aufpralls (nicht erst nach dem Ausrichten an der Wand, sonst sähe jeder schräge Treffer wie Querrutschen aus). Frontal oder streifend
   gibt es Crash und Dreher, keinen Überschlag. Das Auto hebt ab, rollt um die Längsachse und federt bei jedem Aufschlag. Landet es auf den Rädern, geht es weiter; auf Dach oder
   Seite wird es nach gut einer Sekunde auf die Straße zurückgesetzt. Hart getroffene Verkehrsautos überschlagen sich
   ebenfalls und bleiben liegen. Laternen, Schilder und Poller werden am Treffpunkt angestoßen und kippen um.
@@ -139,8 +140,11 @@ Skript), schreibt `scripts/city_data.gd`.
 - Kreuzungen mit Ampeln, Baustellen, Verkehr in beide Richtungen. Laternen, Mülltonnen, Zeitungsboxen, Parkuhren,
   Schilder, Büsche und Container fliegen weg und kosten etwas Tempo. Sackgassen sind an der Einmündung abgesperrt,
   vor den Trögen lenkt eine schräge Leitwand hinein.
-- **Anecken wie in NFSU:** An Wänden und Banden schrammt man entlang und wird parallel gestellt; je flacher der
-  Winkel, desto weniger Tempo kostet es (15° ≈ 12 %, 45° ≈ 45 %), nur frontal prallt man ab. Verkehr bestraft härter:
+- **Anecken wie in NFSU:** An Wänden und Banden schrammt man entlang und dreht dabei weich parallel zur Wand
+  (höchstens 230° pro Sekunde, ein schräger Treffer braucht etwa 0,2–0,4 s, nie ein Sprung im Bild); die Reifen
+  halten dabei weniger, damit sie das Auto nicht wieder in die Wand ziehen, und das Schrammen zählt nicht als Drift. Je flacher der Winkel, desto weniger Tempo
+  kostet es (15° ≈ 5 %, 30° ≈ 20 %, 45° ≈ 45 %), nur frontal prallt man ab. Kleine Hindernisse wie Poller, Pfosten
+  und Bänke drehen das Auto kaum (ihre Ecken hätten sonst schräge Richtungen vorgegeben). Verkehr bestraft härter:
   seitlich abprallen, frontal oder beim Auffahren Dreher und kurz keine Kontrolle. Mittelstreifen laufen spitz aus.
 
 ## Fortschritt
@@ -206,7 +210,7 @@ dann steht „Benutzerdefiniert“ da. Werte in `GameState.GFX`.
   und Autos auf die Fernansicht wechseln), **Lichter** (Reichweite der Laternen), **Kantenglättung** (Aus, FXAA,
   MSAA 2x/4x), **Glühen**, **Spiegelungen** und **Umgebungsverdeckung** (nur am Rechner, nicht im Browser),
   **Effekte** (Regen, Dampf), **Pixel-Look**.
-- Einstellungen: **Sprungkamera** (An / Ohne Zeitlupe / Aus), **FPS anzeigen** (oben in der Mitte, mit aktueller 3D-Auflösung), **V-Sync**, **FPS-Limit**, **Vollbild**.
+- Einstellungen: **Schwierigkeit** (Leicht / Normal / Schwer), **Sprungkamera** (An / Ohne Zeitlupe / Aus), **FPS anzeigen** (oben in der Mitte, mit aktueller 3D-Auflösung), **V-Sync**, **FPS-Limit**, **Vollbild**.
 - Erststart: Handy/Tablet „Niedrig“, sonst „Mittel“ (beide mit dynamischer Auflösung).
 - **Leistung:** Unbewegliche Teile der Strecke werden je Material und Rasterzelle zu einem Mesh verschmolzen
   (`Track.batch_static`), Autos je Material und beweglichem Teil (Karosserie, Räder), dazu eine Fernansicht in
@@ -218,6 +222,13 @@ dann steht „Benutzerdefiniert“ da. Werte in `GameState.GFX`.
   was im Bild ist); `--nobatch` schaltet das Verschmelzen zum Vergleich ab.
 - Verkehr nach Schwierigkeit: 1 Stern ohne, 2 Sterne wenig, 3 Sterne voller Verkehr.
 - **Tempo-Stufe:** am Anfang fahren alle (auch Gegner) mit 72 % Höchsttempo, mit jedem Sieg mehr, ab 20 Siegen volles Tempo.
+- **Gegner-Stärke** wie in NFSU mit dem Spiel wachsend: Gegner fahren Autos passend zur Stufe des Events (1 Stern:
+  Kaizen, Hachi, Sakura, Tsubame; 2 Sterne bis Raijin; 3 Sterne alle), mit 84 / 88 / 92 % Können je Stufe, dazu
+  0,4 % je Sieg (bis 10 Siege). Schwierigkeit **Leicht** −11 % (zum Kennenlernen der Strecken), **Schwer** +5 % und
+  Autos eine Stufe höher. Gummiband: liegst du weit vorn, holen sie auf Leicht gar nicht, auf Normal höchstens 7 %,
+  auf Schwer 15 % auf; liegst du weit hinten, fahren sie mit 82 / 88 / 90 % (Leicht / Normal / Schwer).
+  Abkürzungen (sie sparen bis zu einem Fünftel der Zeit) nehmen Gegner auf Leicht nur 30 % so oft, auf Normal 80 %. Oben heraus beschleunigen auch Gegner
+  schwächer (Gänge, Luftwiderstand). Driftziele: Leicht 65 %, Normal 85 %, Schwer 100 %.
 - **Fahrgefühl:** alle Autos mit Heckantrieb; mit Gas in der Kurve schiebt das Heck raus, im Drift dreht das Auto
   um die Vorderachse. Gas setzt weich ein, Drehmoment folgt der Drehzahl, das Getriebe schaltet mit Hysterese (kein
   Pendeln an Gangwechseln). Langsam begrenzt der Wendekreis (5,2 m), bei Tempo die Querbeschleunigung (2,1–2,7 g je

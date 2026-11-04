@@ -103,17 +103,21 @@ func _ready() -> void:
 		_rain = Moods.rain([200, 340, 520][GameState.gv("fx")])
 		player.cam.add_child(_rain)
 
-	# Gegner mit zufälligem Tuning; Stärke nach Schwierigkeit des Events, leicht steigend mit deinen Siegen
+	# Gegner mit zufälligem Tuning. Wie in NFSU fahren sie Autos passend zur Stufe des Events (anfangs Kleinwagen,
+	# zuletzt alles bis zum Kaze TT); Können nach Stufe, Schwierigkeit (Einstellungen) und leicht steigend mit Siegen.
 	var rng := RandomNumberGenerator.new()
 	rng.seed = race["seed"] * 31 + GameState.wins
 	var lanes := [Track.LANES[0], Track.LANES[1], Track.LANES[3]]
-	var difficulty: float = 0.84 + race.get("tier", 1) * 0.035 + minf(GameState.total_wins(), 10) * 0.006
+	var tier: int = race.get("tier", 1)
+	var diff: int = GameState.difficulty
+	var difficulty: float = [0.0, 0.84, 0.88, 0.92][tier] + [-0.11, 0.0, 0.05][diff] + minf(GameState.total_wins(), 10) * 0.004
+	var pool: Array = Catalog.CAR_ORDER.filter(func(id): return Catalog.CARS[id]["top_speed"] <= [0.0, 62.0, 70.0, 99.0][mini(tier + (1 if diff == 2 else 0), 3)])
 	if event_type == "drift":
-		# Drift: allein, Zielpunkte je nach Schwierigkeit und Zahl der Kurven (Erstabstimmung, nach Spielgefühl anpassen)
-		var k: float = [1.0, 1.0, 1.35, 1.7][race.get("tier", 1)] * track["laps"] * race.get("corners", 12) / 24.0
+		# Drift: allein, Zielpunkte je nach Stufe, Schwierigkeit und Zahl der Kurven
+		var k: float = [1.0, 1.0, 1.35, 1.7][tier] * [0.65, 0.85, 1.0][diff] * track["laps"] * race.get("corners", 12) / 24.0
 		drift_targets = [int(700 * k / 10.0) * 10, int(1500 * k / 10.0) * 10, int(2600 * k / 10.0) * 10]
 	for i in (0 if event_type == "drift" else 3):
-		var id: String = Catalog.CAR_ORDER[rng.randi() % Catalog.CAR_ORDER.size()]
+		var id: String = pool[rng.randi() % pool.size()]
 		var cfg := {}
 		for cat in Catalog.PART_ORDER:
 			cfg[cat] = rng.randi() % Catalog.PARTS[cat]["options"].size()
@@ -128,7 +132,12 @@ func _ready() -> void:
 		# Drag: alle nebeneinander an der Linie
 		var start_d: float = track["start"] if event_type == "drag" else track["start"] + (i - 1) * 4.0
 		ai.drag = event_type == "drag"
-		ai.setup(track, id, cfg, start_d, lanes[i], top, difficulty + rng.randf_range(-0.03, 0.03))
+		ai.setup(track, id, cfg, start_d, lanes[i], top, difficulty + rng.randf_range(-0.025, 0.025))
+		# Gummiband: liegst du hinten, werden sie etwas langsamer; führst du, holen sie auf Leicht gar nicht,
+		# auf Normal etwas und nur auf Schwer stark auf
+		ai.rubber = [Vector2(0.82, 1.0), Vector2(0.88, 1.07), Vector2(0.9, 1.15)][diff]
+		# Abkürzungen sparen bis zu einem Fünftel der Zeit: auf Leicht nehmen Gegner sie selten
+		ai.shortcut_k = [0.3, 0.8, 1.0][diff]
 		ai.accel *= 0.8 + 0.2 * GameState.pace()
 		ais.append(ai)
 
@@ -1003,6 +1012,10 @@ func _show_result(place: int, new_best: bool, unlocked: Array, dnf := "") -> voi
 	else:
 		var w := _label(vb, 11, HORIZONTAL_ALIGNMENT_CENTER)
 		w.text = tr("Nur Platz 1 schaltet neue Teile frei.")
+		if GameState.difficulty > 0:
+			var h := _label(vb, 10, HORIZONTAL_ALIGNMENT_CENTER)
+			h.text = tr("Zu schwer? Einstellungen > Schwierigkeit: Leicht")
+			h.modulate = Color(0.7, 0.85, 1.0)
 	var hb := HBoxContainer.new()
 	hb.alignment = BoxContainer.ALIGNMENT_CENTER
 	vb.add_child(hb)

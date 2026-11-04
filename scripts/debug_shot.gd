@@ -46,6 +46,8 @@ var _bench := []  # je Bild: [Bildzeit ms, GPU ms, CPU-Render ms, Draw Calls, Ob
 var _bench_vp := RID()
 var _crash: PackedStringArray = []
 var _crash_done := false
+var _crash_yaw := 0.0
+var _crash_t0 := 0.0
 var _block: PackedStringArray = []
 var _block_done := false
 var _added := {}  # in diesem Bild neu hinzugefügte Knoten nach Art (Ruckler-Suche)
@@ -270,7 +272,7 @@ func _process(dt: float) -> void:
 			print("rel=%.1f lat=%.1f y=%.2f vy=%.1f v=%.1f air=%s path=%d train=%s" % [rel, pl.lateral, pl.position.y, pl.vy, pl.speed_fwd, pl.airborne, pl.path_id, race.track["crossing"].train.global_position])
 	if fulltest and race and "curve" in race and race.player:
 		_fulltest(race)
-	if race and "curve" in race and race.player and (OS.get_cmdline_user_args().has("--trace") or OS.get_cmdline_user_args().has("--handling")):
+	if race and "curve" in race and race.player and (OS.get_cmdline_user_args().has("--trace") or OS.get_cmdline_user_args().has("--handling") or not _crash.is_empty()):
 		race.player.debug_hits = true
 	if race and "curve" in race and race.player and race.player.last_hit != "":
 		print("  >> Treffer t=%.1f: %s" % [_t, race.player.last_hit])
@@ -326,6 +328,7 @@ func _process(dt: float) -> void:
 		var pl = race.player
 		if not _crash_done:
 			_crash_done = true
+			_crash_t0 = _t
 			if _crash.size() > 2:
 				pl.place(Track.xform_at(race.track["curve"], float(_crash[2]), float(_crash[3]) if _crash.size() > 3 else 0.0))
 			if _crash[1] == "k":
@@ -352,7 +355,16 @@ func _process(dt: float) -> void:
 				pl.rotate_y(-deg_to_rad(float(_crash[1])))
 			pl.velocity = -pl.global_basis.z * float(_crash[0])
 			pl.speed_fwd = float(_crash[0])
-		elif fmod(_t, 0.2) < dt:
+			_crash_yaw = rad_to_deg(pl.global_rotation.y)
+		else:
+			# Drehung pro Bild: ruckartige Sprünge der Ausrichtung (Wandkontakt) sichtbar machen
+			var yaw: float = rad_to_deg(pl.global_rotation.y)
+			var dy := wrapf(yaw - _crash_yaw, -180.0, 180.0)
+			_crash_yaw = yaw
+			if absf(dy) > 1.5 and _t - _crash_t0 < 4.0:
+				print("  dreh t=%.2f %+.1f° (rel. Straße %.0f°) v=%.1f wand=%d" % [_t, dy, rad_to_deg(wrapf(pl.global_rotation.y
+					- Basis.looking_at(Track.frame_at(race.track["curve"], pl.progress)["fwd"], Vector3.UP).get_euler().y, -PI, PI)), pl.velocity.length(), pl.wall_hits])
+		if _crash_done and fmod(_t, 0.2) < dt:
 			print("crash t=%.1f v=%.1f y=%.2f luft=%s ueberschlag=%s roll=%.2f nick=%.2f d=%.0f lat=%.1f" % [_t, pl.velocity.length(),
 				pl.position.y, pl.airborne, pl.tumbling, pl._air_roll, pl._air_pitch, pl.progress, pl.lateral])
 	if OS.get_cmdline_user_args().has("--drawlog") and race and "curve" in race and race.player and race.state == 1 and fmod(_t, 2.0) < dt:
@@ -492,6 +504,10 @@ func _fulltest(race) -> void:
 		return
 	if race.state != 1 or pl.loc.is_empty():
 		return
+	if not _ft.has("ki_info"):
+		_ft["ki_info"] = true
+		print("FT KI-STÄRKE schwierigkeit=%d spieler_top=%.1f | %s" % [GameState.difficulty, pl.top_speed,
+			" | ".join(race.ais.map(func(a): return "top=%.1f können=%.3f eff=%.1f" % [a.top, a.skill, a.top * a.skill]))])
 	var where := "t=%.1f d=%.0f pfad=%d(%s) quer=%.1f pos=(%.0f,%.1f,%.0f) v=%.1f" % [race.race_time, pl.progress, pl.path_id,
 		tr["paths"][pl.path_id]["kind"], pl.loc["lat"], pl.global_position.x, pl.global_position.y, pl.global_position.z, pl.velocity.length()]
 	# Ruckler: echte Bildzeit über 60 ms

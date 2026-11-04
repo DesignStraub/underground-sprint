@@ -11,6 +11,7 @@ const CareerMap := preload("res://scripts/career_map.gd")
 
 ## Tipps wie auf den Ladebildschirmen von NFS Underground
 const TIPS := [
+	"Zu schwer? Einstellungen > Schwierigkeit: Leicht. Dann lernst du die Strecken in Ruhe kennen.",
 	"Gib kurz vor LOS Gas: Drehzahl im grünen Bereich gibt einen perfekten Start.",
 	"Knapp am Verkehr vorbei füllt dein Nitro.",
 	"Im Drag im grünen Bereich schalten: perfekter Schaltvorgang, mehr Schub.",
@@ -502,6 +503,7 @@ const SETTING_HINTS := {
 	"fullscreen": "Vollbild (auch F / F11).",
 	"language": "Sprache des Spiels. Titel, Orte und Schilder bleiben deutsch.",
 	"touch": "Touch-Knöpfe im Rennen. Auto: nur auf Handy und Tablet.",
+	"difficulty": "Wie stark die Gegner fahren. Leicht: zum Kennenlernen der Strecken. Schwer: schnellere Autos, und wer führt, wird gejagt.",
 	"jumpcam": "Bei hohen Sprüngen schaut eine Kamera schräg von vorn zu, wie in NFS Underground, dazu Zeitlupe.",
 }
 
@@ -512,7 +514,7 @@ func _show_settings() -> void:
 	_set_section("EINSTELLUNGEN")
 	var g := _button("Grafik  >", _show_graphics)
 	g.focus_entered.connect(func(): info.text = tr(SETTING_HINTS["graphics"]))
-	for key in ["language", "jumpcam", "show_fps", "vsync", "fps", "fullscreen", "touch"]:
+	for key in ["language", "difficulty", "jumpcam", "show_fps", "vsync", "fps", "fullscreen", "touch"]:
 		_setting_button(key)
 	_button("Spielstand zurücksetzen", _confirm_reset)
 	_button("< Zurück", _show_main)

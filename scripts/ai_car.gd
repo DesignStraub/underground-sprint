@@ -33,6 +33,7 @@ var speed := 0.0
 var top := 55.0
 var accel := 9.0
 var skill := 1.0
+var rubber := Vector2(0.88, 1.07)  # Gummiband: Tempofaktor kleinster/größter Wert (Spieler weit hinten/vorn)
 var drag := false  # Drag: Beschleunigung lässt mit dem Tempo nach (wie Gänge und Luftwiderstand)
 var running := false
 var finish_time := -1.0
@@ -40,6 +41,7 @@ var stun := 0.0
 var model: Node3D
 var length := 4.4
 var shortcut_rate := 0.6
+var shortcut_k := 1.0  # Schwierigkeit: auf Leicht nehmen Gegner Abkürzungen selten (Neulinge kennen sie noch nicht)
 var jumper := true
 var y := 0.0
 var vy := 0.0
@@ -122,7 +124,7 @@ func _physics_process(dt: float) -> void:
 		var bend := (f0["fwd"] as Vector3).angle_to(f1["fwd"])
 		target = top * skill * lerpf(1.0, 0.5, clampf(bend / 1.1, 0.0, 1.0))
 		var gap := player_total - total
-		target *= clampf(1.0 + gap * 0.0025, 0.88, 1.15)
+		target *= clampf(1.0 + gap * 0.0025, rubber.x, rubber.y)
 		if on_main:
 			# Ein paar Mal pro Sekunde: Spur wählen
 			_think -= dt
@@ -184,7 +186,8 @@ func _physics_process(dt: float) -> void:
 							lane_target = -2.4
 			else:
 				target = minf(target, 30.0)  # enge Gasse
-	var acc := accel
+	# oben heraus zieht auch ein Gegner schwächer (Gänge, Luftwiderstand), sonst hängt er dich nach jeder Kurve ab
+	var acc := accel * maxf(1.0 - 0.4 * pow(speed / maxf(top, 1.0), 2.0), 0.45)
 	if drag:
 		acc = accel * 0.8 * maxf(1.0 - pow(speed / maxf(top * skill, 1.0), 1.6), 0.05)
 	speed = move_toward(speed, target, dt * (acc if target > speed else 22.0))
@@ -198,7 +201,7 @@ func _physics_process(dt: float) -> void:
 				continue
 			if prev_d < p["from"] and d >= p["from"] and not _decided.has(p["id"]):
 				_decided[p["id"]] = true
-				if randf() < (0.5 if p["kind"] == "fork" else shortcut_rate):
+				if randf() < (0.5 if p["kind"] == "fork" else shortcut_rate) * shortcut_k:
 					path = p
 					d = d - p["from"]
 					lane = clampf(lane, -p["half_w"] + 1.5, p["half_w"] - 1.5)
