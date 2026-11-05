@@ -89,7 +89,7 @@ func _ready() -> void:
 		add_child(snd)
 		snd.play()
 	# Musik erst nach dem Intro
-	Music.stream_paused = true
+	Music.set_paused(true)
 
 
 func _process(dt: float) -> void:
@@ -133,5 +133,5 @@ func _finish() -> void:
 	if _leaving:
 		return
 	_leaving = true
-	Music.stream_paused = false
+	Music.set_paused(false)
 	get_tree().change_scene_to_file(NEXT_SCENE)

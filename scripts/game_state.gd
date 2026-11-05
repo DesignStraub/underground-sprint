@@ -83,6 +83,14 @@ func _ready() -> void:
 			race_index = clampi(int(a.substr(7)), 0, Catalog.RACES.size() - 1)
 		elif a.begins_with("--quality="):  # nur für Tests, wird nicht gespeichert
 			apply_preset(clampi(int(a.substr(10)), 0, PRESETS.size() - 1))
+		elif a.begins_with("--gfx="):  # nur für Tests: einzelne Optionen, z. B. --gfx=res:0,ssr:0
+			for kv in a.substr(6).split(","):
+				var p := kv.split(":")
+				if p.size() == 2 and GFX.has(p[0]):
+					gfx[p[0]] = clampi(int(p[1]), 0, GFX[p[0]]["levels"].size() - 1)
+					preset = -1
+				elif p.size() == 2 and p[0] == "blur":
+					motion_blur = clampi(int(p[1]), 0, 3)
 		elif a.begins_with("--pixel="):
 			pixel_look = a.substr(8) == "1"
 		elif a.begins_with("--car=") and Catalog.CARS.has(a.substr(6)):  # nur für Tests: mit diesem Auto fahren

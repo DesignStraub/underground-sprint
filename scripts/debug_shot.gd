@@ -426,7 +426,7 @@ func _bench_sample(race, dt: float) -> void:
 	var rs := RenderingServer
 	_bench.append([dt * 1000.0,
 		rs.viewport_get_measured_render_time_gpu(_bench_vp) + rs.viewport_get_measured_render_time_gpu(get_viewport().get_viewport_rid()),
-		rs.viewport_get_measured_render_time_cpu(_bench_vp),
+		rs.viewport_get_measured_render_time_gpu(_bench_vp),
 		rs.viewport_get_render_info(_bench_vp, rs.VIEWPORT_RENDER_INFO_TYPE_VISIBLE, rs.VIEWPORT_RENDER_INFO_DRAW_CALLS_IN_FRAME),
 		rs.viewport_get_render_info(_bench_vp, rs.VIEWPORT_RENDER_INFO_TYPE_VISIBLE, rs.VIEWPORT_RENDER_INFO_OBJECTS_IN_FRAME),
 		rs.viewport_get_render_info(_bench_vp, rs.VIEWPORT_RENDER_INFO_TYPE_VISIBLE, rs.VIEWPORT_RENDER_INFO_PRIMITIVES_IN_FRAME),
@@ -507,7 +507,7 @@ func _bench_report(race) -> void:
 		elif nd is PhysicsBody3D:
 			counts["bodies"] += 1
 		stack.append_array(nd.get_children())
-	print("BENCH race=%s q=%d frames=%d frame=%.2fms med=%.2fms p99=%.2fms gpu=%.2fms cpu_render=%.2fms process=%.2fms physics=%.2fms draws=%d objs=%d tris=%dk %s" % [
+	print("BENCH race=%s q=%d frames=%d frame=%.2fms med=%.2fms p99=%.2fms gpu=%.2fms gpu3d=%.2fms process=%.2fms physics=%.2fms draws=%d objs=%d tris=%dk %s" % [
 		race.race["name"], GameState.preset, _bench.size(), sums[0] / n, med, worst[int(n * 0.99) - 1], sums[1] / n, sums[2] / n,
 		sums[6] / n, sums[7] / n, int(sums[3] / n), int(sums[4] / n), int(sums[5] / n / 1000.0), counts])
 	print("BENCH spikes=%d %s" % [spikes.size(), " ".join(spikes.slice(0, 40))])

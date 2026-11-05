@@ -3,8 +3,9 @@ extends AudioStreamPlayer
 ## Druckstöße im Auspuff (schmale Pulse je Zündung: das gibt den kernigen, hellen Anteil) und ein leises Rasseln
 ## (Rauschen im Takt der Zündungen) unter Last. Tiefpass bis gut 2 kHz: klar, aber nicht schrill. Lautstärke steigt
 ## mit Drehzahl und Gas; beim Gaswegnehmen bei hoher Drehzahl ploppt es ab und zu im Auspuff.
-## Dazu leise: Turbo, Blow-off, Fahrtwind, Nitro. Reifenquietschen kommt aus einer eigenen Schleife (skid.wav),
-## Lautstärke und Tonhöhe nach Rutschen und Tempo.
+## Dazu leise: Turbo, Blow-off, Fahrtwind. Reifen und Nitro kommen aus eigenen Schleifen (tools/make_sfx.py):
+## scrub.wav (Schrubben, schon bei leichtem Rutschen), skid.wav (Quietschen erst im echten Drift), nitro_on.wav
+## (Zünden) und nitro.wav (Fauchen, solange Nitro läuft).
 
 ## Abtastrate: am Rechner 22 kHz, auf Handy/Tablet die Hälfte (der Klang liegt ohnehin unter 1,5 kHz, und die
 ## Berechnung läuft Sample für Sample im Skript). k gleicht die Glättung je Sample an die Rate an.
@@ -29,7 +30,6 @@ var _phase := 0.0
 var _turbo_phase := 0.0
 var _rpm_s := 900.0
 var _thr_s := 0.0
-var _slip_s := 0.0
 var _lp1 := 0.0
 var _lp2 := 0.0
 var _rough_lp := 0.0
@@ -46,6 +46,11 @@ var _crash := 0.0
 var _crash_lp := 0.0
 var _skid: AudioStreamPlayer
 var _skid_k := 0.0
+var _scrub: AudioStreamPlayer
+var _scrub_k := 0.0
+var _nos: AudioStreamPlayer
+var _nos_k := 0.0
+var _nos_was := false
 
 
 func configure(profile: Dictionary) -> void:
@@ -69,14 +74,22 @@ func _ready() -> void:
 	playback_type = AudioServer.PLAYBACK_TYPE_STREAM
 	play()
 	_pb = get_stream_playback()
-	_skid = Sfx.looping("skid")
-	_skid.volume_db = -80.0
-	add_child(_skid)
-	_skid.play()
+	_skid = _loop("skid")
+	_scrub = _loop("scrub")
+	_nos = _loop("nitro")
+
+
+func _loop(sound: String) -> AudioStreamPlayer:
+	var a := Sfx.looping(sound)
+	a.volume_db = -80.0
+	add_child(a)
+	a.play()
+	return a
 
 
 func _process(delta: float) -> void:
 	_update_skid(delta)
+	_update_nitro(delta)
 	if _pb == null:
 		return
 	if turbo_amount > 0.0 and _last_throttle > 0.6 and throttle < 0.2 and _turbo > 0.5:
@@ -91,7 +104,7 @@ func _process(delta: float) -> void:
 	var fire := rpm / 60.0 * cylinders / 2.0
 	# Obere Frequenzgrenze wächst mit Drehzahl und Last: unter Gas hell und offen (bis ~2,2 kHz), im Schiebebetrieb
 	# dumpfer. Bis 2.12 lag sie unter 1 kHz, das klang wie durch eine Wand.
-	var cutoff := clampf(fire * 3.0 + throttle * 500.0, 300.0, 1800.0)
+	var cutoff := clampf(fire * 3.0 + throttle * 500.0, 300.0, 1800.0) + _nos_k * 500.0
 	var a := 1.0 - exp(-TAU * cutoff / rate)
 	var h0: float = harmonics[0]
 	var h1: float = harmonics[1]
@@ -114,7 +127,6 @@ func _process(delta: float) -> void:
 	for i in n:
 		_rpm_s += (rpm - _rpm_s) * 0.002 * k
 		_thr_s += (throttle - _thr_s) * 0.002 * k
-		_slip_s += (slip - _slip_s) * 0.001 * k
 		var rpm_n := clampf((_rpm_s - 800.0) / 7200.0, 0.0, 1.0)
 		_phase = fmod(_phase + (_rpm_s / 60.0 * cylinders / 2.0) / rate, 2.0)
 		var p := _phase * TAU
@@ -155,10 +167,6 @@ func _process(delta: float) -> void:
 		if _bov > 0.001:
 			s += band * _bov * 0.25
 			_bov *= k_bov
-		if nitro:
-			s += band * 0.12
-		if _slip_s > 0.02:
-			s += band * _slip_s * 0.3
 		if _crash > 0.001:
 			_crash_lp += 0.08 * k * (noise - _crash_lp)
 			s += _crash_lp * _crash * 2.5
@@ -172,17 +180,42 @@ func _process(delta: float) -> void:
 		_pb.push_buffer(buf)
 
 
-## Reifenquietschen: setzt weich ein (kein Klick), höher und lauter, je stärker das Auto quer rutscht und je
-## schneller es ist; fällt schnell ab, sobald die Reifen wieder greifen
+## Reifen: Schrubben setzt schon bei leichtem Rutschen ein (Kurve am Limit), das Quietschen erst im echten Drift oder
+## bei durchdrehenden Rädern. Beides weich ein- und schnell ausblenden, sobald die Reifen wieder greifen; das
+## Quietschen wird mit Rutschen und Tempo etwas höher.
 func _update_skid(delta: float) -> void:
 	if _skid == null:
 		return
 	var target := clampf(slip, 0.0, 1.0)
-	_skid_k = move_toward(_skid_k, target, delta * (5.0 if target > _skid_k else 3.0))
-	_skid.bus = bus
-	_skid.volume_db = -80.0 if _skid_k < 0.01 else linear_to_db(_skid_k) * 1.3 - 10.0
+	var sq := clampf((target - 0.3) / 0.5, 0.0, 1.0)
+	var sc := clampf(target / 0.35, 0.0, 1.0)
+	_skid_k = move_toward(_skid_k, sq, delta * (4.0 if sq > _skid_k else 3.0))
+	_scrub_k = move_toward(_scrub_k, sc, delta * (6.0 if sc > _scrub_k else 4.0))
 	var speed_n := clampf(speed / 50.0, 0.0, 1.0)
-	_skid.pitch_scale = 0.86 + 0.18 * _skid_k + 0.12 * speed_n
+	for a in [_skid, _scrub]:
+		(a as AudioStreamPlayer).bus = bus
+	_skid.volume_db = -80.0 if _skid_k < 0.01 else linear_to_db(_skid_k) * 1.4 - 9.0
+	_skid.pitch_scale = 0.93 + 0.08 * _skid_k + 0.07 * speed_n
+	# Schrubben tritt zurück, wenn das Quietschen voll da ist
+	var scrub_lvl := _scrub_k * (1.0 - 0.45 * _skid_k) * (0.5 + 0.5 * speed_n)
+	_scrub.volume_db = -80.0 if scrub_lvl < 0.01 else linear_to_db(scrub_lvl) - 11.0
+	_scrub.pitch_scale = 0.85 + 0.3 * speed_n
+
+
+## Nitro: beim Zünden ein Zischen mit dumpfem Stoß, danach Fauchen, solange es läuft; beim Loslassen kurz
+## ausklingen. Der Motor klingt dabei heller (Filter weiter offen).
+func _update_nitro(delta: float) -> void:
+	if _nos == null:
+		return
+	if nitro and not _nos_was:
+		var a := Sfx.play("nitro_on", -2.0, randf_range(0.96, 1.04))
+		if a:
+			a.bus = bus
+	_nos_was = nitro
+	_nos_k = move_toward(_nos_k, 1.0 if nitro else 0.0, delta * (5.0 if nitro else 3.0))
+	_nos.bus = bus
+	_nos.volume_db = -80.0 if _nos_k < 0.01 else linear_to_db(_nos_k) - 5.5
+	_nos.pitch_scale = 0.94 + 0.12 * clampf(speed / 75.0, 0.0, 1.0)
 
 
 ## Dumpfer Aufprall, Stärke 0..1

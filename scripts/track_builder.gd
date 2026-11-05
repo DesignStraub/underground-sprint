@@ -3896,8 +3896,8 @@ static func _build_props(root: Node3D, track: Dictionary, rng: RandomNumberGener
 			d += rng.randf_range(7.0, 15.0) * dist.get("prop_gap", 1.0)
 
 
-## Zuschauer (Blockfiguren aus people.gd, im Shader bewegt): jubeln, winken, filmen mit dem Handy. In Gruppen je
-## 300 m Strecke, damit die Grafikkarte entfernte Gruppen weglassen kann; ab ~220 m ausgeblendet.
+## Zuschauer (Figuren aus people.gd, im Shader bewegt): jubeln, winken, filmen mit dem Handy. people.gd teilt sie in
+## kleine Zellen (nah detailliert, fern als Blockfigur); ab ~220 m ausgeblendet.
 static func _build_spectators(root: Node3D, track: Dictionary, rng: RandomNumberGenerator) -> void:
 	var chunks := {}
 	for e in track["spectators"]:
@@ -3906,12 +3906,7 @@ static func _build_spectators(root: Node3D, track: Dictionary, rng: RandomNumber
 			chunks[k] = []
 		chunks[k].append(e[0])
 	for k in chunks:
-		var holder := People.crowd(root, chunks[k], [People.CHEER, People.WAVE, People.CLAP, People.PHONE, People.WAIT, People.CHEER], rng)
-		for mmi in holder.get_children():
-			if mmi is GeometryInstance3D:
-				(mmi as GeometryInstance3D).visibility_range_end = 220.0
-				(mmi as GeometryInstance3D).visibility_range_end_margin = 20.0
-				(mmi as GeometryInstance3D).visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
+		People.crowd(root, chunks[k], [People.CHEER, People.WAVE, People.CLAP, People.PHONE, People.WAIT, People.CHEER], rng, 220.0)
 
 
 ## Dampf aus Gullys

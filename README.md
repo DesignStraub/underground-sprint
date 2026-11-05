@@ -79,6 +79,11 @@ bei GO runter. Im Ziel bleibt das Auto stehen, die Kamera kreist, Fans laufen au
 Sieg) oder klatschen. Unterwegs schauen Zuschauergruppen zu: hinter den Absperrungen der Seitenstraßen und hinter
 den Zäunen, wo kein Haus steht (dort kommt man mit dem Auto nicht hin). Sie jubeln, winken, klatschen oder filmen mit
 dem Handy. In den Wohnungen flackern hier und da Fernseher, manchmal steht jemand am Fenster.
+Die Leute sind seit 2.14 richtige Figuren statt Klötzchen: runde Formen, Ellbogen (klatschen, Arme verschränken,
+Handy am Ohr), Hände, Turnschuhe, ein Gesicht mit Augen, Brauen, Nase und Mund. Kleidung und Frisur wechseln:
+T-Shirt (manche mit Aufdruck), Langarm, Hoodie mit Kapuze und Kordeln, offene Jacke; Jeans mit Gürtel, Shorts, Rock;
+kurze oder lange Haare, Zopf, Dutt, Glatze, Kappe, Mütze; dazu schmale und kräftige Statur. In der Ferne (je nach
+Detaildichte ab 30–96 m) zeigt das Spiel die einfache Blockfigur, die kostet kaum etwas.
 
 **Freischalten:** Rennsiege (Sprint + Rundkurs) und Driftsiege werden getrennt gezählt. Mit jedem Rennsieg bis zum
 14. kommt ein Auto dazu, jedes ein Stück stärker (Klasse D, C, B, A). Driftautos (Hachi, Sakura, Kitsune, Mirai,
@@ -216,17 +221,27 @@ in den Altstädten und Graffiti an den Altbauten im Kiez.
 <img src="update_bilder/stimmungen.jpg" alt="Stimmungen" width="480">
 
 ## Musik und Sounds
-Musik (`music/`) und Intro-Sound (`assets/intro_sound.mp3`) sind lizenzfreie Tracks von Pixabay.
-Weitere mp3/ogg-Dateien in `music/` laufen automatisch mit, in zufälliger Reihenfolge.
+Musik (`music/`, sieben Tracks: Phonk, Trap, Drill, Rap-Beat) und Intro-Sound (`assets/intro_sound.mp3`) sind
+lizenzfreie Tracks von Pixabay. Die Musik läuft wie ein durchgehender Mix (`scripts/music.gd`): zufällige Reihenfolge,
+jeder Track bis zum Ende (ein neues Rennen schneidet ihn nicht ab), die letzten 6 s blendet der nächste über; ist die
+Liste durch, wird neu gemischt. Die Tracks sind gleich laut gemacht (mit `ffmpeg -af ebur128` gemessen, Ziel -11 LUFS,
+Tabelle `TRACKS`), Stille am Anfang und Ende wird übersprungen. M springt mit kurzer Überblendung weiter. Weitere
+mp3/ogg-Dateien in `music/` laufen automatisch mit (ohne Eintrag in der Tabelle ohne Angleich).
 
 Motorsound, Nitro und Crashs werden im Spiel erzeugt. Der Motor ist seit 2.13 heller: zu den Obertönen kommen die
 Druckstöße im Auspuff (ein schmaler Puls je Zündung), unter Last ein leises Rasseln im Takt und beim Gaswegnehmen
 bei hoher Drehzahl ab und zu ein Plopp; der Tiefpass reicht bis knapp 2 kHz statt 1 kHz. Zug, Glocke, Landung, Platschen, Tunnel, Stadion,
 Reifenquietschen usw. sind synthetisch erzeugte WAVs in `assets/sfx/` (`python3 tools/make_sfx.py`, einzelne mit
 `python3 tools/make_sfx.py skid`).
-- **Drift-Sound:** Reifenquietschen als nahtlose Schleife (`skid.wav`): zwei, drei helle, leicht raue Töne (Haft-Gleit-
-  Effekt), deren Tonhöhe unruhig wandert, dazu etwas Zischen und tiefes Rubbeln. Es setzt weich ein, wird mit dem
-  Driftwinkel lauter und mit Tempo und Winkel höher. Der Motor schaltet im Drift nicht mehr herunter: Gang und
+- **Reifen (seit 2.14):** zwei Schleifen. `scrub.wav` ist das Schrubben schon bei leichtem Rutschen (raues, eher tiefes
+  Rauschen mit Körnung vom Asphalt). `skid.wav` ist das Quietschen im echten Drift und bei durchdrehenden Rädern:
+  kein reiner Pfeifton mehr, sondern die Haft-Gleit-Schwingung der Reifen (rauer Sägezahn mit unruhiger Periode)
+  durch die Resonanzen von Reifen und Karosserie (um 1,2 / 2,3 / 3,6 kHz), zwei Reifen fast gleich hoch (Schwebung
+  statt Akkord, der nach Pfeife klang), dazu Rattern und Zischen. Beides setzt weich ein, wird mit dem Driftwinkel
+  lauter und mit Tempo etwas höher.
+- **Nitro (seit 2.14):** beim Zünden `nitro_on.wav` (Ventil-Klacken, dumpfer Stoß, aufschießendes Zischen und ein
+  Wusch), solange es läuft `nitro.wav` (Fauchen der Düsen, Brausen der Flamme, leiser Pfeifton); der Motor klingt
+  dabei heller. Der Motor schaltet im Drift nicht mehr herunter: Gang und
   Drehzahl, die man hört und sieht, richten sich nach dem Tempo über Grund, mit Gas dreht er durch die
   durchdrehenden Hinterräder hoch (bis knapp unter den Begrenzer). Der Vortrieb rechnet weiter mit dem Gang nach
   dem Tempo nach vorn, das Fahrverhalten bleibt also gleich.
@@ -332,6 +347,9 @@ dann steht „Benutzerdefiniert“ da. Werte in `GameState.GFX`.
   40 % Tempo verwischt der Bildrand entlang der Fahrtrichtung (Zoom-Unschärfe vom Fluchtpunkt aus, zehn versetzte
   Proben je Bildpunkt), die Mitte mit dem eigenen Auto bleibt scharf; beim Einlenken verwischt das Bild zusätzlich
   seitlich, mit Nitro stärker, dazu ein blauer Schimmer und leichte Farbsäume. Steht nichts an, ist der Effekt ganz aus.
+  Seit 2.14 rechnet er in der 3D-Auflösung (Ebene im Welt-Viewport) statt im ganzen Fenster: auf 4K-Bildschirmen nur
+  noch ein Viertel bis die Hälfte der Bildpunkte, ohne eigene Kopie des Fensterbilds. Spiegelungen auf „Niedrig“
+  laufen in halber Auflösung.
 - Erststart: Handy/Tablet „Niedrig“, sonst „Mittel“ (beide mit dynamischer Auflösung).
 - **Leistung:** Unbewegliche Teile der Strecke werden je Material und Rasterzelle zu einem Mesh verschmolzen
   (`Track.batch_static`), Autos je Material und beweglichem Teil (Karosserie, Räder), dazu eine Fernansicht in
@@ -340,7 +358,9 @@ dann steht „Benutzerdefiniert“ da. Werte in `GameState.GFX`.
   („Strecke wird vorbereitet“), sonst ruckelt es beim ersten Anblick jedes neuen Materials. Verkehr außer
   Sichtweite wird ausgeblendet und nur zweimal pro Sekunde bewegt, der Motorsound rechnet auf Handy/Tablet mit
   halber Abtastrate. Messmodus: `-- --race=N --drive --quit=32 --bench` (Bildzeit, Draw Calls, Ruckler,
-  was im Bild ist); `--nobatch` schaltet das Verschmelzen zum Vergleich ab.
+  was im Bild ist); `--nobatch` schaltet das Verschmelzen zum Vergleich ab, `--gfx=ssr:0,bloom:0,blur:0` stellt
+  einzelne Grafikoptionen nur für den Test um. GPU-Zeiten liefert Godot unter macOS nur mit
+  `--rendering-driver vulkan`.
 - Verkehr nach Schwierigkeit: 1 Stern ohne, 2 Sterne wenig, 3 Sterne voller Verkehr.
 - **Tempo-Stufe:** am Anfang fahren alle (auch Gegner) mit 72 % Höchsttempo, mit jedem Sieg mehr, ab 20 Siegen volles Tempo.
 - **Gegner-Stärke** wie in NFSU mit dem Spiel wachsend: Gegner fahren Autos passend zur Stufe des Events (1 Stern:
@@ -399,6 +419,9 @@ dann steht „Benutzerdefiniert“ da. Werte in `GameState.GFX`.
 Vergleichsbilder aus der Entwicklung liegen in `update_bilder/` (Godot ignoriert den Ordner, sie landen nicht im
 Spiel). Die wichtigsten:
 
+- **2.14 – Zuschauer:** oben die Blockfiguren bis 2.13 (bleiben als Fernansicht), unten die neuen Figuren mit
+  Gesicht, Ellbogen, Händen, Kleidung und Frisuren.
+  <br><img src="update_bilder/zuschauer_2_14.jpg" alt="Zuschauer vorher und nachher" width="640">
 - **2.13 – neue Tuningteile:** Felgen (13 Bauarten, Felgenfarbe), Bodykits, Motorhauben, Auspuffe, Spoiler,
   Scheinwerferfarben und Folien.
   <br><img src="update_bilder/tuning_2_13.jpg" alt="Neue Tuningteile" width="640">
@@ -445,7 +468,8 @@ Texte, Cover und Screenshots für die itch.io-Seite: `release/`.
 - `scripts/rail_crossing.gd` – Bahnübergang mit Bahnhof und Zug
 - `scripts/city_builder.gd` – Wahrzeichen der Städte-Strecken (Dom, Residenz, Festung, Gradierbau, Türmersturm …)
 - `scripts/city_data.gd` – Straßenverläufe, Flüsse, Gebäude und Wahrzeichen-Positionen (erzeugt von `tools/osm_city.py`)
-- `scripts/people.gd` + `shaders/people.gdshader` – Figuren (Publikum, Starterin, Fans, Wartende), Bewegung im Shader
+- `scripts/people.gd` + `shaders/people.gdshader` – Figuren (Publikum, Starterin, Fans, Wartende): ein Modell mit allen
+  Kleidungs- und Frisur-Varianten, der Shader wählt je Figur aus und bewegt sie; Vorschau mit `tools/people_shots.tscn`
 - `scripts/race_show.gd` – Kameraflug, Publikum und Starterin am Start, Zielszene
 - `scripts/elevated_rail.gd` – Hochbahn-Zug, `scripts/ambient_sound.gd` – ortsfeste Geräusche (Stadion)
 - `tools/track_stats.tscn` – baut alle Strecken und zeigt Kennzahlen

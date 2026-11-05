@@ -111,7 +111,6 @@ func _ready() -> void:
 	# Tempo-Stufe gilt für alle gleich (Spieler und Gegner)
 	player.top_speed *= GameState.pace()
 	player.accel *= 0.8 + 0.2 * GameState.pace()
-	Music.next()  # jedes Rennen mit einem neuen Track
 	player.place(Track.xform_at(curve, track["start"], Track.LANES[2]))
 	if mood["rain"]:
 		_rain = Moods.rain([200, 340, 520][GameState.gv("fx")])
@@ -441,6 +440,8 @@ func _setup_environment() -> void:
 	# Spiegelungen und Umgebungsverdeckung nur, wenn die Grafikstufe sie vorsieht (die teuersten Effekte)
 	env.ssr_enabled = GameState.gfx_available("ssr") and GameState.gv("ssr") > 0
 	env.ssr_max_steps = maxi(GameState.gv("ssr"), 8)
+	# Stufe "Niedrig": Spiegelungen in halber Auflösung (auf nasser Straße kaum zu unterscheiden, kostet ein Viertel)
+	RenderingServer.environment_set_ssr_half_size(GameState.gv("ssr") < 32)
 	env.ssao_enabled = GameState.gfx_available("ssao") and GameState.gv("ssao")
 	# günstige Variante: Umgebungsverdeckung in halber Auflösung (die Rauheits-Stufe der Spiegelungen gibt es seit
 	# Godot 4.7 nicht mehr)
@@ -526,9 +527,15 @@ static func _hud_col(c: Color) -> Color:
 
 
 func _build_hud() -> void:
+	# Bewegungsunschärfe in der 3D-Auflösung rechnen (Ebene im Welt-Viewport), nicht im ganzen Fenster: auf
+	# hochauflösenden Bildschirmen sind das nur noch ein Viertel bis die Hälfte der Bildpunkte, und die Kopie des
+	# Bildes für den Effekt entfällt im großen Fenster ganz
 	var fx_layer := CanvasLayer.new()
 	fx_layer.layer = 0
-	add_child(fx_layer)
+	world.add_child(fx_layer)
+	var bar_layer := CanvasLayer.new()
+	bar_layer.layer = 0
+	add_child(bar_layer)
 	var fx := ColorRect.new()
 	fx.set_anchors_preset(Control.PRESET_FULL_RECT)
 	fx.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -545,7 +552,7 @@ func _build_hud() -> void:
 		bar.anchor_right = 1.0
 		bar.anchor_top = 0.0 if top else 1.0
 		bar.anchor_bottom = bar.anchor_top
-		fx_layer.add_child(bar)
+		bar_layer.add_child(bar)
 		_bars.append(bar)
 
 	var layer := CanvasLayer.new()

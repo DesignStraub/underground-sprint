@@ -241,44 +241,162 @@ def _wander(rng, n, fc):
     return [v / peak for v in out]
 
 
-def skid_loop():
-    """Reifenquietschen im Drift: zwei Reifen als helle, leicht raue Töne (Haft-Gleit-Effekt), deren Tonhöhe
-    unruhig wandert, dazu etwas Zischen und tiefes Rubbeln. 2,4 s nahtlos (Ende in den Anfang überblendet)."""
-    rng = random.Random(11)
-    n = secs(2.4)
-    xf = secs(0.3)
-    m = n + xf
-    voices = [(830.0, 1.0), (1150.0, 0.7), (640.0, 0.45)]
-    x = [0.0] * m
-    for f0, amp in voices:
-        slow = _wander(rng, m, 2.2)
-        fast = _wander(rng, m, 28.0)
-        level = _wander(rng, m, 5.0)
-        grit = _wander(rng, m, 160.0)
-        ph = 0.0
-        for i in range(m):
-            f = f0 * (1.0 + 0.05 * slow[i] + 0.012 * fast[i])
-            ph += 2.0 * math.pi * f / SR
-            # Grundton mit Obertönen; Haft-Gleiten macht ihn rau (schnelle Lautstärkeschwankung)
-            w = math.sin(ph) + 0.38 * math.sin(2.0 * ph + 0.3) + 0.16 * math.sin(3.0 * ph + 1.1) + 0.06 * math.sin(5.0 * ph)
-            a = amp * (0.62 + 0.38 * level[i]) * (1.0 + 0.3 * grit[i])
-            x[i] += w * a
-    hiss = bandpass([rng.uniform(-1.0, 1.0) for _ in range(m)], 2600.0, 0.9)
-    scrub = lp(lp([rng.uniform(-1.0, 1.0) for _ in range(m)], 260.0), 260.0)
-    hp = max(1e-9, max(abs(v) for v in hiss))
-    sp = max(1e-9, max(abs(v) for v in scrub))
-    for i in range(m):
-        x[i] += 0.32 * hiss[i] / hp + 0.35 * scrub[i] / sp
+def _loop_xfade(x, n, xf):
+    """Ende (n..n+xf) gleichmäßig in den Anfang überblenden -> nahtlose Schleife der Länge n."""
     for i in range(xf):
         k = i / xf
         x[i] = x[i] * math.sqrt(k) + x[n + i] * math.sqrt(1.0 - k)
     return x[:n]
 
 
+def _norm(x):
+    p = max(1e-9, max(abs(v) for v in x))
+    return [v / p for v in x]
+
+
+def _hp(x, fc):
+    low = lp(x, fc)
+    return [a - b for a, b in zip(x, low)]
+
+
+def _saw_blep(rng, m, f0, slow_amt, fast_amt, jit, seed_fc=(1.2, 11.0)):
+    """Haft-Gleit-Schwingung eines Reifens: Sägezahn (langsam spannen, schlagartig rutschen) mit unruhiger Periode
+    und schwankender Stärke je Schwingung. Bandbegrenzt (PolyBLEP), damit nichts kratzig zurückspiegelt."""
+    slow = _wander(rng, m, seed_fc[0])
+    fast = _wander(rng, m, seed_fc[1])
+    out = []
+    ph = 0.0
+    amp = 1.0
+    j = 0.0
+    for i in range(m):
+        f = f0 * (1.0 + slow_amt * slow[i] + fast_amt * fast[i] + j)
+        dt = f / SR
+        ph += dt
+        if ph >= 1.0:
+            ph -= 1.0
+            amp = 1.0 + rng.uniform(-0.35, 0.35)
+            j = rng.uniform(-jit, jit)
+        v = 2.0 * ph - 1.0
+        if ph < dt:
+            t = ph / dt
+            v -= t + t - t * t - 1.0
+        elif ph > 1.0 - dt:
+            t = (ph - 1.0) / dt
+            v -= t * t + t + t + 1.0
+        out.append(v * amp)
+    return out
+
+
+def skid_loop():
+    """Reifenquietschen (starkes Rutschen, Drift, durchdrehende Räder). Kein reiner Pfeifton: jeder Reifen schwingt
+    im Haft-Gleit-Takt (rauer Sägezahn mit unruhiger Periode), der Klang kommt aus den Resonanzen von Reifen und
+    Karosserie (Bandpässe um 1,2 / 2,3 / 3,6 kHz). Dazu Rattern (die Haftung reißt im Takt von 10–30 Hz ab),
+    Zischen und etwas Sättigung. 2,4 s nahtlos."""
+    rng = random.Random(23)
+    n = secs(2.4)
+    xf = secs(0.3)
+    m = n + xf
+    x = [0.0] * m
+    # zwei Reifen fast gleich hoch (Schwebung statt Akkord: ein Akkord klingt nach Pfeife oder Orgel)
+    for f0, amp in [(760.0, 1.0), (787.0, 0.7)]:
+        saw = _saw_blep(rng, m, f0, 0.05, 0.015, 0.035)
+        body = [0.0] * m
+        for fc, q, g in [(1200.0, 3.0, 1.0), (2300.0, 4.0, 0.75), (3600.0, 5.0, 0.4)]:
+            for i, v in enumerate(bandpass(saw, fc, q)):
+                body[i] += v * g
+        low = lp(saw, 900.0)
+        for i in range(m):
+            x[i] += (body[i] + 0.35 * low[i]) * amp
+    x = _norm(x)
+    # Rattern: Haftung reißt ab und kommt wieder (unregelmäßig, 10–30 Hz)
+    chat = _wander(rng, m, 22.0)
+    lvl = _wander(rng, m, 3.0)
+    hiss = _norm(bandpass([rng.uniform(-1.0, 1.0) for _ in range(m)], 3200.0, 0.8))
+    out = []
+    for i in range(m):
+        a = (0.78 + 0.22 * lvl[i]) * (1.0 - 0.3 * max(0.0, chat[i]))
+        v = math.tanh(1.8 * x[i] * a) + 0.12 * hiss[i]
+        out.append(v)
+    return _loop_xfade(out, n, xf)
+
+
+def scrub_loop():
+    """Reifen schrubben (leichtes Rutschen, Kurve am Limit, Anfang eines Drifts): raues, eher tiefes Rauschen mit
+    Körnung vom Asphalt, kein Ton. 2 s nahtlos."""
+    rng = random.Random(31)
+    n = secs(2.0)
+    xf = secs(0.25)
+    m = n + xf
+    nz = [rng.uniform(-1.0, 1.0) for _ in range(m)]
+    body = _norm([a + 0.6 * b for a, b in zip(bandpass(nz, 380.0, 0.8), bandpass(nz, 1100.0, 1.2))])
+    # Körnung: viele kleine Stöße (Steinchen, Fugen), durch einen Bandpass um 1,6 kHz
+    grit = [0.0] * m
+    i = 0
+    while i < m:
+        grit[i] = rng.uniform(0.3, 1.0) * (1 if rng.random() < 0.5 else -1)
+        i += int(rng.uniform(0.002, 0.012) * SR)
+    grit = _norm(bandpass(grit, 1600.0, 2.0))
+    am = _wander(rng, m, 14.0)
+    out = [(body[i] * 0.8 + grit[i] * 0.35) * (0.8 + 0.2 * am[i]) for i in range(m)]
+    return _loop_xfade(out, n, xf)
+
+
+def nitro_loop():
+    """Nitro: scharfes Fauchen aus den Düsen (Rauschen 1,5–7 kHz, flatternd), dumpfes Brausen der Flamme im
+    Auspuff und ein leiser, heller Pfeifton. 2 s nahtlos."""
+    rng = random.Random(41)
+    n = secs(2.0)
+    xf = secs(0.25)
+    m = n + xf
+    nz = [rng.uniform(-1.0, 1.0) for _ in range(m)]
+    hiss = _norm(lp(_hp(nz, 1500.0), 7000.0))
+    roar = _norm(lp(lp([rng.uniform(-1.0, 1.0) for _ in range(m)], 170.0), 170.0))
+    mid = _norm(bandpass([rng.uniform(-1.0, 1.0) for _ in range(m)], 700.0, 0.9))
+    flut = _wander(rng, m, 16.0)
+    out = []
+    ph = 0.0
+    for i in range(m):
+        t = i / SR
+        ph += 2.0 * math.pi * 2650.0 * (1.0 + 0.008 * math.sin(2.0 * math.pi * 5.0 * t)) / SR
+        v = hiss[i] * (0.7 + 0.3 * flut[i]) * 0.75 + roar[i] * 0.9 + mid[i] * 0.3 + math.sin(ph) * 0.06
+        out.append(v)
+    return _loop_xfade(out, n, xf)
+
+
+def nitro_on():
+    """Nitro zünden: Klacken des Ventils, ein dumpfer Stoß, dann schießt das Zischen hoch (Filter öffnet sich) und
+    ein Wusch läuft durch; klingt auf den Pegel der Dauerschleife aus. 1,4 s."""
+    rng = random.Random(43)
+    n = secs(1.4)
+    nz = [rng.uniform(-1.0, 1.0) for _ in range(n)]
+    fcs = [1500.0 + 8000.0 * min(1.0, (i / SR) / 0.22) - 2500.0 * max(0.0, (i / SR - 0.22) / 1.2) for i in range(n)]
+    hiss = _norm(_hp(lp_var(nz, fcs), 900.0))
+    sweep = [400.0 + 2600.0 * min(1.0, (i / SR) / 0.5) for i in range(n)]
+    wl = lp_var([rng.uniform(-1.0, 1.0) for _ in range(n)], sweep)
+    whoosh = _norm(_hp(wl, 300.0))
+    out = []
+    ph = 0.0
+    for i in range(n):
+        t = i / SR
+        env_h = min(1.0, t / 0.03) * (0.45 + 0.55 * math.exp(-t * 2.2))
+        env_w = math.sin(math.pi * min(1.0, t / 0.7)) ** 2
+        f = 48.0 + 60.0 * math.exp(-t * 18.0)
+        ph += 2.0 * math.pi * f / SR
+        boom = math.sin(ph) * math.exp(-t * 9.0) * min(1.0, t / 0.008)
+        click = rng.uniform(-1.0, 1.0) * math.exp(-t * 400.0)
+        out.append(hiss[i] * env_h * 0.8 + whoosh[i] * env_w * 0.45 + boom * 0.9 + click * 0.7)
+    # die letzten 0,15 s sanft auf null
+    k = secs(0.15)
+    for i in range(k):
+        out[n - k + i] *= 1.0 - i / k
+    return out
+
+
 SOUNDS = {
     "horn": (horn, 0.89), "bell": (bell_loop, 0.7), "rumble": (rumble_loop, 0.89), "thud": (thud, 0.89),
     "whoosh": (whoosh, 0.7), "splash": (splash, 0.89), "clang": (clang, 0.75), "tunnel": (tunnel, 0.8),
-    "crowd": (crowd_loop, 0.6), "skid": (skid_loop, 0.8),
+    "crowd": (crowd_loop, 0.6), "skid": (skid_loop, 0.8), "scrub": (scrub_loop, 0.8), "nitro": (nitro_loop, 0.8),
+    "nitro_on": (nitro_on, 0.89),
 }
 
 if __name__ == "__main__":

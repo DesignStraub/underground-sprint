@@ -48,8 +48,9 @@ Berlin-Kreuzberg, mit Dom, Residenz, Festung, Oberbaumbrücke und Hochbahn an ih
 - 15 JDM-Autos in fünf Leistungsklassen (die letzten fünf gleich stark, aber jedes mit eigenem Charakter), Tuning wie in NFS, ein Satz Teile für alle Autos: Optik (21 Lacke mit Matt, Perlmutt und Chrom, 13 Felgenarten mit eigener Felgenfarbe, Spoiler, Bodykits, Motorhauben mit Kohlefaser, Auspuff, Folien, Neon, Scheiben, Scheinwerfer) und Leistung (Motor, Turbo, Nitro, Fahrwerk, Reifen)
 - Kein Geld, kein Grind: Siege schalten Teile und Autos frei
 - Schwierigkeit Leicht / Normal / Schwer: Leicht zum entspannten Kennenlernen der Städte
-- Start- und Zielszene wie damals: Starterin, jubelnde Fans, Kamerafahrt
-- Motorsound in Echtzeit erzeugt – jedes Auto klingt anders
+- Start- und Zielszene wie damals: Starterin, jubelnde Fans, Kamerafahrt; Zuschauer mit eigener Kleidung und Frisur
+- Motorsound in Echtzeit erzeugt – jedes Auto klingt anders; Nitro faucht, Reifen schrubben und quietschen
+- Musik als durchgehender Mix: sieben Tracks (Phonk, Trap, Drill), gleich laut, weich übergeblendet
 - Grafikmenü wie in großen PC-Spielen: Voreinstellungen Niedrig bis Ultra, dynamische Auflösung, Sichtweite, Details, Kantenglättung, FPS-Anzeige
 - Englisch und Deutsch, Retro-Pixel-Look (einstellbar), läuft bis 4K und im Browser, auch auf Handy und Tablet
 
@@ -84,8 +85,9 @@ cathedral, palace, fortress, Oberbaum Bridge and elevated U-Bahn in their real p
 - 15 JDM cars in five performance classes (the top five equally strong, each with its own character), NFS-style tuning, one set of parts for all your cars: visual (21 paints incl. matte, pearl and chrome, 13 rim styles with their own rim colour, spoilers, body kits, carbon hoods, exhausts, vinyls, underglow, tint, headlights) and performance (engine, turbo, nitro, suspension, tires)
 - No money, no grind: wins unlock parts and cars
 - Difficulty Easy / Normal / Hard: Easy for exploring the cities at your own pace
-- Start and finish scenes like back in the day: flag girl, cheering crowd, camera fly-in
-- Real-time engine sound – every car sounds different
+- Start and finish scenes like back in the day: flag girl, cheering crowd, camera fly-in; spectators with their own clothes and hairstyles
+- Real-time engine sound – every car sounds different; nitro hisses, tires scrub and squeal
+- Music as a continuous mix: seven tracks (phonk, trap, drill), levelled and crossfaded
 - Graphics menu like big PC games: Low to Ultra presets, dynamic resolution, view distance, detail, anti-aliasing, FPS counter
 - English and German (choose at first start), retro pixel look, runs up to 4K and in the browser, also on phones and tablets
 
