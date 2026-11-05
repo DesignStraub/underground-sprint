@@ -137,70 +137,184 @@ const CAR_ORDER := ["kaizen", "hachi", "sakura", "hayate", "kitsune", "tsubame",
 const LEGACY_UNLOCK := {"hachi": {"race": 1, "drift": 1}, "mirai": {"race": 2, "drift": 1}, "sakura": {"drift": 1},
 	"tsubame": {"race": 3}, "vortex": {"race": 5}, "raijin": {"race": 7}, "ronin": {"drift": 3}, "kaze": {"race": 9, "drift": 4}}
 
-## Jede Kategorie: Liste von Optionen {name, wins, ...}.
+## Jede Kategorie: Liste von Optionen {name, wins, ...}. Neue Optionen kommen hinten dazu, damit die Nummern im
+## Spielstand gültig bleiben. Optik: die Grundteile sind von Anfang an frei, Besonderes kommt mit Siegen.
 const PARTS := {
+	# finish: "" glänzend (Klarlack), "matt", "pearl" (Perlmutt), "chrome", "metal" (stark metallisch)
 	"paint": {
 		"label": "Lack",
 		"options": [
 			{"name": "Werkslack", "wins": 0, "color": Color(0.75, 0.77, 0.8)},  # je Auto eigen (CARS.paint), sonst Silber
 			{"name": "Schwarz", "wins": 0, "color": Color(0.05, 0.05, 0.06)},
 			{"name": "Rot", "wins": 0, "color": Color(0.75, 0.05, 0.05)},
-			{"name": "Gelb", "wins": 1, "color": Color(0.95, 0.75, 0.05)},
-			{"name": "Giftgrün", "wins": 2, "color": Color(0.35, 0.9, 0.1)},
-			{"name": "Candyblau", "wins": 3, "color": Color(0.05, 0.2, 0.9)},
-			{"name": "Neonpink", "wins": 4, "color": Color(0.95, 0.1, 0.6)},
+			{"name": "Gelb", "wins": 0, "color": Color(0.95, 0.75, 0.05)},
+			{"name": "Giftgrün", "wins": 1, "color": Color(0.35, 0.9, 0.1)},
+			{"name": "Candyblau", "wins": 2, "color": Color(0.05, 0.2, 0.9), "finish": "metal"},
+			{"name": "Neonpink", "wins": 2, "color": Color(0.95, 0.1, 0.6)},
+			{"name": "Weiß", "wins": 0, "color": Color(0.9, 0.9, 0.88)},
+			{"name": "Silber", "wins": 0, "color": Color(0.72, 0.74, 0.77)},
+			{"name": "Orange", "wins": 0, "color": Color(0.95, 0.38, 0.04)},
+			{"name": "Blau", "wins": 0, "color": Color(0.07, 0.22, 0.62)},
+			{"name": "Dunkelgrün", "wins": 0, "color": Color(0.03, 0.2, 0.1)},
+			{"name": "Gunmetal", "wins": 0, "color": Color(0.2, 0.21, 0.23)},
+			{"name": "Lila", "wins": 1, "color": Color(0.33, 0.07, 0.55)},
+			{"name": "Babyblau", "wins": 1, "color": Color(0.42, 0.68, 0.95)},
+			{"name": "Bronze", "wins": 2, "color": Color(0.5, 0.31, 0.13), "finish": "metal"},
+			{"name": "Mattschwarz", "wins": 3, "color": Color(0.035, 0.035, 0.04), "finish": "matt"},
+			{"name": "Mattgrau", "wins": 3, "color": Color(0.28, 0.29, 0.3), "finish": "matt"},
+			{"name": "Perlweiß", "wins": 4, "color": Color(0.93, 0.92, 0.9), "finish": "pearl"},
+			{"name": "Gold", "wins": 6, "color": Color(0.85, 0.62, 0.2), "finish": "metal"},
+			{"name": "Chrom", "wins": 8, "color": Color(0.85, 0.86, 0.88), "finish": "chrome"},
 		],
 	},
+	# style: Bauart der Felge (car_builder._rim), spokes: Zahl der Speichen, radius: Felgengröße
 	"rims": {
 		"label": "Felgen",
 		"options": [
-			{"name": "Serie", "wins": 0, "color": Color(0.62, 0.63, 0.66), "radius": 0.22, "spokes": 7},
-			{"name": "Fünfspeichen", "wins": 1, "color": Color(0.85, 0.85, 0.9), "radius": 0.27, "spokes": 5},
-			{"name": "Gitter Gold", "wins": 2, "color": Color(0.85, 0.65, 0.2), "radius": 0.28, "spokes": 10},
-			{"name": "Tiefbett Schwarz", "wins": 4, "color": Color(0.08, 0.08, 0.08), "radius": 0.29, "spokes": 6},
+			{"name": "Serie", "wins": 0, "color": Color(0.62, 0.63, 0.66), "radius": 0.22, "spokes": 7, "style": "std"},
+			{"name": "Fünfspeichen", "wins": 0, "color": Color(0.85, 0.85, 0.9), "radius": 0.27, "spokes": 5, "style": "std"},
+			{"name": "Gitter Gold", "wins": 1, "color": Color(0.85, 0.65, 0.2), "radius": 0.28, "spokes": 10, "style": "mesh"},
+			{"name": "Tiefbett Schwarz", "wins": 2, "color": Color(0.08, 0.08, 0.08), "radius": 0.29, "spokes": 6, "style": "dish"},
+			{"name": "Doppelspeichen", "wins": 0, "color": Color(0.78, 0.79, 0.82), "radius": 0.27, "spokes": 5, "style": "split"},
+			{"name": "Y-Speichen", "wins": 0, "color": Color(0.46, 0.47, 0.5), "radius": 0.28, "spokes": 5, "style": "y"},
+			{"name": "Mehrspeichen", "wins": 0, "color": Color(0.8, 0.8, 0.83), "radius": 0.28, "spokes": 16, "style": "thin"},
+			{"name": "Stahlfelge", "wins": 0, "color": Color(0.1, 0.1, 0.11), "radius": 0.22, "spokes": 6, "style": "steel"},
+			{"name": "Turbine", "wins": 1, "color": Color(0.82, 0.83, 0.86), "radius": 0.27, "spokes": 12, "style": "turbine"},
+			{"name": "Rennsport-Sechs", "wins": 2, "color": Color(0.62, 0.42, 0.16), "radius": 0.29, "spokes": 6, "style": "te"},
+			{"name": "Kreuzspeichen", "wins": 3, "color": Color(0.85, 0.65, 0.25), "radius": 0.29, "spokes": 8, "style": "cross"},
+			{"name": "Aero-Scheibe", "wins": 4, "color": Color(0.9, 0.9, 0.9), "radius": 0.27, "spokes": 5, "style": "aero"},
+			{"name": "Tiefbett Stern", "wins": 5, "color": Color(0.85, 0.86, 0.9), "radius": 0.3, "spokes": 5, "style": "dish"},
+		],
+	},
+	# Felgenfarbe: "Passend" behält die Farbe der Felge, "Wagenfarbe" nimmt den Lack
+	"rimcol": {
+		"label": "Felgenfarbe",
+		"options": [
+			{"name": "Passend", "wins": 0},
+			{"name": "Silber", "wins": 0, "color": Color(0.78, 0.79, 0.82)},
+			{"name": "Schwarz", "wins": 0, "color": Color(0.06, 0.06, 0.065)},
+			{"name": "Gunmetal", "wins": 0, "color": Color(0.26, 0.27, 0.29)},
+			{"name": "Weiß", "wins": 0, "color": Color(0.92, 0.92, 0.9)},
+			{"name": "Wagenfarbe", "wins": 0, "paint": true},
+			{"name": "Rot", "wins": 0, "color": Color(0.75, 0.05, 0.05)},
+			{"name": "Gold", "wins": 1, "color": Color(0.85, 0.65, 0.2)},
+			{"name": "Bronze", "wins": 1, "color": Color(0.6, 0.4, 0.16)},
+			{"name": "Neongrün", "wins": 2, "color": Color(0.45, 1.0, 0.1)},
+			{"name": "Chrom", "wins": 3, "color": Color(0.9, 0.9, 0.92), "chrome": true},
 		],
 	},
 	"spoiler": {
 		"label": "Spoiler",
 		"options": [
 			{"name": "Keiner", "wins": 0},
-			{"name": "Lippe", "wins": 1},
-			{"name": "GT-Flügel", "wins": 3},
+			{"name": "Lippe", "wins": 0},
+			{"name": "GT-Flügel", "wins": 1},
 			{"name": "Monster-Flügel", "wins": 5},
+			{"name": "Entenbürzel", "wins": 0},
+			{"name": "Street-Flügel", "wins": 0},
+			{"name": "Schwanenhals", "wins": 2},
+			{"name": "Doppeldecker", "wins": 3},
+			{"name": "Dachspoiler", "wins": 0},
+			{"name": "Bügelflügel", "wins": 1},
 		],
 	},
+	# flare: Kotflügel verbreitert; die Anbauteile baut car_builder._bodykit
 	"bodykit": {
 		"label": "Bodykit",
 		"options": [
 			{"name": "Serie", "wins": 0},
-			{"name": "Seitenschweller", "wins": 2},
-			{"name": "Breitbau", "wins": 4},
+			{"name": "Seitenschweller", "wins": 0},
+			{"name": "Breitbau", "wins": 3, "flare": true},
+			{"name": "Street", "wins": 0},
+			{"name": "Rallye", "wins": 1},
+			{"name": "Racing", "wins": 2},
+			{"name": "Breitbau Racing", "wins": 5, "flare": true},
+		],
+	},
+	"hood": {
+		"label": "Motorhaube",
+		"options": [
+			{"name": "Serie", "wins": 0},
+			{"name": "Lufthutze", "wins": 0},
+			{"name": "Lamellen", "wins": 0},
+			{"name": "NACA-Einlass", "wins": 0},
+			{"name": "Doppelhutze", "wins": 1},
+			{"name": "Carbon", "wins": 2},
+			{"name": "Carbon mit Hutze", "wins": 4},
+		],
+	},
+	"exhaust": {
+		"label": "Auspuff",
+		"options": [
+			{"name": "Serie", "wins": 0},
+			{"name": "Sport", "wins": 0},
+			{"name": "Doppelrohr", "wins": 0},
+			{"name": "Ovalrohr", "wins": 1},
+			{"name": "Titan", "wins": 2},
+			{"name": "Rennauspuff", "wins": 3},
 		],
 	},
 	"vinyl": {
 		"label": "Folierung",
 		"options": [
 			{"name": "Keins", "wins": 0},
-			{"name": "Rennstreifen", "wins": 2},
-			{"name": "Seitenstreifen", "wins": 3},
+			{"name": "Rennstreifen", "wins": 0},
+			{"name": "Seitenstreifen", "wins": 0},
+			{"name": "Mittelstreifen", "wins": 0},
+			{"name": "Zweifarbig", "wins": 1},
+			{"name": "Flankenband", "wins": 0},
+			{"name": "Haube und Heck", "wins": 0},
+			{"name": "Kontrastdach", "wins": 0},
+			{"name": "Rallye", "wins": 2},
+		],
+	},
+	# Folienfarbe: "Kontrast" = Weiß auf dunklem, Schwarz auf hellem Lack
+	"vinylcol": {
+		"label": "Folienfarbe",
+		"options": [
+			{"name": "Kontrast", "wins": 0},
+			{"name": "Weiß", "wins": 0, "color": Color(0.93, 0.93, 0.92)},
+			{"name": "Schwarz", "wins": 0, "color": Color(0.04, 0.04, 0.045)},
+			{"name": "Rot", "wins": 0, "color": Color(0.8, 0.05, 0.05)},
+			{"name": "Blau", "wins": 0, "color": Color(0.06, 0.25, 0.8)},
+			{"name": "Gelb", "wins": 0, "color": Color(0.98, 0.78, 0.05)},
+			{"name": "Gold", "wins": 1, "color": Color(0.85, 0.63, 0.2), "metal": true},
+			{"name": "Neongrün", "wins": 1, "color": Color(0.45, 1.0, 0.1)},
+			{"name": "Pink", "wins": 1, "color": Color(0.98, 0.12, 0.6)},
+			{"name": "Carbon", "wins": 2, "color": Color(0.07, 0.07, 0.08), "carbon": true},
 		],
 	},
 	"neon": {
 		"label": "Unterbodenneon",
 		"options": [
 			{"name": "Aus", "wins": 0},
-			{"name": "Blau", "wins": 1, "color": Color(0.1, 0.4, 1.0)},
-			{"name": "Pink", "wins": 2, "color": Color(1.0, 0.1, 0.7)},
-			{"name": "Grün", "wins": 3, "color": Color(0.1, 1.0, 0.3)},
+			{"name": "Blau", "wins": 0, "color": Color(0.1, 0.4, 1.0)},
+			{"name": "Pink", "wins": 0, "color": Color(1.0, 0.1, 0.7)},
+			{"name": "Grün", "wins": 1, "color": Color(0.1, 1.0, 0.3)},
+			{"name": "Rot", "wins": 0, "color": Color(1.0, 0.08, 0.05)},
+			{"name": "Lila", "wins": 0, "color": Color(0.55, 0.1, 1.0)},
+			{"name": "Weiß", "wins": 1, "color": Color(0.85, 0.9, 1.0)},
+			{"name": "Orange", "wins": 1, "color": Color(1.0, 0.45, 0.05)},
+			{"name": "Türkis", "wins": 2, "color": Color(0.05, 1.0, 0.85)},
 		],
 	},
 	"tint": {
 		"label": "Scheiben",
 		"options": [
 			{"name": "Klar", "wins": 0, "color": Color(0.03, 0.04, 0.06)},
-			{"name": "Getönt", "wins": 1, "color": Color(0.012, 0.012, 0.016)},
-			{"name": "Dunkel", "wins": 2, "color": Color(0.003, 0.003, 0.004)},
-			{"name": "Blau verspiegelt", "wins": 3, "color": Color(0.02, 0.07, 0.2)},
+			{"name": "Getönt", "wins": 0, "color": Color(0.012, 0.012, 0.016)},
+			{"name": "Dunkel", "wins": 1, "color": Color(0.003, 0.003, 0.004)},
+			{"name": "Blau verspiegelt", "wins": 2, "color": Color(0.02, 0.07, 0.2)},
+		],
+	},
+	# Scheinwerfer: Lichtfarbe der Frontlichter und des Lichtkegels
+	"lights": {
+		"label": "Scheinwerfer",
+		"options": [
+			{"name": "Serie", "wins": 0, "color": Color(1.0, 0.97, 0.88)},
+			{"name": "Xenon", "wins": 0, "color": Color(0.82, 0.9, 1.0)},
+			{"name": "Gelb", "wins": 0, "color": Color(1.0, 0.82, 0.35)},
+			{"name": "Eisblau", "wins": 1, "color": Color(0.55, 0.72, 1.0)},
 		],
 	},
 	"engine": {
@@ -252,9 +366,11 @@ const PARTS := {
 	},
 }
 
-const PART_ORDER := ["paint", "rims", "spoiler", "bodykit", "vinyl", "neon", "tint", "engine", "turbo", "nitro", "suspension", "tires"]
+const PART_ORDER := ["paint", "rims", "rimcol", "spoiler", "bodykit", "hood", "exhaust", "vinyl", "vinylcol", "neon", "tint",
+	"lights", "engine", "turbo", "nitro", "suspension", "tires"]
 ## Tuning-Menü wie in NFS: erst Optik oder Leistung, dann die Kategorie, dann das Teil
-const PART_GROUPS := {"optik": ["paint", "rims", "spoiler", "bodykit", "vinyl", "neon", "tint"],
+const PART_GROUPS := {"optik": ["paint", "rims", "rimcol", "spoiler", "bodykit", "hood", "exhaust", "vinyl", "vinylcol", "neon",
+	"tint", "lights"],
 	"leistung": ["engine", "turbo", "nitro", "suspension", "tires"]}
 
 
@@ -287,7 +403,7 @@ static func rating(car_id: String, cfg: Dictionary) -> int:
 
 ## Events: werden aus dem Seed prozedural erzeugt. Alle sind von Anfang an fahrbar.
 ## type: "sprint" (A nach B), "circuit" (Rundkurs, laps Runden), "drift" (Rundkurs allein, Punkte fürs Querfahren),
-## "drag" (gerade, Spurwechsel und Handschaltung).
+## "drag" (gerade, auf Schienen: Spurwechsel und Handschaltung).
 ## tier: Schwierigkeit 1..3. bulges: Segment-Index -> "alley" (kurvige Gasse), "lake" (Seesprung),
 ## "fork" (echte Gabelung: kurz mit Gegenverkehr oder breiter Boulevard außen herum).
 ## districts: Gewichte der Stadtviertel. Rundkurse: corners = Eckpunkte, radius = ungefähre Größe.
@@ -370,7 +486,7 @@ const EVENT_TYPES := {
 	"sprint": {"label": "Sprint", "desc": "Von A nach B gegen 3 Gegner. Gabelungen und Abkürzungen: du entscheidest. * ohne Verkehr, ** wenig, *** voll."},
 	"circuit": {"label": "Rundkurs", "desc": "2 Runden gegen 3 Gegner. Wer die beste Linie findet, gewinnt. * ohne Verkehr, ** wenig, *** voll."},
 	"drift": {"label": "Drift", "desc": "Allein auf der Strecke. Querfahren gibt Punkte, Ketten geben Multiplikator, Crash kostet die Kette."},
-	"drag": {"label": "Drag", "desc": "Geradeaus gegen 3 Gegner. A/D wechselt die Spur, E/Q schaltet: im grünen Bereich perfekt. Zu lange im Begrenzer: Motorschaden. Crash mit Verkehr: Totalschaden."},
+	"drag": {"label": "Drag", "desc": "Geradeaus gegen 3 Gegner, das Auto fährt wie auf Schienen. A/D wechselt die Spur, S schaltet hoch, X runter: im grünen Bereich perfekt. Zu lange im Begrenzer: Motorschaden. Crash mit Verkehr: Totalschaden."},
 }
 const TYPE_ORDER := ["sprint", "circuit", "drag", "drift"]
 ## Karriere: so werden die Events nacheinander freigeschaltet (Sieg im vorigen Event öffnet das nächste)

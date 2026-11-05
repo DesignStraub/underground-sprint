@@ -1,6 +1,8 @@
 extends AudioStreamPlayer
-## Synthetischer Motorsound in Echtzeit. Grundton aus Drehzahl und Zylinderzahl, Obertöne je nach Auto,
-## alles durch einen weichen Tiefpass. Lautstärke steigt mit Drehzahl und Gas.
+## Synthetischer Motorsound in Echtzeit. Grundton aus Drehzahl und Zylinderzahl, Obertöne je nach Auto, dazu die
+## Druckstöße im Auspuff (schmale Pulse je Zündung: das gibt den kernigen, hellen Anteil) und ein leises Rasseln
+## (Rauschen im Takt der Zündungen) unter Last. Tiefpass bis gut 2 kHz: klar, aber nicht schrill. Lautstärke steigt
+## mit Drehzahl und Gas; beim Gaswegnehmen bei hoher Drehzahl ploppt es ab und zu im Auspuff.
 ## Dazu leise: Turbo, Blow-off, Fahrtwind, Nitro. Reifenquietschen kommt aus einer eigenen Schleife (skid.wav),
 ## Lautstärke und Tonhöhe nach Rutschen und Tempo.
 
@@ -33,6 +35,8 @@ var _lp2 := 0.0
 var _rough_lp := 0.0
 var _n_lo := 0.0
 var _n_hi := 0.0
+var _n_top := 0.0
+var _pop := 0.0
 var _wind_lp := 0.0
 var _bov := 0.0
 var _last_throttle := 0.0
@@ -77,13 +81,17 @@ func _process(delta: float) -> void:
 		return
 	if turbo_amount > 0.0 and _last_throttle > 0.6 and throttle < 0.2 and _turbo > 0.5:
 		_bov = 1.0
+	# Plopp im Auspuff: Gas weg bei hoher Drehzahl
+	if _last_throttle > 0.5 and throttle < 0.1 and rpm > 4500.0 and randf() < 0.5:
+		_pop = 0.6 + randf() * 0.4
 	_last_throttle = throttle
 	_turbo = move_toward(_turbo, throttle * clampf((rpm - 2500.0) / 4000.0, 0.0, 1.0), delta * (1.5 if throttle > 0.5 else 4.0))
 
 	# Pro Block konstante Werte
 	var fire := rpm / 60.0 * cylinders / 2.0
-	# Obere Frequenzgrenze wächst mit der Drehzahl, bleibt aber unter ~1 kHz: warm statt schrill
-	var cutoff := clampf(fire * 2.6 + throttle * 250.0, 200.0, 1000.0)
+	# Obere Frequenzgrenze wächst mit Drehzahl und Last: unter Gas hell und offen (bis ~2,2 kHz), im Schiebebetrieb
+	# dumpfer. Bis 2.12 lag sie unter 1 kHz, das klang wie durch eine Wand.
+	var cutoff := clampf(fire * 3.0 + throttle * 500.0, 300.0, 1800.0)
 	var a := 1.0 - exp(-TAU * cutoff / rate)
 	var h0: float = harmonics[0]
 	var h1: float = harmonics[1]
@@ -95,6 +103,8 @@ func _process(delta: float) -> void:
 	var wind_amp := speed_n * speed_n * 0.25
 	var a_lo := 1.0 - exp(-TAU * 350.0 / rate)
 	var a_hi := 1.0 - exp(-TAU * 1400.0 / rate)
+	var a_top := 1.0 - exp(-TAU * minf(3600.0, rate * 0.4) / rate)
+	var k_pop := pow(0.9985, k)
 	var k_bov := pow(0.9997, k)
 	var k_crash := pow(0.9996, k)
 	var n := _pb.get_frames_available()
@@ -114,6 +124,11 @@ func _process(delta: float) -> void:
 		var p2 := _phase2 * TAU
 		x += 0.35 * (h0 * sin(p2) + h1 * sin(2.0 * p2 + 1.1))
 		x *= norm * 0.8
+		# Druckstöße: ein schmaler Puls je Zündung (viele Obertöne), unter Last kräftiger
+		var sp := maxf(sin(p), 0.0)
+		var sp2 := sp * sp
+		var pulse := sp2 * sp2 * sp2
+		x += (pulse - 0.12) * (0.15 + 0.2 * _thr_s)
 		# Leichte Unruhe über langsam schwankende Amplitude statt kratzigem Rauschen
 		var noise := randf() * 2.0 - 1.0
 		_rough_lp += 0.015 * k * (noise - _rough_lp)
@@ -126,7 +141,13 @@ func _process(delta: float) -> void:
 		# Bandbegrenztes Rauschen (350–1400 Hz) für Zischen, Reifen, Nitro: kein schrilles Hochtonrauschen
 		_n_lo += a_lo * (noise - _n_lo)
 		_n_hi += a_hi * (noise - _n_hi)
+		_n_top += a_top * (noise - _n_top)
 		var band := _n_hi - _n_lo
+		# Rasseln: helles Rauschen (1,4–3,6 kHz) im Takt der Zündungen, nur unter Last und mit Drehzahl
+		s += (_n_top - _n_hi) * pulse * (0.02 + 0.07 * _thr_s) * (0.3 + rpm_n) * (0.6 + rough)
+		if _pop > 0.01:
+			s += (_n_top - _n_lo) * _pop * pulse * 0.9
+			_pop *= k_pop
 
 		if turbo_amp > 0.0001:
 			_turbo_phase = fmod(_turbo_phase + (700.0 + _rpm_s * 0.1) / rate, 1.0)

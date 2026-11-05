@@ -190,6 +190,7 @@ func _physics_process(dt: float) -> void:
 	var acc := accel * maxf(1.0 - 0.4 * pow(speed / maxf(top, 1.0), 2.0), 0.45)
 	if drag:
 		acc = accel * 0.8 * maxf(1.0 - pow(speed / maxf(top * skill, 1.0), 1.6), 0.05)
+	acc *= 0.6 + 0.4 * minf(speed / 8.0, 1.0)  # Anfahren wie beim Spieler: erst greifen die Reifen nicht voll
 	speed = move_toward(speed, target, dt * (acc if target > speed else 22.0))
 	var prev_d := d
 	d += speed * dt

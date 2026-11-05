@@ -1,5 +1,6 @@
 extends Node
-## Spielstand: Siege, aktuelles Auto, Tuning pro Auto. Kein Geld, nur Freischalten über Siege.
+## Spielstand: Siege, aktuelles Auto, Tuning. Kein Geld, nur Freischalten über Siege.
+## Tuning wie in NFS Underground: eingebaute Teile gelten für alle eigenen Autos (ein Satz für die ganze Garage).
 
 const Catalog := preload("res://scripts/catalog.gd")
 const I18n := preload("res://scripts/i18n.gd")
@@ -64,7 +65,7 @@ var current_car := "kaizen"
 var race_index := 0
 var best_times := {}  # Rennname -> Sekunden
 var won_events: Array = []  # gewonnene Events (Karriere: ein Sieg öffnet das nächste)
-var car_configs := {}  # car_id -> {category: option_index}
+var tuning := {}  # category -> option_index, für alle Autos gemeinsam
 var kept_cars: Array = []  # schon mit den alten Schwellen (bis 2.10) freigeschaltete Autos bleiben frei
 
 
@@ -104,8 +105,10 @@ func _setup_input() -> void:
 	_add_action("steer_right", [KEY_D, KEY_RIGHT], [], [JOY_AXIS_LEFT_X, 1.0])
 	_add_action("handbrake", [KEY_SPACE], [JOY_BUTTON_B], [])
 	_add_action("nitro", [KEY_SHIFT, KEY_N], [JOY_BUTTON_A], [])
-	_add_action("shift_up", [KEY_E], [JOY_BUTTON_RIGHT_SHOULDER], [])  # Drag: hochschalten
-	_add_action("shift_down", [KEY_Q], [JOY_BUTTON_LEFT_SHOULDER], [])
+	# Drag: hochschalten S (im Drag wird nicht gebremst), runter X; auf deutscher und englischer Tastatur gleich.
+	# E/Q gehen weiterhin.
+	_add_action("shift_up", [KEY_S, KEY_E], [JOY_BUTTON_RIGHT_SHOULDER], [])
+	_add_action("shift_down", [KEY_X, KEY_Q], [JOY_BUTTON_LEFT_SHOULDER], [])
 	_add_action("camera", [KEY_C], [JOY_BUTTON_Y], [])
 	_add_action("reset_car", [KEY_R], [JOY_BUTTON_BACK], [])
 	# Pause auch mit Enter: im Browser beendet Esc im Vollbild nur das Vollbild und kommt nicht im Spiel an
@@ -398,17 +401,12 @@ func is_part_unlocked(category: String, index: int) -> bool:
 	return total_wins() >= Catalog.PARTS[category]["options"][index]["wins"]
 
 
-func get_config(car_id: String) -> Dictionary:
-	if not car_configs.has(car_id):
-		var cfg := {}
-		for cat in Catalog.PART_ORDER:
-			cfg[cat] = 0
-		car_configs[car_id] = cfg
-	var c: Dictionary = car_configs[car_id]
+## Eingebautes Tuning. Gilt für jedes Auto gleich (car_id bleibt für die Aufrufer, ändert aber nichts).
+func get_config(_car_id := "") -> Dictionary:
 	for cat in Catalog.PART_ORDER:
-		if not c.has(cat):
-			c[cat] = 0
-	return c
+		if not tuning.has(cat):
+			tuning[cat] = 0
+	return tuning
 
 
 func part(car_id: String, category: String) -> Dictionary:
@@ -429,10 +427,14 @@ func register_win(event_type: String) -> Array:
 	for car_id in Catalog.CAR_ORDER:
 		if not is_car_unlocked(car_id, rw0, dw0) and is_car_unlocked(car_id):
 			unlocked.append(tr("Auto: ") + Catalog.CARS[car_id]["name"])
+	# je Kategorie eine Zeile ("Felgen: Turbine, Gitter Gold"), sonst wird die Liste nach einem Sieg zu lang
 	for cat in Catalog.PART_ORDER:
+		var names := []
 		for opt in Catalog.PARTS[cat]["options"]:
 			if opt["wins"] > before and opt["wins"] <= total_wins():
-				unlocked.append(tr(Catalog.PARTS[cat]["label"]) + ": " + tr(opt["name"]))
+				names.append(tr(opt["name"]))
+		if not names.is_empty():
+			unlocked.append(tr(Catalog.PARTS[cat]["label"]) + ": " + ", ".join(names))
 	save_game()
 	return unlocked
 
@@ -455,7 +457,7 @@ func save_game() -> void:
 		return
 	f.store_string(JSON.stringify({
 		"wins": wins, "drift_wins": drift_wins, "current_car": current_car, "race_index": race_index,
-		"best_times": best_times, "car_configs": car_configs, "won_events": won_events, "kept_cars": kept_cars,
+		"best_times": best_times, "tuning": tuning, "won_events": won_events, "kept_cars": kept_cars,
 		"gfx": {"preset": preset, "opts": gfx, "pixel": pixel_look, "vsync": vsync, "fps": fps_limit, "fullscreen": fullscreen,
 			"touch": touch_mode, "show_fps": show_fps, "jump_cam": jump_cam, "motion_blur": motion_blur,
 			"speed_fov": speed_fov, "cam_shake": cam_shake},
@@ -512,16 +514,14 @@ func load_game() -> void:
 	speed_fov = bool(g.get("speed_fov", true))
 	cam_shake = bool(g.get("cam_shake", true))
 	difficulty = clampi(int(data.get("difficulty", 1)), 0, 2)
-	car_configs = {}
-	var cc: Dictionary = data.get("car_configs", {})
-	for car_id in cc:
-		if not Catalog.CARS.has(car_id):
-			continue
-		var cfg := {}
-		for cat in Catalog.PART_ORDER:
-			var n: int = Catalog.PARTS[cat]["options"].size()
-			cfg[cat] = clampi(int(cc[car_id].get(cat, 0)), 0, n - 1)
-		car_configs[car_id] = cfg
+	# Bis 2.12 hatte jedes Auto sein eigenes Tuning: übernommen wird das des zuletzt gefahrenen Autos
+	var src: Dictionary = data.get("tuning", {})
+	if src.is_empty():
+		src = data.get("car_configs", {}).get(current_car, {})
+	tuning = {}
+	for cat in Catalog.PART_ORDER:
+		var n: int = Catalog.PARTS[cat]["options"].size()
+		tuning[cat] = clampi(int(src.get(cat, 0)), 0, n - 1)
 
 
 func reset_progress() -> void:
@@ -530,7 +530,7 @@ func reset_progress() -> void:
 	current_car = "kaizen"
 	race_index = 0
 	best_times = {}
-	car_configs = {}
+	tuning = {}
 	won_events = []
 	kept_cars = []
 	save_game()

@@ -31,11 +31,11 @@ Ordner in Godot 4.7 öffnen (Import), dann F5. Das Spiel startet mit dem ONE-HUM
 | Taste | Gamepad | Funktion |
 |---|---|---|
 | W / ↑ | RT | Gas (auch beim Countdown zum Hochdrehen) |
-| S / ↓ | LT | Bremse / Rückwärts |
+| S / ↓ | LT | Bremse / Rückwärts (im Drag: S schaltet hoch) |
 | A D / ← → | linker Stick | Lenken |
 | Leertaste | B | Handbremse (Drift) |
 | Shift / N | A | Nitro (leer ist leer: erst loslassen, dann lädt es nach) |
-| E / Q | RB / LB | Drag: hoch-/runterschalten (A/D wechselt dort die Spur) |
+| S / X (oder E / Q) | RB / LB | Drag: hoch-/runterschalten (A/D wechselt dort die Spur); steht klein neben dem Drehzahlmesser |
 | C | Y | Kamera: Verfolger (Standard) / Stoßstange / Motorhaube |
 | R | Back | Auto auf die Straße zurücksetzen |
 | M | | Nächster Musiktrack |
@@ -43,7 +43,9 @@ Ordner in Godot 4.7 öffnen (Import), dann F5. Das Spiel startet mit dem ONE-HUM
 | ↑↓←→ / W A S D, Enter, Esc / Rücktaste | Steuerkreuz, A, B | Menüs: wählen, ändern, bestätigen, zurück |
 | F11 / Alt+Enter | | Vollbild an/aus |
 
-Nitro lädt sich langsam von selbst auf und schneller beim Driften.
+Nitro lädt sich langsam von selbst auf. Driften, knapp am Verkehr vorbei und Sprünge geben Punkte (klein unten
+links), die Nitro ein Stück nachfüllen: eine schöne Drift-Kette etwa ein Zehntel, gedeckelt, damit Driften kein
+Nitro-Automat wird. In der Bildmitte steht nur noch Countdown und Ergebnis.
 
 ## Events
 **Karriere:** Garage → Rennen fahren zeigt alle 21 Events als Liste neben einer Deutschlandkarte. Jedes Event liegt in
@@ -54,10 +56,12 @@ Earth (gemeinfrei).
 
 - **Sprint** (6): von A nach B gegen 3 Gegner.
 - **Rundkurs** (4): 2–3 Runden gegen 3 Gegner.
-- **Drag** (3): geradeaus gegen 3 Gegner, wie in Underground. Gelenkt wird automatisch, A/D wechselt die Spur,
-  geschaltet wird von Hand (E/Q). Großer Drehzahlmesser mit grünem Schaltbereich und Schaltlicht: dort schalten ist
-  „perfekt“ (kaum Zugkraftunterbrechung, kleiner Schub), zu früh kostet Zug, wer im Begrenzer bleibt, überhitzt den
-  Motor (Temperaturbalken) bis zum Motorschaden. Auffahren oder frontal in den Verkehr ist Totalschaden. Start im
+- **Drag** (3): geradeaus gegen 3 Gegner, wie in Underground. Das Auto läuft wie auf Schienen in seiner Spur, A/D
+  wechselt die Spur (weicher Schwenk, vier Spuren), geschaltet wird von Hand: **S hoch, X runter** (E/Q gehen auch;
+  die Tasten stehen neben dem Drehzahlmesser, der Titel vor dem Start sagt „DRAG · A/D SPUR · S/X SCHALTEN“). Nur hier
+  wird von Hand geschaltet, in allen anderen Rennen schaltet das Getriebe selbst. Großer Drehzahlmesser mit grünem
+  Schaltbereich und Schaltlicht: dort schalten ist „perfekt“ (kaum Zugkraftunterbrechung, kurzer Schub), zu früh
+  kostet Zug, wer im Begrenzer bleibt, überhitzt den Motor (Temperaturbalken) bis zum Motorschaden. Auffahren oder frontal in den Verkehr ist Totalschaden. Start im
   grünen Drehzahlbereich = perfekter Start, Nitro und Near Miss wie sonst. Entfernungstafeln alle 200 m, Viertelmeile.
 - **Drift** (2): allein auf kleinen, rundum abgesperrten Kursen. Eigenes Fahrverhalten: ist das Auto
   quer, hält Gas den Winkel, Lenken steuert ihn, Gas weg richtet es auf. Querfahren ab 12° gibt Punkte
@@ -65,13 +69,16 @@ Earth (gemeinfrei).
   jede Bandenberührung kostet die laufende Kette. Zielpunkte für Platz 3/2/1 stehen im HUD.
 - **Städte** (6): echte Strecken durch Aachen, Würzburg, Bad Kissingen, Tauberbischofsheim, Hammelburg und
   Berlin-Kreuzberg (siehe unten).
-- **Wie in Underground:** Near Miss am Verkehr gibt Nitro; wer kurz vor GO Gas gibt (Drehzahl im grünen
-  Bereich), schafft einen perfekten Start. Kleinteile am Straßenrand fliegen weg und kosten Tempo statt zu stoppen.
+- **Wie in Underground:** Near Miss am Verkehr gibt Punkte und etwas Nitro; wer kurz vor GO Gas gibt (Drehzahl im
+  grünen Bereich), schafft einen perfekten Start (gut eine Sekunde mehr Zug, kein Satz nach vorn), zu viel Gas lässt
+  die Räder kurz durchdrehen. Kleinteile am Straßenrand fliegen weg und kosten Tempo statt zu stoppen.
 
 **Start und Ziel wie in Underground:** Vor dem Countdown fliegt die Kamera übers Startfeld (Gas/Enter überspringt),
 links und rechts jubelt Publikum auf den Gehwegen, zwischen den Autos steht die Starterin: Arme hoch beim Countdown,
 bei GO runter. Im Ziel bleibt das Auto stehen, die Kamera kreist, Fans laufen auf die Straße und tanzen (nach einem
-Sieg) oder klatschen. Sonst steht niemand an der Strecke.
+Sieg) oder klatschen. Unterwegs schauen Zuschauergruppen zu: hinter den Absperrungen der Seitenstraßen und hinter
+den Zäunen, wo kein Haus steht (dort kommt man mit dem Auto nicht hin). Sie jubeln, winken, klatschen oder filmen mit
+dem Handy. In den Wohnungen flackern hier und da Fernseher, manchmal steht jemand am Fenster.
 
 **Freischalten:** Rennsiege (Sprint + Rundkurs) und Driftsiege werden getrennt gezählt. Mit jedem Rennsieg bis zum
 14. kommt ein Auto dazu, jedes ein Stück stärker (Klasse D, C, B, A). Driftautos (Hachi, Sakura, Kitsune, Mirai,
@@ -195,7 +202,8 @@ Skript), schreibt `scripts/city_data.gd`.
 
 ## Fortschritt
 Kein Geld: Jeder 1. Platz zählt als Sieg. Ein Sieg öffnet das nächste Karriere-Event (`Catalog.CAREER`), Siege
-insgesamt schalten Autos und Tuningteile frei (Werte in `scripts/catalog.gd`). Gesperrte Teile kann man in der Garage
+insgesamt schalten Autos und Tuningteile frei (Werte in `scripts/catalog.gd`). Die Grundteile der Optik sind von
+Anfang an frei, Besonderes (Chrom, Perlweiß, Kreuzspeichen, Monster-Flügel, Breitbau …) kommt mit Siegen. Gesperrte Teile kann man in der Garage
 als Vorschau ansehen. Alte Spielstände übernehmen ihre bisherigen Siege in die Karriere.
 
 ## Stimmungen
@@ -211,7 +219,9 @@ in den Altstädten und Graffiti an den Altbauten im Kiez.
 Musik (`music/`) und Intro-Sound (`assets/intro_sound.mp3`) sind lizenzfreie Tracks von Pixabay.
 Weitere mp3/ogg-Dateien in `music/` laufen automatisch mit, in zufälliger Reihenfolge.
 
-Motorsound, Nitro und Crashs werden im Spiel erzeugt. Zug, Glocke, Landung, Platschen, Tunnel, Stadion,
+Motorsound, Nitro und Crashs werden im Spiel erzeugt. Der Motor ist seit 2.13 heller: zu den Obertönen kommen die
+Druckstöße im Auspuff (ein schmaler Puls je Zündung), unter Last ein leises Rasseln im Takt und beim Gaswegnehmen
+bei hoher Drehzahl ab und zu ein Plopp; der Tiefpass reicht bis knapp 2 kHz statt 1 kHz. Zug, Glocke, Landung, Platschen, Tunnel, Stadion,
 Reifenquietschen usw. sind synthetisch erzeugte WAVs in `assets/sfx/` (`python3 tools/make_sfx.py`, einzelne mit
 `python3 tools/make_sfx.py skid`).
 - **Drift-Sound:** Reifenquietschen als nahtlose Schleife (`skid.wav`): zwei, drei helle, leicht raue Töne (Haft-Gleit-
@@ -240,6 +250,9 @@ Motor-Tuning), Tastenleiste unten, wechselnde Tipps oben rechts. Pause und Ergeb
   schrägen Feld mit blassen führenden Nullen, Nitro als Segmentbogen. Am Begrenzer blinkt der Rand rot, mit
   Nitro leuchtet er blau und das Instrument zittert. Im Drag kommen der grüne Schaltbereich, ein Schaltlicht und
   eine Temperaturleiste dazu.
+- **Unten links über dem Radar:** Punkte-Zeilen (DRIFT +240, KNAPP VORBEI +300, SPRUNG 1,2 s +240, Abkürzung,
+  Runde), darunter der Name des Viertels oder der Straße. Im Drift-Event steht dort die laufende Kette.
+- **Drag:** neben dem Drehzahlmesser die Schalttasten und kurz das Ergebnis des letzten Schaltvorgangs.
 - **Sonstiges:** Die Tastenhilfe blendet nach 12 s aus, der Musiktitel nach einem Wechsel nach 6 s.
 
 <img src="update_bilder/anzeigen_vorher_nachher.jpg" alt="Anzeigen vorher und nachher" width="480">
@@ -250,8 +263,30 @@ Oben die alten Anzeigen, unten die neuen seit 2.10 (Minimap, Drehzahlmesser, Pla
   Kreis ab. Zeit und Tempo werden Zeichen für Zeichen ohne Textformung gezeichnet.
 
 ## Tuning wie in NFS
-Garage → Tuning → **Optik** (Lack, Felgen, Spoiler, Bodykit, Folierung, Unterbodenneon, Scheiben) oder **Leistung**
-(Motor, Turbo, Nitro, Fahrwerk, Reifen) → Teil wählen: die Kamera fährt an das Teil (Felge, Heck, Unterboden …),
+**Ein Satz Teile für die ganze Garage** (wie in Underground): was eingebaut ist, passt auf alle eigenen Autos, beim
+Autowechsel bleibt alles dran. Rücktaste und Esc gehen eine Ebene zurück (Teileliste → Kategorie → Optik/Leistung →
+Garage), der Fokus steht wieder auf dem Eintrag, aus dem man kam.
+
+Garage → Tuning → **Optik** oder **Leistung** (Motor, Turbo, Nitro, Fahrwerk, Reifen) → Teil wählen. Optik:
+- **Lack:** 21 Farben, dazu Oberflächen: glänzend mit Klarlack, stark metallisch (Candyblau, Bronze, Gold), matt
+  (Mattschwarz, Mattgrau), Perlweiß mit Schimmer an den Kanten, Chrom.
+- **Felgen:** 13 Bauarten, jede eigens gebaut: Serie, Fünfspeichen, Gitter, Tiefbett (poliertes breites Horn),
+  Doppelspeichen, Y-Speichen, Mehrspeichen, Stahlfelge mit Löchern, Turbine, Rennsport-Sechs, Kreuzspeichen mit
+  Zwischenring, Aero-Scheibe, Tiefbett Stern. Alle mit Radmuttern und Nabendeckel. **Felgenfarbe** extra (passend,
+  Silber, Schwarz, Gunmetal, Weiß, Wagenfarbe, Rot, Gold, Bronze, Neongrün, Chrom).
+- **Spoiler:** Lippe, Entenbürzel, Street-Flügel, GT-Flügel, Schwanenhals, Doppeldecker, Dachspoiler, Bügelflügel,
+  Monster-Flügel.
+- **Bodykit:** Seitenschweller, Street (lackierte Lippe, Schweller, Heckschürze), Rallye (Schmutzfänger,
+  Unterfahrschutz, Zusatzscheinwerfer), Racing (Kohlefaser-Splitter, Canards, großer Diffusor), Breitbau, Breitbau
+  Racing.
+- **Motorhaube:** Lufthutze, Lamellen, NACA-Einlass, Doppelhutze, Kohlefaser (Köperbindung), Kohlefaser mit Hutze.
+- **Auspuff:** Sport, Doppelrohr, Ovalrohr, Titan (blau angelaufen), Rennauspuff mittig.
+- **Folierung:** Rennstreifen, Seitenstreifen, Mittelstreifen, Zweifarbig, Flankenband, Haube und Heck,
+  Kontrastdach, Rallye; **Folienfarbe** extra (Kontrast, Weiß, Schwarz, Rot, Blau, Gelb, Gold, Neongrün, Pink, Carbon).
+- **Unterbodenneon** in acht Farben, **Scheiben** getönt bis verspiegelt, **Scheinwerfer** Serie, Xenon, Gelb,
+  Eisblau (Lichtkegel in derselben Farbe).
+
+Beim Auswählen fährt die Kamera an das Teil (Felge, Heck, Haube, Auspuff, Unterboden …),
 beim Motor und Turbo geht die Haube auf (Ventildeckel in der Farbe der Stufe, Pilzfilter, Turbolader, Domstrebe),
 beim Nitro der Kofferraum (Flaschen je nach Stufe). Vorschau beim Auswählen, Einbauen mit Enter, gesperrte Teile
 zeigen die nötigen Siege. Leistungsteile wirken wirklich (`Catalog.stats`): Motor und Turbo auf Schub und Endtempo,
@@ -274,7 +309,7 @@ Englisch und Deutsch: Beim ersten Start fragt das Spiel (Englisch vorausgewählt
 in der Welt bleiben deutsch.
 
 ## Schrift und Texte
-Alles auf Deutsch, im Ton von NFS Underground (KNAPP VORBEI +NITRO, DRIFT +NITRO, SPRUNG, Tuning-Marken auf den
+Alles auf Deutsch, im Ton von NFS Underground (KNAPP VORBEI +300, DRIFT +240, SPRUNG, Tuning-Marken auf den
 Dächern, Ladetipps im Menü). Schrift überall im Stil der deutschen Straßenschilder (DIN 1451):
 D-DIN von Datto, SIL Open Font License 1.1 (`assets/fonts/COPYING.txt`). Alte englische Eventnamen werden im
 Spielstand automatisch umgeschrieben, der Spielstand aus „Underground Sprint“ wird beim ersten Start übernommen.
@@ -316,8 +351,11 @@ dann steht „Benutzerdefiniert“ da. Werte in `GameState.GFX`.
   Abkürzungen (sie sparen bis zu einem Fünftel der Zeit) nehmen Gegner in den 1-Stern-Rennen nie, danach auf Leicht nur 30 % so oft, auf Normal 80 %. Oben heraus beschleunigen auch Gegner
   schwächer (Gänge, Luftwiderstand). Driftziele: Leicht 65 %, Normal 85 %, Schwer 100 %.
 - **Fahrgefühl:** alle Autos mit Heckantrieb; mit Gas in der Kurve schiebt das Heck raus, im Drift dreht das Auto
-  um die Vorderachse. Gas setzt weich ein, Drehmoment folgt der Drehzahl, das Getriebe schaltet mit Hysterese (kein
-  Pendeln an Gangwechseln). Langsam begrenzt der Wendekreis (5,2 m), bei Tempo die Querbeschleunigung (2,1–2,7 g je
+  um die Vorderachse. Gas baut sich in gut einer Drittelsekunde auf, Drehmoment folgt der Drehzahl, beim Anfahren
+  begrenzt die Haftung (die Kupplung schleift, der Zug kommt mit dem Tempo), jeder Gangwechsel nimmt kurz Zug weg, das
+  Getriebe schaltet mit Hysterese (kein Pendeln an Gangwechseln). Seit 2.13 gibt es keine Sprünge mehr im Tempo:
+  der perfekte Start gibt gut eine Sekunde mehr Zug statt 30 km/h auf einen Schlag, Nitro setzt in einer
+  Drittelsekunde ein, im Drag gibt perfektes Schalten einen kurzen Schub statt eines Satzes nach vorn. Langsam begrenzt der Wendekreis (5,2 m), bei Tempo die Querbeschleunigung (2,1–2,7 g je
   Auto, bei Topspeed etwas weniger). Kurven kosten kein Tempo, an der Haftgrenze rutscht das Auto sichtbar ein paar
   Grad; Rutschen radiert etwas ab, würgt das Tempo aber nicht ab. Anbremsen in die Kurve lässt das Heck leicht kommen,
   Handbremse dreht bei 80 km/h in 0,8 s um gut 90°. Bremsen ~2,4 g, Gegenlenken geht schneller als Einlenken.
@@ -361,6 +399,9 @@ dann steht „Benutzerdefiniert“ da. Werte in `GameState.GFX`.
 Vergleichsbilder aus der Entwicklung liegen in `update_bilder/` (Godot ignoriert den Ordner, sie landen nicht im
 Spiel). Die wichtigsten:
 
+- **2.13 – neue Tuningteile:** Felgen (13 Bauarten, Felgenfarbe), Bodykits, Motorhauben, Auspuffe, Spoiler,
+  Scheinwerferfarben und Folien.
+  <br><img src="update_bilder/tuning_2_13.jpg" alt="Neue Tuningteile" width="640">
 - **2.12 – Laternenlicht auf der Straße:** links vorher, rechts nachher, an denselben Stellen derselben Rennen
   (Hafentunnel, Aachen, Unterführung mit Asphalt statt Ziegelmuster am Boden).
   <br><img src="update_bilder/licht_vorher_nachher.jpg" alt="Licht vorher und nachher" width="640">

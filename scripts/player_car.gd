@@ -5,8 +5,11 @@ extends CharacterBody3D
 ## Wände wie in NFSU: man schrammt entlang und dreht weich parallel zur Wand, Verkehr bestraft deutlich härter.
 ## Handbremse für Drifts, Nitro, Sprünge über Rampen (in der Luft keine Lenkung, Nitro schiebt weiter).
 ## Kamera: Verfolger (Standard), Stoßstange, Motorhaube – Taste C schaltet durch.
-## Drag-Modus wie in NFSU: gelenkt wird automatisch, links/rechts wechselt die Spur, geschaltet wird von Hand
-## (im grünen Bereich perfekt), zu lange im Begrenzer überhitzt der Motor, ein Crash mit Verkehr ist Totalschaden.
+## Drag-Modus wie in NFSU: das Auto fährt wie auf Schienen in seiner Spur, links/rechts wechselt die Spur (weicher
+## Schwenk), geschaltet wird von Hand mit S/X (im grünen Bereich perfekt), zu lange im Begrenzer überhitzt der Motor,
+## ein Crash mit Verkehr ist Totalschaden.
+## Antrieb: Gas baut sich in gut einer halben Sekunde auf, beim Anfahren begrenzt die Haftung, jeder Gangwechsel
+## nimmt kurz Zug weg; Nitro und Start-Bonus setzen weich ein (kein Satz nach vorn).
 
 const Catalog := preload("res://scripts/catalog.gd")
 const Builder := preload("res://scripts/car_builder.gd")
@@ -18,6 +21,7 @@ const Knockable := preload("res://scripts/knockable.gd")
 const GEARS := [0.0, 0.16, 0.31, 0.47, 0.63, 0.81, 1.3]
 const SHIFT_RPM := 7400.0
 const TOP_RPM := 6600.0  # Drehzahl bei Höchstgeschwindigkeit im 6. Gang
+const VMAX_K := 0.948  # so viel von top_speed erreicht das Auto ohne Nitro in der Ebene (wie bis 2.12)
 const GEAR_PULL := [0.0, 1.0, 0.86, 0.74, 0.63, 0.54, 0.46]
 const GRAVITY := 18.0  # knapp 2 g: Sprünge mit spürbarer Flugphase, ohne zu schweben
 const MAX_LAUNCH_VY := 14.0
@@ -91,6 +95,16 @@ var _nos_empty := false
 var _sliding := false
 var _slide_out := 0.0
 var _thr_s := 0.0  # Gas weich nachgeführt (kein Sprung von 0 auf volle Kraft)
+var _nos_k := 0.0  # Nitro-Schub, weich ein- und ausgeblendet
+var _launch_t := 0.0  # > 0: perfekter Start (mehr Zug), < 0: Räder drehen durch (weniger Zug)
+var _shift_boost := 0.0  # Drag: kurzer Schub nach perfektem Schalten
+var _rail_lat := 0.0  # Drag: Querlage auf der Schiene (folgt der gewählten Spur weich)
+var _rail_v := 0.0
+var _rail_init := false
+var _rail_on := false  # Schiene war im letzten Takt aktiv
+var _rail_tf := Vector3.FORWARD  # Straßenrichtung dort
+var _rail_speed := 0.0  # Tempo entlang der Straße (der Schwenk beim Spurwechsel ist kein Vortrieb)
+var _was_enabled := false
 var _slip_hold := 0.0  # 0..1: wie sehr das Heck gerade gelöst ist (Handbremse baut auf, Gas hält, klingt weich ab)
 var _cam_drift := 0.0  # wie weit die Kamera im Drift in Fahrtrichtung schaut (geglättet)
 var _shake_t := 0.0
@@ -304,7 +318,9 @@ func _physics_process(dt: float) -> void:
 				_drag_shift(1)
 			elif Input.is_action_just_pressed("shift_down") and gear > 1:
 				_drag_shift(-1)
-		steer_in = _drag_steer() if controls_enabled or finished else 0.0
+		steer_in = 0.0  # gelenkt wird von der Schiene (_drag_rail)
+		if controls_enabled:
+			brk = 0.0  # S ist im Drag die Taste zum Hochschalten
 		if blown:
 			thr = 0.0
 			want_nitro = false
@@ -324,6 +340,12 @@ func _physics_process(dt: float) -> void:
 	var hvel := Vector3(velocity.x, 0, velocity.z)
 	speed_fwd = hvel.dot(fwd)
 	speed_lat = hvel.dot(right)
+	if _rail_on and not airborne:
+		speed_fwd = _rail_speed
+	_rail_on = false
+	if controls_enabled and not _was_enabled:
+		_thr_s = thr  # LOS: wer schon Gas gibt, lässt die Kupplung kommen (kein langsames Anrollen)
+	_was_enabled = controls_enabled
 	var spd := absf(speed_fwd)
 
 	# --- Gänge & Drehzahl. Hochschalten am Gangende, Zurückschalten erst deutlich darunter (Hysterese): sonst pendelt
@@ -334,7 +356,7 @@ func _physics_process(dt: float) -> void:
 		_pull_gear = gear  # Handschaltung (oben)
 	elif _pull_gear < 6 and ratio > GEARS[_pull_gear]:
 		_pull_gear += 1
-		_shift_timer = 0.16
+		_shift_timer = 0.2
 	elif _pull_gear > 1 and ratio < GEARS[_pull_gear - 1] * 0.88:
 		_pull_gear -= 1
 	_shift_timer = maxf(_shift_timer - dt, 0.0)
@@ -360,6 +382,8 @@ func _physics_process(dt: float) -> void:
 			# ohne Hochschalten dreht der Motor bis in den Begrenzer (dort kein Vortrieb, er wird heiß)
 			var per_ratio: float = SHIFT_RPM / GEARS[gear] if gear < 6 else TOP_RPM
 			var raw := maxf(900.0 + thr * 600.0, ratio * per_ratio)
+			if spd < 6.0 and thr > 0.5:
+				raw = maxf(raw, 2500.0 + 1500.0 * thr)  # Anfahren: Kupplung schleift, Motor bleibt im Drehmoment
 			if gear == 6:
 				raw = minf(raw, PERFECT_SHIFT.y - 100.0)  # letzter Gang: Nitro darf über Topspeed schieben, ohne Begrenzer
 			_limiter = raw >= DRAG_LIMIT - 40.0 and thr > 0.1
@@ -389,11 +413,13 @@ func _physics_process(dt: float) -> void:
 		if nitro <= 0.0:
 			_nos_empty = true
 	else:
-		nitro = minf(nitro + dt * (0.015 + (0.13 if drifting else 0.0)) / nitro_cap, 1.0)
+		# langsam von selbst; Drift, knapp vorbei und Sprünge geben Punkte, die etwas nachfüllen (race.gd)
+		nitro = minf(nitro + dt * 0.022 / nitro_cap, 1.0)
+	_nos_k = move_toward(_nos_k, 1.0 if nitro_on else 0.0, dt * (2.8 if nitro_on else 5.0))
 
 	# --- Längsbeschleunigung (Drehmoment über die Drehzahl, unten herum Traktionsgrenze)
-	_thr_s = move_toward(_thr_s, thr, dt * (4.0 if thr > _thr_s else 8.0))
-	var tq := 0.78 + 0.22 * sin(clampf((_pull_rpm - 1000.0) / 6200.0, 0.0, 1.0) * PI)
+	_thr_s = move_toward(_thr_s, thr, dt * (3.0 if thr > _thr_s else 7.0))
+	var tq := _torque(_pull_rpm)
 	if drag_mode:
 		# Drag: Drehmoment kommt erst oben (zu früh schalten kostet richtig), im Begrenzer nichts
 		tq = 0.0 if _limiter else 0.55 + 0.45 * smoothstep(2500.0, 6800.0, rpm)
@@ -405,17 +431,32 @@ func _physics_process(dt: float) -> void:
 				Sfx.play("clang", 0.0, 0.6)
 				audio.crash(0.8)
 	var a := 0.0
-	var eff_top := top_speed * (1.0 + 0.22 * nitro_power if nitro_on else 1.0)
-	var drag_k := accel * GEAR_PULL[6] / (top_speed * top_speed)
-	if nitro_on:
-		a += 8.5 * nitro_power
+	var eff_top := top_speed * (1.0 + 0.22 * nitro_power * _nos_k)
+	# Luftwiderstand so, dass das Auto wie bis 2.12 bei knapp 95 % von top_speed ausdreht (Abgleich mit den Gegnern);
+	# der Drag rechnet mit eigener Drehmomentkurve und behält den alten Wert
+	var drag_k: float = accel * GEAR_PULL[6] / (top_speed * top_speed)
+	if not drag_mode:
+		drag_k = accel * GEAR_PULL[6] * _torque(VMAX_K * TOP_RPM) / pow(VMAX_K * top_speed, 2.0)
+	a += 8.0 * nitro_power * _nos_k
+	if _launch_t > 0.0:
+		_launch_t = maxf(_launch_t - dt, 0.0)
+	elif _launch_t < 0.0:
+		_launch_t = minf(_launch_t + dt, 0.0)
+	_shift_boost = maxf(_shift_boost - dt, 0.0)
 	if airborne:
 		a -= drag_k * 0.5 * speed_fwd * absf(speed_fwd)
 	else:
-		if _shift_timer <= 0.0:
-			a += accel * _thr_s * GEAR_PULL[_pull_gear] * tq
-			if spd < 6.0:
-				a *= 0.7 + 0.3 * spd / 6.0  # Räder drehen beim Anfahren etwas durch
+		# Schaltpause: kurz kaum Zug (Kupplung), danach setzt der neue Gang wieder ein
+		var drive: float = accel * _thr_s * GEAR_PULL[_pull_gear] * tq * (0.3 if _shift_timer > 0.0 else 1.0)
+		if spd < 8.0 and speed_fwd > -0.5:
+			# Anfahren: Haftung begrenzt, der Zug baut sich mit dem Tempo auf (perfekter Start: volle Haftung)
+			drive *= 1.0 if _launch_t > 0.0 else 0.65 + 0.35 * pow(spd / 8.0, 0.7)
+		if _launch_t > 0.0:
+			drive += accel * 0.3 * _thr_s * _launch_t
+		elif _launch_t < 0.0:
+			drive *= 0.75  # durchdrehende Räder
+		drive += accel * 0.6 * _shift_boost / 0.5  # über eine halbe Sekunde etwa so viel wie früher der Sprung (+1,6 m/s)
+		a += drive
 		a -= drag_k * speed_fwd * absf(speed_fwd)
 		if thr < 0.05:
 			a -= signf(speed_fwd) * 1.6  # Motorbremse
@@ -429,7 +470,7 @@ func _physics_process(dt: float) -> void:
 		# Bergauf etwas zäher, bergab etwas Schwung (abgeschwächt, damit es nicht frustriert)
 		a -= 6.0 * sin(_slope_pitch)
 	if speed_fwd > eff_top:
-		a = minf(a, -6.0)
+		a = minf(a, -4.0)
 	speed_fwd += a * dt
 	if not airborne and absf(speed_fwd) < 0.3 and thr < 0.05 and brk < 0.05:
 		speed_fwd = 0.0
@@ -445,7 +486,9 @@ func _physics_process(dt: float) -> void:
 	var lat_eff := lat_acc * (1.0 - 0.12 * sf0)  # bei Topspeed etwas weniger wendig
 	var high_speed := minf(1.0, minf(lat_eff / maxf(spd, 0.1), spd / MIN_RADIUS) / steer_rate)
 	var l2 := 0.0
-	if drift_mode and _sliding and not airborne:
+	if drag_mode and not airborne and not loc.is_empty() and loc["path"]["id"] == 0 and (controls_enabled or finished):
+		l2 = _drag_rail(dt)
+	elif drift_mode and _sliding and not airborne:
 		_slip_hold = 0.6
 		l2 = _slide_physics(dt, fwd, right, thr, hb, a, eff_top, low_speed)
 	else:
@@ -516,6 +559,8 @@ func _physics_process(dt: float) -> void:
 	var pre := velocity
 	move_and_slide()
 	_handle_collisions(pre)
+	if _rail_on:
+		_rail_speed = Vector3(velocity.x, 0.0, velocity.z).dot(_rail_tf)
 	_update_vertical(dt)
 
 	# --- Optik, Kamera, Sound
@@ -549,7 +594,20 @@ func _physics_process(dt: float) -> void:
 	audio.throttle = 1.0 if nitro_on else (Input.get_action_strength("accelerate") if not finished else 0.0)
 	audio.nitro = nitro_on
 	audio.slip = clampf((absf(l2) - 3.0) / 10.0, 0.0, 1.0) if spd > 5.0 and not airborne else 0.0
+	if _launch_t < 0.0 and _thr_s > 0.5:
+		audio.slip = maxf(audio.slip, 0.7)
 	audio.speed = spd
+
+
+## Drehmoment über der Drehzahl (0..1): unten weniger, ab ~5.000/min voll, oben leicht abfallend
+func _torque(r: float) -> float:
+	var x := clampf((r - 1000.0) / 6200.0, 0.0, 1.0)
+	return 0.7 + 0.3 * sin(minf(x * 1.4, 1.0) * PI / 2.0) - 0.1 * maxf(x - 0.8, 0.0) / 0.2
+
+
+## Start-Wertung (race.gd): k > 0 perfekter Start, k < 0 zu viel Gas
+func launch(k: float) -> void:
+	_launch_t = 1.2 * k if k > 0.0 else -0.7
 
 
 ## Drehzahl im Gang g bei Tempoanteil r: proportional zur Geschwindigkeit, im 6. Gang liegt Topspeed bei TOP_RPM.
@@ -557,6 +615,8 @@ func _physics_process(dt: float) -> void:
 func _gear_rpm(g: int, r: float, thr: float, hb: bool, spd: float, spin: float) -> float:
 	var per_ratio: float = SHIFT_RPM / GEARS[g] if g < 6 else TOP_RPM
 	var t := clampf(maxf(900.0 + thr * 600.0, r * per_ratio), 900.0, SHIFT_RPM + 300.0)
+	if g == 1 and spd < 6.0 and thr > 0.5:
+		t = maxf(t, 2500.0 + 1500.0 * thr)  # Anfahren: Kupplung schleift, Motor bleibt im Drehmoment
 	if speed_fwd < -0.5:
 		t = 900.0 + spd * 300.0
 	elif spin > 0.0:
@@ -576,7 +636,7 @@ func _drag_shift(dir: int) -> void:
 	if rpm >= PERFECT_SHIFT.x and rpm <= PERFECT_SHIFT.y:
 		shift_result = "perfect"
 		_shift_timer = 0.04
-		velocity += -global_basis.z * 1.6
+		_shift_boost = 0.5
 	elif rpm >= GOOD_SHIFT:
 		shift_result = "good"
 		_shift_timer = 0.14
@@ -586,22 +646,35 @@ func _drag_shift(dir: int) -> void:
 	gear += 1
 
 
-## Drag: auf die gewählte Spur zielen (Blickpunkt vor dem Auto), Lenkung daraus
-func _drag_steer() -> float:
-	if loc.is_empty():
-		return 0.0
+## Drag wie in NFSU: das Auto läuft auf einer Schiene. Die Querlage folgt der gewählten Spur als gedämpfte Feder
+## (Spurwechsel in gut einer halben Sekunde, ohne Überschwingen), die Nase zeigt in Fahrt- plus Schwenkrichtung.
+## Stöße von Gegnern verschieben das Auto kurz, die Schiene holt es zurück. Liefert die Quergeschwindigkeit.
+func _drag_rail(dt: float) -> float:
 	var c: Curve3D = loc["path"]["curve"]
-	var d: float = loc["d"] + 7.0 + absf(speed_fwd) * 0.32
+	var d: float = loc["d"]
 	var f := Track.frame_at(c, d)
-	var tgt: Vector3 = f["pos"] + f["right"] * Track.lane_lat(track, d, Track.LANES[drag_lane])
-	var to := tgt - global_position
-	to.y = 0.0
-	var fw := -global_basis.z
-	fw.y = 0.0
-	if to.length() < 0.5:
-		return 0.0
-	var err := fw.normalized().signed_angle_to(to.normalized(), Vector3.UP)
-	return clampf(-err * 4.0, -1.0, 1.0)
+	var tf: Vector3 = f["fwd"]
+	var tr: Vector3 = f["right"]
+	var lat_now: float = (global_position - f["pos"]).dot(tr)
+	if not _rail_init:
+		_rail_init = true
+		_rail_lat = lat_now
+		_rail_v = 0.0
+	var target := Track.lane_lat(track, d, Track.LANES[drag_lane])
+	var w := 8.0
+	_rail_v += (w * w * (target - _rail_lat) - 2.0 * w * _rail_v) * dt
+	_rail_lat += _rail_v * dt
+	var lat_vel := _rail_v + (_rail_lat - lat_now) * 10.0
+	var heading := (tf * maxf(absf(speed_fwd), 5.0) + tr * _rail_v).normalized()
+	global_basis = Basis.looking_at(heading, Vector3.UP)
+	velocity = tf * speed_fwd + tr * lat_vel
+	_rail_on = true
+	_rail_tf = tf
+	steer = clampf(_rail_v * 0.3, -1.0, 1.0)
+	drifting = false
+	drift_angle = 0.0
+	_slip_hold = 0.0
+	return velocity.dot(global_basis.x)
 
 
 ## Drehung um die Hochachse; k = 0 dreht um die Wagenmitte, k = 1 um die Vorderachse (das Heck schwenkt aus,
@@ -987,6 +1060,9 @@ func place(xform: Transform3D) -> void:
 	airborne = false
 	vy = 0.0
 	sinking = 0.0
+	_rail_init = false
+	_launch_t = 0.0
+	_nos_k = 0.0
 	_end_jump_cam()
 	_cam_init = false
 	_base_ok = false

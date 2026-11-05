@@ -4,7 +4,8 @@ extends Node
 ##   -- --shot=/pfad/pre   speichert Screenshots
 ##   -- --quit=40          beendet nach 40 Sekunden
 ##   -- --demo             klickt sich nach dem Intro durchs Menü (Tuning zeigen, Rennen starten)
-##   -- --at=lake|crossing|alley|fork|tunnel|el|stadium|<viertel>|d:<meter>   setzt das Auto nach dem Start direkt vor die Stelle
+##   -- --at=lake|crossing|alley|fork|tunnel|el|stadium|fans|<viertel>|d:<meter>   setzt das Auto nach dem Start direkt vor die Stelle
+##   -- --keys=1.5:ui_cancel,2.0:ui_down   drückt Aktionen zu festen Zeiten (Menüs testen, z. B. Zurück im Tuning)
 ##   -- --race=2           wählt die Strecke (Index in Catalog.RACES)
 ##   -- --car=shiden       fährt mit diesem Auto (auch in der Garage vorausgewählt)
 ##   -- --lang=de          Sprache für Bilder (de/en)
@@ -126,6 +127,16 @@ func _process(dt: float) -> void:
 		_step += 1
 	var race = get_tree().current_scene
 	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--keys="):
+			# Test: Aktionen zu festen Zeiten drücken, z. B. --keys=1.5:ui_cancel,2.5:ui_down
+			for item in a.substr(7).split(","):
+				var tk := float(item.get_slice(":", 0))
+				if _t >= tk and _t - get_process_delta_time() < tk:
+					for pressed in [true, false]:
+						var ev := InputEventAction.new()
+						ev.action = item.get_slice(":", 1)
+						ev.pressed = pressed
+						Input.parse_input_event(ev)
 		if a.begins_with("--tune=") and race and race.has_method("_show_parts") and _t > 0.5 and not _menu_done:
 			_menu_done = true  # Test: Tuning-Teileliste einer Kategorie öffnen (z. B. --tune=engine), Kamera fährt hin
 			var cat := a.substr(7)
@@ -633,6 +644,11 @@ func _place_at(race) -> void:
 	var tr: Dictionary = race.track
 	var pl = race.player
 	match at:
+		"fans":
+			# Test: kurz vor der zweiten Zuschauergruppe an der Hauptstraße anhalten (Platzierung und Licht prüfen)
+			var fans: Array = tr["spectators"]
+			var d: float = fans[mini(12, fans.size() - 1)][1] - 22.0 if not fans.is_empty() else 100.0
+			pl.place(Track.xform_at(tr["curve"], d, Track.LANES[3]))
 		"crossing":
 			var d: float = tr["crossing_d"] - 150.0
 			_lane = Track.LANES[3]

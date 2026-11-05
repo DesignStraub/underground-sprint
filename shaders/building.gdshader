@@ -132,6 +132,19 @@ void fragment() {
 
 	vec3 wcol = mix(vec3(1.0, 0.72, 0.38), vec3(0.55, 0.75, 1.0), step(0.62, hash(cid * 1.31 + seed)));
 	wcol *= 0.55 + 0.7 * hash(cid * 2.7 + seed);
+	// Leben hinter den Fenstern: in einzelnen Wohnungen flackert ein Fernseher (bläulich, unruhig), in anderen
+	// steht jemand am Fenster (dunkle Silhouette vor dem Licht)
+	float who = hash(cid * 3.7 + seed * 1.3);
+	if (who > 0.93) {
+		float ph = hash(cid + seed * 2.1) * 40.0;
+		float fl = 0.55 + 0.25 * sin(TIME * 7.3 + ph) + 0.2 * sin(TIME * 17.9 + ph * 2.3) * step(0.5, fract(TIME * 0.8 + ph));
+		wcol = vec3(0.45, 0.6, 1.0) * fl;
+	} else if (who > 0.88) {
+		vec2 wf = vec2(fract(u / 3.0), fract(y / 3.6));
+		float body = step(abs(wf.x - 0.5), 0.07) * step(0.5, wf.y) * step(wf.y, 0.78);
+		float head = step(length((wf - vec2(0.5, 0.82)) * vec2(1.0, 1.3)), 0.045);
+		wcol *= 1.0 - 0.85 * max(body, head);
+	}
 	// Erdgeschoss: große Schaufenster, meist beleuchtet, bunt
 	float shop_cell = floor(u / 6.0);
 	float sf = fract(u / 6.0);

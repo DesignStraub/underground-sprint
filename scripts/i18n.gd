@@ -42,7 +42,10 @@ const EN := {
 	"Niedrig": "Low", "Mittel": "Medium", "Hoch": "High",
 	# Ladetipps
 	"Gib kurz vor LOS Gas: Drehzahl im grünen Bereich gibt einen perfekten Start.": "Hit the throttle just before GO: revs in the green zone give a perfect start.",
-	"Knapp am Verkehr vorbei füllt dein Nitro.": "Near misses with traffic refill your nitro.",
+	"Knapp am Verkehr vorbei gibt Punkte und füllt dein Nitro ein Stück.": "Near misses with traffic give points and top up your nitro a little.",
+	"Im Drag schaltest du von Hand: S hoch, X runter. A/D wechselt die Spur.": "In drag races you shift by hand: S up, X down. A/D changes lanes.",
+	"Tuningteile passen auf alle deine Autos: einmal einbauen, überall dran.": "Tuning parts fit all your cars: install once, they're on every car.",
+	"Driften, knapp vorbei und Sprünge geben Punkte, die Nitro etwas nachfüllen.": "Drifts, near misses and jumps give points that top up your nitro a little.",
 	"Im Drag im grünen Bereich schalten: perfekter Schaltvorgang, mehr Schub.": "In drag races, shift in the green zone for a perfect shift and extra push.",
 	"Abkürzungen sparen Zeit, aber dort kommt dir Verkehr entgegen.": "Shortcuts save time, but traffic comes the other way.",
 	"Handbremse und Lenken stellen das Auto quer. Drift-Ketten bringen Multiplikator.": "Handbrake and steering get you sideways. Drift chains build a multiplier.",
@@ -87,8 +90,8 @@ const EN := {
 		"2 laps against 3 rivals. Best line wins. * no traffic, ** light, *** heavy.",
 	"Allein auf der Strecke. Querfahren gibt Punkte, Ketten geben Multiplikator, Crash kostet die Kette.":
 		"Alone on the track. Going sideways scores points, chains build a multiplier, a crash costs the chain.",
-	"Geradeaus gegen 3 Gegner. A/D wechselt die Spur, E/Q schaltet: im grünen Bereich perfekt. Zu lange im Begrenzer: Motorschaden. Crash mit Verkehr: Totalschaden.":
-		"Straight line against 3 rivals. A/D changes lanes, E/Q shifts: perfect in the green zone. Too long on the limiter: blown engine. Hit traffic: totaled.",
+	"Geradeaus gegen 3 Gegner, das Auto fährt wie auf Schienen. A/D wechselt die Spur, S schaltet hoch, X runter: im grünen Bereich perfekt. Zu lange im Begrenzer: Motorschaden. Crash mit Verkehr: Totalschaden.":
+		"Straight line against 3 rivals, the car runs as if on rails. A/D changes lanes, S shifts up, X down: perfect in the green zone. Too long on the limiter: blown engine. Hit traffic: totaled.",
 	"Echte Straßen aus Aachen, Würzburg, Bad Kissingen, Tauberbischofsheim und Hammelburg, die Wahrzeichen stehen an ihrem Platz. Kartendaten © OpenStreetMap-Mitwirkende.":
 		"Real streets from Aachen, Würzburg, Bad Kissingen, Tauberbischofsheim and Hammelburg, landmarks in their real places. Map data © OpenStreetMap contributors.",
 	"Bankenviertel-Sprint": "Financial District Sprint", "Prachtallee-Sprint": "Boulevard Sprint", "Hafenrunde": "Harbor Run",
@@ -112,11 +115,14 @@ const EN := {
 	"%s   ·   %s   ·   Gas/Enter: los": "%s   ·   %s   ·   Throttle/Enter: go",
 	"%s   ·   %s   ·   Karte © OpenStreetMap-Mitwirkende   ·   Gas/Enter: los": "%s   ·   %s   ·   Map © OpenStreetMap contributors   ·   Throttle/Enter: go",
 	"SPRINT": "SPRINT", "RUNDKURS · %d RUNDEN": "CIRCUIT · %d LAPS", "DRIFT · %d RUNDEN": "DRIFT · %d LAPS",
-	"DRAG · E/Q SCHALTEN": "DRAG · E/Q TO SHIFT", "ALLEIN": "SOLO", "4 FAHRER": "4 DRIVERS",
+	"DRAG · A/D SPUR · S/X SCHALTEN": "DRAG · A/D LANE · S/X SHIFT", "ALLEIN": "SOLO", "4 FAHRER": "4 DRIVERS",
 	"W/S Gas/Bremse  A/D Lenken\nLeertaste Handbremse  Shift Nitro\nC Kamera  R Zurücksetzen  M Musik\nF Vollbild  Esc Pause":
 		"W/S Throttle/Brake  A/D Steer\nSpace Handbrake  Shift Nitro\nC Camera  R Reset  M Music\nF Fullscreen  Esc Pause",
-	"W Gas  E/Q hoch-/runterschalten\nA/D Spur wechseln  Shift Nitro\nC Kamera  F Vollbild  Esc Pause":
-		"W Throttle  E/Q Shift up/down\nA/D Change lane  Shift Nitro\nC Camera  F Fullscreen  Esc Pause",
+	"W Gas  S hoch-, X runterschalten\nA/D Spur wechseln  Shift Nitro\nC Kamera  F Vollbild  Esc Pause":
+		"W Throttle  S shift up, X down\nA/D Change lane  Shift Nitro\nC Camera  F Fullscreen  Esc Pause",
+	"HOCHSCHALTEN  S   ·   RUNTER  X": "SHIFT UP  S   ·   DOWN  X", "MOTOR HEISS – SCHALTEN!": "ENGINE HOT – SHIFT!",
+	"ABKÜRZUNG": "SHORTCUT", "GEGENVERKEHR": "ONCOMING TRAFFIC", "BANDE: KETTE VERLOREN": "BARRIER: CHAIN LOST",
+	"KNAPP VORBEI": "NEAR MISS", "… und %d weitere": "… and %d more", "GANG +": "GEAR +", "GANG -": "GEAR -",
 	"LOS!": "GO!", "Gas kurz vor LOS = perfekter Start": "Throttle just before GO = perfect start",
 	"BANKENVIERTEL": "FINANCIAL DISTRICT", "MARKTVIERTEL": "MARKET DISTRICT", "PRACHTALLEE": "BOULEVARD", "ALTSTADT": "OLD TOWN",
 	"HAFEN": "HARBOR", "CHINATOWN": "CHINATOWN", "SCHNELLSTRASSE": "HIGHWAY", "INNENSTADT": "CITY CENTER",
@@ -148,6 +154,27 @@ const EN := {
 	"Gesperrt: noch 1 Sieg nötig.": "Locked: 1 more win needed.", "Gesperrt: noch %d Siege nötig.": "Locked: %d more wins needed.",
 	"ENTER: einbauen": "ENTER: install",
 	"Scheiben": "Windows", "Klar": "Clear", "Getönt": "Tinted", "Dunkel": "Dark", "Blau verspiegelt": "Blue mirror",
+	# Teile seit 2.13
+	"Felgenfarbe": "Rim colour", "Auspuff": "Exhaust", "Folienfarbe": "Vinyl colour", "Scheinwerfer": "Headlights",
+	"Weiß": "White", "Orange": "Orange", "Dunkelgrün": "Dark Green", "Gunmetal": "Gunmetal", "Lila": "Purple",
+	"Babyblau": "Baby Blue", "Bronze": "Bronze", "Mattschwarz": "Matte Black", "Mattgrau": "Matte Grey", "Perlweiß": "Pearl White",
+	"Gold": "Gold", "Chrom": "Chrome",
+	"Doppelspeichen": "Split-spoke", "Y-Speichen": "Y-spoke", "Mehrspeichen": "Multi-spoke", "Stahlfelge": "Steelie",
+	"Turbine": "Turbine", "Rennsport-Sechs": "Six-spoke Racing", "Kreuzspeichen": "Cross-spoke", "Aero-Scheibe": "Aero Disc",
+	"Tiefbett Stern": "Deep Dish Star",
+	"Passend": "Matching", "Wagenfarbe": "Body colour", "Neongrün": "Neon Green",
+	"Entenbürzel": "Ducktail", "Street-Flügel": "Street Wing", "Schwanenhals": "Swan Neck", "Doppeldecker": "Double Deck",
+	"Dachspoiler": "Roof Spoiler", "Bügelflügel": "Hoop Wing",
+	"Street": "Street", "Rallye": "Rally", "Racing": "Racing", "Breitbau Racing": "Widebody Racing",
+	"Lufthutze": "Scoop", "Lamellen": "Louvres", "NACA-Einlass": "NACA Duct", "Doppelhutze": "Twin Scoop", "Carbon": "Carbon",
+	"Carbon mit Hutze": "Carbon with Scoop",
+	"Doppelrohr": "Twin Tip", "Ovalrohr": "Oval Tip", "Titan": "Titanium", "Rennauspuff": "Race Exhaust",
+	"Mittelstreifen": "Centre Stripe", "Zweifarbig": "Two-tone", "Flankenband": "Side Band", "Haube und Heck": "Hood and Deck",
+	"Kontrastdach": "Contrast Roof", "Kontrast": "Contrast",
+	"Türkis": "Turquoise",
+	"Xenon": "Xenon", "Eisblau": "Ice Blue",
+	"Lack, Felgen, Spoiler, Bodykit, Haube, Auspuff, Folierung, Neon, Scheiben, Licht.": "Paint, rims, spoiler, body kit, hood, exhaust, vinyl, underglow, windows, lights.",
+	"Eingebaute Teile passen auf alle deine Autos.": "Installed parts fit all your cars.",
 	"Turbo": "Turbo", "Fahrwerk": "Suspension", "Sport": "Sport", "Gewinde": "Coilovers", "Rennfahrwerk": "Race suspension",
 	"Reifen": "Tires", "Semi-Slicks": "Semi-slicks", "Rennreifen": "Race tires",
 	# --- Touch / Handy ---

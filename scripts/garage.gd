@@ -13,7 +13,7 @@ const CareerMap := preload("res://scripts/career_map.gd")
 const TIPS := [
 	"Zu schwer? Einstellungen > Schwierigkeit: Leicht. Dann lernst du die Strecken in Ruhe kennen.",
 	"Gib kurz vor LOS Gas: Drehzahl im grünen Bereich gibt einen perfekten Start.",
-	"Knapp am Verkehr vorbei füllt dein Nitro.",
+	"Knapp am Verkehr vorbei gibt Punkte und füllt dein Nitro ein Stück.",
 	"Im Drag im grünen Bereich schalten: perfekter Schaltvorgang, mehr Schub.",
 	"Abkürzungen sparen Zeit, aber dort kommt dir Verkehr entgegen.",
 	"Handbremse und Lenken stellen das Auto quer. Drift-Ketten bringen Multiplikator.",
@@ -22,6 +22,9 @@ const TIPS := [
 	"Über die Rampe am Bahnübergang springst du über die Gleise.",
 	"Motor-Tuning steigert Beschleunigung und Höchstgeschwindigkeit.",
 	"Im Drag nicht im Begrenzer bleiben: der Motor überhitzt.",
+	"Im Drag schaltest du von Hand: S hoch, X runter. A/D wechselt die Spur.",
+	"Tuningteile passen auf alle deine Autos: einmal einbauen, überall dran.",
+	"Driften, knapp vorbei und Sprünge geben Punkte, die Nitro etwas nachfüllen.",
 ]
 
 var world: SubViewport
@@ -42,6 +45,8 @@ var _tip_t := 0.0
 var preview_car := ""
 var preview_cfg := {}
 var _t := 0.0
+## Rücktaste/Esc: eine Ebene zurück wie in NFS (jedes Menü setzt, wohin es zurückgeht; leer = Hauptmenü)
+var _back := Callable()
 
 
 func _ready() -> void:
@@ -366,7 +371,7 @@ func _view_for(cat: String) -> Array:
 	match cat:
 		"paint":
 			return [Vector3(3.4, 1.35, -3.4), Vector3(0.2, 0.55, 0.0)]
-		"rims", "tires":
+		"rims", "rimcol", "tires":
 			return [Vector3(W / 2.0 + 1.3, 0.45, fz - 0.9), Vector3(W / 2.0, 0.32, fz)]
 		"suspension":
 			return [Vector3(W / 2.0 + 1.6, 0.55, fz - 0.6), Vector3(W / 2.0 - 0.1, 0.42, fz + 0.1)]
@@ -374,8 +379,14 @@ func _view_for(cat: String) -> Array:
 			return [Vector3(1.7, 1.55, L / 2.0 + 1.7), Vector3(0.0, 0.95, L / 2.0 - 0.35)]
 		"bodykit":
 			return [Vector3(3.2, 0.55, -2.6), Vector3(0.2, 0.35, -0.3)]
-		"vinyl":
-			return [Vector3(4.4, 1.1, 0.2), Vector3(0.0, 0.6, 0.0)]
+		"vinyl", "vinylcol":
+			return [Vector3(4.0, 2.0, -1.6), Vector3(0.0, 0.6, 0.0)]
+		"hood":
+			return [Vector3(1.6, 1.9, -L / 2.0 - 1.9), Vector3(0.0, 0.75, -L / 2.0 + 1.0)]
+		"exhaust":
+			return [Vector3(1.4, 0.6, L / 2.0 + 1.6), Vector3(0.0, 0.3, L / 2.0)]
+		"lights":
+			return [Vector3(2.0, 0.9, -L / 2.0 - 2.6), Vector3(0.0, 0.5, -L / 2.0)]
 		"neon":
 			return [Vector3(3.3, 0.32, -1.6), Vector3(0.0, 0.05, 0.0)]
 		"tint":
@@ -475,6 +486,7 @@ func _focus_first() -> void:
 
 func _show_main() -> void:
 	_clear_menu()
+	_back = Callable()
 	_cam_view = ""
 	preview_car = GameState.current_car
 	preview_cfg = GameState.get_config(preview_car).duplicate()
@@ -521,29 +533,44 @@ const SETTING_HINTS := {
 
 
 ## Grafik, Vollbild, Spielstand: nicht auf der Startseite, sondern gesammelt hier
-func _show_settings() -> void:
+func _show_settings(focus := "") -> void:
 	_clear_menu()
+	_back = _show_main
 	_set_section("EINSTELLUNGEN")
 	var g := _button("Grafik  >", _show_graphics)
 	g.focus_entered.connect(func(): info.text = tr(SETTING_HINTS["graphics"]))
+	g.set_meta("key", "graphics")
 	var mo := _button("Kamera & Tempo  >", _show_motion)
 	mo.focus_entered.connect(func(): info.text = tr(SETTING_HINTS["motion"]))
+	mo.set_meta("key", "motion")
 	for key in ["language", "difficulty", "show_fps", "vsync", "fps", "fullscreen", "touch"]:
-		_setting_button(key)
-	_button("Spielstand zurücksetzen", _confirm_reset)
+		_setting_button(key).set_meta("key", key)
+	_button("Spielstand zurücksetzen", _confirm_reset).set_meta("key", "reset")
 	_button("< Zurück", _show_main)
 	info.text = tr(SETTING_HINTS["graphics"])
 	_focus_first()
+	_focus_key(focus)
+
+
+## Nach dem Zurückgehen steht der Fokus wieder auf dem Eintrag, aus dem man kam
+func _focus_key(key: String) -> void:
+	if key == "":
+		return
+	for c in menu.get_children():
+		if c.has_meta("key") and c.get_meta("key") == key:
+			(c as Control).grab_focus.call_deferred()
+			return
 
 
 ## Grafikmenü: Voreinstellung oben, darunter jede Option einzeln (Links/Rechts oder Klick schaltet um).
 ## Optionen, die der Browser-Renderer nicht kann (Spiegelungen, Umgebungsverdeckung), fehlen dort.
 func _show_graphics() -> void:
 	_clear_menu()
+	_back = _show_settings.bind("graphics")
 	_set_section("GRAFIK")
 	for key in ["preset"] + GameState.GFX_ORDER.filter(GameState.gfx_available) + ["pixel"]:
 		_setting_button(key)
-	_button("< Zurück", _show_settings)
+	_button("< Zurück", _back)
 	info.text = tr(SETTING_HINTS["preset"])
 	_focus_first()
 
@@ -551,10 +578,11 @@ func _show_graphics() -> void:
 ## Tempogefühl: Bewegungsunschärfe, Tempo-Zoom, Kamerawackeln, Sprungkamera (gegen Übelkeit alles abschaltbar)
 func _show_motion() -> void:
 	_clear_menu()
+	_back = _show_settings.bind("motion")
 	_set_section("KAMERA & TEMPO")
 	for key in ["motion_blur", "speed_fov", "cam_shake", "jumpcam"]:
 		_setting_button(key)
-	_button("< Zurück", _show_settings)
+	_button("< Zurück", _back)
 	info.text = tr(SETTING_HINTS["motion_blur"])
 	_focus_first()
 
@@ -585,6 +613,7 @@ func _setting_button(k: String) -> Button:
 ## Karriere wie in NFS: alle Events der Reihe nach, ein Sieg öffnet das nächste. Rechts die Deutschlandkarte.
 func _show_races() -> void:
 	_clear_menu()
+	_back = _show_main
 	_set_section("KARRIERE")
 	career_map.visible = true
 	var last_open := 0
@@ -642,6 +671,7 @@ func _in_list(r: Dictionary, type: String) -> bool:
 
 func _show_events(type: String) -> void:
 	_clear_menu()
+	_back = _show_races
 	section.text = tr(str(Catalog.CITY_EVENTS["label"] if type == "city" else Catalog.EVENT_TYPES[type]["label"])).to_upper()
 	stats.get_parent().visible = false
 	for i in Catalog.RACES.size():
@@ -673,23 +703,31 @@ func _start_race(i: int) -> void:
 	get_tree().change_scene_to_file("res://scenes/race.tscn")
 
 
-func _show_tuning() -> void:
+func _show_tuning(focus := "") -> void:
 	_clear_menu()
+	_back = _show_main
 	_cam_view = ""
 	preview_cfg = GameState.get_config(preview_car).duplicate()
 	_show_car(preview_car, preview_cfg)
 	_set_section("TUNING", true)
 	var bo := _button("Optik", func(): _show_group("optik"))
-	bo.focus_entered.connect(func(): info.text = tr("Lack, Felgen, Spoiler, Bodykit, Folierung, Unterbodenneon, Scheiben."))
+	bo.set_meta("key", "optik")
+	bo.focus_entered.connect(func(): info.text = tr("Lack, Felgen, Spoiler, Bodykit, Haube, Auspuff, Folierung, Neon, Scheiben, Licht.") + "\n" + tr(TUNING_SHARED))
 	var bl := _button("Leistung", func(): _show_group("leistung"))
-	bl.focus_entered.connect(func(): info.text = tr("Motor, Turbo, Nitro, Fahrwerk, Reifen. Wirkt wirklich auf das Fahrverhalten."))
+	bl.set_meta("key", "leistung")
+	bl.focus_entered.connect(func(): info.text = tr("Motor, Turbo, Nitro, Fahrwerk, Reifen. Wirkt wirklich auf das Fahrverhalten.") + "\n" + tr(TUNING_SHARED))
 	_button("< Fertig", func(): _cam_view = ""; _show_main())
 	_focus_first()
+	_focus_key(focus)
+
+
+const TUNING_SHARED := "Eingebaute Teile passen auf alle deine Autos."
 
 
 ## Kategorien einer Gruppe, rechts daneben jeweils das eingebaute Teil
-func _show_group(group: String) -> void:
+func _show_group(group: String, focus := "") -> void:
 	_clear_menu()
+	_back = _show_tuning.bind(group)
 	preview_cfg = GameState.get_config(preview_car).duplicate()
 	_show_car(preview_car, preview_cfg)
 	_set_section("OPTIK" if group == "optik" else "LEISTUNG", group == "leistung")
@@ -697,12 +735,14 @@ func _show_group(group: String) -> void:
 		var c: String = cat
 		var opt := Catalog.part_of(preview_cfg, c)
 		var b := _button("%s:  %s" % [tr(Catalog.PARTS[c]["label"]), tr(opt["name"])], func(): _show_parts(c, group))
+		b.set_meta("key", c)
 		b.focus_entered.connect(func():
 			_cam_view = c
 			Builder.showcase(car_node, preview_car, preview_cfg, _showcase_mode(c))
 			info.text = tr(Catalog.PARTS[c]["label"]) + ": " + tr(opt["name"]))
-	_button("< Zurück", _show_tuning)
+	_button("< Zurück", _back)
 	_focus_first()
+	_focus_key(focus)
 
 
 func _showcase_mode(cat: String) -> String:
@@ -716,6 +756,7 @@ func _showcase_mode(cat: String) -> String:
 ## Teile einer Kategorie: Vorschau beim Auswählen, Einbauen mit Enter (wenn freigeschaltet)
 func _show_parts(cat: String, group: String) -> void:
 	_clear_menu()
+	_back = _show_group.bind(group, cat)
 	_cam_view = cat
 	section.text = tr(Catalog.PARTS[cat]["label"]).to_upper()
 	stats.get_parent().visible = group == "leistung"  # Optik-Teile ändern keine Fahrwerte: Balken weg, Auto frei
@@ -726,7 +767,7 @@ func _show_parts(cat: String, group: String) -> void:
 		var b := _button("", func(): _install(cat, idx, group))
 		b.set_meta("part", idx)
 		b.focus_entered.connect(func(): _preview_part(cat, idx))
-	_button("< Zurück", func(): _show_group(group))
+	_button("< Zurück", _back)
 	_refresh_parts(cat)
 	_focus_first()
 	# Fokus auf das eingebaute Teil
@@ -795,6 +836,7 @@ func _part_info(cat: String, idx: int) -> void:
 
 func _show_cars() -> void:
 	_clear_menu()
+	_back = _show_main
 	_set_section("AUTOHAUS", true)
 	var b := _button("", func(): _cycle_car(1))
 	b.set_meta("car", true)
@@ -852,8 +894,9 @@ func _show_language(first: bool) -> void:
 			GameState.set_language(l)
 			get_tree().reload_current_scene())  # alle Texte neu in der gewählten Sprache
 		menu.add_child(b)
+	_back = Callable() if first else _show_settings.bind("language")
 	if not first:
-		_button("< Zurück", _show_settings)
+		_button("< Zurück", _back)
 	info.text = "Choose your language. Title, places and signs stay German.\nWähle deine Sprache. Titel, Orte und Schilder bleiben deutsch."
 	_focus_first()
 	if not first and GameState.language == "de":
@@ -862,6 +905,7 @@ func _show_language(first: bool) -> void:
 
 func _confirm_reset() -> void:
 	_clear_menu()
+	_back = _show_settings.bind("reset")
 	_set_section("ACHTUNG")
 	info.text = tr("Alle Siege und Tuningteile gehen verloren.")
 	_button("Ja, zurücksetzen", func(): GameState.reset_progress(); _show_main())
@@ -880,4 +924,8 @@ func _lr_input(ev: InputEvent, cb: Callable) -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel") and GameState.language != "":
-		_show_main()
+		Sfx.play("whoosh", -24.0, 1.8)
+		if _back.is_valid():
+			_back.call()
+		else:
+			_show_main()

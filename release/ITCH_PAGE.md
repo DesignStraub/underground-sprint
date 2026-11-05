@@ -38,14 +38,14 @@ Berlin-Kreuzberg, mit Dom, Residenz, Festung, Oberbaumbrücke und Hochbahn an ih
 
 **Features**
 - Karriere mit Deutschlandkarte: 21 Events, eins nach dem anderen freischalten
-- Sprint, Rundkurs, Drag mit Handschaltung, Drift – sechs Strecken auf echten Straßen (OpenStreetMap)
+- Sprint, Rundkurs, Drag (auf Schienen mit Spurwechsel und Handschaltung), Drift – sechs Strecken auf echten Straßen (OpenStreetMap)
 - Jede Stadt mit eigener Stimmung: Regen auf nasser Fahrbahn, Nebel, Natriumlicht, Dämmerung, Neon, Kiez
 - Tunnel, Hochbahn, Bahnübergang mit Zug, Brücken, Abkürzungen, Verkehr in beide Richtungen
 - Abkürzungen als Lichttunnel aus Neonbögen, Sprünge mit echter Flugphase, Überschläge bei harten Crashs, umfahrbare Laternen und Schilder
 - Sprungkamera wie in Underground: Bei großen Sprüngen fängt dich eine Kamera schräg von vorn ein, in leichter Zeitlupe
 - Asphalt wie damals: körnig, mit Rissen, Teerfugen und Radspuren, Lichtkreise unter jeder Laterne, nass spiegeln sich Laternen und Rücklichter; Gehwege aus Betonplatten, Kopfsteinpflaster in den Altstädten
 - Tempogefühl wie in Underground: Bewegungsunschärfe am Bildrand, Tempo-Zoom, Reifenquietschen im Drift – alles einzeln abschaltbar
-- 15 JDM-Autos in fünf Leistungsklassen (die letzten fünf gleich stark, aber jedes mit eigenem Charakter), Tuning wie in NFS: Optik (Lack, Felgen, Spoiler, Bodykit, Folierung, Neon, Scheiben) und Leistung (Motor, Turbo, Nitro, Fahrwerk, Reifen)
+- 15 JDM-Autos in fünf Leistungsklassen (die letzten fünf gleich stark, aber jedes mit eigenem Charakter), Tuning wie in NFS, ein Satz Teile für alle Autos: Optik (21 Lacke mit Matt, Perlmutt und Chrom, 13 Felgenarten mit eigener Felgenfarbe, Spoiler, Bodykits, Motorhauben mit Kohlefaser, Auspuff, Folien, Neon, Scheiben, Scheinwerfer) und Leistung (Motor, Turbo, Nitro, Fahrwerk, Reifen)
 - Kein Geld, kein Grind: Siege schalten Teile und Autos frei
 - Schwierigkeit Leicht / Normal / Schwer: Leicht zum entspannten Kennenlernen der Städte
 - Start- und Zielszene wie damals: Starterin, jubelnde Fans, Kamerafahrt
@@ -54,7 +54,7 @@ Berlin-Kreuzberg, mit Dom, Residenz, Festung, Oberbaumbrücke und Hochbahn an ih
 - Englisch und Deutsch, Retro-Pixel-Look (einstellbar), läuft bis 4K und im Browser, auch auf Handy und Tablet
 
 **Steuerung**
-W/S Gas/Bremse · A/D Lenken · Leertaste Handbremse · Shift Nitro · E/Q Schalten (Drag) · C Kamera · R Zurücksetzen · M Musik · F11 Vollbild · Esc/Enter/P Pause · Menüs auch mit WASD, zurück mit Esc oder Rücktaste
+W/S Gas/Bremse · A/D Lenken · Leertaste Handbremse · Shift Nitro · S/X Schalten (Drag) · C Kamera · R Zurücksetzen · M Musik · F11 Vollbild · Esc/Enter/P Pause · Menüs auch mit WASD, zurück mit Esc oder Rücktaste
 Gamepad wird unterstützt.
 
 **macOS-Hinweis:** Das Spiel ist nicht von Apple signiert. Beim ersten Start Rechtsklick auf die App → „Öffnen“.
@@ -74,14 +74,14 @@ cathedral, palace, fortress, Oberbaum Bridge and elevated U-Bahn in their real p
 
 **Features**
 - Career with a map of Germany: 21 events, unlocked one after another
-- Sprint, circuit, drag with manual shifting, drift – six tracks on real streets (OpenStreetMap)
+- Sprint, circuit, drag (on rails with lane changes and manual shifting), drift – six tracks on real streets (OpenStreetMap)
 - Every city has its own mood: rain on wet asphalt, fog, sodium light, dusk, neon, Kiez
 - Tunnels, elevated railway, rail crossing with train, bridges, shortcuts, two-way traffic
 - Shortcuts as neon light tunnels, jumps with real air time, rollovers in hard crashes, lamps and signs you can knock over
 - Jump camera like in Underground: big jumps cut to a camera watching you from ahead at an angle, in slight slow motion
 - Asphalt like back then: grainy, with cracks, tar seams and wheel ruts, a pool of light under every street lamp, street lights and tail lights reflecting when wet; concrete-slab sidewalks, cobblestones in the old towns
 - Speed feel like Underground: motion blur at the screen edges, speed zoom, tyre squeal when drifting – each can be switched off
-- 15 JDM cars in five performance classes (the top five equally strong, each with its own character), NFS-style tuning: visual (paint, rims, spoiler, body kit, vinyl, underglow, tint) and performance (engine, turbo, nitro, suspension, tires)
+- 15 JDM cars in five performance classes (the top five equally strong, each with its own character), NFS-style tuning, one set of parts for all your cars: visual (21 paints incl. matte, pearl and chrome, 13 rim styles with their own rim colour, spoilers, body kits, carbon hoods, exhausts, vinyls, underglow, tint, headlights) and performance (engine, turbo, nitro, suspension, tires)
 - No money, no grind: wins unlock parts and cars
 - Difficulty Easy / Normal / Hard: Easy for exploring the cities at your own pace
 - Start and finish scenes like back in the day: flag girl, cheering crowd, camera fly-in
@@ -90,7 +90,7 @@ cathedral, palace, fortress, Oberbaum Bridge and elevated U-Bahn in their real p
 - English and German (choose at first start), retro pixel look, runs up to 4K and in the browser, also on phones and tablets
 
 **Controls**
-W/S throttle/brake · A/D steer · Space handbrake · Shift nitro · E/Q shift (drag) · C camera · R reset · M music · F11 fullscreen · Esc/Enter/P pause · menus also with WASD, back with Esc or Backspace
+W/S throttle/brake · A/D steer · Space handbrake · Shift nitro · S/X shift (drag) · C camera · R reset · M music · F11 fullscreen · Esc/Enter/P pause · menus also with WASD, back with Esc or Backspace
 Gamepad supported.
 
 Tagline: Illegal street racing at night through real German towns. Tuning, nitro, drift, drag. Free.

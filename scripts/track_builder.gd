@@ -28,6 +28,7 @@ const HILL_SHADER := preload("res://shaders/hill.gdshader")
 const ElevatedRail := preload("res://scripts/elevated_rail.gd")
 const AmbientSound := preload("res://scripts/ambient_sound.gd")
 const CityData := preload("res://scripts/city_data.gd")
+const People := preload("res://scripts/people.gd")
 const City := preload("res://scripts/city_builder.gd")
 
 const HALF_W := 9.0  # 4 Spuren à 4,5 m
@@ -196,6 +197,7 @@ static func build(race: Dictionary) -> Dictionary:
 		"blocks": [], "ramps": [], "lakes": [], "zones": [], "crossing": null, "crossing_d": -1.0,
 		"districts": [], "parks": [], "tunnels": [], "el": [], "posts": [], "stadium_d": -1.0, "medians": [], "elev0": [],
 		"force_stadium": race.get("stadium", false), "city": city, "rivers": [], "bridges": [], "hills": [],
+		"spectators": [],  # Zuschauer hinter Zäunen und Absperrungen: [Transform, Wegstück d]
 		"pools": [],  # zusätzliche Lichtflächen für die Lichtkarte (Tunnel): [x, z, Radius, Farbe mal Stärke]
 		"extra": 2.5 if type == "drift" else 0.0,  # Drift-Kurse: breitere Fahrbahn
 		"paths": [{"id": 0, "kind": "main", "curve": curve, "half_w": HALF_W, "length": length, "from": 0.0, "to": length}],
@@ -270,6 +272,7 @@ static func build(race: Dictionary) -> Dictionary:
 	else:
 		_build_props(root, track, rng)
 	_build_steam(root, track, rng)
+	_build_spectators(root, track, rng)
 	if type == "drag":
 		_drag_boards(root, track)
 	if not city.is_empty() or race.has("town"):
@@ -1779,6 +1782,14 @@ static func _spur_details(root: Node3D, track: Dictionary, p: Dictionary, rng: R
 			lamp.radius = 0.13
 			lamp.height = 0.26
 			Builder._add(mouth, lamp, bm, Vector3(-SPUR_HALF + 1.2 + i * 2.4, 1.1 + CURB_H, 0))
+	# Zuschauer hinter der Absperrung, mit Blick auf die Hauptstraße
+	for i in rng.randi_range(5, 10):
+		var dd := HALF_W + WALK + rng.randf_range(1.6, 6.0)
+		var fs := frame_at(c, dd)
+		var q: Vector3 = fs["pos"] + fs["right"] * rng.randf_range(-SPUR_HALF + 0.6, SPUR_HALF - 0.6)
+		q.y = elev_at(c, dd)
+		var look := Basis.looking_at(-fs["fwd"], Vector3.UP).rotated(Vector3.UP, rng.randf_range(-0.6, 0.6))
+		track["spectators"].append([Transform3D(look, q), p["from"]])
 	# Absperrung + Gebäude am Ende der Sackgasse
 	var fz := frame_at(c, len - 1.0)
 	var bar := Node3D.new()
@@ -1812,6 +1823,18 @@ static func _build_fences(root: Node3D, track: Dictionary, blockers: Array) -> v
 		bgrid[k].append(b)
 		bmax = maxf(bmax, b["r"])
 	var breach := int(ceil((bmax * 0.85 + 1.5) / LOT_CELL))
+	# frei von Häusern? (für Zuschauer hinter dem Zaun)
+	var free := func(q: Vector3, margin: float) -> bool:
+		var qk := Vector2i(floori(q.x / LOT_CELL), floori(q.z / LOT_CELL))
+		for gx in range(qk.x - breach, qk.x + breach + 1):
+			for gz in range(qk.y - breach, qk.y + breach + 1):
+				for b in bgrid.get(Vector2i(gx, gz), []):
+					if _flat(q - b["pos"]).length() < b["r"] * 0.85 + margin:
+						return false
+		return true
+	var fan_rng := RandomNumberGenerator.new()
+	fan_rng.seed = int(track["length"] * 7.0) + 11
+	var next_fans := {-1.0: 30.0, 1.0: 70.0}  # frühestes d für die nächste Gruppe je Seite
 	for p in track["paths"]:
 		if p["id"] == 0 or p["kind"] == "fork" or p["kind"] == "spur":
 			lines.append(p)
@@ -1849,6 +1872,18 @@ static func _build_fences(root: Node3D, track: Dictionary, blockers: Array) -> v
 					continue
 				var bf := Basis.looking_at(f["fwd"], Vector3.UP)
 				var base := Vector3(pos.x, CURB_H + (0.0 if main else f["y"]), pos.z)
+				# Zuschauer: ab und zu eine Gruppe hinter dem Zaun, die dem Rennen zuschaut
+				if main and d > next_fans[side] and absf(f["y"]) < 0.5 and fan_rng.randf() < 0.12:
+					var n := fan_rng.randi_range(3, 7)
+					var face := Basis.looking_at(-f["right"] * side, Vector3.UP)
+					for i in n:
+						var dd := d + fan_rng.randf_range(-2.5, 4.5)
+						var ff := frame_at(c, dd)
+						var q: Vector3 = ff["pos"] + ff["right"] * side * (hw(track, dd) + WALK + fan_rng.randf_range(0.9, 2.6))
+						if free.call(q, 1.0):
+							q.y = 0.0
+							track["spectators"].append([Transform3D(face.rotated(Vector3.UP, fan_rng.randf_range(-0.5, 0.5)), q), d])
+					next_fans[side] = d + fan_rng.randf_range(45.0, 110.0)
 				posts.append(Transform3D(bf, base + Vector3(0, 0.6, 0)))
 				for ry in [0.45, 1.05]:
 					rails.append(Transform3D(bf, base + Vector3(0, ry, 0)))
@@ -3859,6 +3894,24 @@ static func _build_props(root: Node3D, track: Dictionary, rng: RandomNumberGener
 						Builder._add(s, Builder.tapered_box(Vector2(3.6, 0.6), Vector2(3.6, 0.22), 0.85, 0.0), concrete, Vector3.ZERO)
 						_knock_shape(s, Vector3(3.6, 1.0, 0.6), Vector3(0, 0.5, 0))
 			d += rng.randf_range(7.0, 15.0) * dist.get("prop_gap", 1.0)
+
+
+## Zuschauer (Blockfiguren aus people.gd, im Shader bewegt): jubeln, winken, filmen mit dem Handy. In Gruppen je
+## 300 m Strecke, damit die Grafikkarte entfernte Gruppen weglassen kann; ab ~220 m ausgeblendet.
+static func _build_spectators(root: Node3D, track: Dictionary, rng: RandomNumberGenerator) -> void:
+	var chunks := {}
+	for e in track["spectators"]:
+		var k := int(e[1] / 300.0)
+		if not chunks.has(k):
+			chunks[k] = []
+		chunks[k].append(e[0])
+	for k in chunks:
+		var holder := People.crowd(root, chunks[k], [People.CHEER, People.WAVE, People.CLAP, People.PHONE, People.WAIT, People.CHEER], rng)
+		for mmi in holder.get_children():
+			if mmi is GeometryInstance3D:
+				(mmi as GeometryInstance3D).visibility_range_end = 220.0
+				(mmi as GeometryInstance3D).visibility_range_end_margin = 20.0
+				(mmi as GeometryInstance3D).visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
 
 
 ## Dampf aus Gullys

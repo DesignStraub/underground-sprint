@@ -22,8 +22,8 @@ func _ready() -> void:
 	_place(nitro, func(s: Vector2): return Vector2(s.x - 72, s.y - 196))
 	_place(pause, func(s: Vector2): return Vector2(s.x / 2.0, 40))
 	if drag:
-		_place(_make("E +", "shift_up", 40, UI.GREEN, false), func(s: Vector2): return Vector2(s.x - 186, s.y - 64))
-		_place(_make("Q -", "shift_down", 30, Color(1.0, 0.75, 0.3), false), func(s: Vector2): return Vector2(s.x - 186, s.y - 156))
+		_place(_make(tr("GANG +"), "shift_up", 40, UI.GREEN, false), func(s: Vector2): return Vector2(s.x - 186, s.y - 64))
+		_place(_make(tr("GANG -"), "shift_down", 30, Color(1.0, 0.75, 0.3), false), func(s: Vector2): return Vector2(s.x - 186, s.y - 156))
 	else:
 		_place(_make(tr("BREMSE"), "brake", 38, Color(1.0, 0.3, 0.25), false), func(s: Vector2): return Vector2(s.x - 186, s.y - 60))
 		_place(_make(tr("HAND"), "handbrake", 30, Color(1.0, 0.75, 0.3), false), func(s: Vector2): return Vector2(s.x - 186, s.y - 154))
