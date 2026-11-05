@@ -42,6 +42,13 @@ var touch_mode := 0
 ## Sprungkamera bei hohen Sprüngen: 0 an (mit Zeitlupe), 1 ohne Zeitlupe, 2 aus
 var jump_cam := 0
 const JUMP_CAM_NAMES := ["An", "Ohne Zeitlupe", "Aus"]
+## Tempogefühl (Einstellungen > Kamera & Tempo), alles abschaltbar: Bewegungsunschärfe 0 Aus, 1 Dezent, 2 Normal,
+## 3 Stark (mit Nitro-Schimmer); Tempo-Zoom (Sichtfeld wird mit dem Tempo weiter); Kamerawackeln (Stöße bei
+## Einschlägen und Landungen, Neigen beim Lenken)
+var motion_blur := 2
+const MOTION_BLUR_NAMES := ["Aus", "Dezent", "Normal", "Stark"]
+var speed_fov := true
+var cam_shake := true
 ## Schwierigkeit: wie stark die Gegner fahren (und wie viele Driftpunkte es braucht). 0 Leicht, 1 Normal, 2 Schwer
 var difficulty := 1
 const DIFFICULTY_NAMES := ["Leicht", "Normal", "Schwer"]
@@ -236,6 +243,12 @@ func cycle_setting(key: String, dir := 1) -> void:
 			touch_mode = (touch_mode + 1) % 3
 		"jumpcam":
 			jump_cam = posmod(jump_cam + dir, 3)
+		"motion_blur":
+			motion_blur = posmod(motion_blur + dir, 4)
+		"speed_fov":
+			speed_fov = not speed_fov
+		"cam_shake":
+			cam_shake = not cam_shake
 		"difficulty":
 			difficulty = posmod(difficulty + dir, 3)
 		"show_fps":
@@ -308,6 +321,12 @@ func setting_text(key: String) -> String:
 			return tr("Touch-Steuerung: ") + tr(["Auto", "An", "Aus"][touch_mode])
 		"jumpcam":
 			return tr("Sprungkamera: ") + tr(JUMP_CAM_NAMES[jump_cam])
+		"motion_blur":
+			return tr("Bewegungsunschärfe: ") + tr(MOTION_BLUR_NAMES[motion_blur])
+		"speed_fov":
+			return tr("Tempo-Zoom: ") + tr("An" if speed_fov else "Aus")
+		"cam_shake":
+			return tr("Kamerawackeln: ") + tr("An" if cam_shake else "Aus")
 		"difficulty":
 			return tr("Schwierigkeit: ") + tr(DIFFICULTY_NAMES[difficulty])
 	if GFX.has(key):
@@ -438,7 +457,8 @@ func save_game() -> void:
 		"wins": wins, "drift_wins": drift_wins, "current_car": current_car, "race_index": race_index,
 		"best_times": best_times, "car_configs": car_configs, "won_events": won_events, "kept_cars": kept_cars,
 		"gfx": {"preset": preset, "opts": gfx, "pixel": pixel_look, "vsync": vsync, "fps": fps_limit, "fullscreen": fullscreen,
-			"touch": touch_mode, "show_fps": show_fps, "jump_cam": jump_cam},
+			"touch": touch_mode, "show_fps": show_fps, "jump_cam": jump_cam, "motion_blur": motion_blur,
+			"speed_fov": speed_fov, "cam_shake": cam_shake},
 		"language": language, "difficulty": difficulty,
 	}, "\t"))
 
@@ -488,6 +508,9 @@ func load_game() -> void:
 	fullscreen = bool(g.get("fullscreen", false))
 	touch_mode = clampi(int(g.get("touch", 0)), 0, 2)
 	jump_cam = clampi(int(g.get("jump_cam", 0)), 0, 2)
+	motion_blur = clampi(int(g.get("motion_blur", 2)), 0, 3)
+	speed_fov = bool(g.get("speed_fov", true))
+	cam_shake = bool(g.get("cam_shake", true))
 	difficulty = clampi(int(data.get("difficulty", 1)), 0, 2)
 	car_configs = {}
 	var cc: Dictionary = data.get("car_configs", {})

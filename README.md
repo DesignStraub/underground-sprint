@@ -165,7 +165,7 @@ Skript), schreibt `scripts/city_data.gd`.
   Auto nach und zoomt mit, sodass es etwa gleich groß bleibt. Ein Aufhelllicht auf der Kameraseite sorgt dafür, dass
   das Auto nachts von vorn nicht schwarz bleibt, und oben und unten fahren schwarze Kino-Balken ein. Dazu leichte Zeitlupe (Faktor
   0,45–0,7, je länger der Flug, desto weniger), in der Motor und Effekte dumpf klingen. Kurz nach dem Aufsetzen geht es
-  zurück zur Fahrerkamera, bei Überschlag oder Platsch erst etwas später. Einstellungen → Sprungkamera: An / Ohne
+  zurück zur Fahrerkamera, bei Überschlag oder Platsch erst etwas später. Einstellungen → Kamera & Tempo → Sprungkamera: An / Ohne
   Zeitlupe / Aus.
 - **Überschlag** wie in echt: nur wer quer rutschend (ab 36 km/h Querfahrt, Schräglage über gut 30°, mindestens
   50 km/h) mit der Flanke gegen Wand oder Auto kracht, kippt darüber, oder wer schief landet. Beurteilt wird die Lage
@@ -183,7 +183,7 @@ Skript), schreibt `scripts/city_data.gd`.
 - **Gabelungen:** Vor der Teilung zeigt ein Wegweiser beide Wege. Die Altstadt-Route ist kürzer, aber zweispurig
   mit Gegenverkehr; außen herum geht ein breiter Boulevard. Wer sich nicht entscheidet, landet auf der Verkehrsinsel.
 - **Boulevards:** breite Straßen mit bepflanztem Mittelstreifen (auf der Schnellstraße mit Betonleitwand).
-- Kreuzungen mit Ampeln, Baustellen, Verkehr in beide Richtungen. Laternen, Mülltonnen, Zeitungsboxen, Parkuhren,
+- Kreuzungen mit Ampeln, Verkehr in beide Richtungen. Laternen, Mülltonnen, Zeitungsboxen, Parkuhren,
   Schilder, Büsche und Container fliegen weg und kosten etwas Tempo. Sackgassen sind an der Einmündung abgesperrt,
   vor den Trögen lenkt eine schräge Leitwand hinein.
 - **Anecken wie in NFSU:** An Wänden und Banden schrammt man entlang und dreht dabei weich parallel zur Wand
@@ -211,8 +211,15 @@ in den Altstädten und Graffiti an den Altbauten im Kiez.
 Musik (`music/`) und Intro-Sound (`assets/intro_sound.mp3`) sind lizenzfreie Tracks von Pixabay.
 Weitere mp3/ogg-Dateien in `music/` laufen automatisch mit, in zufälliger Reihenfolge.
 
-Motorsound, Reifen, Nitro und Crashs werden im Spiel erzeugt. Zug, Glocke, Landung, Platschen, Tunnel, Stadion usw.
-sind synthetisch erzeugte WAVs in `assets/sfx/` (`python3 tools/make_sfx.py`).
+Motorsound, Nitro und Crashs werden im Spiel erzeugt. Zug, Glocke, Landung, Platschen, Tunnel, Stadion,
+Reifenquietschen usw. sind synthetisch erzeugte WAVs in `assets/sfx/` (`python3 tools/make_sfx.py`, einzelne mit
+`python3 tools/make_sfx.py skid`).
+- **Drift-Sound:** Reifenquietschen als nahtlose Schleife (`skid.wav`): zwei, drei helle, leicht raue Töne (Haft-Gleit-
+  Effekt), deren Tonhöhe unruhig wandert, dazu etwas Zischen und tiefes Rubbeln. Es setzt weich ein, wird mit dem
+  Driftwinkel lauter und mit Tempo und Winkel höher. Der Motor schaltet im Drift nicht mehr herunter: Gang und
+  Drehzahl, die man hört und sieht, richten sich nach dem Tempo über Grund, mit Gas dreht er durch die
+  durchdrehenden Hinterräder hoch (bis knapp unter den Begrenzer). Der Vortrieb rechnet weiter mit dem Gang nach
+  dem Tempo nach vorn, das Fahrverhalten bleibt also gleich.
 
 ## Menüs
 Im Stil von NFS Underground (`scripts/ui_style.gd`): schräge Leisten, Neongrün für die Auswahl, kursive
@@ -279,10 +286,17 @@ dann steht „Benutzerdefiniert“ da. Werte in `GameState.GFX`.
 - **3D-Auflösung** 540p–1440p (höchstens so viele Zeilen, darüber weich hochskaliert), **Dynamische Auflösung**
   (fällt die Bildrate unter 60, geht die 3D-Auflösung in Stufen bis 60 % herunter; bringt das nichts, weil der
   Prozessor bremst, bleibt sie oben), **Sichtweite** 600–1400 m, **Detaildichte** (ab wann Kleinteile verschwinden
-  und Autos auf die Fernansicht wechseln), **Lichter** (Reichweite der Laternen), **Kantenglättung** (Aus, FXAA,
+  und Autos auf die Fernansicht wechseln), **Lichter** (wie weit Laternen Autos und Häuser beleuchten; die Lichtkreise auf der Straße sind immer da), **Kantenglättung** (Aus, FXAA,
   MSAA 2x/4x), **Glühen**, **Spiegelungen** und **Umgebungsverdeckung** (nur am Rechner, nicht im Browser),
   **Effekte** (Regen, Dampf), **Pixel-Look**.
-- Einstellungen: **Schwierigkeit** (Leicht / Normal / Schwer), **Sprungkamera** (An / Ohne Zeitlupe / Aus), **FPS anzeigen** (oben in der Mitte, mit aktueller 3D-Auflösung), **V-Sync**, **FPS-Limit**, **Vollbild**.
+- Einstellungen: **Schwierigkeit** (Leicht / Normal / Schwer), **FPS anzeigen** (oben in der Mitte, mit aktueller 3D-Auflösung), **V-Sync**, **FPS-Limit**, **Vollbild**.
+- **Kamera & Tempo** (alles einzeln abschaltbar, z. B. gegen Übelkeit): **Bewegungsunschärfe** (Aus / Dezent / Normal /
+  Stark), **Tempo-Zoom** (Sichtfeld wird mit Tempo und Nitro weiter), **Kamerawackeln** (Stöße bei Einschlägen und
+  Landungen, Neigen beim Lenken), **Sprungkamera** (An / Ohne Zeitlupe / Aus).
+- **Bewegungsunschärfe wie in NFS Underground** (`shaders/speed_fx.gdshader`) statt gezeichneter Tempolinien: ab gut
+  40 % Tempo verwischt der Bildrand entlang der Fahrtrichtung (Zoom-Unschärfe vom Fluchtpunkt aus, zehn versetzte
+  Proben je Bildpunkt), die Mitte mit dem eigenen Auto bleibt scharf; beim Einlenken verwischt das Bild zusätzlich
+  seitlich, mit Nitro stärker, dazu ein blauer Schimmer und leichte Farbsäume. Steht nichts an, ist der Effekt ganz aus.
 - Erststart: Handy/Tablet „Niedrig“, sonst „Mittel“ (beide mit dynamischer Auflösung).
 - **Leistung:** Unbewegliche Teile der Strecke werden je Material und Rasterzelle zu einem Mesh verschmolzen
   (`Track.batch_static`), Autos je Material und beweglichem Teil (Karosserie, Räder), dazu eine Fernansicht in
@@ -328,6 +342,17 @@ dann steht „Benutzerdefiniert“ da. Werte in `GameState.GFX`.
   glatt gefahrene Radspuren mit Öltropfen dazwischen, am Rand ein Rinnstein mit Gully-Rosten, abgefahrene
   Markierungen, Flickstellen mit Teerrand, Gullydeckel, Pfützen; Linien kantengeglättet (kein Flimmern in der Ferne).
   Normal-Mapping ohne Tangenten im Mesh (Basis aus Bildschirm-Ableitungen), daher auch nach dem Zusammenfassen.
+- **Laternenlicht auf der Straße** (`Track._bake_street_light`, `shaders/street_light.gdshaderinc`): Beim Aufbau der
+  Strecke kommt unter jede Lampe (Laternen, Tunnel, Brücken, Flutlicht, Lichterketten) ein weicher Lichtkreis in eine
+  Lichtkarte über der ganzen Strecke (2 m je Bildpunkt, meist unter 1000 x 1000, 10–35 ms). Tunnel bekommen
+  dazu ein durchgehendes Lichtband. Fahrbahn, Gehweg und Tunnelwände lesen sie im Shader: Jede Laterne beleuchtet
+  sichtbar die Straße, auch im Browser, wo jedes Objekt nur von wenigen echten Lampen Licht bekommt (lange
+  Straßenstücke und Tunnel blieben dort stellenweise schwarz). Überlagern sich viele Kreise, sättigt es weich.
+- **Kopfsteinpflaster:** kleine, gewölbte Steine in Reihen quer zur Fahrtrichtung, jede Reihe mit eigener Steinbreite
+  und zufällig versetzt; in der Ferne geht das Muster in den mittleren Farbton über (kein Flimmern). Vorher waren es
+  große Rechtecke im Ziegelverband, die im Dunkeln wie eine Hauswand aussahen.
+- **Schilder:** Ladennamen sitzen auf Leuchtkästen (dunkler Kasten mit Neonrahmen, `Track._sign_box`), dazu senkrechte
+  Leuchtschilder und Dachwerbung. Frei an der Fassade schwebende Schriftzüge gibt es nicht mehr.
 - **Gehweg** (`shaders/pavement.gdshader`): Betonplatten 1,5 x 1,5 m mit Fugen, je Platte etwas anders getönt,
   Flecken und Kaugummi-Punkte, an beiden Rändern eine Reihe heller Bordsteine, Bordsteinkanten aus hellem Beton.
   Wo kein Haus die Streckenbegrenzung verdeckt, steht ein Zaun.
@@ -336,6 +361,9 @@ dann steht „Benutzerdefiniert“ da. Werte in `GameState.GFX`.
 Vergleichsbilder aus der Entwicklung liegen in `update_bilder/` (Godot ignoriert den Ordner, sie landen nicht im
 Spiel). Die wichtigsten:
 
+- **2.12 – Laternenlicht auf der Straße:** links vorher, rechts nachher, an denselben Stellen derselben Rennen
+  (Hafentunnel, Aachen, Unterführung mit Asphalt statt Ziegelmuster am Boden).
+  <br><img src="update_bilder/licht_vorher_nachher.jpg" alt="Licht vorher und nachher" width="640">
 - **2.11 – Startwagen von hinten:** links vorher (Keile an den Ecken plus ein zweites Band innen), rechts nachher
   (ein Leuchtenband um die Ecken).
   <br><img src="update_bilder/startwagen_heck_vorher_nachher.jpg" alt="Startwagen Heck" width="640">
@@ -367,7 +395,7 @@ Texte, Cover und Screenshots für die itch.io-Seite: `release/`.
 ## Aufbau
 - `scripts/catalog.gd` – Autos, Teile, Rennen
 - `scripts/player_car.gd` – Fahrphysik, Kamera, Geschwindigkeitsgefühl
-- `scripts/engine_audio.gd` – synthetischer Motorsound (Turbo, Blow-off, Reifen, Wind)
+- `scripts/engine_audio.gd` – synthetischer Motorsound (Turbo, Blow-off, Wind) und Reifenquietschen
 - `scripts/track_builder.gd` – prozedurale Stadtstrecke
 - `scripts/ai_car.gd` – Gegner
 - `scripts/garage.gd` / `scripts/race.gd` – Menü und Rennen

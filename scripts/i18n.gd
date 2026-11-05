@@ -171,8 +171,8 @@ const EN := {
 		"How far you can see. Further = more buildings and landmarks on screen, costs performance.",
 	"Ab welcher Entfernung Kleinteile verschwinden und Autos vereinfacht gezeichnet werden.":
 		"Distance at which small objects disappear and cars switch to a simplified model.",
-	"Bis zu welcher Entfernung Laternen und Leuchtreklamen die Straße beleuchten.":
-		"Distance up to which street lamps and neon signs light up the road.",
+	"Bis zu welcher Entfernung Laternen und Leuchtreklamen Autos und Häuser beleuchten. Die Lichtkreise auf der Straße sind immer da.":
+		"Distance up to which street lamps and neon signs light up cars and buildings. The pools of light on the road are always there.",
 	"Glättet Treppchen an Kanten. MSAA ist schärfer, kostet aber mehr.": "Smooths jagged edges. MSAA is sharper but costs more.",
 	"Leuchtreklamen, Scheinwerfer und Neon strahlen über.": "Neon signs, headlights and underglow bloom.",
 	"Spiegelungen auf nasser Straße. Teuer.": "Reflections on wet roads. Expensive.",
@@ -190,6 +190,13 @@ const EN := {
 	"Wie stark die Gegner fahren. Leicht: zum Kennenlernen der Strecken. Schwer: schnellere Autos, und wer führt, wird gejagt.":
 		"How strong the rivals drive. Easy: for getting to know the tracks. Hard: faster cars, and whoever leads gets hunted.",
 	"Sprungkamera: ": "Jump camera: ", "Ohne Zeitlupe": "No slow motion",
+	"Kamera & Tempo  >": "Camera & speed  >", "KAMERA & TEMPO": "CAMERA & SPEED",
+	"Bewegungsunschärfe: ": "Motion blur: ", "Dezent": "Subtle", "Stark": "Strong",
+	"Tempo-Zoom: ": "Speed zoom: ", "Kamerawackeln: ": "Camera shake: ",
+	"Wie sich Tempo anfühlt: Bewegungsunschärfe, Tempo-Zoom, Kamerawackeln und Sprungkamera. Alles einzeln abschaltbar.": "How speed feels: motion blur, speed zoom, camera shake and jump camera. Each can be switched off.",
+	"Bei hohem Tempo verwischt der Bildrand in Fahrtrichtung, mit Nitro stärker; das eigene Auto bleibt scharf. Aus: auch kein Nitro-Schimmer.": "At high speed the edges of the screen blur in the direction of travel, more with nitro; your own car stays sharp. Off: no nitro glow either.",
+	"Das Sichtfeld wird mit dem Tempo und bei Nitro weiter. Aus: festes Sichtfeld.": "The field of view widens with speed and nitro. Off: fixed field of view.",
+	"Kurze Stöße bei Einschlägen und Landungen, die Kamera neigt sich beim Lenken. Aus: ruhige Kamera.": "Short jolts on impacts and landings, the camera tilts when steering. Off: steady camera.",
 	"Bei hohen Sprüngen schaut eine Kamera schräg von vorn zu, wie in NFS Underground, dazu Zeitlupe.":
 		"On big jumps a camera watches from ahead at an angle, like in NFS Underground, in slow motion.",
 }

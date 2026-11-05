@@ -1,6 +1,6 @@
 extends CharacterBody3D
 ## Gegner: fährt Wege (Hauptstraße oder Abkürzung) mit Spurversatz ab, bremst vor Kurven, sucht Lücken im Verkehr,
-## weicht Baustellen und dem Spieler aus, nimmt manchmal Abkürzungen, springt über Rampen.
+## weicht gesperrten Spuren und dem Spieler aus, nimmt manchmal Abkürzungen, springt über Rampen.
 ## Am Bahnübergang hält er, wenn der Zug kommt – oder nimmt Anlauf über die Rampe.
 ## Auf Boulevards bleibt er auf seiner Seite des Mittelstreifens; in Gabelungen fährt er rechts und bremst hinter Verkehr.
 ## Berührt er den Spieler oder einen anderen Gegner, fährt er nicht hindurch: von hinten bleibt er an der Stoßstange und

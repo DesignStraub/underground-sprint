@@ -1,7 +1,7 @@
 extends RefCounted
 ## Erzeugt eine Sprintstrecke durch eine nächtliche Stadt aus einem Seed.
 ## Hauptstraße mit Gehweg, Abkürzungen (kurvige Gasse, Seesprung über eine Schanze), Seitenstraßen mit Ampeln,
-## Bahnübergang mit Rampe, Baustellen, Tunnel, Hochbahn, Brücken, Gabelungen, Boulevards mit Mittelstreifen,
+## Bahnübergang mit Rampe, Tunnel, Hochbahn, Brücken, Gabelungen, Boulevards mit Mittelstreifen,
 ## Stadtviertel mit eigenem Stil (Downtown, Boulevard, Marktviertel, Altstadt, Docks, Schnellstraße; Chinatown ist
 ## derzeit keiner Strecke zugeordnet).
 ## Sprints laufen von A nach B, Rundkurse (circuit/drift) sind geschlossene Schleifen.
@@ -56,7 +56,6 @@ const TUNNEL_NAMES := ["INNENSTADTTUNNEL", "HAFENTUNNEL", "RINGTUNNEL", "NORDTUN
 const STATIONS := ["MARKTPLATZ", "HAFENSTRASSE", "STADION", "RATHAUS", "NORDRING", "ZENTRUM", "DOCKS"]
 const GANTRY_SIGNS := [["ZENTRUM", "STADION 2 km"], ["HAFEN", "CONTAINERTERMINAL"], ["FLUGHAFEN", "RING"], ["MESSE", "MARKT"],
 	["ALTSTADT", "AUSFAHRT"], ["A 7  NORD", "INDUSTRIE"], ["ALLE RICHTUNGEN", "AUTOBAHN"], ["MESSE", "HAUPTBAHNHOF"]]
-const SIGNS := ["PENSION", "24 STD.", "TUNING", "KNEIPE", "HOTEL", "NUDELN", "DISKO", "WERKSTATT", "ERSATZTEILE", "SPIELHALLE"]
 const SHOPS := ["PIZZA", "DÖNER", "KIOSK", "BÄCKEREI", "APOTHEKE", "FRISEUR", "TATTOO", "AUTOTEILE",
 	"WÄSCHEREI", "SPÄTI", "SUSHI", "CURRYWURST", "HANDYLADEN", "BLUMEN", "JUWELIER", "SPIELHALLE", "MUSIK",
 	"TURNSCHUHE", "NAGELSTUDIO", "WETTBÜRO", "CAFÉ", "KNEIPE", "TUNING", "REIFEN", "VIDEOTHEK", "ASIA IMBISS",
@@ -197,6 +196,7 @@ static func build(race: Dictionary) -> Dictionary:
 		"blocks": [], "ramps": [], "lakes": [], "zones": [], "crossing": null, "crossing_d": -1.0,
 		"districts": [], "parks": [], "tunnels": [], "el": [], "posts": [], "stadium_d": -1.0, "medians": [], "elev0": [],
 		"force_stadium": race.get("stadium", false), "city": city, "rivers": [], "bridges": [], "hills": [],
+		"pools": [],  # zusätzliche Lichtflächen für die Lichtkarte (Tunnel): [x, z, Radius, Farbe mal Stärke]
 		"extra": 2.5 if type == "drift" else 0.0,  # Drift-Kurse: breitere Fahrbahn
 		"paths": [{"id": 0, "kind": "main", "curve": curve, "half_w": HALF_W, "length": length, "from": 0.0, "to": length}],
 	}
@@ -251,8 +251,6 @@ static func build(race: Dictionary) -> Dictionary:
 		track["crossing"] = rc
 	_build_tunnels(root, track, rng)
 	_build_el(root, track, rng)
-	if type != "drift" and type != "drag":
-		_build_roadworks(root, track, rng)
 	if not city.is_empty():
 		_build_rivers(root, track)
 		_build_hills(root, track, rng)
@@ -286,6 +284,7 @@ static func build(race: Dictionary) -> Dictionary:
 
 	# Boden (sichtbar, mit Löchern über den Trögen) + Boden-Kollision nur für umherfliegende Teile
 	_build_ground(root, track)
+	_bake_street_light(root, track)
 	var gb := StaticBody3D.new()
 	gb.collision_layer = Knockable.GROUND
 	gb.collision_mask = 0
@@ -1141,7 +1140,9 @@ static func _build_road(root: Node3D, track: Dictionary) -> void:
 		if piece >= 20 or (d > length and piece > 0):
 			if n_road > 0:
 				# Altstadt-Abschnitte mit Kopfsteinpflaster: jede Strecke fühlt sich anders an
-				var cob := 1.0 if _district_at(track, piece_d0 + 30.0)["name"] == "ALTSTADT" else 0.0
+				# (nicht in Tunnel und Trog: die sind asphaltiert)
+				var cob := 1.0 if _district_at(track, piece_d0 + 30.0)["name"] == "ALTSTADT" \
+					and _trough_at(track, piece_d0) == 0 and _trough_at(track, minf(d, length)) == 0 else 0.0
 				_road_mesh(root, road, 4.0, HALF_W * 2.0, cob)
 			if n_carr > 0:
 				_road_mesh(root, carr, 2.0, HALF_W, 0.0)
@@ -2018,58 +2019,6 @@ static func _build_ramps(root: Node3D, track: Dictionary) -> void:
 				Vector3(s * (w / 2.0 - 0.2), r["h"] / 2.0, -l - 0.1)).set_meta("no_collide", true)
 
 
-# --- Baustellen ----------------------------------------------------------------
-
-## Baustellen sperren eine Außenspur auf ~30 m. Ergänzt track["blocks"] für KI und Verkehr.
-static func _build_roadworks(root: Node3D, track: Dictionary, rng: RandomNumberGenerator) -> void:
-	var curve: Curve3D = track["curve"]
-	var length: float = track["length"]
-	var stripe := Builder.mat(Color(0.9, 0.15, 0.1), 0.0, 0.6)
-	var white := Builder.mat(Color(0.9, 0.9, 0.9), 0.0, 0.6)
-	var warn := Builder.mat(Color(1, 0.7, 0.1), 0.0, 0.4, Color(1, 0.6, 0.0), 5.0)
-	var count := 2 + int(length / 1200.0)
-	for k in count:
-		var d0 := length * (0.2 + 0.65 * (k + rng.randf() * 0.6) / count)
-		var tries := 0
-		while (_in_zone(track, d0, 50.0) or _near_median(track, d0 - 30.0, d0 + 70.0)) and tries < 20:
-			d0 += 37.0
-			tries += 1
-		if _in_zone(track, d0, 50.0) or _near_median(track, d0 - 30.0, d0 + 70.0) or d0 > length - 150.0:
-			continue
-		var lane: float = LANES[0] if rng.randf() < 0.5 else LANES[3]
-		var len := 30.0
-		track["blocks"].append({"from": d0 - 14.0, "to": d0 + len + 4.0, "lane": lane})
-		track["zones"].append({"from": d0 - 14.0, "to": d0 + len + 4.0})
-		var dd := 0.0
-		while dd <= len:
-			var taper := clampf(dd / 8.0, 0.0, 1.0)
-			var lat := lane + signf(lane) * (1.8 - taper * 1.8) - signf(lane) * 2.0 * taper
-			var n := Knockable.new()
-			n.mass = 45.0
-			n.slowdown = 0.82
-			n.transform = xform_at(curve, d0 + dd, lat)
-			root.add_child(n)
-			Builder._add(n, Builder.box(Vector3(0.5, 0.9, 2.6)), stripe if int(dd / 3.0) % 2 == 0 else white, Vector3(0, 0.45, 0))
-			Builder._add(n, Builder.box(Vector3(0.2, 0.2, 0.2)), warn, Vector3(0, 1.0, 0))
-			_knock_shape(n, Vector3(0.5, 1.2, 2.6), Vector3(0, 0.6, 0))
-			dd += 3.0
-		var sign_n := Knockable.new()
-		sign_n.mass = 25.0
-		sign_n.slowdown = 0.9
-		sign_n.transform = xform_at(curve, d0 - 10.0, lane)
-		root.add_child(sign_n)
-		Builder._add(sign_n, Builder.box(Vector3(1.8, 1.4, 0.1)), warn, Vector3(0, 1.4, 0))
-		_knock_shape(sign_n, Vector3(1.8, 2.0, 0.4), Vector3(0, 1.0, 0))
-		var l := Label3D.new()
-		l.text = "BAUSTELLE"
-		l.font_size = 40
-		l.pixel_size = 0.01
-		l.modulate = Color(0, 0, 0)
-		l.shaded = false
-		l.position = Vector3(0, 1.4, 0.07)
-		sign_n.add_child(l)
-
-
 # --- Wahrzeichen -------------------------------------------------------------
 
 ## Knoten am Straßenrand der Hauptstraße: lokales -Z zeigt zur Straße.
@@ -2095,6 +2044,39 @@ static func _label(parent: Node3D, text: String, col: Color, size: int, pos: Vec
 	l.rotation_degrees.y = 180.0  # Label ist von +Z lesbar, Straße liegt bei -Z
 	parent.add_child(l)
 	return l
+
+
+## Leuchtkasten an einer Fassade: dunkler Kasten mit Neonrahmen, die Schrift leuchtet darauf. xf: Mitte des Kastens,
+## +Z zeigt zur Straße. Zu lange Wörter werden kleiner gesetzt, damit der Kasten höchstens max_w breit wird.
+static func _sign_box(root: Node3D, text: String, col: Color, size: int, px: float, xf: Transform3D, max_w: float) -> void:
+	var tw := ThemeDB.fallback_font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x * px
+	var pad := size * px * 0.45
+	if tw + 2.0 * pad > max_w:
+		var k := maxf(max_w - 2.0 * pad, 0.5) / tw
+		px *= k
+		tw *= k
+		pad = size * px * 0.45
+	var bw := tw + 2.0 * pad
+	var bh := size * px * 0.8 + pad
+	var d := 0.2
+	var n := Node3D.new()
+	n.transform = xf
+	root.add_child(n)
+	Builder._add(n, Builder.box(Vector3(bw, bh, d)), Builder.mat(Color(0.03, 0.03, 0.04), 0.3, 0.5, col, 0.12), Vector3.ZERO)
+	var rim := Builder.mat(col, 0.0, 0.4, col, 2.2)
+	var t := minf(0.06, bh * 0.08)
+	for s in [-1.0, 1.0]:
+		Builder._add(n, Builder.box(Vector3(bw + t, t, t)), rim, Vector3(0, s * bh / 2.0, d / 2.0))
+		Builder._add(n, Builder.box(Vector3(t, bh, t)), rim, Vector3(s * bw / 2.0, 0, d / 2.0))
+	var l := Label3D.new()
+	l.text = text
+	l.font_size = size
+	l.pixel_size = px
+	l.modulate = Color(col.r * 1.8, col.g * 1.8, col.b * 1.8)
+	l.shaded = false
+	l.double_sided = false
+	l.position = Vector3(0, 0, d / 2.0 + 0.02)
+	n.add_child(l)
 
 
 ## Baut Kirche, Krankenhaus, Tankstelle, Stadion. Liefert belegte Flächen [{pos, r}] für die übrige Bebauung.
@@ -2242,6 +2224,7 @@ static func _hospital(n: Node3D) -> void:
 	var blue := Builder.mat(Color(0.1, 0.3, 1), 0, 0.3, Color(0.1, 0.3, 1), 6.0)
 	Builder._add(amb, Builder.box(Vector3(1.4, 0.18, 0.3)), blue, Vector3(0, 2.7, -2.4))
 	var bl := OmniLight3D.new()
+	bl.set_meta("no_pool", true)  # blinkt: kein fester Lichtkreis auf der Lichtkarte
 	bl.position = Vector3(0, 3.2, -2.4)
 	bl.light_color = Color(0.15, 0.35, 1.0)
 	bl.omni_range = 14.0
@@ -3308,14 +3291,8 @@ static func _building(root: Node3D, center: Vector3, basis: Basis, w: float, dep
 		aw.transform = Transform3D(face_basis, face_pos + Vector3(0, 3.6, 0) + face_dir * 0.8)
 		root.add_child(aw)
 		if rng.randf() < 0.35:
-			var open := Label3D.new()
-			open.text = "GEÖFFNET"
-			open.font_size = 32
-			open.pixel_size = 0.012
-			open.modulate = Color(3.0, 0.4, 1.5)
-			open.shaded = false
-			open.transform = Transform3D(face_basis, face_pos + Vector3(0, 2.4, 0) + face_dir * 0.05 + basis.z * w * 0.25)
-			root.add_child(open)
+			_sign_box(root, "GEÖFFNET", Color(1.0, 0.15, 0.55), 32, 0.012,
+				Transform3D(face_basis, face_pos + Vector3(0, 2.4, 0) + basis.z * w * 0.25), w * 0.4)
 	var names: Array = dist.get("names", SHOPS)
 	if dist.has("de") and not _city_names.is_empty():
 		names = _city_names + _city_names + names
@@ -3352,18 +3329,10 @@ static func _building(root: Node3D, center: Vector3, basis: Basis, w: float, dep
 				bl.double_sided = false
 				bl.transform = Transform3D(basis if s > 0.0 else basis.rotated(Vector3.UP, PI), bp + basis.z * s * 0.14)
 				root.add_child(bl)
-	if shop or rng.randf() < 0.3:
-		var col: Color = NEON[rng.randi() % NEON.size()]
-		var lbl := Label3D.new()
-		lbl.text = names[rng.randi() % names.size()] if (shop or dist.has("names")) else SIGNS[rng.randi() % SIGNS.size()]
-		lbl.font_size = 64 if shop else 96
-		lbl.pixel_size = 0.02
-		lbl.modulate = Color(col.r * 1.8, col.g * 1.8, col.b * 1.8)
-		lbl.shaded = false
-		lbl.double_sided = false
-		var y := 4.6 if shop else rng.randf_range(6.0, minf(h - 2.0, 14.0))
-		lbl.transform = Transform3D(face_basis, face_pos + Vector3(0, y, 0))
-		root.add_child(lbl)
+	if shop:
+		# Ladenschild über der Markise: Leuchtkasten statt frei an der Wand schwebender Buchstaben
+		_sign_box(root, names[rng.randi() % names.size()], NEON[rng.randi() % NEON.size()], 64, 0.02,
+			Transform3D(face_basis, face_pos + Vector3(0, 4.75, 0)), w * 0.8)
 	if style == 4.0 and h > 10.0 and rng.randf() < dist.get("fire_escape", 0.0):
 		_fire_escape(root, face_pos + basis.z * rng.randf_range(-w * 0.25, w * 0.25), Basis.looking_at(-face_dir, Vector3.UP),
 			mini(int((h - 4.2) / 3.2), 6))
@@ -3513,6 +3482,92 @@ static func _containers(root: Node3D, center: Vector3, basis: Basis, rng: Random
 			for k in stack:
 				var pos := center + basis * Vector3((i - 0.5) * 2.8, 0, (j - 1) * 6.4) + Vector3(0, 1.3 + k * 2.6, 0)
 				Builder._add(root, Builder.box(Vector3(2.4, 2.55, 6.1)), Builder.mat(cols[rng.randi() % cols.size()], 0.4, 0.6), pos).basis = basis
+
+
+## Lichtkarte der Straße: unter jeder Lampe der Strecke (Laternen, Tunnel, Brücken, Flutlicht ...) ein weicher
+## Lichtkreis, als Bild über der ganzen Strecke (STREET_CELL Meter je Bildpunkt). Fahrbahn, Gehweg und Tunnelwände
+## lesen es im Shader (street_light.gdshaderinc): jede Laterne beleuchtet sichtbar die Straße, auch im Browser, wo
+## jedes Objekt nur von wenigen echten Lampen Licht bekommt. Kostet beim Fahren nur einen Texturzugriff.
+const STREET_CELL := 2.0
+const STREET_GAIN := 5.0  # Helligkeit der Lichtkreise bei voller Sättigung
+const STREET_FLOOR := Vector3(0.1, 0.085, 0.07)  # Grundhelligkeit zwischen den Laternen: nirgends pechschwarz
+
+
+static func _bake_street_light(root: Node3D, track: Dictionary) -> void:
+	var t0 := Time.get_ticks_usec()
+	var pools: Array = track["pools"].duplicate()
+	var stack: Array = [[root, Transform3D.IDENTITY]]
+	while not stack.is_empty():
+		var e: Array = stack.pop_back()
+		for c in (e[0] as Node).get_children():
+			if not c is Node3D:
+				continue
+			var xf: Transform3D = e[1] * (c as Node3D).transform
+			if c is OmniLight3D:
+				var l := c as OmniLight3D
+				if l.has_meta("no_pool") or l.omni_range > 40.0:
+					continue
+				var p := xf.origin
+				var loc := locate(track, p)
+				var h := p.y - elev_at((loc["path"] as Dictionary)["curve"], loc["d"])
+				if h < 0.5 or h > 18.0:
+					continue
+				# Kreis so weit, wie das Licht den Boden erreicht; hohe Lampen streuen breiter und schwächer
+				var r := clampf(sqrt(maxf(l.omni_range * l.omni_range - h * h, 16.0)) * 1.05, 6.0, 28.0)
+				var k := l.light_energy * 0.55 * clampf(1.4 - h / 14.0, 0.5, 1.2)
+				pools.append([p.x, p.z, r, l.light_color * k])
+			if c.get_child_count() > 0:
+				stack.append([c, xf])
+	if pools.is_empty():
+		for m in _road_mats.values():
+			m.set_shader_parameter("street_gain", 0.0)  # sonst blieben die Lichtkreise der vorigen Strecke
+		return
+	var lo := Vector2(1e9, 1e9)
+	var hi := Vector2(-1e9, -1e9)
+	for pl in pools:
+		lo = Vector2(minf(lo.x, pl[0] - pl[2]), minf(lo.y, pl[1] - pl[2]))
+		hi = Vector2(maxf(hi.x, pl[0] + pl[2]), maxf(hi.y, pl[1] + pl[2]))
+	lo -= Vector2(4.0, 4.0)
+	hi += Vector2(4.0, 4.0)
+	var cell := maxf(STREET_CELL, maxf(hi.x - lo.x, hi.y - lo.y) / 2048.0)
+	var w := int(ceil((hi.x - lo.x) / cell))
+	var h := int(ceil((hi.y - lo.y) / cell))
+	# Summe je Bildpunkt (nur berührte Punkte), danach ins 8-Bit-Bild
+	var acc := {}
+	for pl in pools:
+		var r: float = pl[2]
+		var col: Color = pl[3]
+		var cx := (float(pl[0]) - lo.x) / cell - 0.5
+		var cz := (float(pl[1]) - lo.y) / cell - 0.5
+		var rr := r / cell
+		for iz in range(maxi(int(floor(cz - rr)), 0), mini(int(ceil(cz + rr)), h - 1) + 1):
+			for ix in range(maxi(int(floor(cx - rr)), 0), mini(int(ceil(cx + rr)), w - 1) + 1):
+				var x2 := (Vector2(ix - cx, iz - cz) / rr).length_squared()
+				if x2 >= 1.0:
+					continue
+				# flacher heller Kern, weicher Rand; direkt unter der Lampe etwas heller
+				var x := sqrt(x2)
+				var f := (1.0 - smoothstep(0.3, 1.0, x)) * (0.8 + 0.2 * exp(-x2 * 6.0))
+				var idx := iz * w + ix
+				acc[idx] = acc.get(idx, Color(0, 0, 0)) + col * f
+	# weiche Sättigung: wo sich viele Kreise überlagern (Boulevard mit Doppel-Laternen), wird es nicht grell
+	var img := Image.create(w, h, false, Image.FORMAT_RGB8)
+	for idx in acc:
+		var v: Color = acc[idx]
+		img.set_pixel(idx % w, idx / w, Color(1.0 - exp(-v.r * 0.9), 1.0 - exp(-v.g * 0.9), 1.0 - exp(-v.b * 0.9)))
+	var tex := ImageTexture.create_from_image(img)
+	var rect := Vector4(lo.x, lo.y, 1.0 / (w * cell), 1.0 / (h * cell))
+	for m in _road_mats.values():
+		m.set_shader_parameter("street_light", tex)
+		m.set_shader_parameter("street_rect", rect)
+		m.set_shader_parameter("street_gain", STREET_GAIN)
+		m.set_shader_parameter("street_floor", STREET_FLOOR)
+	track["street_light"] = tex
+	if OS.get_cmdline_user_args().has("--lightlog"):
+		print("LICHTKARTE %dx%d (%.1f m) Kreise=%d Punkte=%d %.0f ms" % [w, h, cell, pools.size(), acc.size(), (Time.get_ticks_usec() - t0) / 1000.0])
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--lightpng="):  # Test: Lichtkarte als Bild speichern
+			img.save_png(a.substr(11))
 
 
 ## Laternen: fliegen weg, wenn man sie trifft (und gehen aus). Form und Lichtfarbe je Viertel.
@@ -4152,6 +4207,7 @@ static func _build_tunnels(root: Node3D, track: Dictionary, rng: RandomNumberGen
 	var curve: Curve3D = track["curve"]
 	var tile := ShaderMaterial.new()
 	tile.shader = TUNNEL_SHADER
+	_road_mats[Vector3(-2.0, 0.0, 0.0)] = tile  # bekommt mit Fahrbahn und Gehweg die Lichtkarte
 	var ceil_m := Builder.mat(Color(0.05, 0.05, 0.055), 0.0, 0.9)
 	var steel := Builder.mat(Color(0.32, 0.33, 0.35), 0.7, 0.4)
 	var panel := ShaderMaterial.new()
@@ -4201,6 +4257,9 @@ static func _build_tunnels(root: Node3D, track: Dictionary, rng: RandomNumberGen
 		var u := 2.0
 		while u < len:
 			var f := frame_at(curve, d0 + u)
+			if fmod(u, 3.0) < 1.6:
+				# der ganze Tunnel gleichmäßig hell (Lichtkarte), wie unter durchgehenden Leuchtbändern
+				track["pools"].append([f["pos"].x, f["pos"].z, TUN_W + 0.5, col * 0.3])
 			var b := Basis.looking_at(f["fwd"], Vector3.UP)
 			for s in [-1.0, 1.0]:
 				strips.append(Transform3D(b, f["pos"] + f["right"] * s * (TUN_W - 0.45) + Vector3(0, f["y"] + TUN_H - 0.3, 0)))

@@ -498,7 +498,7 @@ const SETTING_HINTS := {
 	"dynres": "Senkt die 3D-Auflösung automatisch, wenn die Bildrate unter 60 fällt, und hebt sie danach wieder an.",
 	"view": "Wie weit du siehst. Weiter = mehr Häuser und Wahrzeichen im Bild, kostet Leistung.",
 	"detail": "Ab welcher Entfernung Kleinteile verschwinden und Autos vereinfacht gezeichnet werden.",
-	"lights": "Bis zu welcher Entfernung Laternen und Leuchtreklamen die Straße beleuchten.",
+	"lights": "Bis zu welcher Entfernung Laternen und Leuchtreklamen Autos und Häuser beleuchten. Die Lichtkreise auf der Straße sind immer da.",
 	"aa": "Glättet Treppchen an Kanten. MSAA ist schärfer, kostet aber mehr.",
 	"bloom": "Leuchtreklamen, Scheinwerfer und Neon strahlen über.",
 	"ssr": "Spiegelungen auf nasser Straße. Teuer.",
@@ -513,6 +513,10 @@ const SETTING_HINTS := {
 	"touch": "Touch-Knöpfe im Rennen. Auto: nur auf Handy und Tablet.",
 	"difficulty": "Wie stark die Gegner fahren. Leicht: zum Kennenlernen der Strecken. Schwer: schnellere Autos, und wer führt, wird gejagt.",
 	"jumpcam": "Bei hohen Sprüngen schaut eine Kamera schräg von vorn zu, wie in NFS Underground, dazu Zeitlupe.",
+	"motion": "Wie sich Tempo anfühlt: Bewegungsunschärfe, Tempo-Zoom, Kamerawackeln und Sprungkamera. Alles einzeln abschaltbar.",
+	"motion_blur": "Bei hohem Tempo verwischt der Bildrand in Fahrtrichtung, mit Nitro stärker; das eigene Auto bleibt scharf. Aus: auch kein Nitro-Schimmer.",
+	"speed_fov": "Das Sichtfeld wird mit dem Tempo und bei Nitro weiter. Aus: festes Sichtfeld.",
+	"cam_shake": "Kurze Stöße bei Einschlägen und Landungen, die Kamera neigt sich beim Lenken. Aus: ruhige Kamera.",
 }
 
 
@@ -522,7 +526,9 @@ func _show_settings() -> void:
 	_set_section("EINSTELLUNGEN")
 	var g := _button("Grafik  >", _show_graphics)
 	g.focus_entered.connect(func(): info.text = tr(SETTING_HINTS["graphics"]))
-	for key in ["language", "difficulty", "jumpcam", "show_fps", "vsync", "fps", "fullscreen", "touch"]:
+	var mo := _button("Kamera & Tempo  >", _show_motion)
+	mo.focus_entered.connect(func(): info.text = tr(SETTING_HINTS["motion"]))
+	for key in ["language", "difficulty", "show_fps", "vsync", "fps", "fullscreen", "touch"]:
 		_setting_button(key)
 	_button("Spielstand zurücksetzen", _confirm_reset)
 	_button("< Zurück", _show_main)
@@ -539,6 +545,17 @@ func _show_graphics() -> void:
 		_setting_button(key)
 	_button("< Zurück", _show_settings)
 	info.text = tr(SETTING_HINTS["preset"])
+	_focus_first()
+
+
+## Tempogefühl: Bewegungsunschärfe, Tempo-Zoom, Kamerawackeln, Sprungkamera (gegen Übelkeit alles abschaltbar)
+func _show_motion() -> void:
+	_clear_menu()
+	_set_section("KAMERA & TEMPO")
+	for key in ["motion_blur", "speed_fov", "cam_shake", "jumpcam"]:
+		_setting_button(key)
+	_button("< Zurück", _show_settings)
+	info.text = tr(SETTING_HINTS["motion_blur"])
 	_focus_first()
 
 

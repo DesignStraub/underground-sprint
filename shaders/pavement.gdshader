@@ -6,6 +6,7 @@ shader_type spatial;
 uniform float walk_w = 5.0;
 uniform float wet = 0.0;
 uniform sampler2D detail : hint_default_white, filter_linear_mipmap_anisotropic, repeat_enable;
+#include "res://shaders/street_light.gdshaderinc"
 
 varying vec3 w_pos;
 varying vec3 w_nrm;
@@ -66,6 +67,7 @@ void fragment() {
 	col *= 1.35;
 #endif
 	ALBEDO = col;
+	EMISSION = street_lit(col, w_pos);
 	ROUGHNESS = clamp(rough, 0.05, 1.0);
 	SPECULAR = 0.4;
 }

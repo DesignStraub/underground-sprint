@@ -2,12 +2,20 @@ shader_type spatial;
 // Tunnelwand: glänzende Kacheln, dunkler Sockel, gelb-schwarzes Warnband, nach oben verrußt.
 // UV.x = Meter in Fahrtrichtung, UV.y = Höhe in Metern.
 
+#include "res://shaders/street_light.gdshaderinc"
+
+varying vec3 w_pos;
+
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float noise(vec2 p) {
 	vec2 i = floor(p);
 	vec2 f = fract(p);
 	f = f * f * (3.0 - 2.0 * f);
 	return mix(mix(hash(i), hash(i + vec2(1, 0)), f.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), f.x), f.y);
+}
+
+void vertex() {
+	w_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 }
 
 void fragment() {
@@ -28,6 +36,7 @@ void fragment() {
 	col = mix(col, mix(vec3(0.85, 0.62, 0.05), vec3(0.03), chev), band);
 	col *= 1.0 - 0.45 * smoothstep(3.0, 7.0, v) * (0.6 + 0.4 * noise(vec2(u * 0.3, v)));
 	ALBEDO = col;
+	EMISSION = street_lit(col, w_pos) * mix(0.8, 0.35, smoothstep(1.0, 6.0, v));
 	ROUGHNESS = rough;
 	SPECULAR = 0.6;
 }

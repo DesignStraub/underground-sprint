@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Erzeugt die Soundeffekte des Spiels als WAV (synthetisch, keine fremden Dateien).
 
-Aufruf: python3 tools/make_sfx.py   ->  assets/sfx/*.wav
+Aufruf: python3 tools/make_sfx.py [name ...]   ->  assets/sfx/*.wav
 """
 import math
 import os
@@ -226,13 +226,64 @@ def crowd_loop():
     return x[: n - f]
 
 
+def _wander(rng, n, fc):
+    """Langsam schwankende Kurve -1..1 (tiefpassgefiltertes Rauschen, auf den Spitzenwert gebracht)."""
+    a = 1.0 - math.exp(-2.0 * math.pi * fc / SR)
+    y = 0.0
+    out = []
+    # zweimal filtern: weicher, ohne Knicke
+    y2 = 0.0
+    for _ in range(n):
+        y += a * (rng.uniform(-1.0, 1.0) - y)
+        y2 += a * (y - y2)
+        out.append(y2)
+    peak = max(1e-9, max(abs(v) for v in out))
+    return [v / peak for v in out]
+
+
+def skid_loop():
+    """Reifenquietschen im Drift: zwei Reifen als helle, leicht raue Töne (Haft-Gleit-Effekt), deren Tonhöhe
+    unruhig wandert, dazu etwas Zischen und tiefes Rubbeln. 2,4 s nahtlos (Ende in den Anfang überblendet)."""
+    rng = random.Random(11)
+    n = secs(2.4)
+    xf = secs(0.3)
+    m = n + xf
+    voices = [(830.0, 1.0), (1150.0, 0.7), (640.0, 0.45)]
+    x = [0.0] * m
+    for f0, amp in voices:
+        slow = _wander(rng, m, 2.2)
+        fast = _wander(rng, m, 28.0)
+        level = _wander(rng, m, 5.0)
+        grit = _wander(rng, m, 160.0)
+        ph = 0.0
+        for i in range(m):
+            f = f0 * (1.0 + 0.05 * slow[i] + 0.012 * fast[i])
+            ph += 2.0 * math.pi * f / SR
+            # Grundton mit Obertönen; Haft-Gleiten macht ihn rau (schnelle Lautstärkeschwankung)
+            w = math.sin(ph) + 0.38 * math.sin(2.0 * ph + 0.3) + 0.16 * math.sin(3.0 * ph + 1.1) + 0.06 * math.sin(5.0 * ph)
+            a = amp * (0.62 + 0.38 * level[i]) * (1.0 + 0.3 * grit[i])
+            x[i] += w * a
+    hiss = bandpass([rng.uniform(-1.0, 1.0) for _ in range(m)], 2600.0, 0.9)
+    scrub = lp(lp([rng.uniform(-1.0, 1.0) for _ in range(m)], 260.0), 260.0)
+    hp = max(1e-9, max(abs(v) for v in hiss))
+    sp = max(1e-9, max(abs(v) for v in scrub))
+    for i in range(m):
+        x[i] += 0.32 * hiss[i] / hp + 0.35 * scrub[i] / sp
+    for i in range(xf):
+        k = i / xf
+        x[i] = x[i] * math.sqrt(k) + x[n + i] * math.sqrt(1.0 - k)
+    return x[:n]
+
+
+SOUNDS = {
+    "horn": (horn, 0.89), "bell": (bell_loop, 0.7), "rumble": (rumble_loop, 0.89), "thud": (thud, 0.89),
+    "whoosh": (whoosh, 0.7), "splash": (splash, 0.89), "clang": (clang, 0.75), "tunnel": (tunnel, 0.8),
+    "crowd": (crowd_loop, 0.6), "skid": (skid_loop, 0.8),
+}
+
 if __name__ == "__main__":
-    write("horn", horn())
-    write("bell", bell_loop(), 0.7)
-    write("rumble", rumble_loop())
-    write("thud", thud())
-    write("whoosh", whoosh(), 0.7)
-    write("splash", splash())
-    write("clang", clang(), 0.75)
-    write("tunnel", tunnel(), 0.8)
-    write("crowd", crowd_loop(), 0.6)
+    # ohne Argumente alle, sonst nur die genannten (python3 tools/make_sfx.py skid)
+    import sys
+    for name in sys.argv[1:] or list(SOUNDS):
+        fn, gain = SOUNDS[name]
+        write(name, fn(), gain)

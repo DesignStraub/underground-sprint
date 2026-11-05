@@ -69,6 +69,8 @@ var speed_lat := 0.0
 var steer := 0.0
 var gear := 1
 var rpm := 900.0
+var _pull_gear := 1  # Gang für den Vortrieb (nach Tempo nach vorn); gear/rpm sind, was man hört und sieht
+var _pull_rpm := 900.0
 var drifting := false
 var drift_angle := 0.0  # Grad zwischen Fahrtrichtung und Fahrzeugachse
 var drift_k := 0.3  # 0..1: wie willig das Auto quer geht (aus dem Katalog)
@@ -326,38 +328,56 @@ func _physics_process(dt: float) -> void:
 
 	# --- Gänge & Drehzahl. Hochschalten am Gangende, Zurückschalten erst deutlich darunter (Hysterese): sonst pendelt
 	# das Getriebe an einer Grenze hin und her, jeder Schaltvorgang nimmt kurz den Vortrieb und das Auto kommt nicht weiter.
+	# Vortrieb: Gang nach dem Tempo nach vorn (so ist das Fahrverhalten abgestimmt)
 	var ratio := spd / top_speed
 	if drag_mode:
-		pass  # Handschaltung (oben)
-	elif gear < 6 and ratio > GEARS[gear]:
-		gear += 1
+		_pull_gear = gear  # Handschaltung (oben)
+	elif _pull_gear < 6 and ratio > GEARS[_pull_gear]:
+		_pull_gear += 1
 		_shift_timer = 0.16
-	elif gear > 1 and ratio < GEARS[gear - 1] * 0.88:
-		gear -= 1
+	elif _pull_gear > 1 and ratio < GEARS[_pull_gear - 1] * 0.88:
+		_pull_gear -= 1
 	_shift_timer = maxf(_shift_timer - dt, 0.0)
+	# Gang und Drehzahl, die man hört und auf dem Drehzahlmesser sieht: nach dem Tempo über Grund. Steht das Auto
+	# im Drift quer, ist das Tempo nach vorn viel kleiner; danach schaltete der Motor mitten im Drift herunter und
+	# die Drehzahl sprang. Jetzt bleibt der Gang, und mit Gas dreht der Motor im Drift hoch (Räder drehen durch).
+	var g_ratio := ratio
+	if not drag_mode:
+		if speed_fwd > 0.0:
+			g_ratio = maxf(spd, hvel.length()) / top_speed
+		if gear < 6 and g_ratio > GEARS[gear]:
+			gear += 1
+		elif gear > 1 and g_ratio < GEARS[gear - 1] * 0.88:
+			gear -= 1
 	if controls_enabled or finished:
 		var target_rpm: float
+		var pull_target: float
 		if airborne:
 			# Räder in der Luft: Motor dreht frei hoch
 			target_rpm = 1500.0 + thr * 5800.0
-		else:
-			# Drehzahl proportional zur Geschwindigkeit im Gang; im 6. Gang liegt Topspeed bei TOP_RPM
+			pull_target = target_rpm
+		elif drag_mode:
+			# ohne Hochschalten dreht der Motor bis in den Begrenzer (dort kein Vortrieb, er wird heiß)
 			var per_ratio: float = SHIFT_RPM / GEARS[gear] if gear < 6 else TOP_RPM
-			target_rpm = clampf(maxf(900.0 + thr * 600.0, ratio * per_ratio), 900.0, SHIFT_RPM + 300.0)
-			if drag_mode:
-				# ohne Hochschalten dreht der Motor bis in den Begrenzer (dort kein Vortrieb, er wird heiß)
-				var raw := maxf(900.0 + thr * 600.0, ratio * per_ratio)
-				if gear == 6:
-					raw = minf(raw, PERFECT_SHIFT.y - 100.0)  # letzter Gang: Nitro darf über Topspeed schieben, ohne Begrenzer
-				_limiter = raw >= DRAG_LIMIT - 40.0 and thr > 0.1
-				target_rpm = clampf(raw, 900.0, DRAG_LIMIT)
-				if _limiter:
-					target_rpm = DRAG_LIMIT - absf(sin(Time.get_ticks_msec() * 0.05)) * 350.0
+			var raw := maxf(900.0 + thr * 600.0, ratio * per_ratio)
+			if gear == 6:
+				raw = minf(raw, PERFECT_SHIFT.y - 100.0)  # letzter Gang: Nitro darf über Topspeed schieben, ohne Begrenzer
+			_limiter = raw >= DRAG_LIMIT - 40.0 and thr > 0.1
+			target_rpm = clampf(raw, 900.0, DRAG_LIMIT)
+			if _limiter:
+				target_rpm = DRAG_LIMIT - absf(sin(Time.get_ticks_msec() * 0.05)) * 350.0
 			if speed_fwd < -0.5:
 				target_rpm = 900.0 + spd * 300.0
 			if hb and thr > 0.5 and spd < 25.0:
 				target_rpm = maxf(target_rpm, 6500.0)
-		rpm = move_toward(rpm, target_rpm, dt * (9000.0 if airborne else 20000.0))
+			pull_target = target_rpm
+		else:
+			pull_target = _gear_rpm(_pull_gear, ratio, thr, hb, spd, 0.0)
+			var spin := thr * (400.0 + 700.0 * clampf((drift_angle - 5.0) / 25.0, 0.0, 1.0)) if drifting else 0.0
+			target_rpm = _gear_rpm(gear, g_ratio, thr, hb, spd, spin)
+		var rate := dt * (9000.0 if airborne else 20000.0)
+		rpm = move_toward(rpm, target_rpm, rate)
+		_pull_rpm = move_toward(_pull_rpm, pull_target, rate)
 
 	# --- Nitro (funktioniert auch in der Luft). Leer ist leer: erst nach dem Loslassen geht es wieder
 	# (sonst hält das minimale Nachladen den Schub bei gedrückter Taste ewig am Leben)
@@ -373,7 +393,7 @@ func _physics_process(dt: float) -> void:
 
 	# --- Längsbeschleunigung (Drehmoment über die Drehzahl, unten herum Traktionsgrenze)
 	_thr_s = move_toward(_thr_s, thr, dt * (4.0 if thr > _thr_s else 8.0))
-	var tq := 0.78 + 0.22 * sin(clampf((rpm - 1000.0) / 6200.0, 0.0, 1.0) * PI)
+	var tq := 0.78 + 0.22 * sin(clampf((_pull_rpm - 1000.0) / 6200.0, 0.0, 1.0) * PI)
 	if drag_mode:
 		# Drag: Drehmoment kommt erst oben (zu früh schalten kostet richtig), im Begrenzer nichts
 		tq = 0.0 if _limiter else 0.55 + 0.45 * smoothstep(2500.0, 6800.0, rpm)
@@ -393,7 +413,7 @@ func _physics_process(dt: float) -> void:
 		a -= drag_k * 0.5 * speed_fwd * absf(speed_fwd)
 	else:
 		if _shift_timer <= 0.0:
-			a += accel * _thr_s * GEAR_PULL[gear] * tq
+			a += accel * _thr_s * GEAR_PULL[_pull_gear] * tq
 			if spd < 6.0:
 				a *= 0.7 + 0.3 * spd / 6.0  # Räder drehen beim Anfahren etwas durch
 		a -= drag_k * speed_fwd * absf(speed_fwd)
@@ -530,6 +550,20 @@ func _physics_process(dt: float) -> void:
 	audio.nitro = nitro_on
 	audio.slip = clampf((absf(l2) - 3.0) / 10.0, 0.0, 1.0) if spd > 5.0 and not airborne else 0.0
 	audio.speed = spd
+
+
+## Drehzahl im Gang g bei Tempoanteil r: proportional zur Geschwindigkeit, im 6. Gang liegt Topspeed bei TOP_RPM.
+## spin: Zuschlag für durchdrehende Räder im Drift.
+func _gear_rpm(g: int, r: float, thr: float, hb: bool, spd: float, spin: float) -> float:
+	var per_ratio: float = SHIFT_RPM / GEARS[g] if g < 6 else TOP_RPM
+	var t := clampf(maxf(900.0 + thr * 600.0, r * per_ratio), 900.0, SHIFT_RPM + 300.0)
+	if speed_fwd < -0.5:
+		t = 900.0 + spd * 300.0
+	elif spin > 0.0:
+		t = maxf(t, minf(t + spin, SHIFT_RPM - 400.0))  # hoch, aber nicht im Begrenzer
+	if hb and thr > 0.5 and spd < 25.0:
+		t = maxf(t, 6500.0)
+	return t
 
 
 ## Drag: Schaltvorgang bewerten. Im grünen Bereich kaum Zugkraftunterbrechung und ein kleiner Schub.
@@ -902,11 +936,14 @@ func _update_camera(dt: float, sf: float) -> void:
 		_update_jump_cam(dt)
 		return
 	var base := 58.0 if cam_mode == 0 else 70.0
-	var target_fov := base + (14.0 if cam_mode == 0 else 24.0) * sf + (8.0 if nitro_on else 0.0)
+	var zoom := (14.0 if cam_mode == 0 else 24.0) * sf + (8.0 if nitro_on else 0.0)
+	if not GameState.speed_fov:
+		zoom = (7.0 if cam_mode == 0 else 12.0)  # Tempo-Zoom aus: festes, mittleres Sichtfeld
+	var target_fov := base + zoom
 	_fov = lerpf(_fov, target_fov, dt * (6.0 if nitro_on else 2.5))
 	cam.fov = _fov
 	# Kein Dauerwackeln bei Tempo: nur kurze, weiche Stöße bei Einschlägen und Landungen
-	var amp := _shake * 0.06
+	var amp := _shake * (0.06 if GameState.cam_shake else 0.0)
 	var drift_look := clampf((drift_angle - 6.0) / 24.0, 0.0, 1.0) * 0.45 if velocity.length() > 5.0 else 0.0
 	_cam_drift = lerpf(_cam_drift, drift_look, 1.0 - exp(-dt * 3.0))
 	if cam_mode == 0:
@@ -928,9 +965,10 @@ func _update_camera(dt: float, sf: float) -> void:
 		_cam_pos.y = lerpf(_cam_pos.y, target.y, 1.0 - exp(-dt * (6.0 if airborne else 20.0)))
 		cam.global_position = _cam_pos
 		cam.look_at(global_position + Basis(Vector3.UP, _cam_yaw) * Vector3(0, 1.1, -7.0), Vector3.UP)
-		cam.rotate_object_local(Vector3.FORWARD, -steer * sf * 0.02)
+		if GameState.cam_shake:
+			cam.rotate_object_local(Vector3.FORWARD, -steer * sf * 0.02)
 	else:
-		cam.rotation.z = lerpf(cam.rotation.z, -steer * sf * 0.025, dt * 5.0)
+		cam.rotation.z = lerpf(cam.rotation.z, -steer * sf * 0.025 if GameState.cam_shake else 0.0, dt * 5.0)
 	_shake_t += dt
 	cam.h_offset = sin(_shake_t * 41.0) * amp
 	cam.v_offset = sin(_shake_t * 53.0 + 1.3) * amp
@@ -1243,7 +1281,7 @@ func _update_jump_cam(dt: float) -> void:
 	cam.fov = clampf(rad_to_deg(2.0 * atan(JC_FRAME / maxf(dist, 0.1))), 9.0, 60.0)
 	_jc_light.global_position = target + (_jc_pos - target).normalized() * 3.0 + Vector3(0, 1.0, 0)
 	_shake_t += real
-	var amp := _shake * 0.06
+	var amp := _shake * (0.06 if GameState.cam_shake else 0.0)
 	cam.h_offset = sin(_shake_t * 41.0) * amp
 	cam.v_offset = sin(_shake_t * 53.0 + 1.3) * amp
 	_shake = move_toward(_shake, 0.0, real * 3.0)

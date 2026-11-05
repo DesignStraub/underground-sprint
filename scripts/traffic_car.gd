@@ -1,6 +1,6 @@
 extends CharacterBody3D
 ## Ziviler Verkehr: fährt langsam auf seiner Spur (rechts mit, links Gegenverkehr),
-## weicht Baustellen aus, bremst für den Spieler und hält am Bahnübergang. Bei einem Crash wird er weggeschleudert,
+## weicht gesperrten Spuren aus, bremst für den Spieler und hält am Bahnübergang. Bei einem Crash wird er weggeschleudert,
 ## bei einem harten Treffer hebt er ab, überschlägt sich und bleibt auf Seite oder Dach liegen.
 ## Fährt auf der Hauptstraße (mit Mittelstreifen-Versatz) oder in einer Gabelung (path_id).
 
@@ -130,7 +130,7 @@ func _physics_process(dt: float) -> void:
 					_wreck_vy = 0.0
 		return
 
-	# Baustelle auf meiner Spur? Dann eine Spur weiter nach innen.
+	# Gesperrte Spur (Rampe am Bahnübergang)? Dann eine Spur weiter nach innen.
 	var target_lane := lane
 	for b in blocks:
 		if absf(b["lane"] - lane) < 1.0 and progress > b["from"] - 25.0 and progress < b["to"] + 10.0:

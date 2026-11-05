@@ -17,6 +17,9 @@ extends Node
 ##   -- --fulltest         Autopilot fährt das ganze Rennen; meldet Hänger, Stürze, Fahrten neben der Strecke, Ruckler,
 ##                         hängende Gegner und das Ergebnis ("FT ..."), beendet sich 3 s nach dem Ziel
 ##   -- --branches         Autopilot nimmt jede Abkürzung (See, Gasse, Gabelung)
+##   -- --audiolog         alle 0,25 s Gang/Drehzahl (gehört und für den Vortrieb), Driftwinkel, Reifenquietschen
+##   -- --lightlog         Größe und Aufbauzeit der Lichtkarte (Laternenlicht auf der Straße)
+##   -- --lightpng=/pfad.png  speichert die Lichtkarte als Bild
 
 const Track := preload("res://scripts/track_builder.gd")
 const Catalog := preload("res://scripts/catalog.gd")
@@ -304,6 +307,12 @@ func _process(dt: float) -> void:
 	if OS.get_cmdline_user_args().has("--camlog") and race and "curve" in race and race.player and fmod(_t, 0.5) < dt:
 		var pl = race.player
 		print("cam t=%.1f v=%d abstand=%.2f fov=%.1f" % [_t, int(pl.speed_fwd * 3.6), pl.cam.global_position.distance_to(pl.global_position), pl.cam.fov])
+	if OS.get_cmdline_user_args().has("--audiolog") and race and "curve" in race and race.player and fmod(_t, 0.25) < dt:
+		# Motor und Reifen: Gang/Drehzahl (gehört) gegen Gang/Drehzahl für den Vortrieb, Driftwinkel, Quietschen
+		var pl = race.player
+		print("al t=%.2f v=%.1f vf=%.1f gang=%d/%d rpm=%d/%d winkel=%.0f slip=%.2f quietsch=%.1fdB ton=%.2f" % [_t,
+			pl.velocity.length(), pl.speed_fwd, pl.gear, pl._pull_gear, int(pl.rpm), int(pl._pull_rpm), pl.drift_angle,
+			pl.audio.slip, pl.audio._skid.volume_db, pl.audio._skid.pitch_scale])
 	if OS.get_cmdline_user_args().has("--racelog") and race and "curve" in race and race.player and fmod(_t, 3.0) < dt:
 		# kompakter Rennverlauf: eigenes Auto, Gegner (Gesamtfortschritt), Bildrate
 		var pl = race.player

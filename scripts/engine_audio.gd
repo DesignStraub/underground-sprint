@@ -1,7 +1,8 @@
 extends AudioStreamPlayer
 ## Synthetischer Motorsound in Echtzeit. Grundton aus Drehzahl und Zylinderzahl, Obertöne je nach Auto,
 ## alles durch einen weichen Tiefpass. Lautstärke steigt mit Drehzahl und Gas.
-## Dazu leise: Turbo, Blow-off, Reifen, Fahrtwind, Nitro.
+## Dazu leise: Turbo, Blow-off, Fahrtwind, Nitro. Reifenquietschen kommt aus einer eigenen Schleife (skid.wav),
+## Lautstärke und Tonhöhe nach Rutschen und Tempo.
 
 ## Abtastrate: am Rechner 22 kHz, auf Handy/Tablet die Hälfte (der Klang liegt ohnehin unter 1,5 kHz, und die
 ## Berechnung läuft Sample für Sample im Skript). k gleicht die Glättung je Sample an die Rate an.
@@ -39,6 +40,8 @@ var _turbo := 0.0
 var _phase2 := 0.0
 var _crash := 0.0
 var _crash_lp := 0.0
+var _skid: AudioStreamPlayer
+var _skid_k := 0.0
 
 
 func configure(profile: Dictionary) -> void:
@@ -62,9 +65,14 @@ func _ready() -> void:
 	playback_type = AudioServer.PLAYBACK_TYPE_STREAM
 	play()
 	_pb = get_stream_playback()
+	_skid = Sfx.looping("skid")
+	_skid.volume_db = -80.0
+	add_child(_skid)
+	_skid.play()
 
 
 func _process(delta: float) -> void:
+	_update_skid(delta)
 	if _pb == null:
 		return
 	if turbo_amount > 0.0 and _last_throttle > 0.6 and throttle < 0.2 and _turbo > 0.5:
@@ -141,6 +149,19 @@ func _process(delta: float) -> void:
 		buf[i] = Vector2(s, s)
 	if n > 0:
 		_pb.push_buffer(buf)
+
+
+## Reifenquietschen: setzt weich ein (kein Klick), höher und lauter, je stärker das Auto quer rutscht und je
+## schneller es ist; fällt schnell ab, sobald die Reifen wieder greifen
+func _update_skid(delta: float) -> void:
+	if _skid == null:
+		return
+	var target := clampf(slip, 0.0, 1.0)
+	_skid_k = move_toward(_skid_k, target, delta * (5.0 if target > _skid_k else 3.0))
+	_skid.bus = bus
+	_skid.volume_db = -80.0 if _skid_k < 0.01 else linear_to_db(_skid_k) * 1.3 - 10.0
+	var speed_n := clampf(speed / 50.0, 0.0, 1.0)
+	_skid.pitch_scale = 0.86 + 0.18 * _skid_k + 0.12 * speed_n
 
 
 ## Dumpfer Aufprall, Stärke 0..1

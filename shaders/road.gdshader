@@ -10,6 +10,9 @@ uniform float cobble = 0.0;
 uniform float wet = 0.0;  // Stimmung: 0 trocken bis 1 Regen (mehr und größere Pfützen, glänzender Asphalt)
 uniform sampler2D detail : hint_default_white, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D detail_n : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
+#include "res://shaders/street_light.gdshaderinc"
+
+varying vec3 w_pos;
 
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float noise(vec2 p) {
@@ -44,6 +47,10 @@ vec3 perturb(vec3 n, vec3 pos, vec2 uv, vec3 nm) {
 	vec3 b = dp2p * du1.y + dp1p * du2.y;
 	float inv = inversesqrt(max(max(dot(t, t), dot(b, b)), 1e-12));
 	return normalize(mat3(t * inv, b * inv, n) * nm);
+}
+
+void vertex() {
+	w_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 }
 
 void fragment() {
@@ -115,10 +122,38 @@ void fragment() {
 	float slots = step(0.45, fract(gy * 9.0));
 	col = mix(col, vec3(0.05, 0.05, 0.05) * (0.4 + slots), grate);
 	if (cobble > 0.5) {
-		vec2 b = vec2(xm * 3.2 + step(0.5, fract(y * 2.2)) * 0.5, y * 2.2);
-		vec2 fb = fract(b);
-		float grout = clamp(smoothstep(0.86, 0.9, fb.x) + smoothstep(0.82, 0.86, fb.y), 0.0, 1.0);
-		col = mix(vec3(0.1, 0.095, 0.09) * (0.65 + 0.6 * hash(floor(b))) * (0.75 + 0.5 * grain), vec3(0.022), grout);
+		// Kopfsteinpflaster als Bogenpflaster: runde, gewölbte Granitsteine in geschwungenen Reihen, dunkle,
+		// verschmutzte Fugen. Bewusst anders als die Ziegelwände (Rechtecke im Verband mit hellem Mörtel), sonst
+		// sah der Boden im Dunkeln aus wie die Hauswand dahinter.
+		float aa = fwidth(xm) + fwidth(y);
+		float arcw = 1.8;
+		float ax = fract(xm / arcw) - 0.5;
+		float yy = y + ax * ax * 1.6;  // Bögen quer über die Fahrbahn
+		float rowh = 0.13;
+		float row = floor(yy / rowh);
+		float fy = fract(yy / rowh);
+		float sw = 0.11 + 0.05 * hash(vec2(row, 3.0));
+		float rx = xm / sw + hash(vec2(row, 9.0)) * 7.0;
+		float cell = floor(rx);
+		float fx = fract(rx);
+		// jeder Stein ein Rechteck mit stark und unterschiedlich gerundeten Ecken (Abstand zum Rand, < 0 innen)
+		float jit = hash(vec2(cell, row) + 1.7);
+		vec2 q = vec2((fx - 0.5) * sw, (fy - 0.5) * rowh);
+		vec2 hs = vec2(sw, rowh) * 0.5 - 0.011 - 0.006 * jit;
+		float rr = min(hs.x, hs.y) * (0.5 + 0.35 * jit);
+		vec2 dq = abs(q) - (hs - rr);
+		float sd = length(max(dq, 0.0)) + min(max(dq.x, dq.y), 0.0) - rr;
+		float grout = smoothstep(-0.004 - aa, 0.002, sd);
+		float dome = smoothstep(0.0, 0.04, -sd);
+		float tone = 0.55 + 0.75 * hash(vec2(cell, row));
+		vec3 granite = mix(vec3(0.07, 0.075, 0.085), vec3(0.09, 0.08, 0.068), step(0.7, hash(vec2(row, cell) + 4.2)));
+		vec3 stone = granite * tone * (0.45 + 0.55 * dome) * (0.8 + 0.4 * grain);
+		vec3 cb = mix(stone, vec3(0.012), grout);
+		// in der Ferne kein Flimmern: das feine Muster geht in den mittleren Farbton über
+		float far = smoothstep(0.025, 0.08, aa);
+		col = mix(cb, vec3(0.055, 0.056, 0.06) * (0.75 + 0.5 * grain), far);
+		grout *= 1.0 - far;
+		rough_add -= 0.08 * dome * (1.0 - far);  // blank gefahrene Steinkuppen glänzen
 		col *= 1.0 - 0.15 * wheel;
 		puddle *= 0.6;
 		rough_add += 0.05 * grout;
@@ -148,6 +183,7 @@ void fragment() {
 	nm.z = sqrt(max(1.0 - dot(nm.xy, nm.xy), 0.0));
 	NORMAL = perturb(NORMAL, VERTEX, tuv, nm);
 	ALBEDO = col;
+	EMISSION = street_lit(col, w_pos);
 	ROUGHNESS = clamp(rough * (1.0 - manhole * 0.2), 0.02, 1.0);
 	METALLIC = max(manhole * 0.3, grate * 0.5);
 	SPECULAR = mix(0.45, 0.6, puddle);

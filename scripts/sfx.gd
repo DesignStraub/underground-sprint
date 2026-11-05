@@ -2,7 +2,7 @@ extends Node
 ## Kurze Soundeffekte (assets/sfx, erzeugt von tools/make_sfx.py).
 ## Sfx.play("thud") für einmalige Effekte, Sfx.looping("rumble") für Dauer-Sounds.
 
-const NAMES := ["horn", "bell", "rumble", "thud", "whoosh", "splash", "clang", "tunnel", "crowd"]
+const NAMES := ["horn", "bell", "rumble", "thud", "whoosh", "splash", "clang", "tunnel", "crowd", "skid"]
 
 var streams := {}
 
