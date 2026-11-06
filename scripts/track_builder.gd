@@ -1410,7 +1410,7 @@ static func _build_branch(root: Node3D, track: Dictionary, p: Dictionary, rng: R
 				var basis := Basis.looking_at(seg.normalized(), Vector3.UP)
 				if kind == "alley":
 					_bb_box(Transform3D(basis * Basis.from_scale(Vector3(0.5, 4.5, seg.length() + 0.1)), wm + Vector3(0, 2.25, 0)),
-						Vector3(0.24, 0.11, 0.07), 0.4, float(p["id"]), 4.0, 0.0)
+						Vector3(0.24, 0.11, 0.07), 0.4, float(p["id"]), 4.0, 0.0, 0.0, FACE_WALL)
 				elif kind == "lake":
 					var near_lake := _in_lake(track, wm, 2.0)
 					var hm := MeshInstance3D.new()
@@ -1804,7 +1804,7 @@ static func _spur_details(root: Node3D, track: Dictionary, p: Dictionary, rng: R
 	# reicht bis zum Boden hinunter (die Seitenstraße kann den Hang hinaufführen)
 	var hb: float = h + fz["y"]
 	_bb_box(Transform3D(Basis.looking_at(fz["fwd"], Vector3.UP) * Basis.from_scale(Vector3(SPUR_HALF * 2.0 + 16.0, hb, 14.0)),
-		fz["pos"] + fz["fwd"] * 8.0 + Vector3(0, hb / 2.0, 0)), Vector3(0.12, 0.12, 0.14), 0.4, seed, float(rng.randi() % 5))
+		fz["pos"] + fz["fwd"] * 8.0 + Vector3(0, hb / 2.0, 0)), Vector3(0.12, 0.12, 0.14), 0.4, seed, float(rng.randi() % 5), 1.0, -fz["y"])
 
 
 ## Sichtbare Begrenzung: überall, wo die (sonst unsichtbare) Randwand nicht von einem Haus verdeckt wird,
@@ -3024,7 +3024,7 @@ static func _build_city(root: Node3D, track: Dictionary, rng: RandomNumberGenera
 				_building(root, center + Vector3(0, lift, 0), basis, w, depth, h, tall, shop, dist, face_dir, f["right"] * side, rng)
 				if lift > 0.0:
 					_bb_box(Transform3D(basis * Basis.from_scale(Vector3(depth, lift + 0.1, w)), center + Vector3(0, lift / 2.0, 0)),
-						Vector3(0.1, 0.1, 0.11), 0.15, rng.randf() * 100.0, 4.0, 0.0)
+						Vector3(0.1, 0.1, 0.11), 0.15, rng.randf() * 100.0, 4.0, 0.0, -lift, FACE_WALL)
 				var bl := {"pos": center, "r": radius * 0.8, "foot": _foot(center, basis, depth, w)}
 				placed.append(bl)
 				_grid_add(grid, bl)
@@ -3069,7 +3069,7 @@ static func _back_row(root: Node3D, track: Dictionary, rng: RandomNumberGenerato
 		_building(root, center + Vector3(0, lift, 0), basis, w, depth, h, tall, false, dist, -f["right"] * side, f["right"] * side, rng, true)
 		if lift > 0.0:
 			_bb_box(Transform3D(basis * Basis.from_scale(Vector3(depth, lift + 0.1, w)), center + Vector3(0, lift / 2.0, 0)),
-				Vector3(0.1, 0.1, 0.11), 0.15, rng.randf() * 100.0, 4.0, 0.0)
+				Vector3(0.1, 0.1, 0.11), 0.15, rng.randf() * 100.0, 4.0, 0.0, -lift, FACE_WALL)
 		var bl := {"pos": center, "r": Vector2(w, depth).length() * 0.4, "foot": _foot(center, basis, depth, w)}
 		placed.append(bl)
 		_grid_add(grid, bl)
@@ -3384,11 +3384,27 @@ static func _building(root: Node3D, center: Vector3, basis: Basis, w: float, dep
 static func _box_building(root: Node3D, center: Vector3, basis: Basis, w: float, depth: float, h: float,
 		style: float, tint: Vector3, seed: float, shop_glass: float, lit: float, base_y := 0.0) -> void:
 	_bb_box(Transform3D(basis * Basis.from_scale(Vector3(depth, h, w)), center + Vector3(0, base_y + h / 2, 0)),
-		tint, lit, seed, style, shop_glass)
+		tint, lit, seed, style, shop_glass, base_y)
 
 
-## Quader mit Fassaden-Shader in den Häuser-Batch legen (xf skaliert einen Einheitswürfel)
-static func _bb_box(xf: Transform3D, tint := Vector3(0.08, 0.08, 0.1), lit := 0.4, seed := 0.0, style := 0.0, shop_glass := 1.0) -> void:
+## Fassadenkoordinaten für building.gdshader: UV = (Strecke ab der linken Kante der Fläche, Höhe über der Straße),
+## CUSTOM0 = (Breite der Fläche, Oberkante über der Straße, Art). Art: 0 Dach/Boden, 1 Fassade mit Fenstern,
+## 2 Wand ohne Fenster (Sockel am Hang, Mauern), 3 Giebel. So richten sich Fenster nach der Fassade (gleiche Ränder
+## an beiden Ecken, ganze Geschosse unter der Dachkante), egal wie das Haus gedreht ist.
+enum { FACE_TOP, FACE_WINDOWS, FACE_WALL, FACE_GABLE }
+
+
+static func _bb_new() -> SurfaceTool:
+	var nst := SurfaceTool.new()
+	nst.begin(Mesh.PRIMITIVE_TRIANGLES)
+	nst.set_custom_format(0, SurfaceTool.CUSTOM_RGB_FLOAT)
+	return nst
+
+
+## Quader mit Fassaden-Shader in den Häuser-Batch legen (xf skaliert einen Einheitswürfel). base_h: Höhe der
+## Unterkante über der Straße (Turmkrone auf dem Turm; negativ, wenn das Haus am Hang tiefer hinunterreicht).
+static func _bb_box(xf: Transform3D, tint := Vector3(0.08, 0.08, 0.1), lit := 0.4, seed := 0.0, style := 0.0, shop_glass := 1.0,
+		base_h := 0.0, kind := FACE_WINDOWS) -> void:
 	if _box_arrays.is_empty():
 		_box_arrays = BoxMesh.new().get_mesh_arrays()
 	if box_log != null and _box_tag != "":
@@ -3398,30 +3414,45 @@ static func _bb_box(xf: Transform3D, tint := Vector3(0.08, 0.08, 0.1), lit := 0.
 	var idx: PackedInt32Array = _box_arrays[Mesh.ARRAY_INDEX]
 	var key := Vector2i(floori(xf.origin.x / BATCH_CELL), floori(xf.origin.z / BATCH_CELL))
 	if not _bb.has(key):
-		var nst := SurfaceTool.new()
-		nst.begin(Mesh.PRIMITIVE_TRIANGLES)
-		_bb[key] = nst
+		_bb[key] = _bb_new()
 	var st: SurfaceTool = _bb[key]
 	var nb := xf.basis.inverse().transposed()
 	var col := Color(tint.x, tint.y, tint.z, lit)
 	var u2 := Vector2(seed, style + 10.0 * shop_glass)
+	var sc := xf.basis.get_scale()
+	var top := sc.y + base_h
 	for i in idx:
-		st.set_normal((nb * norms[i]).normalized())
+		var v := verts[i]
+		var n := norms[i]
+		var uv := Vector2.ZERO
+		var cu := Color(0.0, top, FACE_TOP)
+		if absf(n.y) < 0.5:
+			# Seitenfläche: "links" ist von außen gesehen links (Blick gegen die Normale)
+			var along := (-v.z * n.x) * sc.z if absf(n.x) > 0.5 else (v.x * n.z) * sc.x
+			var width := sc.z if absf(n.x) > 0.5 else sc.x
+			uv = Vector2(along + width * 0.5, (v.y + 0.5) * sc.y + base_h)
+			cu = Color(width, top, kind)
+		else:
+			uv = Vector2(v.x * sc.x, v.z * sc.z)
+		st.set_normal((nb * n).normalized())
 		st.set_color(col)
+		st.set_uv(uv)
 		st.set_uv2(u2)
-		st.add_vertex(xf * verts[i])
+		st.set_custom(0, cu)
+		st.add_vertex(xf * v)
 
 
 static func _bb_st(pos: Vector3) -> SurfaceTool:
 	var key := Vector2i(floori(pos.x / BATCH_CELL), floori(pos.z / BATCH_CELL))
 	if not _bb.has(key):
-		var nst := SurfaceTool.new()
-		nst.begin(Mesh.PRIMITIVE_TRIANGLES)
-		_bb[key] = nst
+		_bb[key] = _bb_new()
 	return _bb[key]
 
 
-static func _bb_poly(st: SurfaceTool, v: Array, nrm: Vector3, col: Color, u2: Vector2) -> void:
+## Vieleck in den Häuser-Batch; origin/ax: Bezugspunkt und Richtung für die Fassadenkoordinaten (Strecke entlang ax,
+## Höhe über origin.y + base_h), face: CUSTOM0 der Fläche (Breite, Oberkante, Art)
+static func _bb_poly(st: SurfaceTool, v: Array, nrm: Vector3, col: Color, u2: Vector2, origin := Vector3.ZERO, ax := Vector3.RIGHT,
+		base_h := 0.0, face := Color(0, 0, 0)) -> void:
 	if (v[1] - v[0]).cross(v[2] - v[0]).dot(nrm) > 0.0:
 		v = v.duplicate()
 		v.reverse()
@@ -3429,7 +3460,9 @@ static func _bb_poly(st: SurfaceTool, v: Array, nrm: Vector3, col: Color, u2: Ve
 		for q in [v[0], v[i], v[i + 1]]:
 			st.set_normal(nrm)
 			st.set_color(col)
+			st.set_uv(Vector2((q - origin).dot(ax), q.y - origin.y + base_h))
 			st.set_uv2(u2)
+			st.set_custom(0, face)
 			st.add_vertex(q)
 
 
@@ -3453,12 +3486,14 @@ static func _bb_roof(center: Vector3, basis: Basis, w: float, depth: float, h: f
 	for s in [-1.0, 1.0]:
 		var eave: Vector3 = base + ax * s * (span * 0.5 + ov) - Vector3(0, drop, 0)
 		var nrm: Vector3 = (ax * s * rh + Vector3(0, span * 0.5, 0)).normalized()
-		_bb_poly(st, [eave - bx * hb, eave + bx * hb, top + bx * hb, top - bx * hb], nrm, rcol, ru)
+		_bb_poly(st, [eave - bx * hb, eave + bx * hb, top + bx * hb, top - bx * hb], nrm, rcol, ru, base - bx * hb, bx, h,
+			Color(len, h + rh, FACE_GABLE))
 	var wcol := Color(wall_tint.x, wall_tint.y, wall_tint.z, lit)
 	var wu := Vector2(seed, style)
 	for s in [-1.0, 1.0]:
 		var g0: Vector3 = base + bx * s * len * 0.5
-		_bb_poly(st, [g0 - ax * span * 0.5, g0 + ax * span * 0.5, top + bx * s * len * 0.5], bx * s, wcol, wu)
+		_bb_poly(st, [g0 - ax * span * 0.5, g0 + ax * span * 0.5, top + bx * s * len * 0.5], bx * s, wcol, wu, g0 - ax * span * 0.5,
+			ax, h, Color(span, h + rh, FACE_GABLE))
 
 
 static func _bb_flush(root: Node3D) -> void:
@@ -3564,7 +3599,8 @@ static func _bake_street_light(root: Node3D, track: Dictionary) -> void:
 		hi = Vector2(maxf(hi.x, pl[0] + pl[2]), maxf(hi.y, pl[1] + pl[2]))
 	lo -= Vector2(4.0, 4.0)
 	hi += Vector2(4.0, 4.0)
-	var cell := maxf(STREET_CELL, maxf(hi.x - lo.x, hi.y - lo.y) / 2048.0)
+	# Texturdetails Normal: höchstens 1024 Bildpunkte (ein Viertel des Speichers), Hoch: 2048
+	var cell := maxf(STREET_CELL, maxf(hi.x - lo.x, hi.y - lo.y) / (2048.0 if GameState.gv("tex") == 1 else 1024.0))
 	var w := int(ceil((hi.x - lo.x) / cell))
 	var h := int(ceil((hi.y - lo.y) / cell))
 	# Summe je Bildpunkt (nur berührte Punkte), danach ins 8-Bit-Bild

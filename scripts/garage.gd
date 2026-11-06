@@ -50,6 +50,7 @@ var _back := Callable()
 
 
 func _ready() -> void:
+	Music.toast_left = true
 	_build_scene()
 	_build_ui()
 	if GameState.language == "":
@@ -284,18 +285,6 @@ func _build_ui() -> void:
 	keys.offset_left = 14.0
 	keys.offset_top = -16.0
 	keys.offset_right = 400.0
-	var music := _label(root, 9, HORIZONTAL_ALIGNMENT_RIGHT)
-	music.label_settings.font = UI.font("bold", 0.12)
-	music.label_settings.font_color = Color(0.7, 0.75, 0.85)
-	music.anchor_left = 1.0
-	music.anchor_right = 1.0
-	music.anchor_top = 1.0
-	music.anchor_bottom = 1.0
-	music.offset_left = -330.0
-	music.offset_right = -12.0
-	music.offset_top = -16.0
-	music.set_meta("music", true)
-	_music_label = music
 	_tip_i = randi() % TIPS.size()
 	tip.text = tr("TIPP: ") + tr(TIPS[_tip_i])
 
@@ -352,7 +341,6 @@ func _set_section(text: String, with_stats := false) -> void:
 		_show_stats(preview_car, preview_cfg)
 
 
-var _music_label: Label
 var _cam_view := ""  # "" = Drehteller kreist, sonst Kategorie, deren Teil die Kamera zeigt
 var _cam_pos := Vector3(4.6, 1.7, 5.6)
 var _cam_look := Vector3(-1.6, 0.55, 0)
@@ -437,7 +425,6 @@ func _process(dt: float) -> void:
 	cam.look_at(_cam_look)
 	_work_light.light_energy = lerpf(_work_light.light_energy, 0.0 if _cam_view == "" else 1.4, k)
 	status.text = tr("RENNSIEGE %d   ·   DRIFTSIEGE %d   ·   %s") % [GameState.wins, GameState.drift_wins, Catalog.CARS[GameState.current_car]["name"].to_upper()]
-	_music_label.text = (tr("Musik: ") + Music.current_title) if Music.current_title != "" else tr("Keine Musik: mp3/ogg in music/ legen")
 
 
 func _show_car(car_id: String, cfg: Dictionary) -> void:
@@ -510,6 +497,7 @@ const SETTING_HINTS := {
 	"dynres": "Senkt die 3D-Auflösung automatisch, wenn die Bildrate unter 60 fällt, und hebt sie danach wieder an.",
 	"view": "Wie weit du siehst. Weiter = mehr Häuser und Wahrzeichen im Bild, kostet Leistung.",
 	"detail": "Ab welcher Entfernung Kleinteile verschwinden und Autos vereinfacht gezeichnet werden.",
+	"tex": "Hoch: Asphalt bleibt bis weit nach vorn scharf, feinere Lichtkreise der Laternen. Braucht etwas mehr Grafikspeicher.",
 	"lights": "Bis zu welcher Entfernung Laternen und Leuchtreklamen Autos und Häuser beleuchten. Die Lichtkreise auf der Straße sind immer da.",
 	"aa": "Glättet Treppchen an Kanten. MSAA ist schärfer, kostet aber mehr.",
 	"bloom": "Leuchtreklamen, Scheinwerfer und Neon strahlen über.",
@@ -861,7 +849,8 @@ func _refresh_car() -> void:
 	menu.get_child(0).text = ("< %s >%s" % [spec["name"], "" if unlocked else tr("  [GESPERRT]")]).to_upper()
 	_show_stats(preview_car, preview_cfg)
 	menu.get_child(1).disabled = not unlocked
-	info.text = tr(spec["desc"]) + tr("\nHöchstgeschwindigkeit ab Werk: %d km/h") % int(spec["top_speed"] * 3.6)
+	info.text = tr(spec["desc"]) + tr("\nHöchstgeschwindigkeit ab Werk: %d km/h") % int(spec["top_speed"] * 3.6) \
+		+ tr("\nAntrieb: ") + tr({"fwd": "Frontantrieb", "rwd": "Heckantrieb", "mr": "Mittelmotor, Heckantrieb", "awd": "Allrad"}[spec.get("drive", "rwd")])
 	if not unlocked:
 		info.text += tr("\nFreischalten: ") + GameState.unlock_text(preview_car)
 
@@ -929,3 +918,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			_back.call()
 		else:
 			_show_main()
+
+
+func _exit_tree() -> void:
+	Music.toast_left = false

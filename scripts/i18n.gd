@@ -24,6 +24,8 @@ const EN := {
 	"%s ist gesperrt.\nNoch 1 Sieg nötig. (Nur Vorschau)": "%s is locked.\n1 more win needed. (Preview only)",
 	"%s ist gesperrt.\nNoch %d Siege nötig. (Nur Vorschau)": "%s is locked.\n%d more wins needed. (Preview only)",
 	"\nHöchstgeschwindigkeit ab Werk: %d km/h": "\nFactory top speed: %d km/h",
+	"\nAntrieb: ": "\nDrivetrain: ", "Frontantrieb": "Front-wheel drive", "Heckantrieb": "Rear-wheel drive",
+	"Mittelmotor, Heckantrieb": "Mid-engine, rear-wheel drive", "Allrad": "All-wheel drive",
 	"\nFreischalten: ": "\nUnlock: ",
 	"%d Rennsieg": "%d race win", "%d Rennsiege": "%d race wins", "%d Driftsieg": "%d drift win", "%d Driftsiege": "%d drift wins",
 	" oder ": " or ",
@@ -127,7 +129,7 @@ const EN := {
 	"BANKENVIERTEL": "FINANCIAL DISTRICT", "MARKTVIERTEL": "MARKET DISTRICT", "PRACHTALLEE": "BOULEVARD", "ALTSTADT": "OLD TOWN",
 	"HAFEN": "HARBOR", "CHINATOWN": "CHINATOWN", "SCHNELLSTRASSE": "HIGHWAY", "INNENSTADT": "CITY CENTER",
 	"KURVIERTEL": "SPA QUARTER", "CAMPUS": "CAMPUS", "VORSTADT": "SUBURBS",
-	"BANDE! KETTE VERLOREN": "BARRIER! CHAIN LOST", "WAND-BONUS": "WALL BONUS", "PERFEKTER START": "PERFECT START",
+	"BANDE! KETTE VERLOREN": "BARRIER! CHAIN LOST", "   ZONE x2": "   ZONE x2", "WAND-BONUS": "WALL BONUS", "PERFEKTER START": "PERFECT START",
 	"ZU VIEL GAS": "WHEELSPIN", "KNAPP VORBEI  +NITRO": "NEAR MISS  +NITRO", "RUNDE %d": "LAP %d", "LETZTE RUNDE": "FINAL LAP",
 	"PLATZ": "POS", "ZEIT": "TIME", "RUNDE": "LAP", "PUNKTE": "POINTS", "DRIFT  +NITRO": "DRIFT  +NITRO", "SPRUNG": "AIR", "SPRUNG  %.1f s": "AIR  %.1f s",
 	"Platz %d: %d": "Place %d: %d", "ABKÜRZUNG!": "SHORTCUT!", "ALTSTADT · GEGENVERKEHR!": "OLD TOWN · ONCOMING TRAFFIC!",
@@ -184,7 +186,8 @@ const EN := {
 	# Grafikmenü
 	"Grafik  >": "Graphics  >", "GRAFIK": "GRAPHICS", "Voreinstellung: ": "Preset: ", "Benutzerdefiniert": "Custom",
 	"Ultra": "Ultra", "FPS anzeigen: ": "Show FPS: ", "3D-Auflösung": "3D resolution", "Dynamische Auflösung": "Dynamic resolution",
-	"Sichtweite": "View distance", "Detaildichte": "Level of detail", "Lichter": "Lights", "Kantenglättung": "Anti-aliasing",
+	"Sichtweite": "View distance", "Detaildichte": "Level of detail", "Texturdetails": "Texture detail",
+	"Hoch: Asphalt bleibt bis weit nach vorn scharf, feinere Lichtkreise der Laternen. Braucht etwas mehr Grafikspeicher.": "High: the asphalt stays sharp far ahead, finer light pools under street lamps. Uses a bit more video memory.", "Lichter": "Lights", "Kantenglättung": "Anti-aliasing",
 	"Glühen": "Bloom", "Spiegelungen": "Reflections", "Umgebungsverdeckung": "Ambient occlusion", "Effekte": "Effects",
 	"Grafik wie in großen PC-Spielen: Voreinstellung wählen oder jede Option einzeln anpassen.":
 		"Graphics like in big PC games: pick a preset or adjust every option yourself.",

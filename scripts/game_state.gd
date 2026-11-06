@@ -13,6 +13,8 @@ const FONT_WIDE := preload("res://assets/fonts/D-DINExp-Bold.otf")
 ##   res: höchste 3D-Auflösung (Zeilen), darüber wird weich hochskaliert. dynres: senkt sie, wenn die Bildrate fällt.
 ##   view: Sichtweite (m). detail: ab welcher Entfernung Kleinteile / mittlere Teile verschwinden und Autos auf die
 ##   Fernansicht wechseln. lights: ab wann Laternen ausblenden. fx: Partikel (Regen, Dampf).
+##   tex: Texturdetails. Normal: Straße mit 4-facher anisotroper Filterung, Lichtkarte der Laternen bis 1024 Pixel.
+##   Hoch: 16-fach (Asphalt bleibt bis weit nach vorn scharf), Lichtkarte bis 2048 Pixel (feinere Lichtkreise).
 const PRESETS := ["Niedrig", "Mittel", "Hoch", "Ultra"]
 const GFX := {
 	"res": {"label": "3D-Auflösung", "levels": ["540p", "720p", "900p", "1080p", "1440p"], "values": [540.0, 720.0, 900.0, 1080.0, 1440.0], "preset": [1, 2, 3, 4]},
@@ -20,6 +22,7 @@ const GFX := {
 	"view": {"label": "Sichtweite", "levels": ["Niedrig", "Mittel", "Hoch", "Ultra"], "values": [600.0, 850.0, 1100.0, 1400.0], "preset": [0, 1, 2, 3]},
 	"detail": {"label": "Detaildichte", "levels": ["Niedrig", "Mittel", "Hoch", "Ultra"],
 		"values": [[110.0, 230.0, 25.0], [170.0, 340.0, 35.0], [260.0, 520.0, 50.0], [380.0, 800.0, 80.0]], "preset": [0, 1, 2, 3]},
+	"tex": {"label": "Texturdetails", "levels": ["Normal", "Hoch"], "values": [0, 1], "preset": [0, 0, 1, 1]},
 	"lights": {"label": "Lichter", "levels": ["Niedrig", "Mittel", "Hoch", "Ultra"], "values": [80.0, 120.0, 170.0, 250.0], "preset": [0, 1, 2, 3]},
 	"aa": {"label": "Kantenglättung", "levels": ["Aus", "FXAA", "MSAA 2x", "MSAA 4x"], "values": ["aus", "fxaa", "msaa2", "msaa4"], "preset": [0, 1, 2, 3]},
 	"bloom": {"label": "Glühen", "levels": ["Aus", "An"], "values": [false, true], "preset": [1, 1, 1, 1]},
@@ -27,7 +30,7 @@ const GFX := {
 	"ssao": {"label": "Umgebungsverdeckung", "levels": ["Aus", "An"], "values": [false, true], "preset": [0, 0, 1, 1], "desktop": true},
 	"fx": {"label": "Effekte", "levels": ["Niedrig", "Mittel", "Hoch"], "values": [0, 1, 2], "preset": [0, 1, 2, 2]},
 }
-const GFX_ORDER := ["res", "dynres", "view", "detail", "lights", "aa", "bloom", "ssr", "ssao", "fx"]
+const GFX_ORDER := ["res", "dynres", "view", "detail", "tex", "lights", "aa", "bloom", "ssr", "ssao", "fx"]
 const PIXEL_H := 540.0  # Pixel-Look: 3D in 540 Zeilen, pixelgenau hochskaliert
 const FPS_LIMITS := [0, 30, 60, 120]
 

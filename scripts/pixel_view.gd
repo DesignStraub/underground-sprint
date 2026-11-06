@@ -61,6 +61,7 @@ func _resize() -> void:
 	var aa: String = GameState.gv("aa")
 	world.msaa_3d = {"msaa2": Viewport.MSAA_2X, "msaa4": Viewport.MSAA_4X}.get(aa, Viewport.MSAA_DISABLED)
 	world.screen_space_aa = Viewport.SCREEN_SPACE_AA_FXAA if aa == "fxaa" else Viewport.SCREEN_SPACE_AA_DISABLED
+	world.anisotropic_filtering_level = Viewport.ANISOTROPY_16X if GameState.gv("tex") == 1 else Viewport.ANISOTROPY_4X
 	texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	GameState.render_lines = world.size.y
 

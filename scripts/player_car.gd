@@ -32,6 +32,18 @@ const TRIP_MIN_SPEED := 14.0
 const PIVOT := Vector3(0, 0.7, 0)  # Schwerpunkt: um ihn dreht sich das Auto in der Luft und beim Überschlag
 const MIN_RADIUS := 5.2  # kleinster Wendekreis (Radius) bei voll eingeschlagener Lenkung
 const BRAKE := 22.0  # m/s² Vollbremsung (gut 2 g: kräftig, aber nicht wie gegen eine Wand)
+const REV_ACCEL := 5.0  # m/s² rückwärts (gemächlich, wie ein Rückwärtsgang)
+const REV_TOP := 11.0  # m/s rückwärts höchstens (~40 km/h)
+const TO_REVERSE := 0.3  # s im Stand mit Bremse, bis der Rückwärtsgang drin ist
+const TO_FORWARD := 0.15  # s im Stand mit Gas, bis der erste Gang drin ist
+## Antrieb (nur im normalen Fahren; im Drift-Event fahren alle gleich): Haftung beim Anfahren (Anteil, der vom
+## Stand an greift), Heck kommt unter Gas (Übersteuern), Front schiebt unter Gas (Untersteuern)
+const DRIVE := {
+	"fwd": {"launch": 0.58, "oversteer": 0.0, "understeer": 0.16},
+	"rwd": {"launch": 0.65, "oversteer": 1.0, "understeer": 0.0},
+	"mr": {"launch": 0.72, "oversteer": 1.25, "understeer": 0.0},
+	"awd": {"launch": 0.84, "oversteer": 0.3, "understeer": 0.06},
+}
 const WALL_TURN_RATE := 4.0  # rad/s: so schnell dreht die Wand das Auto höchstens parallel (kein Sprung im Bild)
 const DRAG_LIMIT := 8000.0  # Begrenzer im Drag
 const PERFECT_SHIFT := Vector2(7100.0, 7650.0)  # grüner Bereich zum Hochschalten
@@ -98,6 +110,11 @@ var _thr_s := 0.0  # Gas weich nachgeführt (kein Sprung von 0 auf volle Kraft)
 var _nos_k := 0.0  # Nitro-Schub, weich ein- und ausgeblendet
 var _launch_t := 0.0  # > 0: perfekter Start (mehr Zug), < 0: Räder drehen durch (weniger Zug)
 var _shift_boost := 0.0  # Drag: kurzer Schub nach perfektem Schalten
+var drive_type := "rwd"  # Antrieb aus dem Katalog: fwd, rwd, mr (Mittelmotor, Heck), awd
+var reverse_gear := false  # Rückwärtsgang eingelegt (Tacho zeigt R)
+var _change_t := 0.0  # wie lange das Auto schon steht und in die andere Richtung will
+var _holding := false  # dieses Bild: Auto steht beim Gangwechsel still
+var _rev_s := 0.0  # geglättetes "Gas" rückwärts
 var _rail_lat := 0.0  # Drag: Querlage auf der Schiene (folgt der gewählten Spur weich)
 var _rail_v := 0.0
 var _rail_init := false
@@ -179,6 +196,7 @@ func setup(car_id: String, cfg: Dictionary) -> void:
 	steer_rate = st["steer"]
 	lat_acc = 14.0 + st["grip"] * 0.42  # 2,3–2,7 g ab Werk: griffig wie NFSU, aber enge Ecken wollen angebremst werden
 	drift_k = st["drift"]
+	drive_type = _spec.get("drive", "rwd")
 	nitro_power = nos["power"]
 	nitro_cap = nos["capacity"]
 
@@ -449,8 +467,12 @@ func _physics_process(dt: float) -> void:
 		# Schaltpause: kurz kaum Zug (Kupplung), danach setzt der neue Gang wieder ein
 		var drive: float = accel * _thr_s * GEAR_PULL[_pull_gear] * tq * (0.3 if _shift_timer > 0.0 else 1.0)
 		if spd < 8.0 and speed_fwd > -0.5:
-			# Anfahren: Haftung begrenzt, der Zug baut sich mit dem Tempo auf (perfekter Start: volle Haftung)
-			drive *= 1.0 if _launch_t > 0.0 else 0.65 + 0.35 * pow(spd / 8.0, 0.7)
+			# Anfahren: Haftung begrenzt, der Zug baut sich mit dem Tempo auf (perfekter Start: volle Haftung).
+			# Allrad greift am besten, Fronttriebler am schlechtesten (Gewicht geht beim Anfahren nach hinten)
+			var base: float = 0.65 if drift_mode or drag_mode else DRIVE[drive_type]["launch"]
+			drive *= 1.0 if _launch_t > 0.0 else base + (1.0 - base) * pow(spd / 8.0, 0.7)
+		if reverse_gear:
+			drive = 0.0  # im Rückwärtsgang zieht Gas nicht nach vorn (es bremst, siehe _brake_and_reverse)
 		if _launch_t > 0.0:
 			drive += accel * 0.3 * _thr_s * _launch_t
 		elif _launch_t < 0.0:
@@ -458,13 +480,14 @@ func _physics_process(dt: float) -> void:
 		drive += accel * 0.6 * _shift_boost / 0.5  # über eine halbe Sekunde etwa so viel wie früher der Sprung (+1,6 m/s)
 		a += drive
 		a -= drag_k * speed_fwd * absf(speed_fwd)
-		if thr < 0.05:
+		if thr < 0.05 and brk < 0.05:
 			a -= signf(speed_fwd) * 1.6  # Motorbremse
-		if brk > 0.0:
-			if speed_fwd > 1.0:
+		_holding = false
+		if drag_mode:
+			if brk > 0.0 and speed_fwd > 1.0:
 				a -= BRAKE * brk
-			elif speed_fwd > -14.0:
-				a -= 9.0 * brk
+		else:
+			a += _brake_and_reverse(thr, brk, dt)
 		if hb:
 			a -= signf(speed_fwd) * 4.0
 		# Bergauf etwas zäher, bergab etwas Schwung (abgeschwächt, damit es nicht frustriert)
@@ -472,7 +495,7 @@ func _physics_process(dt: float) -> void:
 	if speed_fwd > eff_top:
 		a = minf(a, -4.0)
 	speed_fwd += a * dt
-	if not airborne and absf(speed_fwd) < 0.3 and thr < 0.05 and brk < 0.05:
+	if not airborne and ((absf(speed_fwd) < 0.3 and thr < 0.05 and brk < 0.05) or (_holding and absf(speed_fwd) < 0.8)):
 		speed_fwd = 0.0
 
 	# --- Lenkung (in der Luft wirkungslos). Bei Tempo schlägt das Lenkrad etwas langsamer ein (Tastatur).
@@ -492,11 +515,19 @@ func _physics_process(dt: float) -> void:
 		_slip_hold = 0.6
 		l2 = _slide_physics(dt, fwd, right, thr, hb, a, eff_top, low_speed)
 	else:
-		# Heckantrieb: Vollgas bei engem Einschlag und mittlerem Tempo lässt das Heck etwas kommen (stufenlos)
+		# Heckantrieb: Vollgas bei engem Einschlag und mittlerem Tempo lässt das Heck etwas kommen (stufenlos).
+		# Fronttriebler schieben dagegen unter Gas über die Vorderräder nach außen, Allradler ein wenig; beim
+		# Gaswegnehmen in der Kurve dreht ein Fronttriebler etwas ein. Im Drift-Event fahren alle gleich.
+		var dt_k: Dictionary = DRIVE["rwd"] if drift_mode or drag_mode else DRIVE[drive_type]
 		var po := 0.0
+		var push := 0.0
 		if not airborne:
-			po = _thr_s * smoothstep(0.35, 0.9, absf(steer)) * smoothstep(6.0, 12.0, spd) \
-				* (1.0 - smoothstep(top_speed * 0.4, top_speed * 0.7, spd))
+			var corner := smoothstep(0.35, 0.9, absf(steer))
+			po = _thr_s * corner * smoothstep(6.0, 12.0, spd) \
+				* (1.0 - smoothstep(top_speed * 0.4, top_speed * 0.7, spd)) * dt_k["oversteer"]
+			push = _thr_s * corner * smoothstep(8.0, 20.0, spd) * dt_k["understeer"]
+			if drive_type == "fwd" and not drift_mode and thr < 0.05 and spd > 12.0:
+				push = -0.06 * corner  # Lastwechsel: Heck wird leicht
 		if hb and spd > 8.0 and not airborne:
 			_slip_hold = move_toward(_slip_hold, 1.0, dt * 5.0)
 		elif brk > 0.3 and absf(steer) > 0.5 and spd > 18.0 and not airborne:
@@ -508,7 +539,7 @@ func _physics_process(dt: float) -> void:
 		var yaw := 0.0
 		if not airborne:
 			yaw = -steer * steer_rate * low_speed * high_speed * signf(speed_fwd + 0.001)
-			yaw *= 1.0 + (0.12 + 0.2 * drift_k) * _slip_hold + 0.1 * po + (0.4 if hb else 0.0)
+			yaw *= 1.0 + (0.12 + 0.2 * drift_k) * _slip_hold + 0.1 * po + (0.4 if hb else 0.0) - push
 			if drift_mode:
 				# Drift-Modus: mit Gas und voll eingelenkt bricht das Heck aus
 				yaw *= 1.0 + 0.25 * smoothstep(0.5, 1.0, absf(steer)) * _thr_s * smoothstep(10.0, 16.0, spd)
@@ -591,7 +622,7 @@ func _physics_process(dt: float) -> void:
 	_update_camera(dt, sf)
 
 	audio.rpm = rpm
-	audio.throttle = 1.0 if nitro_on else (Input.get_action_strength("accelerate") if not finished else 0.0)
+	audio.throttle = 1.0 if nitro_on else (0.0 if finished else (_rev_s if reverse_gear else Input.get_action_strength("accelerate")))
 	audio.nitro = nitro_on
 	audio.slip = clampf((absf(l2) - 3.0) / 10.0, 0.0, 1.0) if spd > 5.0 and not airborne else 0.0
 	if _launch_t < 0.0 and _thr_s > 0.5:
@@ -612,6 +643,52 @@ func launch(k: float) -> void:
 
 ## Drehzahl im Gang g bei Tempoanteil r: proportional zur Geschwindigkeit, im 6. Gang liegt Topspeed bei TOP_RPM.
 ## spin: Zuschlag für durchdrehende Räder im Drift.
+## Bremsen und Rückwärtsgang wie im Auto statt wie ein Hoverboard: die Bremse verzögert bis zum Stand. Wer im Stand
+## weiter bremst, legt nach kurzer Pause den Rückwärtsgang ein und rollt gemächlich rückwärts. Gas im Rückwärtsgang
+## bremst erst bis zum Stand, nach einem kurzen Moment geht es vorwärts. Liefert die Beschleunigung (m/s²).
+func _brake_and_reverse(thr: float, brk: float, dt: float) -> float:
+	var a := 0.0
+	if not reverse_gear:
+		_rev_s = 0.0
+		if brk > 0.05:
+			if speed_fwd > 0.6:
+				a -= BRAKE * brk
+				_change_t = 0.0
+			elif speed_fwd > -0.6:
+				_holding = true
+				_change_t += dt
+				if _change_t > TO_REVERSE and thr < 0.05:
+					reverse_gear = true
+					_change_t = 0.0
+			else:
+				a += BRAKE * brk  # rollt im Vorwärtsgang zurück (Abprall, Hang): Bremse bremst
+		else:
+			_change_t = 0.0
+	else:
+		if thr > 0.05:
+			_rev_s = move_toward(_rev_s, 0.0, dt * 6.0)
+			if speed_fwd < -0.6:
+				a += BRAKE * 0.8 * thr
+				_change_t = 0.0
+			else:
+				_holding = true
+				_change_t += dt
+				if _change_t > TO_FORWARD:
+					reverse_gear = false
+					_change_t = 0.0
+		elif brk > 0.05:
+			_change_t = 0.0
+			if speed_fwd > 0.6:
+				a -= BRAKE * brk
+			else:
+				_rev_s = move_toward(_rev_s, brk, dt * 2.5)
+				a -= REV_ACCEL * _rev_s * (1.0 - smoothstep(REV_TOP * 0.6, REV_TOP, -speed_fwd))
+		else:
+			_change_t = 0.0
+			_rev_s = move_toward(_rev_s, 0.0, dt * 6.0)
+	return a
+
+
 func _gear_rpm(g: int, r: float, thr: float, hb: bool, spd: float, spin: float) -> float:
 	var per_ratio: float = SHIFT_RPM / GEARS[g] if g < 6 else TOP_RPM
 	var t := clampf(maxf(900.0 + thr * 600.0, r * per_ratio), 900.0, SHIFT_RPM + 300.0)
@@ -1049,6 +1126,9 @@ func _update_camera(dt: float, sf: float) -> void:
 
 
 func place(xform: Transform3D) -> void:
+	reverse_gear = false
+	_change_t = 0.0
+	_rev_s = 0.0
 	global_transform = xform
 	velocity = Vector3.ZERO
 	speed_fwd = 0.0
@@ -1095,13 +1175,17 @@ func _handle_collisions(pre: Vector3) -> void:
 			walled = true
 			if debug_hits:
 				_collider_name = _describe(c)
-			_hit_wall(pre, n, _is_small(c))
+			var k := _obstacle_kind(c)
+			_hit_wall(pre, n, k == 1, k == 2)
 
 
-## Wand/Bande wie in NFSU: je flacher der Winkel, desto weniger Tempoverlust; das Auto schrammt entlang und dreht
-## dabei weich parallel zur Wand (_wall_turn, über einige Bilder). Steil oder frontal prallt es ab. An kleinen
-## Hindernissen (Poller, Pfosten, Bank) wird es kaum gedreht: deren Ecken haben schräge Normalen.
-func _hit_wall(pre: Vector3, n: Vector3, small := false) -> void:
+## Feste Hindernisse wie in NFSU: sie geben nicht nach und federn nicht zurück. Frontal (Wand, Hausecke, Baum,
+## Mast) steht das Auto mit einem Schlag; man muss zurücksetzen. Je flacher der Winkel, desto mehr Tempo bleibt:
+## an Wänden schrammt das Auto entlang und dreht dabei weich parallel zur Wand (_wall_turn). Schmale runde
+## Hindernisse (Baumstamm, Pfosten, pole) halten das Auto auf, sobald es sie mit der Front trifft, statt es um
+## sich herumzulenken; nur wer sie seitlich streift, rutscht vorbei. Gegen das Hindernis Gas geben schiebt nicht
+## zurück: das Tempo in das Hindernis hinein fällt einfach weg.
+func _hit_wall(pre: Vector3, n: Vector3, small := false, pole := false) -> void:
 	var spd := pre.length()
 	var vn := -pre.dot(n)  # Tempo in die Wand hinein
 	if spd < 0.5 or vn < 0.2:
@@ -1110,36 +1194,43 @@ func _hit_wall(pre: Vector3, n: Vector3, small := false) -> void:
 	# Überschlag nach der Lage beim Aufprall beurteilen (vor jeder Drehung durch die Wand)
 	var trip := _trips(pre, n, pre) and not drag_mode and not drift_mode and not tumbling
 	var head_on := clampf(vn / spd, 0.0, 1.0)  # Sinus des Aufprallwinkels
+	var fwd := -global_basis.z
+	fwd.y = 0.0
+	fwd = fwd.normalized()
+	if pole:
+		# Stamm oder Pfosten vor der Front: zählt wie frontal, auch wenn die runde Form schräg zurückwirft
+		var front := clampf(pre.normalized().dot(fwd), -1.0, 1.0)
+		if absf(front) > 0.5 and head_on > 0.3:
+			head_on = maxf(head_on, 0.85)
 	var tang := pre + n * vn
 	var keep := 1.0 - 0.55 * head_on * head_on
-	var new_v := n * vn * (0.08 + 0.15 * head_on * head_on)
+	# kein Zurückfedern: nur bei harten Einschlägen ein Hauch, damit das Auto nicht im Hindernis klebt
+	var new_v := n * (0.6 if vn > 6.0 else 0.0)
 	if tang.length() > 0.1:
-		new_v += tang.normalized() * spd * keep * (1.0 - pow(head_on, 4.0))
+		new_v += tang.normalized() * tang.length() * keep * (1.0 - pow(head_on, 2.5))
 	new_v = new_v.move_toward(Vector3.ZERO, 3.0 * get_physics_process_delta_time())  # Schleifen kostet etwas
 	velocity = Vector3(new_v.x, 0.0, new_v.z)
-	# Parallel zur Wand drehen: streifend ganz, schräg teilweise, frontal gar nicht (dort Abprall)
+	# Parallel zur Wand drehen: streifend ganz, schräg teilweise, frontal gar nicht (dort steht man)
 	if tang.length() > 0.5 and not tumbling:
-		var fwd := -global_basis.z
-		fwd.y = 0.0
 		var along := tang.normalized() * signf(tang.dot(fwd) + 0.001)
-		var ang := fwd.normalized().signed_angle_to(along, Vector3.UP)
-		_wall_turn = ang * (1.0 - smoothstep(0.6, 0.92, head_on)) * (0.25 if small else 1.0)
+		var ang := fwd.signed_angle_to(along, Vector3.UP)
+		_wall_turn = ang * (1.0 - smoothstep(0.55, 0.85, head_on)) * (0.25 if small or pole else 1.0)
 	if vn > 1.5 and _wall_cool <= 0.0:
 		_wall_cool = 0.4
 		if debug_hits:
 			last_hit = "%s v=%.1f vn=%.1f d=%.0f lat=%.1f" % [_collider_name, spd, vn, progress, lateral]
 		wall_hits += 1
 		audio.crash(clampf(vn / 30.0, 0.08, 1.0))
-		_shake = minf(_shake + vn * 0.025, 0.8)
+		_shake = minf(_shake + vn * 0.03, 0.9)
 	if drift_mode and head_on > 0.5:
 		_sliding = false
 	if trip:
 		start_tumble(n, absf(pre.dot(global_basis.x)))
-	elif vn > 14.0 and head_on > 0.75 and _crash_cooldown <= 0.0:
+	elif vn > 12.0 and head_on > 0.75 and _crash_cooldown <= 0.0:
+		# harter Einschlag: kurz benommen (kein Lenken, kein Gas), aber kein Herumwirbeln
 		crashes += 1
-		stun = 0.3
+		stun = 0.35
 		_crash_cooldown = 0.5
-		_spin = signf(pre.dot(global_basis.x) + 0.01) * 0.6
 
 
 ## Verkehr: frontal oder deutliches Auffahren ist ein Crash wie in NFS (fast Stillstand, Dreher, kurz keine
@@ -1181,12 +1272,19 @@ func _hit_traffic(other: Node, pre: Vector3, n: Vector3) -> void:
 
 
 ## Kleines Hindernis (Poller, Pfosten, Bank, Mülltonne): Kiste, die waagerecht nirgends über 2,5 m misst
-func _is_small(c: KinematicCollision3D) -> bool:
+## 0 Wand, 1 kleines Hindernis (Bank, Schaltkasten: eckig, unter 2,5 m), 2 schmal und fest (Baumstamm, Pfosten,
+## Mast: rund oder unter 0,8 m)
+func _obstacle_kind(c: KinematicCollision3D) -> int:
 	var cs := c.get_collider_shape() as CollisionShape3D
-	if cs == null or not cs.shape is BoxShape3D:
-		return false
+	if cs == null:
+		return 0
+	if cs.shape is CylinderShape3D:
+		return 2 if (cs.shape as CylinderShape3D).radius * cs.global_basis.get_scale().x < 1.0 else 0
+	if not cs.shape is BoxShape3D:
+		return 0
 	var sz: Vector3 = (cs.shape as BoxShape3D).size * cs.global_basis.get_scale()
-	return maxf(sz.x, sz.z) < 2.5
+	var big := maxf(sz.x, sz.z)
+	return 2 if big < 0.8 else (1 if big < 2.5 else 0)
 
 
 ## Nur für Tests: beschreibt, woran das Auto gestoßen ist (Form, Lage, nächste Wandfläche)

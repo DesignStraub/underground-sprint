@@ -15,6 +15,7 @@ extends Node
 ##   -- --block=d:spur     Spieler steht ab dem Start bei Strecke d auf Spur 0–3 und blockiert; gibt Abstände der
 ##                         Gegner zum Spieler und untereinander aus (Schiebe-Logik)
 ##   -- --bench            misst während des Rennens Bildzeit, GPU-Zeit und Draw Calls, gibt am Ende "BENCH ..." aus
+##   -- --revtest          Gas 4 s, Bremse 4 s (bis rückwärts), Gas 3 s: gibt alle 0,1 s Tempo, Gang und R aus
 ##   -- --fulltest         Autopilot fährt das ganze Rennen; meldet Hänger, Stürze, Fahrten neben der Strecke, Ruckler,
 ##                         hängende Gegner und das Ergebnis ("FT ..."), beendet sich 3 s nach dem Ziel
 ##   -- --branches         Autopilot nimmt jede Abkürzung (See, Gasse, Gabelung)
@@ -195,6 +196,8 @@ func _process(dt: float) -> void:
 		if not _placed and race.state == 1:
 			_placed = true
 			_place_at(race)
+	if OS.get_cmdline_user_args().has("--revtest") and race and "curve" in race and race.player and race.state == 1:
+		_revtest(race, dt)
 	if OS.get_cmdline_user_args().has("--handling") and race and "curve" in race and race.player and race.state == 1:
 		_handling(race, dt)
 		return
@@ -511,6 +514,8 @@ func _bench_report(race) -> void:
 		race.race["name"], GameState.preset, _bench.size(), sums[0] / n, med, worst[int(n * 0.99) - 1], sums[1] / n, sums[2] / n,
 		sums[6] / n, sums[7] / n, int(sums[3] / n), int(sums[4] / n), int(sums[5] / n / 1000.0), counts])
 	print("BENCH spikes=%d %s" % [spikes.size(), " ".join(spikes.slice(0, 40))])
+	print("BENCH vram=%dMB tex=%dMB buf=%dMB" % [Performance.get_monitor(Performance.RENDER_VIDEO_MEM_USED) / 1048576.0,
+		Performance.get_monitor(Performance.RENDER_TEXTURE_MEM_USED) / 1048576.0, Performance.get_monitor(Performance.RENDER_BUFFER_MEM_USED) / 1048576.0])
 
 
 ## --fulltest: Rennen mit dem Autopiloten durchfahren und alles Auffällige melden. Hängt das Auto, wird es wie mit
@@ -816,3 +821,25 @@ func _sweep(race) -> void:
 		_sw_f = 0
 		get_viewport().get_texture().get_image().save_png("%s_%05d_%s.png" % [prefix, int(d), "L" if side < 0.0 else "R"])
 		_sw_i += 1
+
+
+var _rt := -1.0
+
+
+## --revtest: Übergang Vorwärts – Bremse – Rückwärts – Gas prüfen
+func _revtest(race, dt: float) -> void:
+	if _rt < 0.0:
+		_rt = 0.0
+	_rt += dt
+	var phase := "gas" if _rt < 4.0 else ("bremse" if _rt < 9.0 else ("gas" if _rt < 13.0 else "aus"))
+	for a in ["accelerate", "brake"]:
+		Input.action_release(a)
+	if phase == "gas":
+		Input.action_press("accelerate")
+	elif phase == "bremse":
+		Input.action_press("brake")
+	if fmod(_rt, 0.25) < dt:
+		var pl = race.player
+		print("REV t=%.2f %s v=%.1f gang=%d R=%s" % [_rt, phase, pl.speed_fwd, pl.gear, pl.reverse_gear])
+	if _rt > 14.0:
+		get_tree().quit()

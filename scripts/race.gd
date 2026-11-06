@@ -41,7 +41,10 @@ var drift_idle := 0.0
 var drift_targets: Array = []  # Punkte für Platz 3, 2, 1
 var _last_crashes := 0
 var _last_walls := 0
-var _wall_bonus := false
+var _zones := []  # Drift-Bonuszonen: [von, bis, Seite] (Seite +1 rechts, -1 links)
+var _zone_mat: ShaderMaterial
+var _zone_k := 0.0
+var in_zone := false  # Spieler driftet gerade in einer Bonuszone
 var _near := {}  # Verkehrsautos, für die es schon einen Near Miss gab
 var _last_lap := 0
 var finish_order: Array = []  # "player" oder AI-Knoten in Zielreihenfolge
@@ -63,7 +66,6 @@ var _style_chain := 0.0  # laufender Drift im Rennen (Punkte, noch nicht gutgesc
 var _style_idle := 0.0
 var _style_crashes := 0
 var _style_walls := 0
-var _music_t := 0.0
 var pause_panel: Control
 var env: Environment
 var moon: DirectionalLight3D
@@ -129,6 +131,7 @@ func _ready() -> void:
 		# Drift: allein, Zielpunkte je nach Stufe, Schwierigkeit und Zahl der Kurven
 		var k: float = [1.0, 1.0, 1.35, 1.7][tier] * [0.65, 0.85, 1.0][diff] * track["laps"] * race.get("corners", 12) / 24.0
 		drift_targets = [int(700 * k / 10.0) * 10, int(1500 * k / 10.0) * 10, int(2600 * k / 10.0) * 10]
+		_build_drift_zones()
 	for i in (0 if event_type == "drift" else 3):
 		var id: String = pool[rng.randi() % pool.size()]
 		var cfg := {}
@@ -586,16 +589,6 @@ func _build_hud() -> void:
 		mm.offset_bottom = -8.0
 		hud["map"] = mm
 	# Musiktitel unten mittig, blendet nach ein paar Sekunden aus
-	hud["music"] = _label(root, 10, HORIZONTAL_ALIGNMENT_CENTER)
-	hud["music"].label_settings.font = UI.font("cond", 0.2)
-	hud["music"].anchor_left = 0.5
-	hud["music"].anchor_right = 0.5
-	hud["music"].anchor_top = 1.0
-	hud["music"].anchor_bottom = 1.0
-	hud["music"].offset_left = -160
-	hud["music"].offset_right = 160
-	hud["music"].offset_top = -17
-	hud["music"].offset_bottom = -3
 	hud["help"] = _label(root, 9, HORIZONTAL_ALIGNMENT_RIGHT)
 	hud["help"].set_anchors_preset(Control.PRESET_TOP_RIGHT)
 	hud["help"].position = Vector2(-250, 6)
@@ -845,19 +838,96 @@ func _update_drift(dt: float) -> void:
 	var kmh := player.velocity.length() * 3.6
 	if player.drifting and player.drift_angle >= 12.0 and kmh > 35.0 and not player.airborne:
 		var ang := clampf(player.drift_angle, 0.0, 60.0)
-		# Wand-Bonus: nah an der Bande driften zählt mehr
-		var wall_dist := Track.hw(track, player.progress) + 0.1 - absf(player.lateral) - 1.0
-		var bonus := wall_dist < 2.0
-		if bonus and not _wall_bonus:
-			_flash(tr("WAND-BONUS"), Color(0.4, 0.9, 1.0))
-		_wall_bonus = bonus
-		drift_chain += (ang - 10.0) * kmh / 100.0 * dt * (1.6 if bonus else 1.0)
+		# Bonuszone wie in Underground: am Außenrand der Kurven (leuchtender Streifen) zählt der Drift doppelt
+		in_zone = _in_drift_zone()
+		drift_chain += (ang - 10.0) * kmh / 100.0 * dt * (2.0 if in_zone else 1.0)
 		drift_chain_t += dt
 		drift_idle = 0.0
 	else:
+		in_zone = false
 		drift_idle += dt
 		if drift_chain > 0.0 and drift_idle > 1.2:
 			_bank_drift()
+	if _zone_mat:
+		_zone_k = move_toward(_zone_k, 1.0 if in_zone else 0.0, dt * 6.0)
+		_zone_mat.set_shader_parameter("active", _zone_k)
+
+
+## Bonuszonen: Außenrand jeder engeren Kurve (Radius unter 75 m) der Hauptstrecke, je ein leuchtender Streifen
+## von 2,4 m Breite an der Bande. Kurvenrichtung aus der Drehung der Fahrtrichtung über 10 m.
+func _build_drift_zones() -> void:
+	var curve: Curve3D = track["curve"]
+	var length := curve.get_baked_length()
+	var step := 2.0
+	var marks := []  # je Abtastpunkt: Seite des Außenrands oder 0
+	var d := 0.0
+	while d < length:
+		var fa := Track.frame_at(curve, d - 5.0)
+		var fb := Track.frame_at(curve, d + 5.0)
+		var turn: float = (fa["fwd"] as Vector3).signed_angle_to(fb["fwd"], Vector3.UP)  # > 0: Linkskurve
+		marks.append(0 if absf(turn) < 10.0 / 75.0 else (1 if turn > 0.0 else -1))
+		d += step
+	# zusammenhängende Stücke derselben Seite; kurze Lücken schließen, Stummel weglassen, an den Enden verlängern
+	var i := 0
+	while i < marks.size():
+		if marks[i] == 0:
+			i += 1
+			continue
+		var side: int = marks[i]
+		var j := i
+		while j + 1 < marks.size() and (marks[j + 1] == side or (marks[j + 1] == 0 and j + 5 < marks.size() and marks.slice(j + 1, j + 6).has(side))):
+			j += 1
+		if (j - i) * step >= 12.0:
+			_zones.append([maxf(i * step - 6.0, 0.0), minf(j * step + 8.0, length), side])
+		i = j + 1
+	if _zones.is_empty():
+		return
+	_zone_mat = ShaderMaterial.new()
+	_zone_mat.shader = preload("res://shaders/drift_zone.gdshader")
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for z in _zones:
+		var a: float = z[0]
+		var b: float = z[1]
+		var side: float = z[2]
+		var prev := []
+		var t := a
+		while true:
+			var f := Track.frame_at(curve, t)
+			var hw := Track.hw(track, t)
+			var fade := clampf(minf(t - a, b - t) / 5.0, 0.0, 1.0)
+			var row := []
+			for k in 2:
+				var lat: float = side * (hw - 2.6 + 2.4 * k)
+				var p: Vector3 = f["pos"] + (f["right"] as Vector3) * lat
+				row.append([Vector3(p.x, f["y"] + 0.04, p.z), Vector2(float(k), t), fade])
+			if not prev.is_empty():
+				for q in [[prev[0], prev[1], row[1]], [prev[0], row[1], row[0]]]:
+					for v in q:
+						st.set_color(Color(1, 1, 1, v[2]))
+						st.set_uv(v[1])
+						st.set_normal(Vector3.UP)
+						st.add_vertex(v[0])
+			prev = row
+			if t >= b:
+				break
+			t = minf(t + 1.5, b)
+	var mi := MeshInstance3D.new()
+	mi.mesh = st.commit()
+	mi.material_override = _zone_mat
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	world.add_child(mi)
+
+
+func _in_drift_zone() -> bool:
+	if player.path_id != 0:
+		return false
+	var d: float = fposmod(player.progress, (track["curve"] as Curve3D).get_baked_length()) if track["loop"] else player.progress
+	for z in _zones:
+		if d >= z[0] and d <= z[1]:
+			var edge := Track.hw(track, d) - absf(player.lateral)
+			return signf(player.lateral) == z[2] and edge < 3.2
+	return false
 
 
 ## Perfekter Start: wer bei GO die Drehzahl im grünen Bereich hält, schießt los. Zu viel Gas: Räder drehen durch.
@@ -921,19 +991,19 @@ func _update_hud() -> void:
 	info.bar_cars.clear()
 	for ai in ais:
 		info.bar_cars.append([(ai.total - track["start"]) / span, ai.get_meta("hud_col")])
-	# Tastenhilfe nur am Anfang, Musiktitel nur kurz nach dem Wechsel
+	# Tastenhilfe nur am Anfang (den Musiktitel zeigt music.gd kurz als Blase)
 	if state == State.RACING:
 		hud["help"].modulate.a = 0.7 * clampf((12.0 - race_time) / 1.5, 0.0, 1.0)
 	var tacho = hud["tacho"]
 	tacho.rpm = player.rpm
 	tacho.speed_kmh = int(absf(player.speed_fwd) * 3.6)
-	tacho.gear = "R" if player.speed_fwd < -0.5 else ("N" if state == State.COUNTDOWN or state == State.INTRO else str(player.gear))
+	tacho.gear = "R" if player.reverse_gear or player.speed_fwd < -0.5 else ("N" if state == State.COUNTDOWN or state == State.INTRO else str(player.gear))
 	tacho.nitro = player.nitro
 	tacho.heat = player.engine_heat
 	tacho.nitro_on = player.nitro_on
 	if event_type == "drift":
 		if drift_chain > 0.0:
-			hud["drift"].text = "x%d   %d" % [_drift_mult(), int(drift_chain)]
+			hud["drift"].text = "x%d   %d%s" % [_drift_mult(), int(drift_chain), tr("   ZONE x2") if in_zone else ""]
 		else:
 			var next := ""
 			for i in drift_targets.size():
@@ -958,12 +1028,6 @@ func _update_hud() -> void:
 	if event_type != "drift" and event_type != "drag":
 		_update_style(get_process_delta_time())
 	_update_feed(get_process_delta_time())
-	var mt: String = (tr("Musik: ") + Music.current_title) if Music.current_title != "" else tr("Keine Musik: mp3/ogg in den Ordner music/ legen")
-	if mt != hud["music"].text:
-		hud["music"].text = mt
-		_music_t = 6.0
-	_music_t = maxf(_music_t - get_process_delta_time(), 0.0)
-	hud["music"].modulate.a = clampf(_music_t / 0.8, 0.0, 1.0)
 
 
 func _unhandled_input(event: InputEvent) -> void:
