@@ -67,7 +67,7 @@ var drift_wins := 0
 var current_car := "kaizen"
 var race_index := 0
 var best_times := {}  # Rennname -> Sekunden
-var won_events: Array = []  # gewonnene Events (Karriere: ein Sieg öffnet das nächste)
+var won_events: Array = []  # gewonnene Events (Karriere: genug Siege in einer Stufe öffnen die nächste)
 var tuning := {}  # category -> option_index, für alle Autos gemeinsam
 var kept_cars: Array = []  # schon mit den alten Schwellen (bis 2.10) freigeschaltete Autos bleiben frei
 
@@ -298,9 +298,29 @@ func touch_ui() -> bool:
 	return is_mobile()
 
 
-## Karriere-Event i ist frei, wenn das vorige gewonnen wurde
-func career_unlocked(i: int) -> bool:
-	return i == 0 or (i < Catalog.CAREER.size() and Catalog.CAREER[i - 1] in won_events)
+## Siege in Stufe s
+func stage_wins(s: int) -> int:
+	var n := 0
+	for ev in Catalog.STAGES[s]["events"]:
+		if ev in won_events:
+			n += 1
+	return n
+
+
+## Stufe s ist offen, wenn die vorige offen ist und darin genug Siege stehen
+func stage_open(s: int) -> bool:
+	if s <= 0:
+		return true
+	return stage_open(s - 1) and stage_wins(s - 1) >= Catalog.STAGE_WINS
+
+
+## Karriere-Event frei: seine Stufe ist offen, oder es war nach der alten Kette (bis 2.15) schon offen
+func career_open(event_name: String) -> bool:
+	var s := Catalog.stage_of(event_name)
+	if s >= 0 and stage_open(s):
+		return true
+	var i := Catalog.CAREER_V1.find(event_name)
+	return i == 0 or (i > 0 and Catalog.CAREER_V1[i - 1] in won_events)
 
 
 func mark_won(event_name: String) -> void:
@@ -514,8 +534,8 @@ func load_game() -> void:
 	else:
 		# ältere Spielstände: so viele Karriere-Events gelten als gewonnen, wie es Siege gibt
 		won_events = []
-		for i in mini(wins + drift_wins, Catalog.CAREER.size()):
-			won_events.append(Catalog.CAREER[i])
+		for i in mini(wins + drift_wins, Catalog.CAREER_V1.size()):
+			won_events.append(Catalog.CAREER_V1[i])
 	vsync = bool(g.get("vsync", true))
 	fps_limit = clampi(int(g.get("fps", 0)), 0, FPS_LIMITS.size() - 1)
 	fullscreen = bool(g.get("fullscreen", false))

@@ -50,7 +50,7 @@ var _back := Callable()
 
 
 func _ready() -> void:
-	Music.toast_left = true
+	Music.toast_corner = true
 	_build_scene()
 	_build_ui()
 	if GameState.language == "":
@@ -64,6 +64,7 @@ func _build_scene() -> void:
 	view_layer.layer = -1
 	add_child(view_layer)
 	var pv := PixelView.new()
+	pv.showroom = true
 	view_layer.add_child(pv)
 	world = pv.world
 	var env := Environment.new()
@@ -598,57 +599,118 @@ func _setting_button(k: String) -> Button:
 	return b
 
 
-## Karriere wie in NFS: alle Events der Reihe nach, ein Sieg öffnet das nächste. Rechts die Deutschlandkarte.
+## Karriere wie in NFSU2: Stufen untereinander, alle Events einer offenen Stufe frei wählbar; drei Siege in einer
+## Stufe öffnen die nächste. Jede Zeile trägt rechts die Art als farbiges Abzeichen (Sprint cyan, Rundkurs grün,
+## Drag pink, Drift orange) und die Schwierigkeit als Rauten (golden, wenn gewonnen). Rechts die Deutschlandkarte.
 func _show_races() -> void:
 	_clear_menu()
 	_back = _show_main
 	_set_section("KARRIERE")
 	career_map.visible = true
-	var last_open := 0
-	for i in Catalog.CAREER.size():
-		var ev: String = Catalog.CAREER[i]
-		var ri := Catalog.race_index(ev)
-		var r: Dictionary = Catalog.RACES[ri]
-		var open := GameState.career_unlocked(i)
-		var txt := "%02d  %s  %s" % [i + 1, tr(ev), "*".repeat(r["tier"])]
-		if GameState.best_times.has(ev):
-			var best: float = GameState.best_times[ev]
-			txt += "   " + ("%d P" % int(best) if r["type"] == "drift" else "%d:%05.2f" % [int(best) / 60, fmod(best, 60.0)])
-		var idx := i
-		var b := _button(txt, func():
-			if GameState.career_unlocked(idx):
-				_start_race(ri)
-			else:
-				Sfx.play("thud", -14.0, 1.3))
-		if not open:
-			b.modulate = Color(1, 1, 1, 0.38)
-		else:
-			last_open = i
-		b.focus_entered.connect(func():
-			career_map.selected = ev
-			info.text = _career_info(idx))
+	var target: Control = null
+	var target_stage := -1
+	for s in Catalog.STAGES.size():
+		menu.add_child(_stage_header(s))
+		for ev in Catalog.STAGES[s]["events"]:
+			var name: String = ev
+			var ri := Catalog.race_index(name)
+			var r: Dictionary = Catalog.RACES[ri]
+			var open := GameState.career_open(name)
+			var won: bool = name in GameState.won_events
+			var b := _button(name, func():
+				if GameState.career_open(name):
+					_start_race(ri)
+				else:
+					Sfx.play("thud", -14.0, 1.3))
+			b.add_theme_font_size_override("font_size", 12)
+			b.clip_text = true
+			b.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+			_event_badge(b, r, won)
+			if not open:
+				b.modulate = Color(1, 1, 1, 0.38)
+			elif target == null or (not won and s > target_stage):
+				target = b
+				target_stage = s if not won else -1
+			b.focus_entered.connect(func():
+				career_map.selected = name
+				info.text = _career_info(name))
 	_button("< Zurück", _show_main)
 	_focus_first()
-	var target: Control = menu.get_child(last_open)
-	target.grab_focus.call_deferred()
-	# erst wenn die Liste ausgelegt ist, stimmt die Position: dann zum offenen Event scrollen
+	# Fokus auf das erste offene, noch nicht gewonnene Event der höchsten offenen Stufe
+	if target:
+		target.grab_focus.call_deferred()
+	# erst wenn die Liste ausgelegt ist, stimmt die Position: dann dorthin scrollen
 	await get_tree().process_frame
 	await get_tree().process_frame
 	if is_instance_valid(target) and target.is_inside_tree():
 		menu_scroll.ensure_control_visible(target)
 
 
-func _career_info(i: int) -> String:
-	var r: Dictionary = Catalog.RACES[Catalog.race_index(Catalog.CAREER[i])]
+## Überschrift einer Stufe: "STUFE 2 · SZENE" links, rechts "1/3 SIEGE" (offen, cyan), "FERTIG" (gold) oder
+## "GESPERRT" (grau)
+func _stage_header(s: int) -> Control:
+	var c := Control.new()
+	c.custom_minimum_size = Vector2(226, 22 if s > 0 else 16)
+	c.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var open := GameState.stage_open(s)
+	var w := GameState.stage_wins(s)
+	var done := w >= Catalog.STAGE_WINS
+	var col: Color = UI.GOLD if open and done else (UI.CYAN if open else Color(0.5, 0.53, 0.58))
+	var left := tr("STUFE %d · %s") % [s + 1, tr(Catalog.STAGES[s]["name"]).to_upper()]
+	var right := tr("GESPERRT") if not open else (tr("FERTIG") if done else tr("%d/%d SIEGE") % [w, Catalog.STAGE_WINS])
+	c.draw.connect(func():
+		var f := UI.font("cond", 0.2)
+		var y := c.size.y - 4.0
+		c.draw_string_outline(f, Vector2(2, y), left, HORIZONTAL_ALIGNMENT_LEFT, -1, 10, 3, Color(0, 0, 0, 0.9))
+		c.draw_string(f, Vector2(2, y), left, HORIZONTAL_ALIGNMENT_LEFT, -1, 10, col)
+		var rw := f.get_string_size(right, HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x
+		c.draw_string_outline(f, Vector2(c.size.x - rw - 4.0, y), right, HORIZONTAL_ALIGNMENT_LEFT, -1, 9, 3, Color(0, 0, 0, 0.9))
+		c.draw_string(f, Vector2(c.size.x - rw - 4.0, y), right, HORIZONTAL_ALIGNMENT_LEFT, -1, 9, col)
+		c.draw_rect(Rect2(2, c.size.y - 1.5, c.size.x - 4.0, 1.0), Color(col.r, col.g, col.b, 0.45)))
+	return c
+
+
+## Abzeichen der Event-Art rechts im Knopf; der Name wird davor gekürzt (Abstand rechts im Knopf-Stil)
+func _event_badge(b: Button, r: Dictionary, won: bool) -> void:
 	var rt: String = r["type"]
-	var head := "%s  ·  %s" % [r.get("town", ""), tr(Catalog.EVENT_TYPES[rt]["label"])]
+	var label := tr(Catalog.EVENT_TYPES[rt]["label"]).to_upper()
+	var tier: int = r.get("tier", 1)
+	var bw := UI.badge_width(label, 8, tier)
+	for st in ["normal", "hover", "focus", "pressed", "disabled"]:
+		var sb: StyleBox = b.get_theme_stylebox(st).duplicate()
+		sb.content_margin_right = bw + 12.0
+		b.add_theme_stylebox_override(st, sb)
+	var bd := Control.new()
+	bd.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bd.set_anchors_preset(Control.PRESET_FULL_RECT)
+	b.add_child(bd)
+	bd.draw.connect(func():
+		UI.draw_badge(bd, Vector2(bd.size.x - bw - 8.0, (bd.size.y - 11.0) / 2.0), rt, label, 8, tier, won))
+
+
+## Infotext zu einem Karriere-Event: Ort und Art, das Ziel, die Beschreibung, dann Stand (gesperrt, Bestwert)
+func _career_info(ev: String) -> String:
+	var r: Dictionary = Catalog.RACES[Catalog.race_index(ev)]
+	var rt: String = r["type"]
+	var head := "%s  ·  %s" % [r.get("town", ""), tr(Catalog.EVENT_TYPES[rt]["label"]).to_upper()]
 	if r.has("laps") and rt != "sprint":
 		head += "  ·  " + tr("%d Runden. ") % r["laps"]
-	var t := head + "\n" + tr(r.get("desc", Catalog.EVENT_TYPES[rt]["desc"]))
-	if not GameState.career_unlocked(i):
-		t = head + "\n" + tr("Gesperrt: gewinne zuerst %s.") % tr(Catalog.CAREER[i - 1])
-	elif Catalog.CAREER[i] in GameState.won_events:
-		t += "\n" + tr("Gewonnen")
+	var goal := tr(Catalog.EVENT_TYPES[rt]["goal"])
+	if rt == "circuit":
+		goal = goal % r.get("laps", 2)
+	elif rt == "drift":
+		var tg: Array = Catalog.drift_targets(r, GameState.difficulty)
+		goal = tr("%d Punkte für Platz 1 (Platz 3 ab %d).") % [tg[2], tg[0]]
+	var t := head + "\n" + tr("Ziel: ") + goal + "\n" + tr(r.get("desc", Catalog.EVENT_TYPES[rt]["desc"]))
+	var s := Catalog.stage_of(ev)
+	if not GameState.career_open(ev):
+		var left: int = Catalog.STAGE_WINS - GameState.stage_wins(s - 1)
+		t = head + "\n" + tr("Ziel: ") + goal + "\n" + (tr("Gesperrt: gewinne noch %d Event in Stufe %d." if left == 1 else
+			"Gesperrt: gewinne noch %d Events in Stufe %d.") % [left, s])
+	elif GameState.best_times.has(ev):
+		var best: float = GameState.best_times[ev]
+		var bt := ("%d P" % int(best)) if rt == "drift" else "%d:%05.2f" % [int(best) / 60, fmod(best, 60.0)]
+		t += "\n" + (tr("Gewonnen") + "  ·  " if ev in GameState.won_events else "") + tr("Bestwert: ") + bt
 	return t
 
 
@@ -921,4 +983,4 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _exit_tree() -> void:
-	Music.toast_left = false
+	Music.toast_corner = false

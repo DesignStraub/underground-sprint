@@ -18,6 +18,9 @@ var _last_drop_ms := 0.0  # Bildzeit vor dem letzten Absenken (bringt es etwas?)
 var _hold := 3.0  # Sekunden bis zur nächsten Änderung (am Anfang warten, bis Shader und Strecke geladen sind)
 var _cpu_bound := 0.0  # so lange nicht weiter senken
 var _calm := 0.0  # wie lange die Bildrate schon im Ziel liegt
+## Garage: nur ein Auto im Bild, also volle Fensterauflösung (bis 1440 Zeilen, Handy 900) und 4x MSAA (Handy 2x),
+## damit Felgen, Schrift und Kanten scharf sind; die Einstellung "3D-Auflösung" gilt erst im Rennen
+var showroom := false
 
 
 func _init() -> void:
@@ -56,9 +59,14 @@ func _resize() -> void:
 		return
 	if not GameState.gv("dynres"):
 		dyn_scale = 1.0
-	var scale := minf(1.0, GameState.gv("res") / maxf(px.y, 1.0)) * dyn_scale
-	world.size = Vector2i(maxi(int(px.x * scale), 16), maxi(int(px.y * scale), 16))
+	var lines: float = GameState.gv("res")
 	var aa: String = GameState.gv("aa")
+	if showroom:
+		var mobile := GameState.is_mobile()
+		lines = maxf(lines, 900.0 if mobile else 1440.0)
+		aa = "msaa2" if mobile else "msaa4"
+	var scale := minf(1.0, lines / maxf(px.y, 1.0)) * dyn_scale
+	world.size = Vector2i(maxi(int(px.x * scale), 16), maxi(int(px.y * scale), 16))
 	world.msaa_3d = {"msaa2": Viewport.MSAA_2X, "msaa4": Viewport.MSAA_4X}.get(aa, Viewport.MSAA_DISABLED)
 	world.screen_space_aa = Viewport.SCREEN_SPACE_AA_FXAA if aa == "fxaa" else Viewport.SCREEN_SPACE_AA_DISABLED
 	world.anisotropic_filtering_level = Viewport.ANISOTROPY_16X if GameState.gv("tex") == 1 else Viewport.ANISOTROPY_4X

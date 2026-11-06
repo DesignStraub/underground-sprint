@@ -5,7 +5,9 @@ extends AudioStreamPlayer
 ## mit Drehzahl und Gas; beim Gaswegnehmen bei hoher Drehzahl ploppt es ab und zu im Auspuff.
 ## Dazu leise: Turbo, Blow-off, Fahrtwind. Reifen und Nitro kommen aus eigenen Schleifen (tools/make_sfx.py):
 ## scrub.wav (Schrubben, schon bei leichtem Rutschen), skid.wav (Quietschen erst im echten Drift), nitro_on.wav
-## (Zünden) und nitro.wav (Fauchen, solange Nitro läuft).
+## (Zünden), nitro.wav (Fauchen, solange Nitro läuft) und nitro_off.wav (Abblasen beim Loslassen).
+## Die Schleifen laufen im Stream-Modus wie der Motor: im Browser spielt Godot sonst fertige Samples ab, deren
+## Lautstärke und Tonhöhe sich nicht zuverlässig in jedem Bild nachführen lassen.
 
 ## Abtastrate: am Rechner 22 kHz, auf Handy/Tablet die Hälfte (der Klang liegt ohnehin unter 1,5 kHz, und die
 ## Berechnung läuft Sample für Sample im Skript). k gleicht die Glättung je Sample an die Rate an.
@@ -82,6 +84,7 @@ func _ready() -> void:
 func _loop(sound: String) -> AudioStreamPlayer:
 	var a := Sfx.looping(sound)
 	a.volume_db = -80.0
+	a.playback_type = AudioServer.PLAYBACK_TYPE_STREAM
 	add_child(a)
 	a.play()
 	return a
@@ -194,27 +197,32 @@ func _update_skid(delta: float) -> void:
 	var speed_n := clampf(speed / 50.0, 0.0, 1.0)
 	for a in [_skid, _scrub]:
 		(a as AudioStreamPlayer).bus = bus
-	_skid.volume_db = -80.0 if _skid_k < 0.01 else linear_to_db(_skid_k) * 1.4 - 9.0
+	_skid.volume_db = -80.0 if _skid_k < 0.01 else linear_to_db(_skid_k) * 1.4 - 5.0
 	_skid.pitch_scale = 0.93 + 0.08 * _skid_k + 0.07 * speed_n
 	# Schrubben tritt zurück, wenn das Quietschen voll da ist
 	var scrub_lvl := _scrub_k * (1.0 - 0.45 * _skid_k) * (0.5 + 0.5 * speed_n)
-	_scrub.volume_db = -80.0 if scrub_lvl < 0.01 else linear_to_db(scrub_lvl) - 11.0
+	_scrub.volume_db = -80.0 if scrub_lvl < 0.01 else linear_to_db(scrub_lvl) - 7.5
 	_scrub.pitch_scale = 0.85 + 0.3 * speed_n
 
 
-## Nitro: beim Zünden ein Zischen mit dumpfem Stoß, danach Fauchen, solange es läuft; beim Loslassen kurz
-## ausklingen. Der Motor klingt dabei heller (Filter weiter offen).
+## Nitro: beim Zünden ein Zischen mit dumpfem Stoß, danach Fauchen, solange es läuft; beim Loslassen bläst es
+## kurz ab. Der Motor klingt dabei heller (Filter weiter offen). Bis 2.15 lag das Fauchen etwa so laut wie der
+## Motor und ging unter der Musik unter; jetzt steht es gut 4 dB darüber.
 func _update_nitro(delta: float) -> void:
 	if _nos == null:
 		return
 	if nitro and not _nos_was:
-		var a := Sfx.play("nitro_on", -2.0, randf_range(0.96, 1.04))
+		var a := Sfx.play("nitro_on", 1.0, randf_range(0.96, 1.04))
 		if a:
 			a.bus = bus
+	elif _nos_was and not nitro and _nos_k > 0.5:
+		var b := Sfx.play("nitro_off", -3.0, randf_range(0.95, 1.05))
+		if b:
+			b.bus = bus
 	_nos_was = nitro
 	_nos_k = move_toward(_nos_k, 1.0 if nitro else 0.0, delta * (5.0 if nitro else 3.0))
 	_nos.bus = bus
-	_nos.volume_db = -80.0 if _nos_k < 0.01 else linear_to_db(_nos_k) - 5.5
+	_nos.volume_db = -80.0 if _nos_k < 0.01 else linear_to_db(_nos_k) - 1.5
 	_nos.pitch_scale = 0.94 + 0.12 * clampf(speed / 75.0, 0.0, 1.0)
 
 

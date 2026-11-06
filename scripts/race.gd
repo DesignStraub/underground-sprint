@@ -129,8 +129,7 @@ func _ready() -> void:
 	var pool: Array = Catalog.CAR_ORDER.filter(func(id): return Catalog.CARS[id]["top_speed"] <= [0.0, 61.0, 70.0, 99.0][mini(tier + (1 if diff == 2 else 0), 3)])
 	if event_type == "drift":
 		# Drift: allein, Zielpunkte je nach Stufe, Schwierigkeit und Zahl der Kurven
-		var k: float = [1.0, 1.0, 1.35, 1.7][tier] * [0.65, 0.85, 1.0][diff] * track["laps"] * race.get("corners", 12) / 24.0
-		drift_targets = [int(700 * k / 10.0) * 10, int(1500 * k / 10.0) * 10, int(2600 * k / 10.0) * 10]
+		drift_targets = Catalog.drift_targets(race, diff)
 		_build_drift_zones()
 	for i in (0 if event_type == "drift" else 3):
 		var id: String = pool[rng.randi() % pool.size()]
@@ -184,6 +183,7 @@ func _ready() -> void:
 		hud_layer.visible = false
 		_build_title()
 		show.start_intro()
+		Music.hold_toast(true)
 	else:
 		show.ready_set()
 	if RenderingServer.get_current_rendering_method() == "gl_compatibility" and not OS.get_cmdline_user_args().has("--nowarmup"):
@@ -395,6 +395,7 @@ func _setup_hall() -> void:
 
 
 func _exit_tree() -> void:
+	Music.hold_toast(false)
 	if _reverb:
 		_reverb.wet = 0.0
 	if _lowpass:
@@ -462,6 +463,8 @@ func _setup_environment() -> void:
 
 
 ## Titel während des Kameraflugs: Eventname groß unten, darunter Art und Fahrerfeld
+## Startkarte während des Kameraflugs: farbiges Abzeichen der Art (wie in der Karriere-Liste), groß der Name,
+## darunter in der Farbe der Art das Ziel, ganz unten Ort, Fahrerzahl und "Gas/Enter: los"
 func _build_title() -> void:
 	title_layer = CanvasLayer.new()
 	title_layer.layer = 2
@@ -471,31 +474,78 @@ func _build_title() -> void:
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	title_layer.add_child(root)
 	var bar := ColorRect.new()
-	bar.color = Color(0, 0, 0, 0.55)
+	bar.color = Color(0, 0, 0, 0.6)
 	bar.anchor_top = 1.0
 	bar.anchor_right = 1.0
 	bar.anchor_bottom = 1.0
-	bar.offset_top = -64
+	bar.offset_top = -92
 	root.add_child(bar)
+	var col: Color = UI.TYPE_COL.get(event_type, UI.CYAN)
+	var line := ColorRect.new()
+	line.color = col
+	line.anchor_top = 1.0
+	line.anchor_right = 1.0
+	line.anchor_bottom = 1.0
+	line.offset_top = -93
+	line.offset_bottom = -91
+	root.add_child(line)
+	var kind := {"sprint": tr("SPRINT"), "circuit": tr("RUNDKURS · %d RUNDEN") % track["laps"], "drift": tr("DRIFT · %d RUNDEN") % track["laps"],
+		"drag": tr("DRAG")}
+	var badge_text: String = kind.get(event_type, "SPRINT")
+	var tier: int = race.get("tier", 1)
+	var bd := Control.new()
+	bd.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bd.anchor_top = 1.0
+	bd.anchor_right = 1.0
+	bd.anchor_bottom = 1.0
+	bd.offset_top = -86
+	bd.offset_bottom = -70
+	root.add_child(bd)
+	bd.draw.connect(func():
+		var w := UI.badge_width(badge_text, 11, tier)
+		UI.draw_badge(bd, Vector2((bd.size.x - w) / 2.0, 0.0), event_type, badge_text, 11, tier,
+			race["name"] in GameState.won_events))
 	var t := _label(root, 30, HORIZONTAL_ALIGNMENT_CENTER)
 	t.text = tr(race["name"]).to_upper()
 	t.anchor_top = 1.0
 	t.anchor_right = 1.0
 	t.anchor_bottom = 1.0
-	t.offset_top = -62
-	t.offset_bottom = -26
-	var kind := {"sprint": tr("SPRINT"), "circuit": tr("RUNDKURS · %d RUNDEN") % track["laps"], "drift": tr("DRIFT · %d RUNDEN") % track["laps"],
-		"drag": tr("DRAG · A/D SPUR · S/X SCHALTEN")}
-	var sub := _label(root, 11, HORIZONTAL_ALIGNMENT_CENTER)
-	sub.text = tr("%s   ·   %s   ·   Gas/Enter: los") % [kind.get(event_type, "SPRINT"), tr("ALLEIN" if event_type == "drift" else "4 FAHRER")]
+	t.offset_top = -70
+	t.offset_bottom = -34
+	var g := _label(root, 12, HORIZONTAL_ALIGNMENT_CENTER)
+	g.text = tr("ZIEL: ") + _goal_text().to_upper().trim_suffix(".")
+	g.label_settings.font_color = col
+	g.anchor_top = 1.0
+	g.anchor_right = 1.0
+	g.anchor_bottom = 1.0
+	g.offset_top = -34
+	g.offset_bottom = -18
+	var sub := _label(root, 9, HORIZONTAL_ALIGNMENT_CENTER)
+	var who := tr("ALLEIN") if event_type == "drift" else tr("4 FAHRER")
+	var keys := tr("A/D SPUR · S/X SCHALTEN") if event_type == "drag" else ""
+	var bits := [race.get("town", "").to_upper(), who]
+	if keys != "":
+		bits.append(keys)
 	if race.has("city"):
-		sub.text = tr("%s   ·   %s   ·   Karte © OpenStreetMap-Mitwirkende   ·   Gas/Enter: los") % [race.get("town", "").to_upper(), kind.get(event_type, "SPRINT")]
-	sub.modulate = Color(0.6, 0.85, 1.0)
+		bits.append(tr("Karte © OpenStreetMap-Mitwirkende"))
+	bits.append(tr("Gas/Enter: los"))
+	sub.text = "   ·   ".join(bits)
+	sub.modulate = Color(0.7, 0.85, 1.0)
 	sub.anchor_top = 1.0
 	sub.anchor_right = 1.0
 	sub.anchor_bottom = 1.0
-	sub.offset_top = -26
-	sub.offset_bottom = -8
+	sub.offset_top = -17
+	sub.offset_bottom = -4
+
+
+## Ziel des Events in einem Satz (Startkarte und Countdown)
+func _goal_text() -> String:
+	match event_type:
+		"circuit":
+			return tr(Catalog.EVENT_TYPES["circuit"]["goal"]) % track["laps"]
+		"drift":
+			return tr("%d Punkte für Platz 1 (Platz 3 ab %d).") % [drift_targets[2], drift_targets[0]]
+	return tr(Catalog.EVENT_TYPES.get(event_type, Catalog.EVENT_TYPES["sprint"])["goal"])
 
 
 func _label(parent: Node, size: int, align := HORIZONTAL_ALIGNMENT_LEFT) -> Label:
@@ -636,6 +686,20 @@ func _build_hud() -> void:
 	hud["center"].offset_right = 200
 	hud["center"].offset_top = -90
 	hud["center"].offset_bottom = 0
+	# Unter dem Countdown: Art und Ziel in der Farbe der Art, bis kurz nach dem Start
+	hud["goal"] = _label(root, 13, HORIZONTAL_ALIGNMENT_CENTER)
+	hud["goal"].label_settings.font = UI.font("cond", 0.2)
+	hud["goal"].label_settings.font_color = UI.TYPE_COL.get(event_type, UI.CYAN)
+	hud["goal"].text = tr(Catalog.EVENT_TYPES[event_type]["label"]).to_upper() + "  ·  " + _goal_text().to_upper().trim_suffix(".")
+	hud["goal"].anchor_left = 0.5
+	hud["goal"].anchor_right = 0.5
+	hud["goal"].anchor_top = 0.5
+	hud["goal"].anchor_bottom = 0.5
+	hud["goal"].offset_left = -260
+	hud["goal"].offset_right = 260
+	hud["goal"].offset_top = 2
+	hud["goal"].offset_bottom = 22
+	hud["goal"].visible = false
 
 	# Unten links über dem Radar (Drag: ohne Radar direkt in der Ecke; Handy: unter dem Radar oben links): Ort,
 	# Drift-Kette im Drift-Event, darüber die Punkte-Zeilen. In der Bildmitte steht nur Countdown und Ergebnis.
@@ -697,12 +761,14 @@ func _process(dt: float) -> void:
 				state = State.COUNTDOWN
 				hud_layer.visible = true
 				title_layer.queue_free()
+				Music.hold_toast(false)
 				player.cam.make_current()
 				show.ready_set()
 		State.COUNTDOWN:
 			countdown -= dt
 			var n := int(ceil(countdown - 1.0))
 			hud["center"].text = str(n) if n > 0 else tr("LOS!")
+			hud["goal"].visible = true
 			if countdown <= 1.0 and not player.controls_enabled:
 				player.controls_enabled = true
 				_launch_check()
@@ -716,6 +782,10 @@ func _process(dt: float) -> void:
 				countdown -= dt
 				if countdown <= 0.0:
 					hud["center"].text = ""
+			if hud["goal"].visible:
+				# Ziel noch gut zwei Sekunden nach dem Start stehen lassen, dann ausblenden
+				hud["goal"].modulate.a = clampf(1.0 - (race_time - 2.2) / 0.6, 0.0, 1.0)
+				hud["goal"].visible = race_time < 2.8
 		State.FINISHED:
 			pass
 
@@ -1110,13 +1180,17 @@ func _on_player_finished() -> void:
 		place = _place()
 	var unlocked := []
 	if place == 1:
-		var next_i: int = Catalog.CAREER.find(race["name"]) + 1
-		var opens_next := next_i > 0 and next_i < Catalog.CAREER.size() and not GameState.career_unlocked(next_i)
+		var stage := Catalog.stage_of(race["name"])
+		var nxt := stage + 1
+		var was_open := nxt < Catalog.STAGES.size() and GameState.stage_open(nxt)
 		GameState.mark_won(race["name"])
 		unlocked = GameState.register_win(event_type)
-		if opens_next:
-			var nr: Dictionary = Catalog.RACES[Catalog.race_index(Catalog.CAREER[next_i])]
-			unlocked.push_front(tr("Nächstes Event: ") + nr.get("town", "") + " · " + tr(nr["name"]))
+		if stage >= 0 and nxt < Catalog.STAGES.size():
+			if not was_open and GameState.stage_open(nxt):
+				unlocked.push_front(tr("STUFE %d: %d neue Events") % [nxt + 1, Catalog.STAGES[nxt]["events"].size()])
+			elif not was_open:
+				var left: int = Catalog.STAGE_WINS - GameState.stage_wins(stage)
+				unlocked.push_front(tr("Noch %d Sieg bis Stufe %d" if left == 1 else "Noch %d Siege bis Stufe %d") % [left, nxt + 1])
 	var key: String = race["name"]
 	var best: float = GameState.best_times.get(key, 0.0)
 	var new_best: bool

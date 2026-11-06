@@ -4,7 +4,7 @@ extends Node
 ## der nächste weich über. Ist die Liste einmal durch, wird neu gemischt (ohne denselben Track zweimal hintereinander).
 ## Die Tracks sind gleich laut gemacht (gemessen mit ffmpeg ebur128, Ziel -11 LUFS), Stille am Anfang und Ende wird
 ## übersprungen. Taste M springt mit kurzer Überblendung zum nächsten Track.
-## Beim Trackwechsel klappt unten in der Mitte kurz eine kleine Blase mit dem Titel auf und wieder zu (wie in NFS),
+## Beim Trackwechsel klappt unten in der Mitte (Garage: rechts unten) kurz eine kleine Blase mit dem Titel auf und wieder zu (wie in NFS),
 ## sonst steht der Titel nirgends. Auf Handy und Tablet bleibt sie weg (kleiner Bildschirm).
 
 signal track_changed(title: String)
@@ -44,7 +44,8 @@ var _toast_t := -1.0
 var _toast_title := ""
 var _toast_artist := ""
 var _toast_pending := false
-var toast_left := false  # Garage: Blase links unten (in der Mitte liegt dort das Infofeld)
+var _toast_hold := false
+var toast_corner := false  # Garage: Blase rechts unten in der Tastenleiste (links Menü, darüber das Infofeld)
 
 
 func _ready() -> void:
@@ -134,8 +135,19 @@ func set_paused(p: bool) -> void:
 		_start_toast()
 
 
+## Rennen: während der Startkarte (Kameraflug) keine Blase, sie käme der Karte unten in die Quere
+func hold_toast(h: bool) -> void:
+	_toast_hold = h
+	if not h and _toast_pending and not _paused:
+		_toast_pending = false
+		_start_toast()
+
+
 func _start_toast() -> void:
 	if GameState.is_mobile() or DisplayServer.get_name() == "headless":
+		return
+	if _toast_hold:
+		_toast_pending = true
 		return
 	_toast_t = 0.0
 	_toast.queue_redraw()
@@ -160,8 +172,9 @@ func _draw_toast() -> void:
 	var full := h + 8.0 + tw + 10.0
 	var w := lerpf(h, full, open) * lerpf(0.6, 1.0, pop)
 	var hh := h * lerpf(0.6, 1.0, pop)
-	var x0 := 14.0 if toast_left else (vs.x - w) / 2.0
-	var r := Rect2(Vector2(x0, vs.y - (46.0 if toast_left else 40.0) + (h - hh) / 2.0), Vector2(w, hh))
+	var y0 := vs.y - h - 0.5 if toast_corner else vs.y - 40.0
+	var x0 := vs.x - 12.0 - w if toast_corner else (vs.x - w) / 2.0
+	var r := Rect2(Vector2(x0, y0 + (h - hh) / 2.0), Vector2(w, hh))
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = Color(0.02, 0.03, 0.06, 0.72 * pop)
 	sb.border_color = Color(UI.GREEN.r, UI.GREEN.g, UI.GREEN.b, 0.55 * pop)

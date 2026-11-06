@@ -3,7 +3,7 @@ extends Node
 ## Sfx.play("thud") für einmalige Effekte, Sfx.looping("rumble") für Dauer-Sounds.
 
 const NAMES := ["horn", "bell", "rumble", "thud", "whoosh", "splash", "clang", "tunnel", "crowd", "skid", "scrub", "nitro",
-	"nitro_on"]
+	"nitro_on", "nitro_off"]
 
 var streams := {}
 

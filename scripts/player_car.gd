@@ -624,9 +624,24 @@ func _physics_process(dt: float) -> void:
 	audio.rpm = rpm
 	audio.throttle = 1.0 if nitro_on else (0.0 if finished else (_rev_s if reverse_gear else Input.get_action_strength("accelerate")))
 	audio.nitro = nitro_on
-	audio.slip = clampf((absf(l2) - 3.0) / 10.0, 0.0, 1.0) if spd > 5.0 and not airborne else 0.0
+	# Reifen (0..1): bis 2.15 nur aus dem Querrutschen in m/s – das reichte im normalen Rennen nie, selbst mit
+	# Handbremse rutscht das Auto bei Tempo nur 2–3 m/s quer. Jetzt wie in NFSU: der Rutschwinkel, Kurvenfahrt am
+	# Grip-Limit (Schrubben, leises Quietschen), Handbremse, Vollbremsung, Drift und durchdrehende Räder beim Start.
+	var tire := 0.0
+	if spd > 5.0 and not airborne:
+		var slip_ang := rad_to_deg(atan2(absf(l2), maxf(absf(speed_fwd), 1.0)))
+		var load := absf(yaw_now) * spd / maxf(lat_acc, 1.0)
+		tire = smoothstep(2.5, 12.0, slip_ang)
+		tire = maxf(tire, 0.5 * smoothstep(0.7, 1.0, load) * smoothstep(10.0, 20.0, spd))
+		if hb and spd > 8.0:
+			tire = maxf(tire, 0.8)
+		if brk > 0.6 and speed_fwd > 15.0 and not reverse_gear and not drag_mode:
+			tire = maxf(tire, 0.42 * brk)
+		if drifting:
+			tire = maxf(tire, 0.7)
 	if _launch_t < 0.0 and _thr_s > 0.5:
-		audio.slip = maxf(audio.slip, 0.7)
+		tire = maxf(tire, 0.7)
+	audio.slip = tire
 	audio.speed = spd
 
 

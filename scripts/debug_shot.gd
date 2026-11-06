@@ -20,6 +20,8 @@ extends Node
 ##                         hängende Gegner und das Ergebnis ("FT ..."), beendet sich 3 s nach dem Ziel
 ##   -- --branches         Autopilot nimmt jede Abkürzung (See, Gasse, Gabelung)
 ##   -- --audiolog         alle 0,25 s Gang/Drehzahl (gehört und für den Vortrieb), Driftwinkel, Reifenquietschen
+##   -- --sndtest          Gas, ab 3 s Nitro, ab 7 s Handbremsen-Drift; loggt Pegel von Nitro und Reifen ("snd ...").
+##                         Mit --write-movie aufnehmen, --nomusic für die Effekte allein, --sndtrace für jedes Bild
 ##   -- --lightlog         Größe und Aufbauzeit der Lichtkarte (Laternenlicht auf der Straße)
 ##   -- --lightpng=/pfad.png  speichert die Lichtkarte als Bild
 
@@ -201,8 +203,48 @@ func _process(dt: float) -> void:
 	if OS.get_cmdline_user_args().has("--handling") and race and "curve" in race and race.player and race.state == 1:
 		_handling(race, dt)
 		return
+	# --sndtest: Gas, dann Nitro, dann ein Drift auf der Geraden; loggt die Pegel von Nitro und Reifen
+	# (--nomusic: Musik aus, um die Effekte allein aufzunehmen)
+	if OS.get_cmdline_user_args().has("--sndtest") and race and "curve" in race and race.player and race.state == 1:
+		var pl = race.player
+		if OS.get_cmdline_user_args().has("--nomusic"):
+			for mp in Music._players:
+				mp.volume_db = -80.0
+		if _drift_t < 0.0:
+			_drift_t = 0.0
+		_drift_t += dt
+		for a in ["steer_left", "steer_right", "handbrake", "accelerate", "nitro"]:
+			Input.action_release(a)
+		var st := _drift_t
+		Input.action_press("accelerate")
+		if not pl.loc.is_empty() and (st < 7.0 or st > 9.6):
+			# außerhalb des Manövers in der Spur halten (sonst schrammt das Auto an der Wand)
+			var pth: Dictionary = race.track["paths"][pl.path_id]
+			var dl: float = pl.loc["d"] + 14.0 + absf(pl.speed_fwd) * 0.3
+			var fr := Track.frame_at(pth["curve"], dl)
+			var tg: Vector3 = fr["pos"] + fr["right"] * Track.lane_lat(race.track, dl, _lane)
+			var side: float = (tg - pl.global_position).dot(pl.global_basis.x)
+			if absf(side) > 0.2:
+				Input.action_press("steer_right" if side > 0.0 else "steer_left", clampf(absf(side) / 2.5, 0.0, 1.0))
+		if st > 3.0 and st < 6.0:
+			Input.action_press("nitro")
+		elif st > 7.0 and st < 7.35:
+			Input.action_press("handbrake")
+			Input.action_press("steer_left")
+		elif st > 7.35 and st < 8.6:
+			Input.action_press("steer_left", 0.5)
+		elif st > 8.6 and st < 9.6:
+			Input.action_press("steer_right", 0.6)
+		if st > 6.9 and st < 9.8 and OS.get_cmdline_user_args().has("--sndtrace"):
+			print("tr t=%.2f v=%.1f lat=%.1f steer=%.2f hold=%.2f winkel=%.0f wall_t=%.1f stun=%.2f hb=%s" % [st, pl.velocity.length(),
+				pl.speed_lat, pl.steer, pl._slip_hold, pl.drift_angle, pl._wall_t, pl.stun, Input.is_action_pressed("handbrake")])
+		if fmod(st, 0.2) < dt:
+			var au = pl.audio
+			print("snd t=%.1f v=%.1f nos=%s nos_db=%.1f slip=%.2f skid_db=%.1f scrub_db=%.1f winkel=%.0f" % [st,
+				pl.velocity.length(), pl.nitro_on, au._nos.volume_db, au.slip, au._skid.volume_db, au._scrub.volume_db,
+				pl.drift_angle])
 	# --slidetest: festes Drift-Manöver auf der Geraden (Fahrmodell prüfen): 0,25 s Handbremse + links, dann nur Gas
-	if OS.get_cmdline_user_args().has("--slidetest") and race and "curve" in race and race.player and race.state == 1:
+	elif OS.get_cmdline_user_args().has("--slidetest") and race and "curve" in race and race.player and race.state == 1:
 		var pl = race.player
 		if _drift_t < 0.0:
 			_drift_t = 0.0

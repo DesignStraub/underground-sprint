@@ -1,6 +1,6 @@
 extends Control
 ## Streckenkarte: Deutschland im Neon-Look, jede Stadt mit Events als Punkt. Gesperrt grau, frei grün, gewonnen gold,
-## die gewählte Stadt pulsiert und trägt ihren Namen. Die Karriere-Route verbindet die freien Städte der Reihe nach.
+## die gewählte Stadt pulsiert und trägt ihren Namen.
 ## Die Karte selbst zeichnet ein Kind-Element nur bei Größenänderung neu (die Umrisse sind teuer zu zerlegen),
 ## jedes Bild nur der Puls.
 
@@ -65,18 +65,14 @@ func _draw_map() -> void:
 			m.draw_polyline(pts, Color(UI.CYAN.r, UI.CYAN.g, UI.CYAN.b, 0.85), 1.4, true)
 	# Städte: Stand je Stadt (gewonnen > frei > gesperrt)
 	var towns := {}  # Stadt -> [Position, Stand]
-	var route := PackedVector2Array()
-	for i in Catalog.CAREER.size():
-		var r: Dictionary = Catalog.RACES[Catalog.race_index(Catalog.CAREER[i])]
+	for ev in Catalog.CAREER:
+		var r: Dictionary = Catalog.RACES[Catalog.race_index(ev)]
 		var p := _to_px(r["geo"].y, r["geo"].x)
 		var state := 0
-		if GameState.career_unlocked(i):
+		if GameState.career_open(ev):
 			state = 2 if r["name"] in GameState.won_events else 1
-			route.append(p)
 		var town: String = r.get("town", "")
 		towns[town] = [p, maxi(state, towns.get(town, [p, 0])[1])]
-	if route.size() >= 2:
-		m.draw_polyline(route, Color(UI.GREEN.r, UI.GREEN.g, UI.GREEN.b, 0.35), 1.0, true)
 	for town in towns:
 		var p: Vector2 = towns[town][0]
 		var st: int = towns[town][1]

@@ -7,6 +7,9 @@ const CYAN := Color(0.35, 0.85, 1.0)
 const PINK := Color(1.0, 0.25, 0.7)
 const GLASS := Color(0.02, 0.03, 0.06, 0.78)
 const SKEW := Vector2(0.28, 0.0)
+const GOLD := Color(1.0, 0.8, 0.25)
+## Farbe je Event-Art: überall gleich (Karriere-Liste, Startkarte, Ziel-Banner), damit man die Art auf einen Blick sieht
+const TYPE_COL := {"sprint": CYAN, "circuit": GREEN, "drift": Color(1.0, 0.55, 0.12), "drag": PINK}
 
 static var _theme: Theme
 static var _fonts := {}
@@ -136,3 +139,32 @@ static func fade_rect(parent: Control, col: Color, horizontal := true) -> Textur
 	tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	parent.add_child(tr)
 	return tr
+
+
+## Abzeichen der Event-Art: schräge Leiste in der Farbe der Art, darin das Wort dunkel; dahinter so viele kleine
+## Rauten, wie das Event schwer ist (tier 1–3), bei gewonnenen Events golden. Breite: badge_width().
+static func draw_badge(ci: CanvasItem, pos: Vector2, type: String, text: String, size: int, tier := 0, won := false) -> float:
+	var col: Color = TYPE_COL.get(type, CYAN)
+	var f := font("cond", 0.2)
+	var tw := f.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
+	var h := size + 3.0
+	var w := tw + 8.0
+	var sk := h * SKEW.x
+	var quad := PackedVector2Array([pos + Vector2(sk, 0), pos + Vector2(w + sk, 0), pos + Vector2(w, h), pos + Vector2(0, h)])
+	ci.draw_colored_polygon(quad, col)
+	quad.append(quad[0])
+	ci.draw_polyline(quad, Color(0, 0, 0, 0.75), 1.0)  # dunkler Rand: auch auf dem grünen Fokus-Knopf sichtbar
+	ci.draw_string(f, pos + Vector2(4.0 + sk * 0.5, h - 3.0), text, HORIZONTAL_ALIGNMENT_LEFT, -1, size, Color(0.02, 0.03, 0.05))
+	var x := pos.x + w + sk + 3.0
+	for i in tier:
+		var c := pos + Vector2(x - pos.x + 3.0 + i * 6.5, h / 2.0)
+		var r := 2.4
+		ci.draw_colored_polygon(PackedVector2Array([c + Vector2(0, -r), c + Vector2(r, 0), c + Vector2(0, r), c + Vector2(-r, 0)]),
+			GOLD if won else Color(0.9, 0.93, 1.0, 0.85))
+	return w + sk + (3.0 + tier * 6.5 + 2.0 if tier > 0 else 0.0)
+
+
+static func badge_width(text: String, size: int, tier := 0) -> float:
+	var tw := font("cond", 0.2).get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
+	var h := size + 3.0
+	return tw + 8.0 + h * SKEW.x + (3.0 + tier * 6.5 + 2.0 if tier > 0 else 0.0)

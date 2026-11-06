@@ -50,9 +50,19 @@ Nitro-Automat wird. In der Bildmitte steht nur noch Countdown und Ergebnis.
 ## Events
 **Karriere:** Garage → Rennen fahren zeigt alle 21 Events als Liste neben einer Deutschlandkarte. Jedes Event liegt in
 einer deutschen Stadt (die ausgedachten Strecken in Frankfurt, München, Hamburg, Köln, Leipzig …, die echten in ihren
-Orten). Freigeschaltet wird der Reihe nach: Wer ein Event gewinnt, öffnet das nächste. Auf der Karte sind gesperrte
-Städte grau, offene grün, gewonnene gold, die Route verbindet die offenen Städte, die gewählte pulsiert. Umriss: Natural
-Earth (gemeinfrei).
+Orten). Seit 2.16 in **fünf Stufen** wie in NFSU2 (Einstieg, Szene, Hafen und Altstadt, Großstadt, Finale, je 4–5
+Events, `Catalog.STAGES`): alle Events einer offenen Stufe sind gleichzeitig frei und in beliebiger Reihenfolge
+fahrbar, **3 Siege in einer Stufe** öffnen die nächste. Ein Event, das einem nicht liegt, kann man also auslassen.
+Jede Stufe mischt die Arten, die Schwierigkeit steigt von Stufe zu Stufe. Was nach der alten Kette (bis 2.15) schon
+offen war, bleibt offen. Auf der Karte sind gesperrte Städte grau, offene grün, gewonnene gold, die gewählte pulsiert.
+Umriss: Natural Earth (gemeinfrei).
+
+**Events auf einen Blick (seit 2.16):** jede Art hat ihre Farbe, überall gleich: Sprint cyan, Rundkurs grün, Drag
+pink, Drift orange (`UI.TYPE_COL`). In der Karriere-Liste trägt jede Zeile rechts ein Abzeichen der Art und die
+Schwierigkeit als Rauten (golden, wenn gewonnen), über jeder Stufe steht der Stand („1/3 SIEGE“, „FERTIG“,
+„GESPERRT“). Das Infofeld nennt Ort, Art, Runden, das **Ziel** in einem Satz (im Drift die Punkte für Platz 1 und 3)
+und den Bestwert. Die Startkarte während des Kameraflugs zeigt Abzeichen, Namen und Ziel in der Farbe der Art, im
+Countdown steht das Ziel noch einmal unter der Zahl und blendet gut zwei Sekunden nach dem Start aus.
 
 - **Sprint** (6): von A nach B gegen 3 Gegner.
 - **Rundkurs** (4): 2–3 Runden gegen 3 Gegner.
@@ -211,7 +221,7 @@ Skript), schreibt `scripts/city_data.gd`.
   seitlich abprallen, frontal oder beim Auffahren Dreher und kurz keine Kontrolle. Mittelstreifen laufen spitz aus.
 
 ## Fortschritt
-Kein Geld: Jeder 1. Platz zählt als Sieg. Ein Sieg öffnet das nächste Karriere-Event (`Catalog.CAREER`), Siege
+Kein Geld: Jeder 1. Platz zählt als Sieg. 3 Siege in einer Karriere-Stufe öffnen die nächste (`Catalog.STAGES`), Siege
 insgesamt schalten Autos und Tuningteile frei (Werte in `scripts/catalog.gd`). Die Grundteile der Optik sind von
 Anfang an frei, Besonderes (Chrom, Perlweiß, Kreuzspeichen, Monster-Flügel, Breitbau …) kommt mit Siegen. Gesperrte Teile kann man in der Garage
 als Vorschau ansehen. Alte Spielstände übernehmen ihre bisherigen Siege in die Karriere.
@@ -243,10 +253,16 @@ Reifenquietschen usw. sind synthetisch erzeugte WAVs in `assets/sfx/` (`python3 
   kein reiner Pfeifton mehr, sondern die Haft-Gleit-Schwingung der Reifen (rauer Sägezahn mit unruhiger Periode)
   durch die Resonanzen von Reifen und Karosserie (um 1,2 / 2,3 / 3,6 kHz), zwei Reifen fast gleich hoch (Schwebung
   statt Akkord, der nach Pfeife klang), dazu Rattern und Zischen. Beides setzt weich ein, wird mit dem Driftwinkel
-  lauter und mit Tempo etwas höher.
+  lauter und mit Tempo etwas höher. Seit 2.16 hängt es nicht mehr am Querrutschen in m/s (das reichte im normalen
+  Rennen nie: selbst mit Handbremse rutscht ein Auto bei Tempo nur 2–3 m/s quer, das Quietschen begann erst bei 6),
+  sondern am Rutschwinkel, an der Kurvenfahrt am Grip-Limit (Schrubben, leises Quietschen), an Handbremse,
+  Vollbremsung, Drift und durchdrehenden Rädern. Gut 3 dB lauter als vorher.
 - **Nitro (seit 2.14):** beim Zünden `nitro_on.wav` (Ventil-Klacken, dumpfer Stoß, aufschießendes Zischen und ein
-  Wusch), solange es läuft `nitro.wav` (Fauchen der Düsen, Brausen der Flamme, leiser Pfeifton); der Motor klingt
-  dabei heller. Der Motor schaltet im Drift nicht mehr herunter: Gang und
+  Wusch), solange es läuft `nitro.wav` (Fauchen der Düsen, Brausen der Flamme, leiser Pfeifton), beim Loslassen
+  `nitro_off.wav` (Abblasen, seit 2.16); der Motor klingt dabei heller. Seit 2.16 4 dB lauter: vorher lag das
+  Fauchen etwa so laut wie der Motor und ging unter der Musik unter, jetzt steht es im Hochton rund 10 dB über der
+  Musik. Reifen- und Nitro-Schleifen laufen im Stream-Modus wie der Motor (im Browser lassen sich fertige Samples nicht
+  zuverlässig in jedem Bild in Lautstärke und Tonhöhe nachführen). Der Motor schaltet im Drift nicht mehr herunter: Gang und
   Drehzahl, die man hört und sieht, richten sich nach dem Tempo über Grund, mit Gas dreht er durch die
   durchdrehenden Hinterräder hoch (bis knapp unter den Begrenzer). Der Vortrieb rechnet weiter mit dem Gang nach
   dem Tempo nach vorn, das Fahrverhalten bleibt also gleich.
@@ -275,7 +291,8 @@ Motor-Tuning), Tastenleiste unten, wechselnde Tipps oben rechts. Pause und Ergeb
 - **Drag:** neben dem Drehzahlmesser die Schalttasten und kurz das Ergebnis des letzten Schaltvorgangs.
 - **Sonstiges:** Die Tastenhilfe blendet nach 12 s aus. Den Musiktitel zeigt seit 2.15 eine kleine Blase unten in der
   Mitte: beim Trackwechsel ploppt sie mit einem Equalizer auf, klappt auf (Titel, darunter klein der Künstler) und
-  nach gut drei Sekunden wieder zu. Auf Handy und Tablet bleibt sie weg.
+  nach gut drei Sekunden wieder zu. Auf Handy und Tablet bleibt sie weg. Während der Startkarte wartet sie, bis die
+  Karte weg ist; in der Garage sitzt sie rechts unten in der Tastenleiste (links liegt die lange Karriere-Liste).
 
 <img src="update_bilder/anzeigen_vorher_nachher.jpg" alt="Anzeigen vorher und nachher" width="480">
 
@@ -316,6 +333,15 @@ Fahrwerk und Reifen auf Grip und Lenkung, das Fahrwerk legt das Auto tiefer; die
 Verlust (rot) gegenüber dem eingebauten Teil. Ab Werk: Bremsscheiben mit Sätteln (rot ab der ersten Leistungsstufe),
 Frontlippe, Diffusor, Chrom-Endrohre (größer ab Motor+Turbo 2), Ladeluftkühler im Einlass mit Turbo, Haubenschlitze
 mit Motor Stufe 3.
+
+**Feinere Teile (seit 2.16):** Reifen sind Drehkörper mit runden Schultern, leicht gewölbten Flanken und drei
+Profilrillen (36 Segmente statt eines Zylinders mit 14 Ecken). Bremsscheiben mit dunklem Topf und zwei versetzten
+Lochkreisen, kräftigere Sättel mit Deckplatte. Speichen an der Nabe breiter als am Horn, mit gefasten Kanten; Felgenhorn,
+Tiefbett und Zwischenringe mit 40 statt 16 Segmenten, große Scheiben (Felgen, Leuchten) runder. Heckflügel haben ein
+echtes Flügelprofil (oben flach, unten gewölbt) mit Abrisskante statt flacher Kästen. Damit Gegner in der Ferne nicht
+teurer werden, lässt die Fernansicht (LOD) Lochkreise, Schrift und Wischer weg und nimmt einen einfachen Reifen.
+Die Garage rendert die 3D-Welt in voller Fensterauflösung (bis 1440 Zeilen, Handy 900) mit 4x MSAA (Handy 2x),
+unabhängig von der Einstellung „3D-Auflösung“, die erst im Rennen gilt.
 
 ## Handy und Tablet (Browser)
 Auf Handy und Tablet erscheinen Knöpfe, am Rechner nicht (Einstellungen → Touch-Steuerung: Auto/An/Aus; Auto erkennt
@@ -407,7 +433,7 @@ dann steht „Benutzerdefiniert“ da. Werte in `GameState.GFX`.
   und in Championship-Weiß (Lack-Stufe „Werkslack“ ist je Auto eigen, `CARS.paint`). Front- und
   Heckschürze sind eigene Teile. Leuchten sind je ein Stück (`_lamp`): ein Feld auf der Stirnfläche und ein Streifen,
   der der Flanke auf gleicher Höhe um die Ecke folgt, so sitzen Rücklicht-Ecke und Band nie versetzt (vorher wirkte das
-  wie ein Auto im Auto). Türfugen, Spiegel, Griffe, Kennzeichen; Anbauteile der Schürzen werden mit der Karosserie
+  wie ein Auto im Auto). Türfugen, Spiegel, Griffe, Scheibenwischer, Kennzeichen mit Schrift („NF-G 86“); Anbauteile der Schürzen werden mit der Karosserie
   verschmolzen (~15 Draw Calls weniger je Auto) und sind auch in der Fernansicht zu sehen. Unterbodenneon ist ein Lichtteppich auf der Straße.
 - **Straße wie in Underground** (`shaders/road.gdshader`): dunkler, körniger Asphalt mit Splitt, Flecken, Rissen und
   Teerfugen aus einer nahtlosen Detail-Textur samt Normal-Map (8 x 8 m, eine zweite, gedrehte Lage gegen sichtbare

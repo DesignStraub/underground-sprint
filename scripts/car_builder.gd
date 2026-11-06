@@ -15,6 +15,7 @@ const FRONT_SEAM := 0.075  # Fuge Frontschürze (t)
 const REAR_SEAM := 0.94  # Fuge Heckschürze (t)
 
 static var _glow_tex: ImageTexture
+static var _mesh_cache := {}  # Reifen, Speichen, Flügel, Kennzeichen: einmal gebaut, von allen Autos geteilt
 
 ## t = Anteil der Länge von vorn (0) nach hinten (1), Höhen in Metern über dem Boden.
 ##   nose/hood: Bug-Oberkante und Haube an der Scheibe, cowl: Scheibenansatz, rf/rr: Dach von/bis,
@@ -352,7 +353,10 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 	var lens := mat(Color(0.25, 0.02, 0.02), 0.2, 0.25, Color(0.5, 0.0, 0.0), 0.5)  # Blende: dunkelrot, glimmt
 	var lamp := func(m: Material, y0: float, y1: float, x_in: float, t_wrap: float, off: float) -> void:
 		_lamp(rbm, S, W, L, flare, m, y0, y1, x_in, t_wrap, 1.0, off)
+	# Kennzeichen: Schild mit dunklem Rand und Schrift
 	_add(rbm, box(Vector3(0.33, 0.165, 0.01)), mat(Color(0.85, 0.85, 0.8), 0.0, 0.5), Vector3(0, CLEARANCE + 0.3, zr + 0.004))
+	_add(rbm, box(Vector3(0.342, 0.177, 0.006)), dark, Vector3(0, CLEARANCE + 0.3, zr + 0.001))
+	_near(_add(rbm, _plate_text(plate_text(car_id)), dark, Vector3(0, CLEARANCE + 0.296, zr + 0.0095)))
 	_add(rbm, box(Vector3(rw * 1.1, 0.07, 0.05)), dark, Vector3(0, CLEARANCE + 0.04, zr - 0.01))
 	for k in 5:  # Diffusor-Finnen
 		_add(rbm, box(Vector3(0.012, 0.09, 0.22)), dark, Vector3((k - 2) * rw * 0.22, CLEARANCE + 0.03, zr - 0.1))
@@ -491,6 +495,26 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 		_add(body, box(Vector3(0.1, 0.03, 0.04)), dark, Vector3(s * (ms[6].x + 0.04), ms[6].y + 0.04, mz))
 		_add(body, box(Vector3(0.05, 0.075, 0.14)), paint, Vector3(s * (ms[6].x + 0.1), ms[6].y + 0.06, mz))
 		_add(body, box(Vector3(0.012, 0.022, 0.1)), dark, Vector3(s * (hs[5].x * 0.4 + hs[6].x * 0.6 + 0.008), hs[6].y - 0.05, zf + (doors[1] - 0.035) * L))
+	# Scheibenwischer: zwei dunkle Blätter unten auf der Frontscheibe, der Neigung der Scheibe folgend
+	var t_w0: float = S["cowl"] + 0.006
+	var t_w1: float = S["cowl"] + 0.03
+	var y_w0 := _top_c(S, t_w0)
+	var y_w1 := _top_c(S, t_w1)
+	var w_slope := atan2(y_w1 - y_w0, (t_w1 - t_w0) * L)
+	var t_wb := t_w0 + 0.008
+	var wiper_m := mat(Color(0.09, 0.09, 0.1), 0.4, 0.45)  # etwas heller als das Glas, damit man sie sieht
+	var sec_w: PackedVector2Array = _section(S, t_wb, W, L, flare)["p"]
+	var half_w: float = sec_w[7].x
+	var blade := half_w * 0.62
+	for k in 2:
+		var wx := (-0.47 + k * 0.92) * half_w * 0.95
+		var xl := wx - blade / 2.0
+		var xr := wx + blade / 2.0
+		var yl := _top_y(sec_w, clampf(absf(xl) / half_w, 0.0, 1.0))
+		var yr := _top_y(sec_w, clampf(absf(xr) / half_w, 0.0, 1.0))
+		var ym := maxf((yl + yr) / 2.0, _top_y(sec_w, clampf(absf(wx) / half_w, 0.0, 1.0)))
+		var wp := _near(_add(body, box(Vector3(blade, 0.012, 0.016)), wiper_m, Vector3(wx, ym + 0.012, zf + t_wb * L)))
+		wp.rotation = Vector3(-w_slope, 0.0, atan2(yr - yl, blade))
 	if car_id == "vortex":
 		# Luftauslässe auf der Haube
 		var vs: PackedVector2Array = _section(S, 0.27, W, L, flare)["p"]
@@ -710,6 +734,7 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 	elif rc.has("color"):
 		rim_m = mat(rc["color"], 0.85 if rc.get("chrome", false) else 0.65, 0.14 if rc.get("chrome", false) else 0.28)
 	var rotor_m := mat(Color(0.42, 0.42, 0.44), 0.8, 0.35)
+	var hat_m := mat(Color(0.2, 0.2, 0.22), 0.7, 0.45)
 	var caliper_m := mat(Color(0.85, 0.06, 0.04), 0.3, 0.35) if perf > 0 else mat(Color(0.2, 0.2, 0.22), 0.5, 0.5)
 	var fronts := []
 	var spinners := []
@@ -723,26 +748,34 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 			root.add_child(pivot)
 			var spin := Node3D.new()
 			pivot.add_child(spin)
-			var tire := CylinderMesh.new()
-			tire.top_radius = WHEEL_R
-			tire.bottom_radius = WHEEL_R
-			tire.height = tw
-			tire.radial_segments = 14
-			_add(spin, tire, tire_m, Vector3.ZERO).rotation_degrees.z = 90
+			_near(_add(spin, _tire_mesh(tw), tire_m, Vector3.ZERO))
+			var far_tire := CylinderMesh.new()
+			far_tire.top_radius = WHEEL_R
+			far_tire.bottom_radius = WHEEL_R
+			far_tire.height = tw
+			far_tire.radial_segments = 16
+			far_tire.rings = 1
+			_far(_add(spin, far_tire, tire_m, Vector3.ZERO)).rotation_degrees.z = 90
 			# Schichten mit klarem Abstand (Reifen bis o, Bremsscheibe o + 0.004, Sattel o + 0.01, Speichen bis o + 0.025)
 			var closed: bool = rim.get("style", "std") in ["steel", "aero"]
 			if not closed:
-				var rotor := CylinderMesh.new()
-				rotor.top_radius = rim["radius"] * 0.8
-				rotor.bottom_radius = rim["radius"] * 0.8
-				rotor.height = 0.008
-				rotor.radial_segments = 14
-				_add(spin, rotor, rotor_m, Vector3(s * (o + 0.004), 0, 0)).rotation_degrees.z = 90
-				_add(spin, _disc(rim["radius"] * 0.26, 0.012), mat(Color(0.12, 0.12, 0.12), 0.6, 0.4), Vector3(s * (o + 0.02), 0, 0)).rotation_degrees.z = 90
-				# Bremssattel steht still (am Achsschenkel), oben hinten an der Scheibe
-				var cal := _add(pivot, box(Vector3(0.012, rim["radius"] * 0.42, 0.09)), caliper_m,
-					Vector3(s * (o + 0.013), rim["radius"] * 0.5, rim["radius"] * 0.38))
+				var rr: float = rim["radius"]
+				_add(spin, _disc(rr * 0.8, 0.008), rotor_m, Vector3(s * (o + 0.004), 0, 0)).rotation_degrees.z = 90
+				# Bremsscheibe: dunkler Topf in der Mitte, gelochter Reibring (zwei versetzte Lochkreise)
+				_add(spin, _disc(rr * 0.42, 0.01), hat_m, Vector3(s * (o + 0.006), 0, 0)).rotation_degrees.z = 90
+				for k in 16:
+					var ha := TAU * k / 16.0
+					var hr := rr * (0.56 if k % 2 == 0 else 0.68)
+					_near(_add(spin, _disc(0.0075, 0.004), dark, Vector3(s * (o + 0.0085), cos(ha) * hr, sin(ha) * hr))).rotation_degrees.z = 90
+				_add(spin, _disc(rr * 0.26, 0.012), mat(Color(0.12, 0.12, 0.12), 0.6, 0.4), Vector3(s * (o + 0.02), 0, 0)).rotation_degrees.z = 90
+				# Bremssattel steht still (am Achsschenkel), oben hinten an der Scheibe: kräftiger Block, der über den
+				# Reibring greift, außen eine schmalere Deckplatte
+				var cal := _add(pivot, box(Vector3(0.03, rr * 0.48, 0.1)), caliper_m,
+					Vector3(s * (o - 0.004), rr * 0.5, rr * 0.4))
 				cal.rotation_degrees.x = -40.0
+				var cap := _add(pivot, box(Vector3(0.006, rr * 0.36, 0.072)), caliper_m,
+					Vector3(s * (o + 0.013), rr * 0.5, rr * 0.4))
+				cap.rotation_degrees.x = -40.0
 			_rim(spin, rim, rim_m, dark, chrome, s, o)
 			spinners.append(spin)
 			if zi == -1:
@@ -753,6 +786,14 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 		_merge_parts(root, body, fronts, spinners, flames)
 		if lod:
 			_build_lod(root, flames, GameState.car_lod_distance())
+	# Ersatzteile der Fernansicht stecken jetzt im LOD-Mesh (oder werden ohne LOD nicht gebraucht)
+	var far := [root]
+	while not far.is_empty():
+		var nd: Node = far.pop_back()
+		far.append_array(nd.get_children())
+		if nd.has_meta("lod_only"):
+			nd.get_parent().remove_child(nd)
+			nd.free()
 	_set_layer(root)
 	root.set_meta("body", body)
 	root.set_meta("front_pivots", fronts)
@@ -762,6 +803,14 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 	root.set_meta("width", W)
 	root.set_meta("eye", Vector3(0, S["roof"] - 0.1, zf + (S["cowl"] + 0.07) * L))
 	return root
+
+
+## Kennzeichen je Auto (Kürzel für "Need for Geschwindigkeit", dahinter eine Nummer mit Bezug zum Vorbild)
+static func plate_text(car_id: String) -> String:
+	var nums := {"kaizen": "92", "hachi": "86", "sakura": "15", "hayate": "88", "kitsune": "18", "tsubame": "99",
+		"mirai": "240", "tenshi": "91", "kumo": "100", "raijin": "4", "vortex": "34", "ronin": "33", "shiden": "1",
+		"ryujin": "300", "kaze": "7"}
+	return "NF-G " + str(nums.get(car_id, str(absi(hash(car_id)) % 900 + 100)))
 
 
 ## Lackfarbe: "Werkslack" (Stufe 0) ist je Auto eigen (Kaizen in Championship-Weiß), sonst die gewählte Farbe
@@ -830,11 +879,182 @@ static func carbon_mat() -> StandardMaterial3D:
 
 ## Speiche von Radius r0 bis r1, Mitte bei Winkel a, Richtung a + tilt (tilt != 0: Speichen kreuzen oder laufen
 ## parallel versetzt). Die Radachse ist x.
+## Speiche: an der Nabe breiter und kräftiger, zum Horn hin schmaler (wie gegossen), Kanten leicht gefast
 static func _spoke(spin: Node3D, m: Material, x: float, a: float, r0: float, r1: float, w: float, tilt := 0.0, th := 0.012) -> MeshInstance3D:
 	var rm := (r0 + r1) / 2.0
-	var sk := _add(spin, box(Vector3(th, r1 - r0, w)), m, Vector3(x, cos(a) * rm, sin(a) * rm))
+	var ln := r1 - r0
+	var key := "spoke_%.4f_%.4f_%.4f" % [ln, w, th]
+	if not _mesh_cache.has(key):
+		_mesh_cache[key] = _spoke_mesh(ln, w, th)
+	var dir := Vector3(0, cos(a + tilt), sin(a + tilt))
+	var sk := _add(spin, _mesh_cache[key], m, Vector3(x, cos(a) * rm, sin(a) * rm) - dir * ln / 2.0)
 	sk.rotation.x = a + tilt
 	return sk
+
+
+## Speiche entlang +Y von 0 bis ln: Querschnitt achteckig gefast (Breite w quer, Dicke th nach außen), innen
+## 25 % breiter, außen 15 % schmaler; die Außenseite ist leicht gewölbt
+static func _spoke_mesh(ln: float, w: float, th: float) -> ArrayMesh:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var sec := func(y: float, k: float) -> Array:
+		var hw := w * k / 2.0
+		var ht := th / 2.0
+		var c := minf(hw, ht) * 0.45
+		return [Vector3(-ht, y, -hw + c), Vector3(-ht + c, y, -hw), Vector3(ht - c, y, -hw), Vector3(ht, y, -hw + c),
+			Vector3(ht + th * 0.15, y, 0.0), Vector3(ht, y, hw - c), Vector3(ht - c, y, hw), Vector3(-ht + c, y, hw), Vector3(-ht, y, hw - c)]
+	var lo: Array = sec.call(0.0, 1.25)
+	var hi: Array = sec.call(ln, 0.85)
+	var n := lo.size()
+	for i in n:
+		var j := (i + 1) % n
+		var mid: Vector3 = (lo[i] + lo[j]) / 2.0
+		var nf := Vector3(mid.x, 0.0, mid.z).normalized()
+		_tri(st, lo[i], hi[i], hi[j], nf, nf, nf, nf)
+		_tri(st, lo[i], hi[j], lo[j], nf, nf, nf, nf)
+	for cap in [[lo, Vector3.DOWN], [hi, Vector3.UP]]:
+		var ring: Array = cap[0]
+		var c0: Vector3 = ring[0]
+		for i in range(1, n - 1):
+			_tri(st, c0, ring[i], ring[i + 1], cap[1], cap[1], cap[1], cap[1])
+	return st.commit()
+
+
+## Reifen als Drehkörper um die X-Achse (bis 2.15 ein Zylinder mit 14 Ecken): runde Schultern, leicht gewölbte
+## Flanken, Lauffläche mit drei Längsrillen, 36 Segmente. Innen und außen geschlossen (hinter offenen Speichen dunkel).
+static func _tire_mesh(tw: float) -> ArrayMesh:
+	var key := "tire_%.3f" % tw
+	if _mesh_cache.has(key):
+		return _mesh_cache[key]
+	var R := WHEEL_R
+	var h := tw / 2.0
+	var side := [Vector2(-h, 0.0), Vector2(-h, R - 0.085), Vector2(-h - 0.005, R - 0.06), Vector2(-h - 0.006, R - 0.04),
+		Vector2(-h - 0.002, R - 0.02), Vector2(-h + 0.008, R - 0.007), Vector2(-h + 0.022, R)]
+	var prof: Array = side.duplicate()
+	var tread := h - 0.022
+	for g in [-0.5, 0.0, 0.5]:
+		var gc: float = g * tread
+		prof.append_array([Vector2(gc - 0.008, R), Vector2(gc - 0.006, R - 0.006), Vector2(gc + 0.006, R - 0.006), Vector2(gc + 0.008, R)])
+	for i in range(side.size() - 1, -1, -1):
+		prof.append(Vector2(-side[i].x, side[i].y))
+	# Normale je Profilabschnitt (nach außen), an weichen Knicken gemittelt
+	var segn := []
+	for i in prof.size() - 1:
+		var d: Vector2 = prof[i + 1] - prof[i]
+		segn.append(Vector2(-d.y, d.x).normalized())
+	var seg := 36
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for i in prof.size() - 1:
+		var p0: Vector2 = prof[i]
+		var p1: Vector2 = prof[i + 1]
+		if p0.distance_to(p1) < 1e-5:
+			continue
+		var n0: Vector2 = segn[i]
+		var n1: Vector2 = segn[i]
+		if i > 0 and segn[i - 1].dot(segn[i]) > 0.6:
+			n0 = (segn[i - 1] + segn[i]).normalized()
+		if i < segn.size() - 1 and segn[i + 1].dot(segn[i]) > 0.6:
+			n1 = (segn[i + 1] + segn[i]).normalized()
+		for k in seg:
+			var a0 := TAU * k / seg
+			var a1 := TAU * (k + 1) / seg
+			var P := func(p: Vector2, a: float) -> Vector3: return Vector3(p.x, p.y * cos(a), p.y * sin(a))
+			var N := func(nn: Vector2, a: float) -> Vector3: return Vector3(nn.x, nn.y * cos(a), nn.y * sin(a))
+			var am := (a0 + a1) / 2.0
+			var nf: Vector3 = N.call(segn[i], am)
+			var v00: Vector3 = P.call(p0, a0)
+			var v01: Vector3 = P.call(p0, a1)
+			var v10: Vector3 = P.call(p1, a0)
+			var v11: Vector3 = P.call(p1, a1)
+			if p0.y > 1e-5:
+				_tri(st, v00, v10, v11, N.call(n0, a0), N.call(n1, a0), N.call(n1, a1), nf)
+			if p1.y > 1e-5:
+				_tri(st, v00, v11, v01, N.call(n0, a0), N.call(n1, a1), N.call(n0, a1), nf)
+	var m := st.commit()
+	_mesh_cache[key] = m
+	return m
+
+
+## Flügelprofil entlang X (Spannweite), Sehne entlang Z (vorn = -Z): oben fast flach, unten gewölbt wie ein
+## umgedrehter Tragflügel, runde Nase, spitze Hinterkante. Ersetzt die flachen Kästen der Heckflügel.
+static func _airfoil(span: float, chord: float, thick: float) -> ArrayMesh:
+	var key := "wing_%.3f_%.3f_%.3f" % [span, chord, thick]
+	if _mesh_cache.has(key):
+		return _mesh_cache[key]
+	var pts := []  # (z, y), Nase -> oben -> Hinterkante -> unten -> Nase
+	var n := 8
+	for i in n + 1:
+		var t := float(i) / n
+		var x := (1.0 - cos(t * PI)) / 2.0  # dichter an der Nase
+		pts.append(Vector2(-chord / 2.0 + x * chord, thick * 0.32 * sqrt(maxf(x, 0.0)) * (1.0 - x) * 2.4))
+	for i in range(n - 1, 0, -1):
+		var t := float(i) / n
+		var x := (1.0 - cos(t * PI)) / 2.0
+		pts.append(Vector2(-chord / 2.0 + x * chord, -thick * 1.05 * sqrt(maxf(x, 0.0)) * (1.0 - x) * 2.2))
+	var c := pts.size()
+	var segn := []
+	for i in c:
+		var d: Vector2 = pts[(i + 1) % c] - pts[i]
+		segn.append(Vector2(-d.y, d.x).normalized())  # nach außen (Umlauf im Uhrzeigersinn in z/y)
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var hs := span / 2.0
+	for i in c:
+		var j := (i + 1) % c
+		var ni: Vector2 = segn[i]
+		var n_a: Vector2 = (segn[(i - 1 + c) % c] + ni).normalized() if segn[(i - 1 + c) % c].dot(ni) > 0.5 else ni
+		var n_b: Vector2 = (segn[j] + ni).normalized() if segn[j].dot(ni) > 0.5 else ni
+		var a0 := Vector3(-hs, pts[i].y, pts[i].x)
+		var a1 := Vector3(hs, pts[i].y, pts[i].x)
+		var b0 := Vector3(-hs, pts[j].y, pts[j].x)
+		var b1 := Vector3(hs, pts[j].y, pts[j].x)
+		var na := Vector3(0, n_a.y, n_a.x)
+		var nb := Vector3(0, n_b.y, n_b.x)
+		var nf := Vector3(0, ni.y, ni.x)
+		_tri(st, a0, b0, b1, na, nb, nb, nf)
+		_tri(st, a0, b1, a1, na, nb, na, nf)
+	for e in [-1.0, 1.0]:
+		var nx := Vector3(e, 0, 0)
+		for i in range(1, c - 1):
+			_tri(st, Vector3(e * hs, pts[0].y, pts[0].x), Vector3(e * hs, pts[i].y, pts[i].x), Vector3(e * hs, pts[i + 1].y, pts[i + 1].x), nx, nx, nx, nx)
+	# Abrisskante (Gurney-Flap) hinten oben: gibt dem Flügel auch von hinten Masse
+	_box_into(st, Vector3(0, thick * 0.55, chord / 2.0 - 0.004), Vector3(span, thick * 1.1, 0.008))
+	var m := st.commit()
+	_mesh_cache[key] = m
+	return m
+
+
+## Quader (Mitte, Größe) mit flachen Normalen in eine SurfaceTool
+static func _box_into(st: SurfaceTool, c: Vector3, sz: Vector3) -> void:
+	var h := sz / 2.0
+	for ax in 3:
+		for sg in [-1.0, 1.0]:
+			var n := Vector3.ZERO
+			n[ax] = sg
+			var u := Vector3.ZERO
+			var v := Vector3.ZERO
+			u[(ax + 1) % 3] = h[(ax + 1) % 3]
+			v[(ax + 2) % 3] = h[(ax + 2) % 3]
+			var f := c + n * h[ax]
+			_tri(st, f - u - v, f + u - v, f + u + v, n, n, n, n)
+			_tri(st, f - u - v, f + u + v, f - u + v, n, n, n, n)
+
+
+## Kennzeichen-Schrift (einmal je Text gebaut): dunkle Buchstaben, flach, Vorderseite nach +Z
+static func _plate_text(text: String) -> Mesh:
+	var key := "plate_" + text
+	if _mesh_cache.has(key):
+		return _mesh_cache[key]
+	var tm := TextMesh.new()
+	tm.text = text
+	tm.font = load("res://assets/fonts/D-DINCondensed-Bold.otf")
+	tm.font_size = 64
+	tm.pixel_size = 0.00125
+	tm.depth = 0.0
+	tm.curve_step = 1.5
+	_mesh_cache[key] = tm
+	return tm
 
 
 ## Felge je Bauart (Catalog rims.style) auf der Außenseite des Rads, s = Seite, o = halbe Reifenbreite.
@@ -868,8 +1088,8 @@ static func _rim(spin: Node3D, rim: Dictionary, rim_m: Material, dark: Material,
 				var ring := TorusMesh.new()
 				ring.inner_radius = rr * 0.5
 				ring.outer_radius = rr * 0.58
-				ring.rings = 16
-				ring.ring_segments = 4
+				ring.rings = 40
+				ring.ring_segments = 6
 				var rm := _add(spin, ring, rim_m, Vector3(x, 0, 0))
 				rm.rotation_degrees.z = 90
 				rm.scale = Vector3(1, 0.3, 1)
@@ -908,8 +1128,8 @@ static func _rim(spin: Node3D, rim: Dictionary, rim_m: Material, dark: Material,
 			var bed := TorusMesh.new()
 			bed.inner_radius = rr * 0.6
 			bed.outer_radius = rr
-			bed.rings = 18
-			bed.ring_segments = 4
+			bed.rings = 40
+			bed.ring_segments = 6
 			var bm := _add(spin, bed, chrome, Vector3(s * (o + 0.017), 0, 0))
 			bm.rotation_degrees.z = 90
 			bm.scale = Vector3(1, 0.12, 1)
@@ -941,8 +1161,8 @@ static func _rim(spin: Node3D, rim: Dictionary, rim_m: Material, dark: Material,
 		var lip := TorusMesh.new()
 		lip.inner_radius = rr * lip_in
 		lip.outer_radius = rr
-		lip.rings = 16
-		lip.ring_segments = 6
+		lip.rings = 40
+		lip.ring_segments = 8
 		var lm := _add(spin, lip, chrome if style == "dish" else rim_m, Vector3(s * (o + 0.016), 0, 0))
 		lm.rotation_degrees.z = 90
 		lm.scale = Vector3(1, 0.35, 1)
@@ -1007,20 +1227,20 @@ static func _spoiler(body: Node3D, S: Dictionary, W: float, L: float, flare: flo
 			for s in [-1, 1]:
 				_add(body, box(Vector3(0.035, 0.1, 0.08)), dark, Vector3(s * (W / 2.0 - 0.42), deck_y + 0.05, wz + 0.03))
 				_add(body, box(Vector3(0.02, 0.08, 0.3)), paint, Vector3(s * (W / 2.0 - 0.16), deck_y + 0.12, wz + 0.04))
-			_add(body, box(Vector3(W - 0.32, 0.035, 0.27)), paint, Vector3(0, deck_y + 0.11, wz + 0.04)).rotation_degrees.x = -6
+			_add(body, _airfoil(W - 0.32, 0.27, 0.035), paint, Vector3(0, deck_y + 0.11, wz + 0.04)).rotation_degrees.x = -6
 		6:
 			var hgt := 0.32
 			for s in [-1, 1]:
 				_add(body, box(Vector3(0.04, hgt + 0.06, 0.06)), dark, Vector3(s * 0.32, deck_y + (hgt + 0.06) / 2.0, wz + 0.17))
 				_add(body, box(Vector3(0.04, 0.04, 0.2)), dark, Vector3(s * 0.32, deck_y + hgt + 0.06, wz + 0.08))
 				_add(body, box(Vector3(0.03, 0.2, 0.42)), paint, Vector3(s * (W / 2.0 - 0.05), deck_y + hgt - 0.02, wz + 0.02))
-			_add(body, box(Vector3(W - 0.1, 0.04, 0.36)), paint, Vector3(0, deck_y + hgt, wz + 0.02)).rotation_degrees.x = -8
+			_add(body, _airfoil(W - 0.1, 0.36, 0.04), paint, Vector3(0, deck_y + hgt, wz + 0.02)).rotation_degrees.x = -8
 		7:
 			for s in [-1, 1]:
 				_add(body, box(Vector3(0.05, 0.24, 0.1)), dark, Vector3(s * (W / 2.0 - 0.4), deck_y + 0.12, wz))
 				_add(body, box(Vector3(0.03, 0.26, 0.46)), paint, Vector3(s * (W / 2.0 - 0.04), deck_y + 0.3, wz + 0.02))
-			_add(body, box(Vector3(W - 0.08, 0.04, 0.34)), paint, Vector3(0, deck_y + 0.24, wz)).rotation_degrees.x = -5
-			_add(body, box(Vector3(W - 0.08, 0.03, 0.2)), paint, Vector3(0, deck_y + 0.38, wz + 0.1)).rotation_degrees.x = -14
+			_add(body, _airfoil(W - 0.08, 0.34, 0.04), paint, Vector3(0, deck_y + 0.24, wz)).rotation_degrees.x = -5
+			_add(body, _airfoil(W - 0.08, 0.2, 0.03), paint, Vector3(0, deck_y + 0.38, wz + 0.1)).rotation_degrees.x = -14
 		8:
 			if car_id == "kaizen":
 				return  # hat ab Werk einen Dachspoiler
@@ -1034,7 +1254,7 @@ static func _spoiler(body: Node3D, S: Dictionary, W: float, L: float, flare: flo
 		9:
 			for s in [-1, 1]:
 				_add(body, box(Vector3(0.07, 0.25, 0.16)), paint, Vector3(s * (W / 2.0 - 0.25), deck_y + 0.09, wz + 0.03)).rotation_degrees.x = 20
-			_add(body, box(Vector3(W - 0.4, 0.04, 0.27)), paint, Vector3(0, deck_y + 0.21, wz + 0.08)).rotation_degrees.x = -5
+			_add(body, _airfoil(W - 0.4, 0.27, 0.04), paint, Vector3(0, deck_y + 0.21, wz + 0.08)).rotation_degrees.x = -5
 
 
 ## Motorhauben 1–6 (5 = Kohlefaser ist nur Haut, siehe _skin): Hutze, Lamellen, NACA-Einlass, Doppelhutze
@@ -1131,8 +1351,10 @@ static func _merge_parts(root: Node3D, body: Node3D, fronts: Array, spinners: Ar
 	var canon := {}
 	for g in [root, body] + fronts + spinners:
 		var buckets := {}
-		collect_static(g, Transform3D.IDENTITY, stops, canon, buckets, func(_mi, _xf): return 0)
-		merge_buckets(g, buckets)
+		collect_static(g, Transform3D.IDENTITY, stops, canon, buckets, func(mi, _xf): return 1 if mi.has_meta("near_only") else 0)
+		for mi in merge_buckets(g, buckets):
+			if mi.get_meta("merge_extra", 0) == 1:
+				mi.set_meta("near_only", true)
 
 
 ## Fernansicht: das ganze Auto als eine Fläche in Vertexfarben, dazu je eine Fläche für Leuchtteile. Ab dist
@@ -1141,8 +1363,19 @@ static func _build_lod(root: Node3D, flames: Array, dist: float) -> void:
 	var stops := {}
 	for f in flames:
 		stops[f] = true
+	# Fernansicht ohne feine Details, mit den einfachen Ersatzteilen
+	var swap := []
+	var all := [root]
+	while not all.is_empty():
+		var nd: Node = all.pop_back()
+		all.append_array(nd.get_children())
+		if nd is MeshInstance3D and (nd.has_meta("near_only") or nd.has_meta("lod_only")):
+			swap.append(nd)
+			(nd as MeshInstance3D).visible = nd.has_meta("lod_only")
 	var buckets := {}
 	collect_static(root, Transform3D.IDENTITY, stops, {}, buckets, func(_mi, _xf): return 0)
+	for nd in swap:
+		(nd as MeshInstance3D).visible = nd.has_meta("near_only")
 	var mesh := ArrayMesh.new()
 	var pos := PackedVector3Array()
 	var nrm := PackedVector3Array()
@@ -1718,12 +1951,18 @@ static func mat(c: Color, metal := 0.0, rough := 0.5, emit := Color.BLACK, emit_
 
 
 ## Flache Scheibe (runde Lampe)
+## Flache Scheibe; große Scheiben runder (Felgen, Bremsen, Leuchten), kleine bleiben sparsam (Radmuttern)
 static func _disc(r: float, h: float) -> CylinderMesh:
+	var key := "disc_%.4f_%.4f" % [r, h]
+	if _mesh_cache.has(key):
+		return _mesh_cache[key]
 	var c := CylinderMesh.new()
 	c.top_radius = r
 	c.bottom_radius = r
 	c.height = h
-	c.radial_segments = 12
+	c.radial_segments = 36 if r >= 0.1 else (20 if r >= 0.03 else 12)
+	c.rings = 1
+	_mesh_cache[key] = c
 	return c
 
 
@@ -1731,6 +1970,20 @@ static func box(size: Vector3) -> BoxMesh:
 	var b := BoxMesh.new()
 	b.size = size
 	return b
+
+
+## Feines Detail nur für die Nahansicht (Fernansicht/LOD lässt es weg): Bremsscheiben-Löcher, Schrift, Wischer,
+## der runde Reifen. Beim Verschmelzen bleibt es in eigenen Flächen, damit _build_lod es erkennt.
+static func _near(mi: MeshInstance3D) -> MeshInstance3D:
+	mi.set_meta("near_only", true)
+	return mi
+
+
+## Ersatz nur für die Fernansicht (z. B. Reifen mit 16 Ecken); unsichtbar, bis _build_lod ihn einsammelt
+static func _far(mi: MeshInstance3D) -> MeshInstance3D:
+	mi.set_meta("lod_only", true)
+	mi.visible = false
+	return mi
 
 
 static func _add(parent: Node3D, mesh: Mesh, m: Material, pos: Vector3) -> MeshInstance3D:

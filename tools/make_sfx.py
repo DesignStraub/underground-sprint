@@ -392,11 +392,34 @@ def nitro_on():
     return out
 
 
+def nitro_off():
+    """Nitro abblasen (Loslassen): kurzes, helles Zischen aus dem Ventil, das schnell dumpfer und leiser wird,
+    dazu ein leises Ploppen im Auspuff. 0,6 s."""
+    rng = random.Random(47)
+    n = secs(0.6)
+    nz = [rng.uniform(-1.0, 1.0) for _ in range(n)]
+    fcs = [7000.0 * math.exp(-(i / SR) * 5.0) + 900.0 for i in range(n)]
+    hiss = _norm(_hp(lp_var(nz, fcs), 700.0))
+    out = []
+    ph = 0.0
+    for i in range(n):
+        t = i / SR
+        env = min(1.0, t / 0.01) * math.exp(-t * 6.5)
+        f = 70.0 + 40.0 * math.exp(-t * 25.0)
+        ph += 2.0 * math.pi * f / SR
+        pop = math.sin(ph) * math.exp(-(t - 0.04) ** 2 / 0.0006) * 0.5
+        out.append(hiss[i] * env + pop)
+    k = secs(0.08)
+    for i in range(k):
+        out[n - k + i] *= 1.0 - i / k
+    return out
+
+
 SOUNDS = {
     "horn": (horn, 0.89), "bell": (bell_loop, 0.7), "rumble": (rumble_loop, 0.89), "thud": (thud, 0.89),
     "whoosh": (whoosh, 0.7), "splash": (splash, 0.89), "clang": (clang, 0.75), "tunnel": (tunnel, 0.8),
     "crowd": (crowd_loop, 0.6), "skid": (skid_loop, 0.8), "scrub": (scrub_loop, 0.8), "nitro": (nitro_loop, 0.8),
-    "nitro_on": (nitro_on, 0.89),
+    "nitro_on": (nitro_on, 0.89), "nitro_off": (nitro_off, 0.85),
 }
 
 if __name__ == "__main__":

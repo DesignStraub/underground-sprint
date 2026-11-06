@@ -86,12 +86,12 @@ const EN := {
 	"Stufe 3": "Stage 3",
 	# --- Events ---
 	"Sprint": "Sprint", "Rundkurs": "Circuit", "Drag": "Drag", "Drift": "Drift", "Städte": "Cities",
-	"Von A nach B gegen 3 Gegner. Gabelungen und Abkürzungen: du entscheidest. * ohne Verkehr, ** wenig, *** voll.":
-		"Point to point against 3 rivals. Forks and shortcuts: your call. * no traffic, ** light, *** heavy.",
-	"2 Runden gegen 3 Gegner. Wer die beste Linie findet, gewinnt. * ohne Verkehr, ** wenig, *** voll.":
-		"2 laps against 3 rivals. Best line wins. * no traffic, ** light, *** heavy.",
-	"Allein auf der Strecke. Querfahren gibt Punkte, Ketten geben Multiplikator, Crash kostet die Kette.":
-		"Alone on the track. Going sideways scores points, chains build a multiplier, a crash costs the chain.",
+	"Von A nach B gegen 3 Gegner. Gabelungen und Abkürzungen: du entscheidest. Rauten: 1 ohne Verkehr, 2 wenig, 3 voll.":
+		"Point to point against 3 rivals. Forks and shortcuts: your call. Diamonds: 1 no traffic, 2 light, 3 heavy.",
+	"Rundkurs gegen 3 Gegner. Wer die beste Linie findet, gewinnt. Rauten: 1 ohne Verkehr, 2 wenig, 3 voll.":
+		"Circuit against 3 rivals. Best line wins. Diamonds: 1 no traffic, 2 light, 3 heavy.",
+	"Allein auf der Strecke. Querfahren gibt Punkte, Ketten geben Multiplikator, die leuchtenden Zonen am Kurvenrand zählen doppelt, ein Crash kostet die Kette.":
+		"Alone on the track. Sliding earns points, chains build a multiplier, the glowing zones on the outside of corners count double, a crash costs the chain.",
 	"Geradeaus gegen 3 Gegner, das Auto fährt wie auf Schienen. A/D wechselt die Spur, S schaltet hoch, X runter: im grünen Bereich perfekt. Zu lange im Begrenzer: Motorschaden. Crash mit Verkehr: Totalschaden.":
 		"Straight line against 3 rivals, the car runs as if on rails. A/D changes lanes, S shifts up, X down: perfect in the green zone. Too long on the limiter: blown engine. Hit traffic: totaled.",
 	"Echte Straßen aus Aachen, Würzburg, Bad Kissingen, Tauberbischofsheim und Hammelburg, die Wahrzeichen stehen an ihrem Platz. Kartendaten © OpenStreetMap-Mitwirkende.":
@@ -211,6 +211,20 @@ const EN := {
 	"Zeigt oben in der Mitte Bildrate und aktuelle 3D-Auflösung.": "Shows frame rate and current 3D resolution at the top.",
 	"STRECKE WIRD VORBEREITET": "PREPARING TRACK",
 	"ÜBERSCHLAG!": "ROLLOVER!",
+	"Als Erster von A nach B.": "First from A to B.",
+	"Nach %d Runden als Erster über die Linie.": "First across the line after %d laps.",
+	"Die meisten Driftpunkte: die Marke für Platz 1 steht am Start.": "Most drift points: the mark for 1st place is shown at the start.",
+	"Als Erster über die Linie: perfekt schalten, dem Verkehr ausweichen.": "First across the line: shift perfectly, dodge the traffic.",
+	"Einstieg": "Rookie", "Szene": "Scene", "Hafen und Altstadt": "Harbor and old town", "Großstadt": "Big city", "Finale": "Finale",
+	"STUFE %d · %s": "STAGE %d · %s", "GESPERRT": "LOCKED", "FERTIG": "DONE", "%d/%d SIEGE": "%d/%d WINS",
+	"%d Punkte für Platz 1 (Platz 3 ab %d).": "%d points for 1st place (3rd from %d).",
+	"Ziel: ": "Goal: ", "ZIEL: ": "GOAL: ", "Bestwert: ": "Best: ",
+	"Gesperrt: gewinne noch %d Event in Stufe %d.": "Locked: win %d more event in stage %d.",
+	"Gesperrt: gewinne noch %d Events in Stufe %d.": "Locked: win %d more events in stage %d.",
+	"STUFE %d: %d neue Events": "STAGE %d: %d new events",
+	"Noch %d Sieg bis Stufe %d": "%d more win to stage %d", "Noch %d Siege bis Stufe %d": "%d more wins to stage %d",
+	"A/D SPUR · S/X SCHALTEN": "A/D LANE · S/X SHIFT", "DRAG": "DRAG",
+	"Karte © OpenStreetMap-Mitwirkende": "Map © OpenStreetMap contributors", "Gas/Enter: los": "Throttle/Enter: go",
 	"KARRIERE": "CAREER", "Nächstes Event: ": "Next event: ", "Gesperrt: gewinne zuerst %s.": "Locked: win %s first.",
 	"Gewonnen": "Won", "KIEZ": "KIEZ", "Berlin Kreuzberg": "Berlin Kreuzberg",
 	"Unter der Hochbahn der U1 durch die Skalitzer Straße, über die Oberbaumbrücke, an der East Side Gallery entlang und über die Schillingbrücke zurück zum Kotti.":

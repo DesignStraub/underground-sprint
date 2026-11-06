@@ -483,17 +483,49 @@ const RACES := [
 ]
 
 const EVENT_TYPES := {
-	"sprint": {"label": "Sprint", "desc": "Von A nach B gegen 3 Gegner. Gabelungen und Abkürzungen: du entscheidest. * ohne Verkehr, ** wenig, *** voll."},
-	"circuit": {"label": "Rundkurs", "desc": "2 Runden gegen 3 Gegner. Wer die beste Linie findet, gewinnt. * ohne Verkehr, ** wenig, *** voll."},
-	"drift": {"label": "Drift", "desc": "Allein auf der Strecke. Querfahren gibt Punkte, Ketten geben Multiplikator, Crash kostet die Kette."},
-	"drag": {"label": "Drag", "desc": "Geradeaus gegen 3 Gegner, das Auto fährt wie auf Schienen. A/D wechselt die Spur, S schaltet hoch, X runter: im grünen Bereich perfekt. Zu lange im Begrenzer: Motorschaden. Crash mit Verkehr: Totalschaden."},
+	"sprint": {"label": "Sprint", "goal": "Als Erster von A nach B.", "desc": "Von A nach B gegen 3 Gegner. Gabelungen und Abkürzungen: du entscheidest. Rauten: 1 ohne Verkehr, 2 wenig, 3 voll."},
+	"circuit": {"label": "Rundkurs", "goal": "Nach %d Runden als Erster über die Linie.", "desc": "Rundkurs gegen 3 Gegner. Wer die beste Linie findet, gewinnt. Rauten: 1 ohne Verkehr, 2 wenig, 3 voll."},
+	"drift": {"label": "Drift", "goal": "Die meisten Driftpunkte: die Marke für Platz 1 steht am Start.", "desc": "Allein auf der Strecke. Querfahren gibt Punkte, Ketten geben Multiplikator, die leuchtenden Zonen am Kurvenrand zählen doppelt, ein Crash kostet die Kette."},
+	"drag": {"label": "Drag", "goal": "Als Erster über die Linie: perfekt schalten, dem Verkehr ausweichen.", "desc": "Geradeaus gegen 3 Gegner, das Auto fährt wie auf Schienen. A/D wechselt die Spur, S schaltet hoch, X runter: im grünen Bereich perfekt. Zu lange im Begrenzer: Motorschaden. Crash mit Verkehr: Totalschaden."},
 }
 const TYPE_ORDER := ["sprint", "circuit", "drag", "drift"]
-## Karriere: so werden die Events nacheinander freigeschaltet (Sieg im vorigen Event öffnet das nächste)
+## Karriere in Stufen wie in NFSU2: alle Events einer Stufe sind gleichzeitig offen und in beliebiger Reihenfolge
+## fahrbar. STAGE_WINS Siege in einer Stufe öffnen die nächste, ein Event, das einem nicht liegt, kann man also
+## auslassen. Jede Stufe mischt die Arten, die Schwierigkeit steigt von Stufe zu Stufe.
+const STAGES := [
+	{"name": "Einstieg", "events": ["Bankenviertel-Sprint", "Tauberbischofsheim Altstadt", "Hafenmeile", "Bad Kissingen Kurmeile"]},
+	{"name": "Szene", "events": ["Prachtallee-Sprint", "Innenstadtring", "Hafen-Drift", "Hammelburg Saaleck"]},
+	{"name": "Hafen und Altstadt", "events": ["Hafenrunde", "Neon-Gerade", "Aachen Grabenring", "Altstadt-Hügel", "Hafenring"]},
+	{"name": "Großstadt", "events": ["Altstadtring", "Berlin Kreuzberg", "Schnellstraßen-Sprint", "Stadion-Drift"]},
+	{"name": "Finale", "events": ["Schnellstraßen-Drag", "Hafen-Sprint", "Nachtschicht", "Würzburg Mainufer"]},
+]
+const STAGE_WINS := 3
+## Alle Karriere-Events Stufe für Stufe (Reihenfolge der Liste in der Garage)
 const CAREER := ["Bankenviertel-Sprint", "Tauberbischofsheim Altstadt", "Hafenmeile", "Bad Kissingen Kurmeile",
+	"Prachtallee-Sprint", "Innenstadtring", "Hafen-Drift", "Hammelburg Saaleck",
+	"Hafenrunde", "Neon-Gerade", "Aachen Grabenring", "Altstadt-Hügel", "Hafenring",
+	"Altstadtring", "Berlin Kreuzberg", "Schnellstraßen-Sprint", "Stadion-Drift",
+	"Schnellstraßen-Drag", "Hafen-Sprint", "Nachtschicht", "Würzburg Mainufer"]
+## Bis 2.15 eine Kette (ein Sieg öffnete das nächste Event): was danach schon offen war, bleibt offen
+const CAREER_V1 := ["Bankenviertel-Sprint", "Tauberbischofsheim Altstadt", "Hafenmeile", "Bad Kissingen Kurmeile",
 	"Prachtallee-Sprint", "Innenstadtring", "Hafenrunde", "Hammelburg Saaleck", "Neon-Gerade", "Aachen Grabenring",
 	"Hafen-Drift", "Altstadt-Hügel", "Hafenring", "Altstadtring", "Berlin Kreuzberg", "Schnellstraßen-Sprint",
 	"Schnellstraßen-Drag", "Hafen-Sprint", "Stadion-Drift", "Nachtschicht", "Würzburg Mainufer"]
+
+
+## Drift: Punkte für Platz 3, 2, 1 je nach Stufe, Schwierigkeit und Zahl der Kurven
+static func drift_targets(r: Dictionary, diff: int) -> Array:
+	var tier: int = r.get("tier", 1)
+	var k: float = [1.0, 1.0, 1.35, 1.7][tier] * [0.65, 0.85, 1.0][diff] * r.get("laps", 2) * r.get("corners", 12) / 24.0
+	return [int(700 * k / 10.0) * 10, int(1500 * k / 10.0) * 10, int(2600 * k / 10.0) * 10]
+
+
+## Stufe (0..) eines Karriere-Events, -1 wenn es in keiner steht
+static func stage_of(event_name: String) -> int:
+	for i in STAGES.size():
+		if event_name in STAGES[i]["events"]:
+			return i
+	return -1
 
 
 static func race_index(name: String) -> int:

@@ -32,19 +32,19 @@ Per `release/push_itch.sh` (butler): Kanäle windows, mac, linux, html5.
 
 **Need for Geschwindigkeit** – Street-Racing bei Nacht, im Geist der frühen 2000er.
 
-Fahr dich in der Karriere quer durch Deutschland: 21 Events von Hamburg bis München, jeder Sieg öffnet die nächste
-Stadt. Sechs Strecken folgen echten Straßen – Aachen, Würzburg, Bad Kissingen, Tauberbischofsheim, Hammelburg und
+Fahr dich in der Karriere quer durch Deutschland: 21 Events von Hamburg bis München in fünf Stufen, du wählst selbst,
+welche du fährst. Sechs Strecken folgen echten Straßen – Aachen, Würzburg, Bad Kissingen, Tauberbischofsheim, Hammelburg und
 Berlin-Kreuzberg, mit Dom, Residenz, Festung, Oberbaumbrücke und Hochbahn an ihrem echten Platz.
 
 **Features**
-- Karriere mit Deutschlandkarte: 21 Events, eins nach dem anderen freischalten
+- Karriere mit Deutschlandkarte: 21 Events in fünf Stufen, drei Siege öffnen die nächste – die Reihenfolge wählst du
 - Sprint, Rundkurs, Drag (auf Schienen mit Spurwechsel und Handschaltung), Drift (mit Bonuszonen am Kurvenrand) – sechs Strecken auf echten Straßen (OpenStreetMap)
 - Jede Stadt mit eigener Stimmung: Regen auf nasser Fahrbahn, Nebel, Natriumlicht, Dämmerung, Neon, Kiez
 - Tunnel, Hochbahn, Bahnübergang mit Zug, Brücken, Abkürzungen, Verkehr in beide Richtungen
 - Abkürzungen als Lichttunnel aus Neonbögen, Sprünge mit echter Flugphase, Überschläge bei harten Crashs, umfahrbare Laternen und Schilder
 - Sprungkamera wie in Underground: Bei großen Sprüngen fängt dich eine Kamera schräg von vorn ein, in leichter Zeitlupe
 - Asphalt wie damals: körnig, mit Rissen, Teerfugen und Radspuren, Lichtkreise unter jeder Laterne, nass spiegeln sich Laternen und Rücklichter; Gehwege aus Betonplatten, Kopfsteinpflaster in den Altstädten
-- Tempogefühl wie in Underground: Bewegungsunschärfe am Bildrand, Tempo-Zoom, Reifenquietschen im Drift – alles einzeln abschaltbar
+- Tempogefühl wie in Underground: Bewegungsunschärfe am Bildrand, Tempo-Zoom, Reifenquietschen in Kurven und Drifts, fauchendes Nitro – alles einzeln abschaltbar
 - 15 JDM-Autos in fünf Leistungsklassen (die letzten fünf gleich stark, aber jedes mit eigenem Charakter) mit Front-, Heck-, Mittelmotor- oder Allradantrieb, Tuning wie in NFS, ein Satz Teile für alle Autos: Optik (21 Lacke mit Matt, Perlmutt und Chrom, 13 Felgenarten mit eigener Felgenfarbe, Spoiler, Bodykits, Motorhauben mit Kohlefaser, Auspuff, Folien, Neon, Scheiben, Scheinwerfer) und Leistung (Motor, Turbo, Nitro, Fahrwerk, Reifen)
 - Kein Geld, kein Grind: Siege schalten Teile und Autos frei
 - Schwierigkeit Leicht / Normal / Schwer: Leicht zum entspannten Kennenlernen der Städte
