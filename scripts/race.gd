@@ -192,7 +192,8 @@ func _ready() -> void:
 
 ## Im Browser (WebGL) übersetzt die Grafikkarte jeden Shader erst, wenn er zum ersten Mal im Bild ist; mitten im
 ## Rennen ruckelt das spürbar. Deshalb vor dem Start hinter einem Ladebild: unsichtbare Kameras fahren die Strecke
-## in beide Richtungen ab und schauen auf die Autos (Nitroflammen kurz an), bis alles einmal gezeichnet wurde.
+## in beide Richtungen ab und schauen auf die Autos (Nitroflammen und Rad-Unschärfe kurz an), bis alles einmal
+## gezeichnet wurde.
 var _warming := false
 
 
@@ -239,7 +240,7 @@ func _warmup() -> void:
 	for car in [player] + ais:
 		var back: Vector3 = car.global_transform.basis.z
 		views.append([car.global_position + back * 7.0 + Vector3(0, 2.0, 0), car.global_position])
-		for fl in car.model.get_meta("flames"):
+		for fl in car.model.get_meta("flames") + car.model.get_meta("blurs", []):
 			if not fl.visible:
 				fl.visible = true
 				flames.append(fl)

@@ -205,6 +205,34 @@ const CAR_ORDER := ["kaizen", "chibi", "hachi", "hotaru", "sakura", "kaido", "ha
 const LEGACY_UNLOCK := {"hachi": {"race": 1, "drift": 1}, "mirai": {"race": 2, "drift": 1}, "sakura": {"drift": 1},
 	"tsubame": {"race": 3}, "vortex": {"race": 5}, "raijin": {"race": 7}, "ronin": {"drift": 3}, "kaze": {"race": 9, "drift": 4}}
 
+## Werksfelge je Auto (Felgen "Serie"): [Bauart, Speichen, Farbe, Zoll ab Werk, Radmuttern]. Ältere und kleine Autos
+## rollen auf kleinen Felgen mit hohem Reifen, die Exoten auf großen.
+const FACTORY_RIMS := {
+	"kaizen": ["std", 7, Color(0.76, 0.77, 0.8), 15, 4],
+	"chibi": ["cap", 8, Color(0.72, 0.73, 0.75), 13, 4],
+	"hachi": ["holes", 8, Color(0.78, 0.79, 0.81), 14, 4],
+	"hotaru": ["turbine", 9, Color(0.8, 0.81, 0.83), 14, 4],
+	"sakura": ["split", 5, Color(0.76, 0.77, 0.8), 16, 4],
+	"kaido": ["rally", 8, Color(0.55, 0.38, 0.16), 14, 4],
+	"hayate": ["std", 5, Color(0.8, 0.81, 0.84), 15, 5],
+	"kitsune": ["y", 5, Color(0.26, 0.27, 0.29), 15, 4],
+	"tsubame": ["concave", 5, Color(0.8, 0.81, 0.84), 16, 5],
+	"hakone": ["steel", 6, Color(0.5, 0.51, 0.53), 14, 4],
+	"mirai": ["split", 7, Color(0.3, 0.31, 0.33), 18, 5],
+	"tanuki": ["ten", 10, Color(0.07, 0.07, 0.075), 18, 5],
+	"tenshi": ["mesh", 8, Color(0.78, 0.79, 0.81), 15, 4],
+	"kumo": ["thin", 12, Color(0.8, 0.81, 0.84), 16, 5],
+	"raijin": ["rally", 6, Color(0.8, 0.62, 0.22), 17, 5],
+	"vortex": ["te", 6, Color(0.24, 0.25, 0.27), 18, 5],
+	"ronin": ["std", 5, Color(0.8, 0.81, 0.84), 17, 5],
+	"shiden": ["concave", 7, Color(0.78, 0.79, 0.82), 17, 5],
+	"ryujin": ["sickle", 10, Color(0.8, 0.81, 0.84), 17, 5],
+	"kaze": ["y", 5, Color(0.8, 0.81, 0.84), 18, 5],
+	"kagura": ["ten", 10, Color(0.24, 0.25, 0.27), 20, 5],
+	"falke": ["clover", 5, Color(0.84, 0.85, 0.87), 18, 5],
+	"furia": ["holes", 5, Color(0.72, 0.6, 0.32), 19, 5],
+}
+
 ## Jede Kategorie: Liste von Optionen {name, wins, ...}. Neue Optionen kommen hinten dazu, damit die Nummern im
 ## Spielstand gültig bleiben. Optik: die Grundteile sind von Anfang an frei, Besonderes kommt mit Siegen.
 const PARTS := {
@@ -235,23 +263,50 @@ const PARTS := {
 			{"name": "Chrom", "wins": 8, "color": Color(0.85, 0.86, 0.88), "finish": "chrome"},
 		],
 	},
-	# style: Bauart der Felge (car_builder._rim), spokes: Zahl der Speichen, radius: Felgengröße
+	# style: Bauart der Felge (car_builder._rim), spokes: Zahl der Speichen (bzw. Löcher, Schlitze), plus: so viel Zoll
+	# größer als die Werksfelge des Autos ist die Felge in ihrer Standardgröße (Kategorie "Zoll" ändert das).
+	# "Serie" ist die Werksfelge des jeweiligen Autos (FACTORY_RIMS).
 	"rims": {
 		"label": "Felgen",
 		"options": [
-			{"name": "Serie", "wins": 0, "color": Color(0.62, 0.63, 0.66), "radius": 0.22, "spokes": 7, "style": "std"},
-			{"name": "Fünfspeichen", "wins": 0, "color": Color(0.85, 0.85, 0.9), "radius": 0.27, "spokes": 5, "style": "std"},
-			{"name": "Gitter Gold", "wins": 1, "color": Color(0.85, 0.65, 0.2), "radius": 0.28, "spokes": 10, "style": "mesh"},
-			{"name": "Tiefbett Schwarz", "wins": 2, "color": Color(0.08, 0.08, 0.08), "radius": 0.29, "spokes": 6, "style": "dish"},
-			{"name": "Doppelspeichen", "wins": 0, "color": Color(0.78, 0.79, 0.82), "radius": 0.27, "spokes": 5, "style": "split"},
-			{"name": "Y-Speichen", "wins": 0, "color": Color(0.46, 0.47, 0.5), "radius": 0.28, "spokes": 5, "style": "y"},
-			{"name": "Mehrspeichen", "wins": 0, "color": Color(0.8, 0.8, 0.83), "radius": 0.28, "spokes": 16, "style": "thin"},
-			{"name": "Stahlfelge", "wins": 0, "color": Color(0.1, 0.1, 0.11), "radius": 0.22, "spokes": 6, "style": "steel"},
-			{"name": "Turbine", "wins": 1, "color": Color(0.82, 0.83, 0.86), "radius": 0.27, "spokes": 12, "style": "turbine"},
-			{"name": "Rennsport-Sechs", "wins": 2, "color": Color(0.62, 0.42, 0.16), "radius": 0.29, "spokes": 6, "style": "te"},
-			{"name": "Kreuzspeichen", "wins": 3, "color": Color(0.85, 0.65, 0.25), "radius": 0.29, "spokes": 8, "style": "cross"},
-			{"name": "Aero-Scheibe", "wins": 4, "color": Color(0.9, 0.9, 0.9), "radius": 0.27, "spokes": 5, "style": "aero"},
-			{"name": "Tiefbett Stern", "wins": 5, "color": Color(0.85, 0.86, 0.9), "radius": 0.3, "spokes": 5, "style": "dish"},
+			{"name": "Serie", "wins": 0, "color": Color(0.62, 0.63, 0.66), "plus": 0, "spokes": 7, "style": "std"},
+			{"name": "Fünfspeichen", "wins": 0, "color": Color(0.85, 0.85, 0.9), "plus": 2, "spokes": 5, "style": "std"},
+			{"name": "Gitter Gold", "wins": 1, "color": Color(0.85, 0.65, 0.2), "plus": 2, "spokes": 10, "style": "mesh"},
+			{"name": "Tiefbett Schwarz", "wins": 2, "color": Color(0.08, 0.08, 0.08), "plus": 2, "spokes": 6, "style": "dish"},
+			{"name": "Doppelspeichen", "wins": 0, "color": Color(0.78, 0.79, 0.82), "plus": 2, "spokes": 5, "style": "split"},
+			{"name": "Y-Speichen", "wins": 0, "color": Color(0.46, 0.47, 0.5), "plus": 2, "spokes": 5, "style": "y"},
+			{"name": "Mehrspeichen", "wins": 0, "color": Color(0.8, 0.8, 0.83), "plus": 2, "spokes": 16, "style": "thin"},
+			{"name": "Stahlfelge", "wins": 0, "color": Color(0.1, 0.1, 0.11), "plus": 0, "spokes": 6, "style": "steel"},
+			{"name": "Turbine", "wins": 1, "color": Color(0.82, 0.83, 0.86), "plus": 1, "spokes": 12, "style": "turbine"},
+			{"name": "Rennsport-Sechs", "wins": 2, "color": Color(0.62, 0.42, 0.16), "plus": 2, "spokes": 6, "style": "te"},
+			{"name": "Kreuzspeichen", "wins": 3, "color": Color(0.85, 0.65, 0.25), "plus": 2, "spokes": 8, "style": "cross"},
+			{"name": "Aero-Scheibe", "wins": 4, "color": Color(0.9, 0.9, 0.9), "plus": 1, "spokes": 5, "style": "aero"},
+			{"name": "Tiefbett Stern", "wins": 5, "color": Color(0.85, 0.86, 0.9), "plus": 3, "spokes": 5, "style": "dish"},
+			# ab 2.18
+			{"name": "Konkav-Stern", "wins": 0, "color": Color(0.44, 0.45, 0.48), "plus": 3, "spokes": 5, "style": "concave"},
+			{"name": "Retro-Loch", "wins": 0, "color": Color(0.8, 0.81, 0.83), "plus": 0, "spokes": 8, "style": "holes"},
+			{"name": "Radkappe", "wins": 0, "color": Color(0.72, 0.73, 0.75), "plus": 0, "spokes": 10, "style": "cap"},
+			{"name": "Rallye", "wins": 1, "color": Color(0.93, 0.93, 0.91), "plus": 1, "spokes": 6, "style": "rally"},
+			{"name": "Sichel", "wins": 1, "color": Color(0.8, 0.81, 0.84), "plus": 2, "spokes": 10, "style": "sickle"},
+			{"name": "Schmiede-Zehn", "wins": 2, "color": Color(0.5, 0.36, 0.17), "plus": 2, "spokes": 10, "style": "ten"},
+			{"name": "Dreiteilig", "wins": 2, "color": Color(0.1, 0.1, 0.11), "plus": 2, "spokes": 6, "style": "3pc"},
+			{"name": "Kleeblatt", "wins": 3, "color": Color(0.82, 0.83, 0.85), "plus": 1, "spokes": 5, "style": "clover"},
+			{"name": "Drahtspeichen", "wins": 3, "color": Color(0.85, 0.86, 0.88), "plus": 0, "spokes": 20, "style": "wire"},
+			{"name": "Zentralverschluss", "wins": 5, "color": Color(0.16, 0.16, 0.17), "plus": 2, "spokes": 5, "style": "center"},
+		],
+	},
+	# Felgengröße: Standard = Werksfelge des Autos (bzw. die Felge in ihrer üblichen Größe), sonst Zoll mehr oder
+	# weniger. Der Reifen behält seinen Außendurchmesser (wie im echten Tuning: größere Felge, flacheres Profil);
+	# zu groß für das Auto geht nicht (mindestens 4 cm Flanke), car_builder.rim_spec begrenzt.
+	"rimsize": {
+		"label": "Zoll",
+		"options": [
+			{"name": "Standard", "wins": 0, "inch": 0},
+			{"name": "-1 Zoll", "wins": 0, "inch": -1},
+			{"name": "+1 Zoll", "wins": 0, "inch": 1},
+			{"name": "+2 Zoll", "wins": 0, "inch": 2},
+			{"name": "+3 Zoll", "wins": 1, "inch": 3},
+			{"name": "+4 Zoll", "wins": 2, "inch": 4},
 		],
 	},
 	# Felgenfarbe: "Passend" behält die Farbe der Felge, "Wagenfarbe" nimmt den Lack
@@ -434,10 +489,10 @@ const PARTS := {
 	},
 }
 
-const PART_ORDER := ["paint", "rims", "rimcol", "spoiler", "bodykit", "hood", "exhaust", "vinyl", "vinylcol", "neon", "tint",
+const PART_ORDER := ["paint", "rims", "rimcol", "rimsize", "spoiler", "bodykit", "hood", "exhaust", "vinyl", "vinylcol", "neon", "tint",
 	"lights", "engine", "turbo", "nitro", "suspension", "tires"]
 ## Tuning-Menü wie in NFS: erst Optik oder Leistung, dann die Kategorie, dann das Teil
-const PART_GROUPS := {"optik": ["paint", "rims", "rimcol", "spoiler", "bodykit", "hood", "exhaust", "vinyl", "vinylcol", "neon",
+const PART_GROUPS := {"optik": ["paint", "rims", "rimcol", "rimsize", "spoiler", "bodykit", "hood", "exhaust", "vinyl", "vinylcol", "neon",
 	"tint", "lights"],
 	"leistung": ["engine", "turbo", "nitro", "suspension", "tires"]}
 

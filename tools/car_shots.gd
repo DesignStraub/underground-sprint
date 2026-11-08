@@ -10,6 +10,7 @@ var cars: Array = Catalog.CAR_ORDER
 var stock := false
 var cfgs: Array = []  # --cfgs: je Eintrag ein Bild je Ansicht, Dateiname mit laufender Nummer
 var views: Array = []
+var spin_v := 0.0  # --spin=m/s: Räder vor dem Bild so lange drehen lassen (Unschärfe testen)
 
 
 func _ready() -> void:
@@ -28,6 +29,8 @@ func _ready() -> void:
 					if ":" in kv:
 						c[kv.get_slice(":", 0)] = int(kv.get_slice(":", 1))
 				cfgs.append(c)
+		elif a.begins_with("--spin="):
+			spin_v = float(a.substr(7))
 		elif a.begins_with("--views="):
 			views = Array(a.substr(8).split(","))
 	var env := Environment.new()
@@ -60,7 +63,7 @@ func _ready() -> void:
 		for cat in Catalog.PART_ORDER:
 			cfg[cat] = 0
 	var all_views := [["vorn", Vector3(4.2, 1.6, -5.2)], ["hinten", Vector3(-4.0, 1.5, 5.4)], ["seite", Vector3(8.5, 0.8, 0.0)],
-		["jagd", Vector3(0.0, 1.75, 6.2)], ["front", Vector3(0.0, 1.2, -6.0)], ["rad", Vector3(2.6, 0.5, -2.6)], ["oben", Vector3(3.0, 4.2, -4.4)],
+		["jagd", Vector3(0.0, 1.75, 6.2)], ["front", Vector3(0.0, 1.2, -6.0)], ["rad", Vector3(2.6, 0.5, -2.6)], ["felge", Vector3.ZERO], ["oben", Vector3(3.0, 4.2, -4.4)],
 		["heck", Vector3.ZERO], ["bug", Vector3.ZERO]]
 	if cfgs.is_empty():
 		cfgs = [cfg]
@@ -69,7 +72,7 @@ func _ready() -> void:
 			var car := Builder.build(id, cfgs[ci], false)
 			add_child(car)
 			for view in all_views:
-				if (views.is_empty() and view[0] in ["rad", "oben", "heck", "bug"]) or (not views.is_empty() and not view[0] in views):
+				if (views.is_empty() and view[0] in ["rad", "felge", "oben", "heck", "bug"]) or (not views.is_empty() and not view[0] in views):
 					continue
 				cam.position = view[1]
 				cam.fov = 32.0
@@ -81,11 +84,21 @@ func _ready() -> void:
 				elif view[0] == "bug":
 					look = Vector3(0, 0.45, -Lh + 0.5)
 					cam.position = Vector3(2.0, 1.3, -Lh - 2.9)
+				if view[0] == "felge":
+					# Felge fast von der Seite, nah
+					var Sf: Dictionary = Builder.SHAPES.get(id, {})
+					look = Vector3(Catalog.CARS[id]["width"] / 2.0 - 0.1, Builder.wheel_r(Sf), -Lh + Builder.axle(Sf))
+					cam.position = look + Vector3(1.05, 0.08, -0.32)
+					cam.fov = 30.0
 				if view[0] == "rad":
-					look = Vector3(0.8, 0.32, -Catalog.CARS[id]["length"] / 2.0 + 0.78)
-					cam.position = look + Vector3(1.4, 0.15, -0.9)
+					# vorderes rechtes Rad, schräg von vorn
+					var Sh: Dictionary = Builder.SHAPES.get(id, {})
+					look = Vector3(Catalog.CARS[id]["width"] / 2.0 - 0.1, Builder.wheel_r(Sh), -Lh + Builder.axle(Sh))
+					cam.position = look + Vector3(1.25, 0.12, -0.55)
 				cam.look_at(look)
 				for i in 8:
+					if spin_v != 0.0:
+						Builder.animate(car, spin_v, 0.0, 0.0, 0.0, false, 1.0 / 60.0)
 					await RenderingServer.frame_post_draw
 				var tag: String = id if cfgs.size() == 1 else "%s_%02d" % [id, ci]
 				get_viewport().get_texture().get_image().save_png("%s_%s_%s.png" % [out, tag, view[0]])

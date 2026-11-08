@@ -112,6 +112,7 @@ var _nos_k := 0.0  # Nitro-Schub, weich ein- und ausgeblendet
 var _launch_t := 0.0  # > 0: perfekter Start (mehr Zug), < 0: Räder drehen durch (weniger Zug)
 var _shift_boost := 0.0  # Drag: kurzer Schub nach perfektem Schalten
 var drive_type := "rwd"  # Antrieb aus dem Katalog: fwd, rwd, mr (Mittelmotor, Heck), awd
+var _wheel_v := Vector2.ZERO  # Umfangsgeschwindigkeit der Räder vorn/hinten (m/s), nur Optik (_wheel_speeds)
 var reverse_gear := false  # Rückwärtsgang eingelegt (Tacho zeigt R)
 var _change_t := 0.0  # wie lange das Auto schon steht und in die andere Richtung will
 var _holding := false  # dieses Bild: Auto steht beim Gangwechsel still
@@ -607,7 +608,7 @@ func _physics_process(dt: float) -> void:
 	var yaw_now := wrapf(global_rotation.y - _yaw_prev, -PI, PI) / maxf(dt, 0.0001)
 	_yaw_prev = global_rotation.y
 	var roll := clampf(-yaw_now * spd / 9.81 * 0.022, -0.065, 0.065) - clampf(l2 * 0.003, -0.035, 0.035)
-	Builder.animate(model, speed_fwd, steer, 0.0 if airborne else roll, pitch, nitro_on, dt)
+	Builder.animate(model, speed_fwd, steer, 0.0 if airborne else roll, pitch, nitro_on, dt, _wheel_speeds(thr, brk, hb, spd, dt))
 	# Ganzes Auto in die Steigung neigen (Trog, Bergstraße)
 	if not airborne:
 		model.rotation.x = lerp_angle(model.rotation.x, _slope_pitch, 1.0 - exp(-dt * 12.0))
@@ -640,12 +641,50 @@ func _physics_process(dt: float) -> void:
 			tire = maxf(tire, 0.8)
 		if brk > 0.6 and speed_fwd > 15.0 and not reverse_gear and not drag_mode:
 			tire = maxf(tire, 0.42 * brk)
+		if _wheel_v.x == 0.0 and speed_fwd > 4.0:
+			tire = maxf(tire, 0.55 * smoothstep(4.0, 14.0, speed_fwd))  # blockierte Räder radieren
 		if drifting:
 			tire = maxf(tire, 0.7)
 	if _launch_t < 0.0 and _thr_s > 0.5:
 		tire = maxf(tire, 0.7)
 	audio.slip = tire
 	audio.speed = spd
+
+
+## Umfangsgeschwindigkeit der Räder vorn/hinten (m/s) für die Optik: sie rollen mit dem Tempo, blockieren bei der
+## Bremse (alle vier) und der Handbremse (hinten), drehen an der Antriebsachse durch (Start mit zu viel Gas, Anfahren
+## mit Vollgas, Drift) und laufen in der Luft frei weiter; Gas in der Luft lässt die Antriebsräder hochdrehen.
+func _wheel_speeds(thr: float, brk: float, hb: bool, spd: float, dt: float) -> Vector2:
+	var front_drive := drive_type in ["fwd", "awd"]
+	var rear_drive := drive_type != "fwd"
+	var t := Vector2(speed_fwd, speed_fwd)
+	if airborne:
+		t = _wheel_v * exp(-0.5 * dt)
+		if thr > 0.1:
+			if front_drive:
+				t.x = speed_fwd + 25.0 * thr
+			if rear_drive:
+				t.y = speed_fwd + 25.0 * thr
+	elif controls_enabled and not finished:
+		var spin := 0.0
+		if _launch_t < 0.0 and _thr_s > 0.5:
+			spin = 16.0  # Start mit zu viel Gas: Räder drehen durch
+		elif drifting and thr > 0.2:
+			spin = (6.0 + spd * 0.25) * thr
+		elif thr > 0.8 and spd < 7.0 and gear <= 1 and not reverse_gear:
+			spin = (7.0 - spd) * 1.3  # kurzes Scharren beim Anfahren mit Vollgas
+		if front_drive:
+			t.x += spin
+		if rear_drive:
+			t.y += spin
+		if brk > 0.3 and speed_fwd > 1.5 and not reverse_gear:
+			t = Vector2.ZERO  # Vollbremsung: alle vier blockieren
+		if hb and absf(speed_fwd) > 0.5:
+			t.y = 0.0  # Handbremse: hinten blockiert
+	# Blockieren geht schlagartig, Hochdrehen und Wiederanrollen dauern einen Moment
+	_wheel_v.x = move_toward(_wheel_v.x, t.x, dt * (400.0 if t.x == 0.0 else 70.0))
+	_wheel_v.y = move_toward(_wheel_v.y, t.y, dt * (400.0 if t.y == 0.0 else 70.0))
+	return _wheel_v
 
 
 ## Drehmoment über der Drehzahl (0..1): unten weniger, ab ~5.000/min voll, oben leicht abfallend

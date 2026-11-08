@@ -323,10 +323,16 @@ Garage), der Fokus steht wieder auf dem Eintrag, aus dem man kam.
 Garage → Tuning → **Optik** oder **Leistung** (Motor, Turbo, Nitro, Fahrwerk, Reifen) → Teil wählen. Optik:
 - **Lack:** 21 Farben, dazu Oberflächen: glänzend mit Klarlack, stark metallisch (Candyblau, Bronze, Gold), matt
   (Mattschwarz, Mattgrau), Perlweiß mit Schimmer an den Kanten, Chrom.
-- **Felgen:** 13 Bauarten, jede eigens gebaut: Serie, Fünfspeichen, Gitter, Tiefbett (poliertes breites Horn),
-  Doppelspeichen, Y-Speichen, Mehrspeichen, Stahlfelge mit Löchern, Turbine, Rennsport-Sechs, Kreuzspeichen mit
-  Zwischenring, Aero-Scheibe, Tiefbett Stern. Alle mit Radmuttern und Nabendeckel. **Felgenfarbe** extra (passend,
-  Silber, Schwarz, Gunmetal, Weiß, Wagenfarbe, Rot, Gold, Bronze, Neongrün, Chrom).
+- **Felgen:** 23 Bauarten, jede eigens gebaut: Serie (je Auto eine eigene Werksfelge), Fünfspeichen, Gitter,
+  Tiefbett (poliertes breites Horn), Doppelspeichen, Y-Speichen, Mehrspeichen, Stahlfelge mit Löchern, Turbine,
+  Rennsport-Sechs, Kreuzspeichen mit Zwischenring, Aero-Scheibe, Tiefbett Stern, dazu seit 2.18 Konkav-Stern,
+  Retro-Loch (Telefon-Wählscheibe), Radkappe, Rallye, Sichel (gebogene Speichen in Laufrichtung), Schmiede-Zehn,
+  Dreiteilig (Stufenbett mit Schraubenring), Kleeblatt, Drahtspeichen mit Flügelmutter und Zentralverschluss. Alle
+  mit Sechskant-Radmuttern (4 oder 5 je nach Auto), Nabendeckel mit Emblem und Ventil. **Felgenfarbe** extra
+  (passend, Silber, Schwarz, Gunmetal, Weiß, Wagenfarbe, Rot, Gold, Bronze, Neongrün, Chrom).
+- **Zoll:** Standard, -1 und +1 bis +4 Zoll. Die Liste zeigt die echte Größe für das gewählte Auto (z. B. 17"), das
+  Infofeld die Reifengröße (z. B. „245/30 R19“). Der Reifen behält seinen Durchmesser, die Flanke wird flacher; zu
+  groß für das Auto geht nicht (mindestens 4,5 cm Flanke). Nur Optik, ändert keine Fahrwerte.
 - **Spoiler:** Lippe, Entenbürzel, Street-Flügel, GT-Flügel, Schwanenhals, Doppeldecker, Dachspoiler, Bügelflügel,
   Monster-Flügel.
 - **Bodykit:** Seitenschweller, Street (lackierte Lippe, Schweller, Heckschürze), Rallye (Schmutzfänger,
@@ -437,6 +443,19 @@ dann steht „Benutzerdefiniert“ da. Werte in `GameState.GFX`.
   Handbremse dreht bei 80 km/h in 0,8 s um gut 90°. Bremsen ~2,4 g, Gegenlenken geht schneller als Einlenken.
   Karosserie wankt nach der echten Querbeschleunigung, taucht beim Bremsen ein; die Verfolgerkamera dreht leicht
   verzögert mit und bleibt nah am Auto (im Stand 4,7 m, bei Tempo knapp 7 m, Blickwinkel 58°–80°). Messwerte aller Autos: `tools/handling_lab.tscn`.
+**Räder (seit 2.18):** Jedes Auto hat eine eigene Werksfelge in eigener Größe, Kei-Wagen und 70er auf 13 bis 14 Zoll
+mit hohem Reifen, die Exoten auf 18 bis 20 Zoll (`Catalog.FACTORY_RIMS`). Aufrüstfelgen sind ein bis drei Zoll größer
+als die Werksfelge (`plus`), die Kategorie Zoll verschiebt das (`Builder.rim_spec`). Das Rad hat jetzt Tiefe: der
+Reifen ist innen offen, darin liegt das Felgenbett (zwischen den Speichen sichtbar), Bremsscheibe und Sattel sitzen
+5 cm hinter der Speichenebene, die Speichen laufen konkav von der Nabe zum Horn. Klasse S hat ab Werk gelbe Sättel und
+gelochte Scheiben, getunte Autos rote. Die Räder drehen wie echte: Bremse und Handbremse lassen sie blockieren (alle
+vier bzw. hinten, das Auto rutscht mit stehenden Rädern und die Reifen radieren hörbar), beim Start mit zu viel Gas,
+beim Anfahren mit Vollgas und im Drift drehen die Antriebsräder durch (Front, Heck oder alle, je nach Antrieb), in
+der Luft laufen sie frei weiter. Gegner blockieren beim kräftigen Bremsen. Gegen den Wagenrad-Effekt (bei 60 Bildern je
+Sekunde scheinen schnelle Speichen zu stehen oder rückwärts zu laufen) dreht das Rad sichtbar höchstens 0,42
+Speichenteilungen je Bild weiter, darüber blendet eine Unschärfescheibe in der Mischfarbe aus Speichen und Felgenbett
+ein, wie auf echten Aufnahmen. Kostet im Rennen etwa 4 % mehr Draw Calls und Dreiecke, die Bildzeit bleibt gleich.
+
 - **Autos** (23) sind aus Querschnitten gebaut (Radhäuser, Kotflügel-Buckel, Hüften, eingezogenes Glashaus), lose
   angelehnt an RX-7, 350Z, Civic EG, Silvia, Skyline, AE86, S2000/MX-5, Lancer Evo/Impreza, Supra, Integra (vier runde
   Scheinwerfer, Flügel auf der Klappe), 180SX (Klappscheinwerfer, Fließheck), MR2 und NSX (Mittelmotor: Kabine vorn,
@@ -490,6 +509,12 @@ dann steht „Benutzerdefiniert“ da. Werte in `GameState.GFX`.
 Vergleichsbilder aus der Entwicklung liegen in `update_bilder/` (Godot ignoriert den Ordner, sie landen nicht im
 Spiel). Die wichtigsten:
 
+- **2.18 – Felgen:** alle 23 Bauarten am Kaizen in ihrer Standardgröße, je Zeile von links: Serie (Kaizen),
+  Fünfspeichen, Gitter Gold, Tiefbett Schwarz, Doppelspeichen, Y-Speichen · Mehrspeichen, Stahlfelge, Turbine,
+  Rennsport-Sechs, Kreuzspeichen, Aero-Scheibe · Tiefbett Stern, Konkav-Stern, Retro-Loch, Radkappe, Rallye, Sichel ·
+  Schmiede-Zehn, Dreiteilig, Kleeblatt, Drahtspeichen, Zentralverschluss und zuletzt Fünfspeichen bei 100 km/h mit
+  Unschärfe.
+  <br><img src="update_bilder/felgen_2_18.jpg" alt="Alle Felgen" width="720">
 - **2.14 – Zuschauer:** oben die Blockfiguren bis 2.13 (bleiben als Fernansicht), unten die neuen Figuren mit
   Gesicht, Ellbogen, Händen, Kleidung und Frisuren.
   <br><img src="update_bilder/zuschauer_2_14.jpg" alt="Zuschauer vorher und nachher" width="640">

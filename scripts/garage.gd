@@ -360,7 +360,7 @@ func _view_for(cat: String) -> Array:
 	match cat:
 		"paint":
 			return [Vector3(3.4, 1.35, -3.4), Vector3(0.2, 0.55, 0.0)]
-		"rims", "rimcol", "tires":
+		"rims", "rimcol", "rimsize", "tires":
 			return [Vector3(W / 2.0 + 1.3, 0.45, fz - 0.9), Vector3(W / 2.0, 0.32, fz)]
 		"suspension":
 			return [Vector3(W / 2.0 + 1.6, 0.55, fz - 0.6), Vector3(W / 2.0 - 0.1, 0.42, fz + 0.1)]
@@ -784,12 +784,13 @@ func _show_group(group: String, focus := "") -> void:
 	for cat in Catalog.PART_GROUPS[group]:
 		var c: String = cat
 		var opt := Catalog.part_of(preview_cfg, c)
-		var b := _button("%s:  %s" % [tr(Catalog.PARTS[c]["label"]), tr(opt["name"])], func(): _show_parts(c, group))
+		var oname := tr(opt["name"]) + _inch_suffix(c, preview_cfg)
+		var b := _button("%s:  %s" % [tr(Catalog.PARTS[c]["label"]), oname], func(): _show_parts(c, group))
 		b.set_meta("key", c)
 		b.focus_entered.connect(func():
 			_cam_view = c
 			Builder.showcase(car_node, preview_car, preview_cfg, _showcase_mode(c))
-			info.text = tr(Catalog.PARTS[c]["label"]) + ": " + tr(opt["name"]))
+			info.text = tr(Catalog.PARTS[c]["label"]) + ": " + oname)
 	_button("< Zurück", _back)
 	_focus_first()
 	_focus_key(focus)
@@ -837,7 +838,9 @@ func _refresh_parts(cat: String) -> void:
 			suffix = "   " + tr("EINGEBAUT")
 		elif not GameState.is_part_unlocked(cat, i):
 			suffix = "   " + (tr("1 SIEG") if opt["wins"] == 1 else tr("%d SIEGE") % opt["wins"])
-		b.text = (tr(opt["name"]) + suffix).to_upper()
+		var c2 := GameState.get_config(preview_car).duplicate()
+		c2[cat] = i
+		b.text = (tr(opt["name"]) + _inch_suffix(cat, c2) + suffix).to_upper()
 
 
 func _preview_part(cat: String, idx: int) -> void:
@@ -862,6 +865,13 @@ func _install(cat: String, idx: int, group: String) -> void:
 	_part_info(cat, idx)
 
 
+## Felgen und Zoll: Größe in Zoll hinter dem Namen (z. B. 18"), je Auto verschieden
+func _inch_suffix(cat: String, cfg: Dictionary) -> String:
+	if cat != "rims" and cat != "rimsize":
+		return ""
+	return "  %d\"" % Builder.rim_spec(preview_car, cfg)["inch"]
+
+
 ## Wirkung des Teils in Zahlen (wie die Werte im NFS-Tuning)
 func _part_info(cat: String, idx: int) -> void:
 	var opt: Dictionary = Catalog.PARTS[cat]["options"][idx]
@@ -876,6 +886,15 @@ func _part_info(cat: String, idx: int) -> void:
 				roundi(opt["steer"] / Catalog.CARS[preview_car]["steer"] * 100.0), roundi(opt["drop"] * 1000.0)]
 		"tires":
 			t += "\n" + tr("Grip +%d %%") % roundi(opt["grip"] / Catalog.CARS[preview_car]["grip"] * 100.0)
+		"rims", "rimsize":
+			var c2 := GameState.get_config(preview_car).duplicate()
+			c2[cat] = idx
+			var rs := Builder.rim_spec(preview_car, c2)
+			t += "\n" + tr("Felge %d Zoll   ·   Reifen %s") % [rs["inch"], rs["tire"]]
+			if cat == "rimsize" and rs["inch"] == rs["max_in"] and rs["std_in"] + int(opt["inch"]) > rs["max_in"]:
+				t += "\n" + tr("Größer passt bei diesem Auto nicht unter den Reifen.")
+			elif cat == "rimsize":
+				t += "\n" + tr("Nur Optik: der Reifen behält seinen Durchmesser, die Flanke wird flacher.")
 	if not GameState.is_part_unlocked(cat, idx):
 		var missing: int = opt["wins"] - GameState.total_wins()
 		t += "\n" + (tr("Gesperrt: noch 1 Sieg nötig.") if missing == 1 else tr("Gesperrt: noch %d Siege nötig.") % missing)

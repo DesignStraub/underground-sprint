@@ -30,6 +30,7 @@ var lane := 0.0
 var lane_target := 0.0
 var lane_vel := 0.0
 var speed := 0.0
+var _locked := false
 var top := 55.0
 var accel := 9.0
 var skill := 1.0
@@ -191,6 +192,8 @@ func _physics_process(dt: float) -> void:
 	if drag:
 		acc = accel * 0.8 * maxf(1.0 - pow(speed / maxf(top * skill, 1.0), 1.6), 0.05)
 	acc *= 0.6 + 0.4 * minf(speed / 8.0, 1.0)  # Anfahren wie beim Spieler: erst greifen die Reifen nicht voll
+	# kräftig bremsen: Räder blockieren kurz (nur Optik, wie beim Spieler)
+	_locked = target < speed - 4.0 and speed > 3.0 and not airborne
 	speed = move_toward(speed, target, dt * (acc if target > speed else 22.0))
 	var prev_d := d
 	d += speed * dt
@@ -242,7 +245,7 @@ func _physics_process(dt: float) -> void:
 	var pitch := 0.0
 	if airborne:
 		pitch = clampf(atan2(vy, maxf(speed, 1.0)) * 0.8, -0.35, 0.3)
-	Builder.animate(model, speed, _steer, _steer * 0.04, pitch, false, dt)
+	Builder.animate(model, speed, _steer, _steer * 0.04, pitch, false, dt, Vector2.ZERO if _locked else null)
 	model.rotation.x = lerp_angle(model.rotation.x, 0.0 if airborne else atan(Track.slope_at(c, d)), 1.0 - exp(-dt * 12.0))
 
 

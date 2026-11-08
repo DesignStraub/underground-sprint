@@ -24,6 +24,8 @@ extends Node
 ##                         Mit --write-movie aufnehmen, --nomusic für die Effekte allein, --sndtrace für jedes Bild
 ##   -- --lightlog         Größe und Aufbauzeit der Lichtkarte (Laternenlicht auf der Straße)
 ##   -- --lightpng=/pfad.png  speichert die Lichtkarte als Bild
+##   -- --wheelcam         Kamera fährt neben dem rechten Vorderrad des Spielers mit (Felgen, Unschärfe, Blockieren);
+##                         mit --revtest: Gas, Vollbremsung, Gas; loggt die Raddrehung ("WHEEL ...")
 
 const Track := preload("res://scripts/track_builder.gd")
 const Catalog := preload("res://scripts/catalog.gd")
@@ -174,6 +176,23 @@ func _process(dt: float) -> void:
 		_vcam.global_position = fa["pos"] + fa["right"] * float(view[2]) + Vector3(0, float(view[3]), 0)
 		_vcam.look_at(fb["pos"] + fb["right"] * float(view[5]) + Vector3(0, float(view[6]), 0), Vector3.UP)
 		_vcam.make_current()
+	if OS.get_cmdline_user_args().has("--wheelcam") and race and "curve" in race and race.world and race.player:
+		if _vcam == null:
+			_vcam = Camera3D.new()
+			_vcam.fov = 50.0
+			_vcam.far = 2000.0
+			race.world.add_child(_vcam)
+			for ch in race.get_children():
+				if ch is CanvasLayer and ch.layer >= 0:
+					ch.visible = false
+		var pm: Node3D = race.player.model
+		var fz: float = -(float(pm.get_meta("length")) / 2.0 - float(pm.get_meta("axle")))
+		var wpos := pm.global_transform * Vector3(float(pm.get_meta("width")) / 2.0, float(pm.get_meta("wheel_r")), fz)
+		_vcam.global_position = pm.global_transform * Vector3(float(pm.get_meta("width")) / 2.0 + 1.6, 0.55, fz - 1.1)
+		_vcam.look_at(wpos, Vector3.UP)
+		_vcam.make_current()
+		if fmod(_t, 0.25) < dt and race.state == 1:
+			print("WHEEL t=%.2f v=%.1f rad=%s" % [_t, race.player.speed_fwd, str(race.player._wheel_v)])
 	if look.size() >= 4 and race and "curve" in race and race.world:
 		var lm: Node3D = race.track["node"].get_node_or_null(look[0])
 		if lm:

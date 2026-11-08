@@ -200,7 +200,7 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 	var S: Dictionary = SHAPES.get(car_id, SHAPES["kaizen"])
 	var P: Dictionary = Catalog.PARTS
 	var paint_c: Color = paint_color(car_id, cfg)
-	var rim: Dictionary = Catalog.part_of(cfg, "rims")
+	var rim := rim_spec(car_id, cfg)
 	var kit: int = int(cfg.get("bodykit", 0))
 	var hood: int = int(cfg.get("hood", 0))
 	var L: float = spec["length"]
@@ -973,23 +973,36 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 		f.visible = false
 		flames.append(f)
 
-	# Räder
+	# Räder: Reifen mit offener Mitte, darin das Felgenbett. Bremsscheibe und Sattel sitzen tief dahinter, die
+	# Speichen laufen von der zurückgesetzten Nabe nach außen zum Horn (konkav). Felgengröße in Zoll (rim_spec).
 	var tire_m := mat(Color(0.05, 0.05, 0.05), 0, 0.9)
 	var rc: Dictionary = Catalog.part_of(cfg, "rimcol")
-	var rim_m: Material = mat(rim["color"], 0.65, 0.28)
+	var rim_c: Color = rim["color"]
+	var rim_m: Material = mat(rim_c, 0.65, 0.28)
 	if rc.get("paint", false):
 		rim_m = paint
+		rim_c = paint_c
 	elif rc.has("color"):
-		rim_m = mat(rc["color"], 0.85 if rc.get("chrome", false) else 0.65, 0.14 if rc.get("chrome", false) else 0.28)
+		rim_c = rc["color"]
+		rim_m = mat(rim_c, 0.85 if rc.get("chrome", false) else 0.65, 0.14 if rc.get("chrome", false) else 0.28)
+	var barrel_m := mat(rim_c.darkened(0.55), 0.55, 0.42)  # Innenseite des Felgenbetts liegt im Schatten
 	var rotor_m := mat(Color(0.42, 0.42, 0.44), 0.8, 0.35)
 	var hat_m := mat(Color(0.2, 0.2, 0.22), 0.7, 0.45)
-	var caliper_m := mat(Color(0.85, 0.06, 0.04), 0.3, 0.35) if perf > 0 else mat(Color(0.2, 0.2, 0.22), 0.5, 0.5)
+	# poliertes Metall statt Chrom: flache Chromflächen spiegeln nachts nur Schwarz
+	var polish := mat(Color(0.86, 0.87, 0.89), 0.72, 0.24)
+	# Sättel: getunt rot, Klasse S ab Werk gelb, sonst dunkel; große Bremsen gelocht
+	var big_brake: bool = perf > 0 or spec["class"] == "S"
+	var cal_c := Color(0.85, 0.06, 0.04) if perf > 0 else (Color(0.95, 0.66, 0.04) if spec["class"] == "S" else Color(0.2, 0.2, 0.22))
+	var caliper_m := mat(cal_c, 0.3, 0.35)
 	var fronts := []
 	var spinners := []
+	var blurs := []
 	var track := W / 2 - 0.15 + (0.05 if flare > 0.0 else 0.0) + (0.03 if S.get("overfenders", false) else 0.0)  # bündig unter dem Kotflügel
 	var wr := wheel_r(S)
 	var tw: float = S.get("tire_w", 0.24) * WHEEL_R / wr  # Breite in Metern (das Rad wird danach skaliert)
 	var o := tw / 2.0
+	var rr: float = rim["radius"]
+	var blur_m := _blur_mesh(rr, rim_c, rim["style"])
 	for zi in [-1, 1]:
 		for s in [-1, 1]:
 			var pivot := Node3D.new()
@@ -998,7 +1011,7 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 			root.add_child(pivot)
 			var spin := Node3D.new()
 			pivot.add_child(spin)
-			_near(_add(spin, _tire_mesh(tw), tire_m, Vector3.ZERO))
+			_add(spin, _tire_mesh(tw, rr - 0.004), tire_m, Vector3.ZERO)
 			var far_tire := CylinderMesh.new()
 			far_tire.top_radius = WHEEL_R
 			far_tire.bottom_radius = WHEEL_R
@@ -1006,27 +1019,55 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 			far_tire.radial_segments = 16
 			far_tire.rings = 1
 			_far(_add(spin, far_tire, tire_m, Vector3.ZERO)).rotation_degrees.z = 90
-			# Schichten mit klarem Abstand (Reifen bis o, Bremsscheibe o + 0.004, Sattel o + 0.01, Speichen bis o + 0.025)
-			var closed: bool = rim.get("style", "std") in ["steel", "aero"]
-			if not closed:
-				var rr: float = rim["radius"]
-				_add(spin, _disc(rr * 0.8, 0.008), rotor_m, Vector3(s * (o + 0.004), 0, 0)).rotation_degrees.z = 90
-				# Bremsscheibe: dunkler Topf in der Mitte, gelochter Reibring (zwei versetzte Lochkreise)
-				_add(spin, _disc(rr * 0.42, 0.01), hat_m, Vector3(s * (o + 0.006), 0, 0)).rotation_degrees.z = 90
-				for k in 16:
-					var ha := TAU * k / 16.0
-					var hr := rr * (0.56 if k % 2 == 0 else 0.68)
-					_near(_add(spin, _disc(0.0075, 0.004), dark, Vector3(s * (o + 0.0085), cos(ha) * hr, sin(ha) * hr))).rotation_degrees.z = 90
-				_add(spin, _disc(rr * 0.26, 0.012), mat(Color(0.12, 0.12, 0.12), 0.6, 0.4), Vector3(s * (o + 0.02), 0, 0)).rotation_degrees.z = 90
-				# Bremssattel steht still (am Achsschenkel), oben hinten an der Scheibe: kräftiger Block, der über den
-				# Reibring greift, außen eine schmalere Deckplatte
-				var cal := _add(pivot, box(Vector3(0.03, rr * 0.48, 0.1)), caliper_m,
-					Vector3(s * (o - 0.004), rr * 0.5, rr * 0.4))
-				cal.rotation_degrees.x = -40.0
-				var cap := _add(pivot, box(Vector3(0.006, rr * 0.36, 0.072)), caliper_m,
-					Vector3(s * (o + 0.013), rr * 0.5, rr * 0.4))
-				cap.rotation_degrees.x = -40.0
-			_rim(spin, rim, rim_m, dark, chrome, s, o)
+			_far(_add(spin, _disc(rr, 0.012), rim_m, Vector3(s * (o + 0.012), 0, 0))).rotation_degrees.z = 90
+			# Felgenbett (zwischen den Speichen sichtbar, Innenseite) und dunkle Rückwand
+			_add(spin, _band(rr * 0.965, s * (-o + 0.012), rr * 0.965, s * (o + 0.014), Vector2(0, -1)), barrel_m, Vector3.ZERO)
+			_add(spin, _disc(rr * 0.97, 0.006), dark, Vector3(s * (-o + 0.016), 0, 0)).rotation_degrees.z = 90
+			# Bremse tief in der Felge: Scheibe (große Bremse gelocht), Topf, Nabe bis zur Speichenebene
+			var xr := o - 0.05
+			_add(spin, _disc(rr * 0.8, 0.02), rotor_m, Vector3(s * xr, 0, 0)).rotation_degrees.z = 90
+			_add(spin, _disc(rr * 0.42, 0.03), hat_m, Vector3(s * (xr + 0.006), 0, 0)).rotation_degrees.z = 90
+			_add(spin, _disc(rr * 0.2, 0.03), hat_m, Vector3(s * (xr + 0.015), 0, 0)).rotation_degrees.z = 90
+			if big_brake:
+				for k in 24:
+					var ha := TAU * k / 24.0
+					var hr := rr * (0.55 if k % 2 == 0 else 0.68)
+					_add(spin, _disc(0.0075, 0.004), dark, Vector3(s * (xr + 0.0095), cos(ha) * hr, sin(ha) * hr)).rotation_degrees.z = 90
+			else:
+				_add(spin, _band(rr * 0.5, s * (xr + 0.0102), rr * 0.52, s * (xr + 0.0102), Vector2(s, 0)), hat_m, Vector3.ZERO)
+			# Bremssattel steht still (am Achsschenkel), oben hinten: Block über dem Reibring, außen Deckplatte mit
+			# hellem Streifen und zwei Schrauben
+			var ca := 0.75
+			var cr := rr * 0.72
+			var cal_p := Vector3(0, cos(ca) * cr, sin(ca) * cr)
+			var cal := _add(pivot, box(Vector3(0.05, rr * (0.36 if big_brake else 0.3), 0.13 if big_brake else 0.1)), caliper_m, Vector3(s * xr, 0, 0) + cal_p)
+			cal.rotation.x = ca
+			var plate := _add(pivot, box(Vector3(0.008, rr * 0.27, 0.11 if big_brake else 0.085)), caliper_m, Vector3(s * (xr + 0.02), 0, 0) + cal_p * 1.02)
+			plate.rotation.x = ca
+			if big_brake:
+				var stripe := _add(pivot, box(Vector3(0.004, rr * 0.06, 0.07)), mat(Color(0.95, 0.95, 0.93), 0.1, 0.4), Vector3(s * (xr + 0.025), 0, 0) + cal_p * 1.02)
+				stripe.rotation.x = ca
+			for e in [-1.0, 1.0]:
+				var bp: Vector3 = cal_p * 0.86 + Vector3(0, -sin(ca), cos(ca)) * e * 0.04
+				_add(pivot, _hex(0.006, 0.006), polish, Vector3(s * (xr + 0.026), bp.y, bp.z)).rotation_degrees.z = 90
+			_rim(spin, rim, rim_m, dark, polish, barrel_m, s, o)
+			# alles außer den Fernansicht-Ersatzteilen nur in der Nahansicht
+			for c in spin.get_children() + pivot.get_children():
+				if c is MeshInstance3D and not c.has_meta("lod_only"):
+					c.set_meta("near_only", true)
+			# Unschärfescheibe (steht still, dreht nicht mit): blendet bei schnell drehendem Rad ein, animate()
+			var bm := StandardMaterial3D.new()
+			bm.vertex_color_use_as_albedo = true
+			bm.vertex_color_is_srgb = true
+			bm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			bm.albedo_color = Color(1, 1, 1, 0)
+			bm.metallic = 0.5
+			bm.roughness = 0.4
+			var bl := _add(pivot, blur_m, bm, Vector3(s * (o + 0.036), 0, 0))
+			bl.rotation.y = 0.0 if s > 0 else PI
+			bl.set_meta("no_merge", true)
+			bl.visible = false
+			blurs.append(bl)
 			spinners.append(spin)
 			if zi == -1:
 				fronts.append(pivot)
@@ -1036,6 +1077,9 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 		_merge_parts(root, body, fronts, spinners, flames)
 		if lod:
 			_build_lod(root, flames, GameState.car_lod_distance())
+			for bl in blurs:
+				(bl as GeometryInstance3D).visibility_range_end = GameState.car_lod_distance()
+				(bl as GeometryInstance3D).visibility_range_end_margin = 2.0
 	# Ersatzteile der Fernansicht stecken jetzt im LOD-Mesh (oder werden ohne LOD nicht gebraucht)
 	var far := [root]
 	while not far.is_empty():
@@ -1052,6 +1096,9 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 	root.set_meta("length", L)
 	root.set_meta("width", W)
 	root.set_meta("wheel_r", wr)
+	root.set_meta("blurs", blurs)
+	# Winkel zwischen zwei gleichen Speichen (Drahtspeichen: zwei Lagen), für Unschärfe und Begrenzung in animate()
+	root.set_meta("rim_period", TAU / float(maxi(int(rim["spokes"]) * (2 if rim["style"] == "wire" else 1), 1)))
 	root.set_meta("axle", axle(S))
 	root.set_meta("eye", Vector3(0, S["roof"] - 0.1, zf + (S["cowl"] + 0.07) * L))
 	return root
@@ -1130,24 +1177,24 @@ static func carbon_mat() -> StandardMaterial3D:
 	return _carbon
 
 
-## Speiche von Radius r0 bis r1, Mitte bei Winkel a, Richtung a + tilt (tilt != 0: Speichen kreuzen oder laufen
-## parallel versetzt). Die Radachse ist x.
-## Speiche: an der Nabe breiter und kräftiger, zum Horn hin schmaler (wie gegossen), Kanten leicht gefast
-static func _spoke(spin: Node3D, m: Material, x: float, a: float, r0: float, r1: float, w: float, tilt := 0.0, th := 0.012) -> MeshInstance3D:
-	var rm := (r0 + r1) / 2.0
-	var ln := r1 - r0
-	var key := "spoke_%.4f_%.4f_%.4f" % [ln, w, th]
+## Speiche von p0 nach p1 (Radachse x, s = Seite): Querschnitt aus _spoke_mesh, Breite w quer zur Speiche, Dicke th
+## entlang der Achse; die gewölbte Außenseite zeigt auf beiden Seiten nach außen. Das breite Ende liegt bei p0.
+static func _spoke_pts(spin: Node3D, m: Material, p0: Vector3, p1: Vector3, w: float, th: float, s: float, k0 := 1.25, k1 := 0.85) -> MeshInstance3D:
+	var d := p1 - p0
+	var ln := d.length()
+	var key := "spoke_%.4f_%.4f_%.4f_%.2f_%.2f" % [ln, w, th, k0, k1]
 	if not _mesh_cache.has(key):
-		_mesh_cache[key] = _spoke_mesh(ln, w, th)
-	var dir := Vector3(0, cos(a + tilt), sin(a + tilt))
-	var sk := _add(spin, _mesh_cache[key], m, Vector3(x, cos(a) * rm, sin(a) * rm) - dir * ln / 2.0)
-	sk.rotation.x = a + tilt
+		_mesh_cache[key] = _spoke_mesh(ln, w, th, k0, k1)
+	var y := d / ln
+	var z := Vector3.RIGHT.cross(y).normalized() * s
+	var sk := _add(spin, _mesh_cache[key], m, p0)
+	sk.basis = Basis(y.cross(z), y, z)
 	return sk
 
 
 ## Speiche entlang +Y von 0 bis ln: Querschnitt achteckig gefast (Breite w quer, Dicke th nach außen), innen
-## 25 % breiter, außen 15 % schmaler; die Außenseite ist leicht gewölbt
-static func _spoke_mesh(ln: float, w: float, th: float) -> ArrayMesh:
+## 25 % breiter, außen 15 % schmaler (k0, k1); die Außenseite ist leicht gewölbt
+static func _spoke_mesh(ln: float, w: float, th: float, k0 := 1.25, k1 := 0.85) -> ArrayMesh:
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var sec := func(y: float, k: float) -> Array:
@@ -1156,8 +1203,8 @@ static func _spoke_mesh(ln: float, w: float, th: float) -> ArrayMesh:
 		var c := minf(hw, ht) * 0.45
 		return [Vector3(-ht, y, -hw + c), Vector3(-ht + c, y, -hw), Vector3(ht - c, y, -hw), Vector3(ht, y, -hw + c),
 			Vector3(ht + th * 0.15, y, 0.0), Vector3(ht, y, hw - c), Vector3(ht - c, y, hw), Vector3(-ht + c, y, hw), Vector3(-ht, y, hw - c)]
-	var lo: Array = sec.call(0.0, 1.25)
-	var hi: Array = sec.call(ln, 0.85)
+	var lo: Array = sec.call(0.0, k0)
+	var hi: Array = sec.call(ln, k1)
 	var n := lo.size()
 	for i in n:
 		var j := (i + 1) % n
@@ -1173,16 +1220,17 @@ static func _spoke_mesh(ln: float, w: float, th: float) -> ArrayMesh:
 	return st.commit()
 
 
-## Reifen als Drehkörper um die X-Achse (bis 2.15 ein Zylinder mit 14 Ecken): runde Schultern, leicht gewölbte
-## Flanken, Lauffläche mit drei Längsrillen, 36 Segmente. Innen und außen geschlossen (hinter offenen Speichen dunkel).
-static func _tire_mesh(tw: float) -> ArrayMesh:
-	var key := "tire_%.3f" % tw
+## Reifen als Drehkörper um die X-Achse: runde Schultern, bauchige Flanken, Lauffläche mit drei Längsrillen,
+## 36 Segmente. Innen offen ab dem Wulst rb (dort sitzt das Felgenbett); je größer die Felge, desto flacher die Flanke.
+static func _tire_mesh(tw: float, rb: float) -> ArrayMesh:
+	var key := "tire_%.3f_%.4f" % [tw, rb]
 	if _mesh_cache.has(key):
 		return _mesh_cache[key]
 	var R := WHEEL_R
 	var h := tw / 2.0
-	var side := [Vector2(-h, 0.0), Vector2(-h, R - 0.085), Vector2(-h - 0.005, R - 0.06), Vector2(-h - 0.006, R - 0.04),
-		Vector2(-h - 0.002, R - 0.02), Vector2(-h + 0.008, R - 0.007), Vector2(-h + 0.022, R)]
+	var sh := R - 0.02 - rb
+	var side := [Vector2(-h + 0.012, rb), Vector2(-h + 0.004, rb + 0.008), Vector2(-h - 0.003, rb + sh * 0.5),
+		Vector2(-h - 0.005, rb + sh * 0.78), Vector2(-h - 0.002, R - 0.02), Vector2(-h + 0.008, R - 0.007), Vector2(-h + 0.022, R)]
 	var prof: Array = side.duplicate()
 	var tread := h - 0.022
 	for g in [-0.5, 0.0, 0.5]:
@@ -1310,40 +1358,69 @@ static func _plate_text(text: String) -> Mesh:
 	return tm
 
 
-## Felge je Bauart (Catalog rims.style) auf der Außenseite des Rads, s = Seite, o = halbe Reifenbreite.
-static func _rim(spin: Node3D, rim: Dictionary, rim_m: Material, dark: Material, chrome: Material, s: float, o: float) -> void:
+## Felge je Bauart (rim_spec: style, spokes, lugs, radius) auf der Außenseite des Rads, s = Seite, o = halbe
+## Reifenbreite. Die Speichen laufen konkav: an der Nabe um cv zurückgesetzt, am Horn vorn. Dazu Radmuttern
+## (Sechskant, 4 oder 5), Nabendeckel mit Emblem und Ventil; Bremse und Felgenbett baut build().
+static func _rim(spin: Node3D, rim: Dictionary, rim_m: Material, dark: Material, chrome: Material, barrel_m: Material, s: float, o: float) -> void:
 	var rr: float = rim["radius"]
 	var n: int = rim["spokes"]
-	var x := s * (o + 0.019)
 	var style: String = rim.get("style", "std")
+	var xf := o + 0.019  # Ebene am Horn (Betrag, nach außen)
+	var CV := {"std": 0.022, "thin": 0.016, "mesh": 0.012, "cross": 0.012, "split": 0.026, "y": 0.022, "turbine": 0.01,
+		"te": 0.03, "concave": 0.04, "rally": 0.008, "sickle": 0.022, "ten": 0.034, "3pc": 0.02, "clover": 0.012,
+		"wire": 0.04, "center": 0.026}
+	var cv: float = CV.get(style, 0.0)
+	var face0 := xf  # Tiefbett und Dreiteilig: der Stern liegt hinter einem breiten Außenring
+	if style == "dish":
+		face0 = xf - 0.03
+	elif style == "3pc":
+		face0 = xf - 0.018
+	var rh := rr * 0.2
+	var rl := rr * 0.96
+	var xat := func(r: float) -> float: return face0 - cv * clampf((rl - r) / (rl - rh), 0.0, 1.0)
+	var hub_x: float = face0 - cv  # Mitte der Nabenscheibe; ihre Vorderseite trägt die Radmuttern
+	var nut_x := hub_x + 0.012
 	var lip_in := 0.86
+	var lip_m: Material = rim_m
 	var face := func(r: float, m: Material, dx: float, h := 0.012) -> MeshInstance3D:
-		var d := _add(spin, _disc(r, h), m, Vector3(s * (o + dx), 0, 0))
+		var d := _add(spin, _disc(r, h), m, Vector3(s * dx, 0, 0))
 		d.rotation_degrees.z = 90
 		return d
+	# Speiche ab Winkel a von Radius r0 bis r1, Richtung a + tilt; die Tiefe folgt der Konkave
+	var spoke := func(a: float, r0: float, r1: float, w: float, tilt := 0.0, th := 0.014, m: Material = rim_m, dx := 0.0) -> void:
+		var ln := r1 - r0
+		var c := Vector2(cos(a), sin(a)) * (r0 + r1) / 2.0
+		var d := Vector2(cos(a + tilt), sin(a + tilt))
+		var q0 := c - d * ln / 2.0
+		var q1 := c + d * ln / 2.0
+		var x0: float = xat.call(q0.length()) + dx
+		var x1: float = xat.call(q1.length()) + dx
+		_spoke_pts(spin, m, Vector3(s * x0, q0.x, q0.y), Vector3(s * x1, q1.x, q1.y), w, th, s)
 	match style:
 		"std":
+			var w := 0.06 if n <= 5 else (0.05 if n <= 7 else 0.04)
 			for k in n:
-				_spoke(spin, rim_m, x, TAU * k / n, rr * 0.025, rr * 0.975, 0.05)
+				spoke.call(TAU * k / n, rr * 0.18, rr * 0.95, w)
+			face.call(rr * 0.27, rim_m, hub_x, 0.024)
 		"thin":
 			for k in n:
-				_spoke(spin, rim_m, x, TAU * k / n, rr * 0.2, rr * 0.95, 0.022)
-			face.call(rr * 0.3, rim_m, 0.02)
+				spoke.call(TAU * k / n, rr * 0.2, rr * 0.95, 0.022)
+			face.call(rr * 0.28, rim_m, hub_x, 0.024)
 		"mesh", "cross":
 			# Gitter: zwei Lagen schräger Speichen, die sich kreuzen; Kreuzspeichen mit Zwischenring
 			var tilt := 0.38 if style == "mesh" else 0.55
 			for k in n:
 				var a := TAU * k / n
-				_spoke(spin, rim_m, x, a, rr * 0.28, rr * 0.93, 0.022, tilt)
-				_spoke(spin, rim_m, x - s * 0.003, a, rr * 0.28, rr * 0.93, 0.022, -tilt)
-			face.call(rr * 0.32, rim_m, 0.02)
+				spoke.call(a, rr * 0.28, rr * 0.93, 0.022, tilt)
+				spoke.call(a, rr * 0.28, rr * 0.93, 0.022, -tilt, 0.012, rim_m, -0.004)
+			face.call(rr * 0.32, rim_m, hub_x, 0.024)
 			if style == "cross":
 				var ring := TorusMesh.new()
 				ring.inner_radius = rr * 0.5
 				ring.outer_radius = rr * 0.58
 				ring.rings = 40
 				ring.ring_segments = 6
-				var rm := _add(spin, ring, rim_m, Vector3(x, 0, 0))
+				var rm := _add(spin, ring, rim_m, Vector3(s * xat.call(rr * 0.54), 0, 0))
 				rm.rotation_degrees.z = 90
 				rm.scale = Vector3(1, 0.3, 1)
 		"split":
@@ -1351,74 +1428,302 @@ static func _rim(spin: Node3D, rim: Dictionary, rim_m: Material, dark: Material,
 			for k in n:
 				var a := TAU * k / n
 				for e in [-1.0, 1.0]:
-					_spoke(spin, rim_m, x, a + e * 0.12, rr * 0.25, rr * 0.95, 0.026, -e * 0.12)
-			face.call(rr * 0.3, rim_m, 0.02)
+					spoke.call(a + e * 0.12, rr * 0.25, rr * 0.95, 0.026, -e * 0.12)
+			face.call(rr * 0.3, rim_m, hub_x, 0.024)
 		"y":
 			# Y-Speichen: innen eine kräftige Speiche, außen zwei auseinanderlaufende Äste
 			for k in n:
 				var a := TAU * k / n
-				_spoke(spin, rim_m, x, a, rr * 0.12, rr * 0.55, 0.055)
+				spoke.call(a, rr * 0.12, rr * 0.55, 0.055)
 				for e in [-1.0, 1.0]:
-					_spoke(spin, rim_m, x, a + e * 0.16, rr * 0.5, rr * 0.95, 0.03, e * 0.28)
+					spoke.call(a + e * 0.16, rr * 0.5, rr * 0.95, 0.03, e * 0.28)
+			face.call(rr * 0.27, rim_m, hub_x, 0.024)
 		"turbine":
 			# Turbine: verdrehte Schaufeln wie ein Lüfterrad
 			for k in n:
 				var a := TAU * k / n
-				var bl := _add(spin, box(Vector3(0.01, rr * 0.66, 0.06)), rim_m, Vector3(x - s * 0.008, cos(a) * rr * 0.6, sin(a) * rr * 0.6))
-				bl.basis = Basis(Vector3.RIGHT, a) * Basis(Vector3.UP, 0.35)
-			face.call(rr * 0.3, rim_m, 0.02)
-			face.call(rr * 0.24, dark, 0.008, 0.01)
+				var bl := _add(spin, box(Vector3(0.012, rr * 0.66, 0.06)), rim_m, Vector3(s * (xat.call(rr * 0.6) - 0.006), cos(a) * rr * 0.6, sin(a) * rr * 0.6))
+				bl.basis = Basis(Vector3.RIGHT, a) * Basis(Vector3.UP, 0.35 * s)
+			face.call(rr * 0.3, rim_m, hub_x, 0.024)
+			face.call(rr * 0.24, dark, hub_x + 0.008, 0.012)
 		"te":
 			# Rennsport-Sechs: breite, flache Speichen bis an das Horn, schmales Horn
 			for k in n:
-				_spoke(spin, rim_m, x, TAU * k / n, rr * 0.18, rr * 0.92, 0.075)
-			face.call(rr * 0.28, rim_m, 0.02)
+				spoke.call(TAU * k / n, rr * 0.18, rr * 0.92, 0.075)
+			face.call(rr * 0.28, rim_m, hub_x, 0.024)
 			lip_in = 0.9
-		"dish":
-			# Tiefbett: kurze Speichen innen, breites poliertes Horn außen (tief zurückgesetzter Stern)
+		"concave":
+			# Konkav-Stern: kräftige Speichen, an der Nabe tief eingezogen
 			for k in n:
-				_spoke(spin, rim_m, x - s * 0.006, TAU * k / n, rr * 0.08, rr * 0.62, 0.05)
-			var bed := TorusMesh.new()
-			bed.inner_radius = rr * 0.6
-			bed.outer_radius = rr
-			bed.rings = 40
-			bed.ring_segments = 6
-			var bm := _add(spin, bed, chrome, Vector3(s * (o + 0.017), 0, 0))
-			bm.rotation_degrees.z = 90
-			bm.scale = Vector3(1, 0.12, 1)
+				spoke.call(TAU * k / n, rr * 0.18, rr * 0.96, 0.064, 0.0, 0.018)
+			face.call(rr * 0.26, rim_m, hub_x, 0.024)
+			lip_in = 0.9
+		"rally":
+			# Rallye: breite, flache Speichen mit kleinen Fenstern, große Mittelscheibe
+			for k in n:
+				spoke.call(TAU * k / n, rr * 0.3, rr * 0.94, 0.085 if n <= 6 else 0.07, 0.0, 0.018)
+			face.call(rr * 0.44, rim_m, hub_x, 0.024)
+			lip_in = 0.9
+		"sickle":
+			# Sichel: gebogene Speichen in Laufrichtung (rechts und links gespiegelt)
+			for k in n:
+				var a0 := TAU * k / n
+				var pts := []
+				for j in 6:
+					var f := j / 5.0
+					var r := lerpf(rr * 0.24, rr * 0.95, f)
+					var ang := a0 + s * 0.6 * pow(f, 1.3)
+					pts.append(Vector3(s * xat.call(r), cos(ang) * r, sin(ang) * r))
+				for j in 5:
+					var pa: Vector3 = pts[j]
+					var pb: Vector3 = pts[j + 1]
+					var dd := pb - pa
+					var w0 := lerpf(0.042, 0.026, j / 5.0)
+					var w1 := lerpf(0.042, 0.026, (j + 1) / 5.0)
+					_spoke_pts(spin, rim_m, pa - dd * 0.08, pb + dd * 0.08, w0, 0.014, s, 1.0, w1 / w0)
+			face.call(rr * 0.3, rim_m, hub_x, 0.024)
+		"ten":
+			# Schmiede-Zehn: zehn schlanke, gerade Speichen, stark konkav
+			for k in n:
+				spoke.call(TAU * k / n, rr * 0.2, rr * 0.96, 0.026, 0.0, 0.016)
+			face.call(rr * 0.26, rim_m, hub_x, 0.024)
+			lip_in = 0.92
+		"3pc":
+			# Dreiteilig: Doppelspeichen-Stern hinter einem polierten Stufenbett, Ring aus Schrauben
+			for k in n:
+				var a := TAU * k / n
+				for e in [-1.0, 1.0]:
+					spoke.call(a + e * 0.1, rr * 0.24, rr * 0.8, 0.026, -e * 0.1)
+			_add(spin, _band(rr * 0.8, s * xf, rr * 0.97, s * xf, Vector2(s, 0)), chrome, Vector3.ZERO)
+			_add(spin, _band(rr * 0.8, s * xf, rr * 0.79, s * (face0 - 0.004), Vector2(0, -1)), chrome, Vector3.ZERO)
+			for k in 24:
+				var a := TAU * k / 24.0
+				_add(spin, _disc(0.0055, 0.006), chrome, Vector3(s * (xf + 0.002), cos(a) * rr * 0.83, sin(a) * rr * 0.83)).rotation_degrees.z = 90
+			face.call(rr * 0.28, rim_m, hub_x, 0.024)
+			lip_in = 0.97
+			lip_m = chrome
+		"dish":
+			# Tiefbett: breiter polierter Außenring, der Stern sitzt tief dahinter
+			for k in n:
+				spoke.call(TAU * k / n, rr * 0.12, rr * 0.66, 0.05)
+			_add(spin, _band(rr * 0.66, s * xf, rr * 0.97, s * xf, Vector2(s, 0)), chrome, Vector3.ZERO)
+			_add(spin, _band(rr * 0.66, s * xf, rr * 0.64, s * (face0 - 0.004), Vector2(0, -1)), chrome, Vector3.ZERO)
+			face.call(rr * 0.26, rim_m, hub_x, 0.024)
 			lip_in = 0.94
+			lip_m = chrome
 		"steel":
-			# Stahlfelge: geschlossene Scheibe mit Löchern, Chromkappe
-			face.call(rr, rim_m, 0.006, 0.02)
+			# Stahlfelge: geschlossene Scheibe, erhabene Mitte, Löcher, Chromkappe
+			face.call(rr * 0.95, rim_m, xf - 0.01, 0.02)
+			face.call(rr * 0.46, rim_m, xf + 0.001, 0.01)
 			for k in n:
 				var a := TAU * k / n + 0.3
-				var hole := _add(spin, _disc(rr * 0.13, 0.008), dark, Vector3(s * (o + 0.0165), cos(a) * rr * 0.62, sin(a) * rr * 0.62))
-				hole.rotation_degrees.z = 90
-			face.call(rr * 0.24, chrome, 0.02)
+				_add(spin, _disc(rr * 0.12, 0.003), dark, Vector3(s * (xf + 0.0003), cos(a) * rr * 0.68, sin(a) * rr * 0.68)).rotation_degrees.z = 90
+			nut_x = xf + 0.006
+			lip_in = 0.93
 		"aero":
 			# Aero-Scheibe: geschlossen und glatt, kleine Kühlschlitze am Rand
-			face.call(rr, rim_m, 0.008, 0.02)
+			face.call(rr, rim_m, o + 0.008, 0.02)
 			for k in n * 2:
 				var a := TAU * k / (n * 2)
 				var sl := _add(spin, box(Vector3(0.006, 0.06, 0.022)), dark, Vector3(s * (o + 0.0185), cos(a) * rr * 0.76, sin(a) * rr * 0.76))
 				sl.rotation.x = a + PI / 2.0
-			face.call(rr * 0.3, rim_m, 0.016, 0.014)
-	# Radmuttern und Nabendeckel
-	if style != "aero":
-		for k in 5:
-			var a := TAU * k / 5.0
-			var nut := _add(spin, _disc(0.014, 0.012), chrome, Vector3(s * (o + 0.027), cos(a) * rr * 0.15, sin(a) * rr * 0.15))
-			nut.rotation_degrees.z = 90
-		face.call(rr * 0.07, dark, 0.028, 0.008)
-	if style != "steel":
-		var lip := TorusMesh.new()
-		lip.inner_radius = rr * lip_in
-		lip.outer_radius = rr
-		lip.rings = 40
-		lip.ring_segments = 8
-		var lm := _add(spin, lip, chrome if style == "dish" else rim_m, Vector3(s * (o + 0.016), 0, 0))
-		lm.rotation_degrees.z = 90
-		lm.scale = Vector3(1, 0.35, 1)
+			face.call(rr * 0.3, rim_m, o + 0.016, 0.014)
+		"holes":
+			# Lochfelge (Retro, Telefon-Wählscheibe): geschlossene Scheibe mit großen runden Löchern
+			face.call(rr * 0.95, rim_m, xf - 0.01, 0.02)
+			var hr := rr * (0.2 if n <= 5 else 0.13)
+			for k in n:
+				var a := TAU * k / n
+				var hp := Vector2(cos(a), sin(a)) * rr * 0.6
+				_add(spin, _disc(hr * 1.15, 0.003), barrel_m, Vector3(s * (xf + 0.0004), hp.x, hp.y)).rotation_degrees.z = 90
+				_add(spin, _disc(hr, 0.004), dark, Vector3(s * (xf + 0.0009), hp.x, hp.y)).rotation_degrees.z = 90
+			face.call(rr * 0.32, rim_m, xf + 0.002, 0.014)
+			nut_x = xf + 0.009
+			lip_in = 0.92
+		"cap":
+			# Radkappe aus Kunststoff über einer Stahlfelge: erhabener Ring, Schlitze, Mitte mit Emblem
+			face.call(rr * 0.94, rim_m, xf - 0.008, 0.016)
+			var ring := TorusMesh.new()
+			ring.inner_radius = rr * 0.72
+			ring.outer_radius = rr * 0.84
+			ring.rings = 40
+			ring.ring_segments = 6
+			var rm := _add(spin, ring, rim_m, Vector3(s * xf, 0, 0))
+			rm.rotation_degrees.z = 90
+			rm.scale = Vector3(1, 0.3, 1)
+			for k in n:
+				var a := TAU * k / n
+				var sl := _add(spin, box(Vector3(0.004, rr * 0.16, 0.018)), dark, Vector3(s * (xf + 0.001), cos(a) * rr * 0.56, sin(a) * rr * 0.56))
+				sl.rotation.x = a
+			face.call(rr * 0.26, rim_m, xf + 0.004, 0.012)
+			face.call(rr * 0.09, chrome, xf + 0.011, 0.004)
+			lip_in = 0.93
+			lip_m = dark
+		"clover":
+			# Kleeblatt: polierte Blätter, die zum Rand hin breiter werden, dazwischen schwarz eloxiert
+			face.call(rr * 0.92, dark, xf - 0.012, 0.012)
+			for k in n:
+				var a := TAU * k / n
+				var po := Vector2(cos(a), sin(a))
+				_spoke_pts(spin, rim_m, Vector3(s * xf, po.x * rr * 0.9, po.y * rr * 0.9),
+					Vector3(s * (xf - cv), po.x * rr * 0.3, po.y * rr * 0.3), 0.13, 0.014, s)
+			face.call(rr * 0.36, rim_m, hub_x, 0.024)
+			lip_in = 0.92
+		"wire":
+			# Drahtspeichen: zwei Lagen dünner, gekreuzter Speichen, Zentralmutter mit Flügeln
+			for k in n * 2:
+				var a := TAU * k / (n * 2)
+				var odd := k % 2 == 1
+				spoke.call(a, rr * 0.2, rr * 0.93, 0.006, -0.5 if odd else 0.5, 0.006, chrome, -0.004 if odd else 0.0)
+			face.call(rr * 0.18, chrome, hub_x + 0.006, 0.036)
+			face.call(rr * 0.1, chrome, hub_x + 0.03, 0.012)
+			var ear := _add(spin, box(Vector3(0.008, rr * 0.38, 0.014)), chrome, Vector3(s * (hub_x + 0.04), 0, 0))
+			ear.rotation.x = 0.4
+			lip_in = 0.9
+			lip_m = chrome
+		"center":
+			# Zentralverschluss: Y-Speichen, eine große Mutter statt Radmuttern
+			for k in n:
+				var a := TAU * k / n
+				spoke.call(a, rr * 0.12, rr * 0.55, 0.055)
+				for e in [-1.0, 1.0]:
+					spoke.call(a + e * 0.16, rr * 0.5, rr * 0.95, 0.03, e * 0.28)
+			face.call(rr * 0.27, rim_m, hub_x, 0.024)
+			face.call(rr * 0.14, mat(Color(0.8, 0.08, 0.05), 0.6, 0.3), nut_x + 0.012, 0.024).mesh = _hex(rr * 0.14, 0.024)
+			face.call(rr * 0.05, chrome, nut_x + 0.026, 0.006)
+	# Radmuttern (Sechskant) und Nabendeckel mit kleinem Emblem
+	if style not in ["aero", "cap", "wire", "center"]:
+		var lugs: int = rim.get("lugs", 5)
+		for k in lugs:
+			var a := TAU * k / lugs + 0.3
+			_add(spin, _hex(0.0115, 0.014), chrome, Vector3(s * (nut_x + 0.006), cos(a) * rr * 0.19, sin(a) * rr * 0.19)).rotation_degrees.z = 90
+		if style == "steel":
+			face.call(rr * 0.12, chrome, nut_x + 0.006, 0.016)
+		else:
+			face.call(rr * 0.085, dark, nut_x + 0.004, 0.008)
+			face.call(rr * 0.045, chrome, nut_x + 0.009, 0.003)
+	# Ventil am Horn
+	if style not in ["aero", "cap"]:
+		var va := 2.4
+		var vr := rr * 0.885
+		var vp := Vector2(cos(va), sin(va)) * vr
+		_add(spin, _disc(0.0042, 0.024), dark, Vector3(s * (xf - 0.004), vp.x, vp.y)).rotation_degrees.z = 90
+		_add(spin, _disc(0.005, 0.008), chrome, Vector3(s * (xf + 0.01), vp.x, vp.y)).rotation_degrees.z = 90
+	# Horn (Felgenrand)
+	var lip := TorusMesh.new()
+	lip.inner_radius = rr * lip_in
+	lip.outer_radius = rr
+	lip.rings = 40
+	lip.ring_segments = 8
+	var lm := _add(spin, lip, lip_m, Vector3(s * (o + 0.016), 0, 0))
+	lm.rotation_degrees.z = 90
+	lm.scale = Vector3(1, 0.35, 1)
+
+
+## Rotationsband zwischen dem Kreis (r0 bei x0) und dem Kreis (r1 bei x1) um die X-Achse: Rohr, Kegelstumpf oder
+## flacher Ring. hint (x, r) gibt an, wohin die Vorderseite zeigt (z. B. (0, -1) zur Achse, (s, 0) nach außen).
+static func _band(r0: float, x0: float, r1: float, x1: float, hint: Vector2, seg := 40) -> ArrayMesh:
+	var key := "band_%.4f_%.4f_%.4f_%.4f_%.1f_%.1f" % [r0, x0, r1, x1, hint.x, hint.y]
+	if _mesh_cache.has(key):
+		return _mesh_cache[key]
+	var d := Vector2(x1 - x0, r1 - r0)
+	var n2 := Vector2(-d.y, d.x).normalized()
+	if n2.dot(hint) < 0.0:
+		n2 = -n2
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for k in seg:
+		var a0 := TAU * k / seg
+		var a1 := TAU * (k + 1) / seg
+		var A := Vector3(x0, r0 * cos(a0), r0 * sin(a0))
+		var B := Vector3(x0, r0 * cos(a1), r0 * sin(a1))
+		var C := Vector3(x1, r1 * cos(a0), r1 * sin(a0))
+		var D := Vector3(x1, r1 * cos(a1), r1 * sin(a1))
+		var na := Vector3(n2.x, n2.y * cos(a0), n2.y * sin(a0))
+		var nb := Vector3(n2.x, n2.y * cos(a1), n2.y * sin(a1))
+		var nf := (na + nb).normalized()
+		_tri(st, A, C, D, na, na, nb, nf)
+		_tri(st, A, D, B, na, nb, nb, nf)
+	var m := st.commit()
+	_mesh_cache[key] = m
+	return m
+
+
+## Sechskant (Radmuttern, Zentralmutter): Zylinder mit sechs Ecken entlang Y
+static func _hex(r: float, h: float) -> CylinderMesh:
+	var key := "hex_%.4f_%.4f" % [r, h]
+	if _mesh_cache.has(key):
+		return _mesh_cache[key]
+	var c := CylinderMesh.new()
+	c.top_radius = r
+	c.bottom_radius = r
+	c.height = h
+	c.radial_segments = 6
+	c.rings = 1
+	_mesh_cache[key] = c
+	return c
+
+
+## Unschärfescheibe für schnell drehende Räder: flacher Ring (Vorderseite +X) in Vertexfarben. Innen und am Horn
+## fast durchsichtig, im Speichenbereich deckend in der Mischfarbe aus Speichen und dunklem Felgenbett (je nachdem,
+## wie viel Fläche die Speichen bedecken), mit feinen konzentrischen Streifen wie auf echten Aufnahmen.
+static func _blur_mesh(rr: float, c: Color, style: String) -> ArrayMesh:
+	var key := "blur_%.4f_%s_%s" % [rr, c.to_html(), style]
+	if _mesh_cache.has(key):
+		return _mesh_cache[key]
+	var cov: float = {"steel": 0.95, "aero": 0.95, "cap": 0.95, "holes": 0.85, "clover": 0.75, "wire": 0.35, "thin": 0.5,
+		"mesh": 0.5, "cross": 0.55, "rally": 0.65, "te": 0.55, "dish": 0.4, "ten": 0.4, "concave": 0.5}.get(style, 0.45)
+	var mid := Color(0.05, 0.05, 0.055).lerp(c, cov)
+	var rings := [[0.1, 0.0], [0.15, 0.45], [0.24, 0.55], [0.32, 0.93], [0.45, 0.97], [0.58, 0.95], [0.7, 0.97], [0.82, 0.95], [0.92, 0.85], [0.985, 0.0]]
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var seg := 40
+	var col := []
+	for i in rings.size():
+		var cc := mid.lightened(0.07) if i % 2 == 0 else mid.darkened(0.07)
+		cc.a = rings[i][1]
+		col.append(cc)
+	for i in rings.size() - 1:
+		var r0: float = rings[i][0] * rr
+		var r1: float = rings[i + 1][0] * rr
+		for k in seg:
+			var a0 := TAU * k / seg
+			var a1 := TAU * (k + 1) / seg
+			# Reihenfolge so, dass die Vorderseite nach +X zeigt (Godot: im Uhrzeigersinn von vorn)
+			for v in [[r0, a0, i], [r1, a1, i + 1], [r1, a0, i + 1], [r0, a0, i], [r0, a1, i], [r1, a1, i + 1]]:
+				st.set_color(col[v[2]])
+				st.set_normal(Vector3.RIGHT)
+				st.add_vertex(Vector3(0.0, v[0] * cos(v[1]), v[0] * sin(v[1])))
+	var m := st.commit()
+	_mesh_cache[key] = m
+	return m
+
+
+## Felge eines Autos mit Tuning: Bauart, Speichen, Farbe und Radmuttern ("Serie" = Werksfelge des Autos), Zoll
+## (Werk + Aufschlag der Felge + Zoll-Tuning, höchstens so groß, dass 4,5 cm Reifenflanke bleiben), Radius in
+## Modellmaßen (das Rad wird danach auf wheel_r skaliert) und Reifengröße als Text (z. B. "225/40 R18").
+static func rim_spec(car_id: String, cfg: Dictionary) -> Dictionary:
+	var S: Dictionary = SHAPES.get(car_id, SHAPES["kaizen"])
+	var wr := wheel_r(S)
+	var opt := Catalog.part_of(cfg, "rims")
+	var fac: Array = Catalog.FACTORY_RIMS.get(car_id, ["std", 7, Color(0.62, 0.63, 0.66), 16, 5])
+	var r := opt.duplicate()
+	if int(cfg.get("rims", 0)) == 0:
+		r["style"] = fac[0]
+		r["spokes"] = fac[1]
+		r["color"] = fac[2]
+	r["lugs"] = fac[4]
+	var max_in := floori((wr - 0.045) / 0.0127)
+	var std_in := mini(int(fac[3]) + int(opt.get("plus", 0)), max_in)
+	var inch := clampi(std_in + int(Catalog.part_of(cfg, "rimsize")["inch"]), 13, max_in)
+	r["inch"] = inch
+	r["std_in"] = std_in
+	r["max_in"] = max_in
+	r["radius"] = inch * 0.0127 * WHEEL_R / wr
+	var width := roundi((float(S.get("tire_w", 0.24)) * 1000.0 - 5.0) / 10.0) * 10 + 5
+	var prof := clampi(roundi((wr - inch * 0.0127) * 1000.0 / width * 20.0) * 5, 20, 80)
+	r["tire"] = "%d/%d R%d" % [width, prof, inch]
+	return r
 
 
 ## Bodykits 3–6: Street (lackierte Lippe, Schweller, Heckschürze), Rallye (Schmutzfänger, Unterfahrschutz,
@@ -2258,12 +2563,32 @@ static func engine_rear(S: Dictionary) -> bool:
 	return S.get("mid", false) or S.get("rear_engine", false)
 
 
-## Animiert Räder, Lenkung, Karosserie-Neigung und Nitroflammen.
-static func animate(car: Node3D, speed: float, steer: float, roll: float, pitch: float, nitro_on: bool, delta: float) -> void:
+## Animiert Räder, Lenkung, Karosserie-Neigung und Nitroflammen. wheel_v (optional, Vector2): Umfangsgeschwindigkeit
+## der Räder vorn und hinten in m/s, wenn sie nicht zum Tempo passt (blockiert = 0, durchdrehend = mehr als speed).
+static func animate(car: Node3D, speed: float, steer: float, roll: float, pitch: float, nitro_on: bool, delta: float, wheel_v = null) -> void:
 	for p in car.get_meta("front_pivots"):
 		p.rotation.y = -steer * 0.5
-	for s in car.get_meta("spinners"):
-		s.rotation.x -= speed / float(car.get_meta("wheel_r", WHEEL_R)) * delta
+	var wr: float = car.get_meta("wheel_r", WHEEL_R)
+	var period: float = car.get_meta("rim_period", TAU / 5.0)
+	var sp: Array = car.get_meta("spinners")
+	var bl: Array = car.get_meta("blurs", [])
+	for i in sp.size():
+		var v := speed
+		if wheel_v is Vector2:
+			v = wheel_v.x if i < 2 else wheel_v.y
+		# Das Bild kommt 60-mal je Sekunde: dreht sich ein Rad dazwischen um mehr als eine halbe Speichenteilung,
+		# scheint es zu stehen oder rückwärts zu laufen. Darüber dreht es sichtbar nur noch so schnell wie gerade noch
+		# erkennbar, und die Unschärfescheibe blendet ein (wie auf echten Aufnahmen).
+		var step := v / wr * delta
+		var lim := period * 0.42
+		var sn: Node3D = sp[i]
+		sn.rotation.x = wrapf(sn.rotation.x - clampf(step, -lim, lim), -PI, PI)
+		if i < bl.size():
+			var k := smoothstep(period * 0.12, period * 0.4, absf(step))
+			var b: MeshInstance3D = bl[i]
+			b.visible = k > 0.01
+			if b.visible:
+				(b.material_override as StandardMaterial3D).albedo_color.a = k
 	var body: Node3D = car.get_meta("body")
 	body.rotation.z = lerpf(body.rotation.z, roll, 8.0 * delta)
 	body.rotation.x = lerpf(body.rotation.x, pitch, 6.0 * delta)
