@@ -97,19 +97,33 @@ T-Shirt (manche mit Aufdruck), Langarm, Hoodie mit Kapuze und Kordeln, offene Ja
 kurze oder lange Haare, Zopf, Dutt, Glatze, Kappe, Mütze; dazu schmale und kräftige Statur. In der Ferne (je nach
 Detaildichte ab 30–96 m) zeigt das Spiel die einfache Blockfigur, die kostet kaum etwas.
 
-**Freischalten:** Rennsiege (Sprint + Rundkurs) und Driftsiege werden getrennt gezählt. Mit jedem Rennsieg bis zum
-14. kommt ein Auto dazu, jedes ein Stück stärker (Klasse D, C, B, A). Driftautos (Hachi, Sakura, Kitsune, Mirai,
-Kumo, Ronin) gibt es auch für Driftsiege, Teile für Siege insgesamt. Die letzten fünf (Klasse S: Vortex GT-R,
-Ronin DR, Shiden NX-1, Ryujin 30Z, Kaze TT) sind gleich stark (Leistungsindex ~456) und unterscheiden sich nur im
-Charakter: Grip, Antritt, Lenkung, Drift oder Endtempo. Die Garage zeigt Klasse und Leistungsindex (mit Tuning bis
-~770). Wer mit den alten Schwellen (bis 2.10) schon ein Auto hatte, behält es.
+**Freischalten:** Rennsiege (Sprint + Rundkurs) und Driftsiege werden getrennt gezählt. 23 Autos: zwei sind von
+Anfang an frei (Kaizen Rally S und der Kei-Wagen Chibi K-Turbo), danach kommt mit fast jedem Rennsieg bis zum 17. ein
+Auto dazu, jedes ein Stück stärker (Klasse D, C, B, A). Driftautos (Hachi, Hotaru, Sakura, Kaido, Kitsune, Hakone,
+Mirai, Kumo, Ronin) gibt es auch für Driftsiege, Teile für Siege insgesamt. Alle Autos der Klasse S (Vortex GT-R,
+Ronin DR, Shiden NX-1, Ryujin 30Z, Kaze TT und die drei Exoten Kagura V10, Falke 9 RS, Furia V12) sind gleich stark
+(Leistungsindex ~456) und unterscheiden sich nur im Charakter: Grip, Antritt, Lenkung, Drift oder Endtempo. Die
+Garage zeigt Klasse und Leistungsindex (mit Tuning bis ~770). Wer mit den alten Schwellen (bis 2.10) schon ein Auto
+hatte, behält es.
 
-![Alle 15 Autos von vorn](update_bilder/autos_alle_15_vorn.jpg)
-![Alle 15 Autos von hinten](update_bilder/autos_alle_15_heck.jpg)
+![Alle 23 Autos von vorn](update_bilder/autos_alle_23_vorn.jpg)
+![Alle 23 Autos von hinten](update_bilder/autos_alle_23_heck.jpg)
 
-Alle 15 Autos ab Werk, in der Reihenfolge des Freischaltens: Kaizen Rally S, Hachi Touge, Sakura D2, Hayate R8,
-Kitsune 18S (oben) · Tsubame Spyder, Mirai 240R, Tenshi MR-T, Kumo JX6, Raijin RS-4 (Mitte) · Vortex GT-R, Ronin DR,
-Shiden NX-1, Ryujin 30Z, Kaze TT (unten, Klasse S).
+Alle 23 Autos ab Werk, in der Reihenfolge des Freischaltens (je Zeile fünf): Kaizen Rally S, Chibi K-Turbo, Hachi
+Touge, Hotaru MR-K, Sakura D2 · Kaido 2000GT, Hayate R8, Kitsune 18S, Tsubame Spyder, Hakone 240 · Mirai 240R,
+Tanuki R4, Tenshi MR-T, Kumo JX6, Raijin RS-4 · Vortex GT-R, Ronin DR, Shiden NX-1, Ryujin 30Z, Kaze TT · Kagura V10,
+Falke 9 RS, Furia V12 (Exoten).
+
+| Neu in 2.17 | Art | Antrieb | Klasse | frei ab |
+|---|---|---|---|---|
+| Chibi K-Turbo | Kei-Wagen mit Turbo-Dreizylinder und Hutze | Front | D | Start |
+| Hotaru MR-K | Kei-Roadster mit Mittelmotor und Stoffverdeck | Mittelmotor | D | 2 Rennsiege oder 1 Driftsieg |
+| Kaido 2000GT | 70er-Hardtop mit Reihensechser, Chrom, Verbreiterungen | Heck | C | 3 Rennsiege oder 1 Driftsieg |
+| Hakone 240 | 70er-Fließheck mit langer Haube, Scheinwerfer in Mulden | Heck | B | 5 Rennsiege oder 2 Driftsiege |
+| Tanuki R4 | Allrad-Kleinwagen mit Turbo-Dreizylinder | Allrad | B | 7 Rennsiege |
+| Kagura V10 | Supersportwagen mit V10 vorn, drei Endrohre | Heck | S | 15 Rennsiege |
+| Falke 9 RS | Heckmotor-Boxer, runde Scheinwerfer auf den Kotflügeln | Heckmotor | S | 16 Rennsiege |
+| Furia V12 | flacher V12-Keil, 2,03 m breit | Allrad | S | 17 Rennsiege |
 
 ## Städte (echte Orte)
 Die Strecken folgen echten Straßen, die Wahrzeichen stehen an ihrem Platz, die Häuser hinter der Straßenfront
@@ -423,11 +437,17 @@ dann steht „Benutzerdefiniert“ da. Werte in `GameState.GFX`.
   Handbremse dreht bei 80 km/h in 0,8 s um gut 90°. Bremsen ~2,4 g, Gegenlenken geht schneller als Einlenken.
   Karosserie wankt nach der echten Querbeschleunigung, taucht beim Bremsen ein; die Verfolgerkamera dreht leicht
   verzögert mit und bleibt nah am Auto (im Stand 4,7 m, bei Tempo knapp 7 m, Blickwinkel 58°–80°). Messwerte aller Autos: `tools/handling_lab.tscn`.
-- **Autos** (15) sind aus Querschnitten gebaut (Radhäuser, Kotflügel-Buckel, Hüften, eingezogenes Glashaus), lose
+- **Autos** (23) sind aus Querschnitten gebaut (Radhäuser, Kotflügel-Buckel, Hüften, eingezogenes Glashaus), lose
   angelehnt an RX-7, 350Z, Civic EG, Silvia, Skyline, AE86, S2000/MX-5, Lancer Evo/Impreza, Supra, Integra (vier runde
   Scheinwerfer, Flügel auf der Klappe), 180SX (Klappscheinwerfer, Fließheck), MR2 und NSX (Mittelmotor: Kabine vorn,
   Lufteinlässe in den Flanken, Motor in der Garage hinten), Chaser (Viertürer mit Chrom) und 300ZX (Glasdach mit
-  Mittelsteg, Leuchtenband über die ganze Breite). Der Startwagen
+  Mittelsteg, Leuchtenband über die ganze Breite). Seit 2.17 dazu Kei-Autos (Alto Works, Beat), ein Allrad-Kleinwagen
+  (GR Yaris), zwei 70er-Klassiker (Hakosuka mit Chromstoßstangen und aufgeschraubten Verbreiterungen, S30 mit
+  Scheinwerfern in Mulden) und drei Exoten (LFA, 911 mit runden Scheinwerfern auf den Kotflügeln und Heckmotor,
+  Countach-Keil mit Y-Leuchten). Radgröße (`wheel_r`) und Achsabstand zu Bug und Heck (`axle`) stehen je Auto in
+  `SHAPES`: Kei-Wagen rollen auf 0,27-m-Rädern mit kurzen Überhängen, die Exoten auf 0,34 m mit langen; das ganze Rad
+  (Reifen, Felge, Bremse) wird dafür skaliert. Neuer Antrieb `rr` (Heckmotor): viel Traktion beim Start, das Heck
+  kommt leichter als beim Mittelmotor. Der Startwagen
   Kaizen ist ein JDM-Fließheck: langes Dach, steile Heckscheibe, schmale Scheinwerfer, durchgehendes Leuchtenband,
   Dachspoiler, Sonnenstreifen mit Schriftzug, rotes Emblem und Abschlepphaken, unten schwarz abgesetzt, ab Werk tiefer
   und in Championship-Weiß (Lack-Stufe „Werkslack“ ist je Auto eigen, `CARS.paint`). Front- und

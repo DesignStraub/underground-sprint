@@ -4,9 +4,10 @@ extends RefCounted
 ## Teile: "wins" = so viele Siege insgesamt (Rennen + Drift).
 ## "drift" (0..1): wie willig das Auto quer geht und im Drift bleibt.
 
-## Leistung: Jedes Auto, das du freischaltest, ist ein Stück stärker (Klasse D bis A). Die letzten fünf (Klasse S) haben
-## die gleiche Grundleistung (Leistungsindex ~456) und unterscheiden sich nur im Charakter: Grip, Antritt, Endtempo,
-## Lenkung, Drift. "class" steht in der Garage, rating() rechnet den Index aus.
+## Leistung: Jedes Auto, das du freischaltest, ist ein Stück stärker (Klasse D bis A). Die Autos der Klasse S (auch die
+## drei Exoten am Ende) haben die gleiche Grundleistung (Leistungsindex ~456) und unterscheiden sich nur im Charakter:
+## Grip, Antritt, Endtempo, Lenkung, Drift. "class" steht in der Garage, rating() rechnet den Index aus.
+## drive: fwd, rwd, mr (Mittelmotor), rr (Heckmotor), awd.
 const CARS := {
 	"kaizen": {
 		"drive": "fwd", "name": "Kaizen Rally S", "style": "hatch", "class": "D", "unlock": {}, "drift": 0.35, "paint": Color(0.92, 0.92, 0.89),
@@ -128,11 +129,78 @@ const CARS := {
 		# Reihensechser mit zwei Turbos
 		"sound": {"cyl": 6, "harm": [1.0, 0.55, 0.32, 0.14], "sub": 0.2, "turbo": 1.0, "rough": 0.15},
 	},
+	# --- Kleinwagen ---
+	"chibi": {
+		"drive": "fwd", "name": "Chibi K-Turbo", "style": "hatch", "class": "D", "unlock": {}, "drift": 0.4, "paint": Color(0.82, 0.06, 0.08),
+		"length": 3.4, "width": 1.48,
+		"accel": 10.0, "top_speed": 56.0, "grip": 27.5, "steer": 2.75,
+		"desc": "Winziger Kei-Wagen mit Turbo und Hutze. Wenig Endtempo, passt aber durch jede Lücke.",
+		# Kleiner Turbo-Dreizylinder, kernig und surrend
+		"sound": {"cyl": 3, "harm": [1.0, 0.62, 0.38, 0.2], "sub": 0.5, "turbo": 0.7, "rough": 0.42},
+	},
+	"hotaru": {
+		"drive": "mr", "name": "Hotaru MR-K", "style": "roadster", "class": "D", "unlock": {"race": 2, "drift": 1}, "drift": 0.55, "paint": Color(0.97, 0.82, 0.06),
+		"length": 3.3, "width": 1.4,
+		"accel": 10.3, "top_speed": 57.5, "grip": 29.5, "steer": 2.85,
+		"desc": "Offener Kei-Roadster mit Mittelmotor. Dreht bis 8.500/min und lenkt wie ein Go-Kart.",
+		# Hochdrehender Dreizylinder-Sauger direkt hinter dir
+		"sound": {"cyl": 3, "harm": [1.0, 0.42, 0.34, 0.22], "sub": 0.35, "turbo": 0.0, "rough": 0.22},
+	},
+	"tanuki": {
+		"drive": "awd", "name": "Tanuki R4", "style": "hatch", "class": "B", "unlock": {"race": 7}, "drift": 0.4, "paint": Color(0.88, 0.89, 0.9),
+		"length": 3.99, "width": 1.8,
+		"accel": 11.9, "top_speed": 63.5, "grip": 29.0, "steer": 2.6,
+		"desc": "Kleinwagen mit Allrad, Turbo-Dreizylinder und Rallye-Genen. Schießt aus engen Kurven.",
+		# Großer Turbo-Dreizylinder, rau und bassig
+		"sound": {"cyl": 3, "harm": [1.0, 0.66, 0.4, 0.18], "sub": 0.6, "turbo": 0.95, "rough": 0.45},
+	},
+	# --- JDM-Klassiker ---
+	"kaido": {
+		"drive": "rwd", "name": "Kaido 2000GT", "style": "sedan", "class": "C", "unlock": {"race": 3, "drift": 1}, "drift": 0.75, "paint": Color(0.6, 0.62, 0.64),
+		"length": 4.4, "width": 1.66,
+		"accel": 10.6, "top_speed": 61.0, "grip": 24.0, "steer": 2.35,
+		"desc": "70er-Hardtop mit Reihensechser, Chrom und aufgeschraubten Verbreiterungen. Kantig, laut, gutmütig.",
+		# Rauer Reihensechser-Sauger mit Vergasern
+		"sound": {"cyl": 6, "harm": [1.0, 0.62, 0.42, 0.22], "sub": 0.28, "turbo": 0.0, "rough": 0.38},
+	},
+	"hakone": {
+		"drive": "rwd", "name": "Hakone 240", "style": "coupe", "class": "B", "unlock": {"race": 5, "drift": 2}, "drift": 0.7, "paint": Color(0.55, 0.12, 0.08),
+		"length": 4.15, "width": 1.63,
+		"accel": 11.3, "top_speed": 65.0, "grip": 24.5, "steer": 2.4,
+		"desc": "Klassisches Fließheck-Coupé mit endlos langer Haube. Leicht, schmal und herrlich quer.",
+		# Reihensechser-Sauger, offen und kehlig
+		"sound": {"cyl": 6, "harm": [1.0, 0.56, 0.4, 0.2], "sub": 0.22, "turbo": 0.0, "rough": 0.3},
+	},
+	# --- Exoten ---
+	"kagura": {
+		"drive": "rwd", "name": "Kagura V10", "style": "coupe", "class": "S", "unlock": {"race": 15}, "drift": 0.45, "paint": Color(0.95, 0.95, 0.94),
+		"length": 4.5, "width": 1.9,
+		"accel": 13.6, "top_speed": 71.5, "grip": 26.5, "steer": 2.35,
+		"desc": "Japanischer Supersportwagen mit V10 vorn. Der stärkste Antritt im Spiel und ein Schrei bis 9.000/min.",
+		# Kreischender V10-Sauger
+		"sound": {"cyl": 10, "harm": [1.0, 0.34, 0.4, 0.26], "sub": 0.08, "turbo": 0.0, "rough": 0.08},
+	},
+	"falke": {
+		"drive": "rr", "name": "Falke 9 RS", "style": "coupe", "class": "S", "unlock": {"race": 16}, "drift": 0.5, "paint": Color(0.45, 0.7, 0.85),
+		"length": 4.55, "width": 1.85,
+		"accel": 13.0, "top_speed": 71.5, "grip": 31.0, "steer": 2.55,
+		"desc": "Sportwagen mit Boxer im Heck. Enorme Traktion, das Heck will aber mit Gefühl gefahren werden.",
+		# Boxer-Sechszylinder-Sauger: hart, metallisch
+		"sound": {"cyl": 6, "harm": [1.0, 0.48, 0.44, 0.26], "sub": 0.3, "turbo": 0.0, "rough": 0.28},
+	},
+	"furia": {
+		"drive": "awd", "name": "Furia V12", "style": "coupe", "class": "S", "unlock": {"race": 17}, "drift": 0.35, "paint": Color(0.55, 0.85, 0.1),
+		"length": 4.8, "width": 2.03,
+		"accel": 12.3, "top_speed": 75.0, "grip": 28.5, "steer": 2.0,
+		"desc": "Flacher V12-Keil mit Allrad, breiter als jeder Gegner. Zieht ewig, lenkt aber träge ein.",
+		# V12-Sauger: dicht, seidig, laut
+		"sound": {"cyl": 12, "harm": [1.0, 0.4, 0.3, 0.2], "sub": 0.06, "turbo": 0.0, "rough": 0.06},
+	},
 }
 
 ## Reihenfolge in der Garage = Reihenfolge des Freischaltens
-const CAR_ORDER := ["kaizen", "hachi", "sakura", "hayate", "kitsune", "tsubame", "mirai", "tenshi", "kumo", "raijin",
-	"vortex", "ronin", "shiden", "ryujin", "kaze"]
+const CAR_ORDER := ["kaizen", "chibi", "hachi", "hotaru", "sakura", "kaido", "hayate", "kitsune", "tsubame", "hakone",
+	"mirai", "tanuki", "tenshi", "kumo", "raijin", "vortex", "ronin", "shiden", "ryujin", "kaze", "kagura", "falke", "furia"]
 ## Bis Version 2.10 galten andere Schwellen: wer damit schon ein Auto freigeschaltet hatte, behält es
 const LEGACY_UNLOCK := {"hachi": {"race": 1, "drift": 1}, "mirai": {"race": 2, "drift": 1}, "sakura": {"drift": 1},
 	"tsubame": {"race": 3}, "vortex": {"race": 5}, "raijin": {"race": 7}, "ronin": {"drift": 3}, "kaze": {"race": 9, "drift": 4}}

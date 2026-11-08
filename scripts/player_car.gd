@@ -43,6 +43,7 @@ const DRIVE := {
 	"rwd": {"launch": 0.65, "oversteer": 1.0, "understeer": 0.0},
 	"mr": {"launch": 0.72, "oversteer": 1.25, "understeer": 0.0},
 	"awd": {"launch": 0.84, "oversteer": 0.3, "understeer": 0.06},
+	"rr": {"launch": 0.8, "oversteer": 1.4, "understeer": 0.03},  # Heckmotor: viel Traktion, Heck kommt leicht
 }
 const WALL_TURN_RATE := 4.0  # rad/s: so schnell dreht die Wand das Auto höchstens parallel (kein Sprung im Bild)
 const DRAG_LIMIT := 8000.0  # Begrenzer im Drag
@@ -158,6 +159,7 @@ var _shift_timer := 0.0
 var _shake := 0.0
 var _fov := 72.0
 var _length := 4.0
+var _axle := 0.78  # Vorderachse so weit hinter dem Bug
 var _spec: Dictionary
 var _spin := 0.0
 var _on_walk := false
@@ -203,6 +205,7 @@ func setup(car_id: String, cfg: Dictionary) -> void:
 	model = Builder.build(car_id, cfg)
 	add_child(model)
 	_length = model.get_meta("length")
+	_axle = model.get_meta("axle", 0.78)
 	# Grundriss mit runden Ecken (vorn stärker): an Kanten, Pfosten und Inselspitzen gleitet das Auto ab,
 	# statt frontal hängen zu bleiben
 	var col := CollisionShape3D.new()
@@ -775,7 +778,7 @@ func _rotate_front(angle: float, k: float) -> void:
 	if k <= 0.0:
 		rotate_y(angle)
 		return
-	var pivot := Vector3(0, 0, -(_length / 2.0 - 0.78))
+	var pivot := Vector3(0, 0, -(_length / 2.0 - _axle))
 	var before := global_transform * pivot
 	rotate_y(angle)
 	var after := global_transform * pivot

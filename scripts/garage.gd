@@ -353,9 +353,9 @@ func _view_for(cat: String) -> Array:
 	var spec: Dictionary = Catalog.CARS[preview_car]
 	var L: float = spec["length"]
 	var W: float = spec["width"]
-	var fz := -(L / 2.0 - 0.78)
+	var fz := -(L / 2.0 - Builder.axle(Builder.SHAPES.get(preview_car, {})))
 	# Mittelmotor: Motor hinten, Kofferraum (Nitro) vorn
-	if Builder.SHAPES.get(preview_car, {}).get("mid", false) and cat in ["engine", "turbo", "nitro"]:
+	if Builder.engine_rear(Builder.SHAPES.get(preview_car, {})) and cat in ["engine", "turbo", "nitro"]:
 		cat = "nitro" if cat != "nitro" else "engine"
 	match cat:
 		"paint":
@@ -908,11 +908,12 @@ func _cycle_car(dir: int) -> void:
 func _refresh_car() -> void:
 	var spec: Dictionary = Catalog.CARS[preview_car]
 	var unlocked := GameState.is_car_unlocked(preview_car)
-	menu.get_child(0).text = ("< %s >%s" % [spec["name"], "" if unlocked else tr("  [GESPERRT]")]).to_upper()
+	menu.get_child(0).text = ("< %s >%s" % [spec["name"], "" if unlocked else tr("  [GESPERRT]")]).to_upper() \
+		+ "  %d/%d" % [Catalog.CAR_ORDER.find(preview_car) + 1, Catalog.CAR_ORDER.size()]
 	_show_stats(preview_car, preview_cfg)
 	menu.get_child(1).disabled = not unlocked
 	info.text = tr(spec["desc"]) + tr("\nHöchstgeschwindigkeit ab Werk: %d km/h") % int(spec["top_speed"] * 3.6) \
-		+ tr("\nAntrieb: ") + tr({"fwd": "Frontantrieb", "rwd": "Heckantrieb", "mr": "Mittelmotor, Heckantrieb", "awd": "Allrad"}[spec.get("drive", "rwd")])
+		+ tr("\nAntrieb: ") + tr({"fwd": "Frontantrieb", "rwd": "Heckantrieb", "mr": "Mittelmotor, Heckantrieb", "rr": "Heckmotor, Heckantrieb", "awd": "Allrad"}[spec.get("drive", "rwd")])
 	if not unlocked:
 		info.text += tr("\nFreischalten: ") + GameState.unlock_text(preview_car)
 
