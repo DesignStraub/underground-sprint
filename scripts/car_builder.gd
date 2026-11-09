@@ -25,8 +25,7 @@ static var _mesh_cache := {}  # Reifen, Speichen, Flügel, Kennzeichen: einmal g
 ##   round_f/round_r: Rundung der Ecken in der Draufsicht, tumble: so viel schmaler ist das Dach,
 ##   hl/tl: Hautband -> bis/ab welchem t es leuchtet (Scheinwerfer/Rückleuchten), doors: Türfugen,
 ##   intake: Lufteinlass vorn (Anteil der Breite, Höhe)
-## Optional: pipes/pipe_r (Endrohre), tire_w (Reifenbreite), softtop (Stoffverdeck), black_bumpers (Schürzen aus
-##   schwarzem Kunststoff), trim_low (schwarzer Streifen unten an der Flanke), wheel_r (Radradius), axle (Achse so weit
+## Optional: pipes/pipe_r (Endrohre), tire_w (Reifenbreite), softtop (Stoffverdeck), wheel_r (Radradius), axle (Achse so weit
 ##   von Bug und Heck), mid (Mittelmotor: Einlässe in den Flanken), rear_engine (Heckmotor), chrome_bumpers
 ##   (Chromstoßstangen), overfenders (aufgeschraubte Kotflügelverbreiterungen)
 const SHAPES := {
@@ -35,7 +34,7 @@ const SHAPES := {
 		"nose": 0.6, "hood": 0.82, "cowl": 0.3, "rf": 0.49, "rr": 0.66, "ge": 0.935, "cp": 0.85,
 		"roof": 1.29, "deck": 0.99, "tail": 0.95, "belt": 0.8, "fender": 0.0, "hips": 0.02,
 		"round_f": 0.22, "round_r": 0.08, "tumble": 0.15, "hl": {}, "tl": {},
-		"doors": [0.315, 0.62], "intake": Vector2(0.48, 0.06), "pipes": [0.46], "pipe_r": 0.085, "trim_low": true,
+		"doors": [0.315, 0.62], "intake": Vector2(0.48, 0.06), "pipes": [0.46], "pipe_r": 0.085,
 		"drop": 0.035,  # ab Werk etwas tiefer
 	},
 	"mirai": {  # 350Z: lange Haube, Dachbogen fließt ins kurze Heck, breite Hüften
@@ -85,7 +84,7 @@ const SHAPES := {
 		"roof": 1.22, "deck": 0.96, "tail": 0.95, "belt": 0.87, "fender": 0.0, "hips": 0.015,
 		"round_f": 0.05, "round_r": 0.04, "tumble": 0.15, "hl": {}, "tl": {},
 		"doors": [0.385, 0.66], "intake": Vector2(0.7, 0.05), "pipes": [-0.46], "pipe_r": 0.04,
-		"tire_w": 0.2, "black_bumpers": true, "trim_low": true,
+		"tire_w": 0.2,
 	},
 	"hayate": {  # 90er-Coupé (Integra-Gefühl): flache Nase mit vier runden Scheinwerfern, lange schräge
 		# Heckklappe, Eckleuchten, hoher Flügel auf der Klappe
@@ -134,7 +133,7 @@ const SHAPES := {
 		"nose": 0.66, "hood": 0.87, "cowl": 0.27, "rf": 0.43, "rr": 0.81, "ge": 0.972, "cp": 0.93,
 		"roof": 1.38, "deck": 0.99, "tail": 0.97, "belt": 0.86, "fender": 0.0, "hips": 0.01,
 		"round_f": 0.15, "round_r": 0.05, "tumble": 0.1, "hl": {}, "tl": {},
-		"doors": [0.3, 0.6], "intake": Vector2(0.42, 0.07), "pipes": [0.36], "pipe_r": 0.045, "trim_low": true,
+		"doors": [0.3, 0.6], "intake": Vector2(0.42, 0.07), "pipes": [0.36], "pipe_r": 0.045,
 		"wheel_r": 0.275, "axle": 0.56, "tire_w": 0.17,
 	},
 	"hotaru": {  # Kei-Mittelmotor-Roadster (Beat-Gefühl): winzig, flach, Stoffverdeck, Kabine in der Mitte, flaches Heck
@@ -237,7 +236,6 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 		"tail": mat(Color(0.6, 0, 0), 0, 0.3, Color(1, 0.05, 0.02), 2.2),
 		"stripe": stripe_m,
 		"carbon": carbon_mat(),
-		"trim": mat(Color(0.035, 0.035, 0.04), 0.1, 0.7),
 		"top": mat(Color(0.03, 0.03, 0.035), 0.0, 0.95),
 	}
 	_shell(body, S, W, L, flare, int(cfg.get("vinyl", 0)), mats, hood == 5 or hood == 6)
@@ -312,7 +310,7 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 			for s in [-1, 1]:
 				_add(fb, box(Vector3(0.12, 0.055, 0.012)), dark, Vector3(s * (fw - 0.14), CLEARANCE + 0.13, zf - 0.004))
 				_add(fb, _disc(0.026, 0.012), amber, Vector3(s * (fw - 0.14), CLEARANCE + 0.13, zf - 0.008)).rotation_degrees.x = 90
-		"hachi":  # Klappscheinwerfer (zu), breite Stand- und Blinklichter im schwarzen Stoßfänger, Kühlerschlitz
+		"hachi":  # Klappscheinwerfer (zu), breite Stand- und Blinklichter im Stoßfänger, Kühlerschlitz
 			for s in [-1, 1]:
 				for z in [0.28, 0.56]:
 					var ps: PackedVector2Array = _section(S, z / L, W, L, flare)["p"]
@@ -323,8 +321,8 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 				_add(fb, box(Vector3(0.24, 0.045, 0.012)), mat(Color(0.95, 0.95, 0.9), 0, 0.3, Color(1, 0.95, 0.85), 1.4),
 					Vector3(s * (fw - 0.22), CLEARANCE + 0.31, zf - 0.005))
 				_add(fb, box(Vector3(0.09, 0.045, 0.012)), amber, Vector3(s * (fw - 0.05), CLEARANCE + 0.31, zf - 0.005))
-			# Stoßfängerleiste aus schwarzem Kunststoff mit Kühlerschlitz
-			_add(fb, box(Vector3(front[4].x * 2.0 + 0.02, 0.18, 0.1)), mats["trim"], Vector3(0, CLEARANCE + 0.15, zf + 0.025))
+			# Stoßfängerleiste in Wagenfarbe mit Kühlerschlitz
+			_add(fb, rbox(Vector3(front[4].x * 2.0 + 0.02, 0.18, 0.1)), mats["paint"], Vector3(0, CLEARANCE + 0.15, zf + 0.025))
 			_add(fb, box(Vector3(fw * 1.1, 0.035, 0.012)), mat(Color(0.18, 0.18, 0.19), 0.6, 0.4), Vector3(0, CLEARANCE + 0.15, zf - 0.03))
 			hy = CLEARANCE + 0.31
 		"hayate":  # vier runde Scheinwerfer in einem dunklen Band, das um die Ecke läuft, schmaler Grillschlitz
@@ -561,8 +559,8 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 			lamp.call(tail_m, y0, y1, rw - 0.28, 0.962, 0.006)
 			for s in [-1, 1]:
 				_add(rbm, box(Vector3(0.09, y1 - y0, 0.012)), rev_m, Vector3(s * (rw - 0.33), (y0 + y1) / 2.0, zr + 0.009))
-		"hachi":  # Leuchtenband über das ganze Heck, Stoßfängerleiste aus schwarzem Kunststoff
-			_add(rbm, box(Vector3(rear[4].x * 2.0 + 0.02, 0.18, 0.1)), mats["trim"], Vector3(0, CLEARANCE + 0.12, zr - 0.025))
+		"hachi":  # Leuchtenband über das ganze Heck, Stoßfängerleiste in Wagenfarbe
+			_add(rbm, rbox(Vector3(rear[4].x * 2.0 + 0.02, 0.18, 0.1)), mats["paint"], Vector3(0, CLEARANCE + 0.12, zr - 0.025))
 			_add(rbm, box(Vector3(rw * 2.0 - 0.04, 0.13, 0.01)), dark, Vector3(0, ty, zr + 0.003))
 			for s in [-1, 1]:
 				_add(rbm, box(Vector3(0.4, 0.1, 0.01)), tail_m, Vector3(s * (rw - 0.22), ty, zr + 0.006))
@@ -834,14 +832,14 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 			var gp := _add(body, box(Vector3(0.3, 0.006, (rt1 - rt0) * L)), mats["glass"], Vector3(s * px, _top_y(rp, px / rp[7].x), zf + tm * L))
 			gp.rotation.z = s * atan(slope)
 
-	# Bodykit: Schweller, Frontlippe
+	# Bodykit: Schweller, Frontlippe, in Wagenfarbe (gehören zur Karosserie)
 	if kit == 1 or kit == 2:
 		var sp3: PackedVector2Array = _section(S, 0.5, W, L, flare)["p"]
 		var sw := sp3[3].x
 		for s in [-1, 1]:
-			var sk := _add(body, rbox(Vector3(0.07, 0.09, L - 2.0 * axle(S) - 0.85)), dark, Vector3(s * (sw + 0.01), CLEARANCE + 0.05, 0))
+			var sk := _add(body, rbox(Vector3(0.07, 0.09, L - 2.0 * axle(S) - 0.85)), mats["paint"], Vector3(s * (sw + 0.01), CLEARANCE + 0.05, 0))
 			sk.name = "SideSkirt"
-		_add(fb, rbox(Vector3(fw * 2.0 - 0.1, 0.03, 0.18)), dark, Vector3(0, CLEARANCE + 0.02, zf + 0.06))
+		_add(fb, rbox(Vector3(fw * 2.0 - 0.1, 0.03, 0.18)), mats["paint"], Vector3(0, CLEARANCE + 0.02, zf + 0.06))
 
 	# Spoiler
 	var sp: int = int(cfg.get("spoiler", 0))
@@ -954,18 +952,14 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 			ol.position = Vector3(0, 0.12, z * L * 0.3)
 			body.add_child(ol)
 
-	# Auspuff + Flammen (Nitro, Fehlzündung): je Rohr ein Drehpunkt an der Rohrmündung mit einem langen Kegel (Hülle)
-	# und einem kurzen, hellen Kern; animate() streckt den Drehpunkt. Dazu ein Licht, das die Straße dahinter anstrahlt.
+	# Auspuff + Flammen: Nitro ein blauer Kegel, Fehlzündung ein kurzer orangefarbener (animate() tauscht das Material)
 	var flames := []
-	var flame_m := ShaderMaterial.new()
-	flame_m.shader = FLAME_SHADER
-	flame_m.set_shader_parameter("half_h", 0.45)
-	var flame_core := ShaderMaterial.new()
-	flame_core.shader = FLAME_SHADER
-	flame_core.set_shader_parameter("half_h", 0.22)
-	flame_core.set_shader_parameter("core", 1.0)
-	var flame_glow := ShaderMaterial.new()
-	flame_glow.shader = GLOW_SHADER
+	var flame_m := mat(Color(0.3, 0.6, 1), 0, 0.5, Color(0.3, 0.6, 1.0), 6.0)
+	flame_m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	flame_m.albedo_color.a = 0.8
+	var fire_m := mat(Color(1.0, 0.55, 0.2), 0, 0.5, Color(1.0, 0.45, 0.1), 5.0)
+	fire_m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	fire_m.albedo_color.a = 0.8
 	var pr: float = S.get("pipe_r", 0.05) * (1.25 if int(cfg.get("engine", 0)) + int(cfg.get("turbo", 0)) >= 2 else 1.0)
 	var chrome := mat(Color(0.75, 0.75, 0.78), 0.95, 0.15)
 	var pipe_m: Material = chrome
@@ -1003,33 +997,16 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 		var inner := _add(body, _disc(pr * 0.72, 0.01), dark, Vector3(x, CLEARANCE + 0.08, zr + 0.112))
 		inner.rotation_degrees.x = 90
 		inner.scale = Vector3(1, 1, oval)
-		var f := Node3D.new()
-		f.position = Vector3(x, CLEARANCE + 0.08, zr + 0.1)
-		f.rotation_degrees.x = 90  # Kegelachse (Y) zeigt nach hinten
+		var cone := CylinderMesh.new()
+		cone.top_radius = 0.0
+		cone.bottom_radius = 0.09
+		cone.height = 0.7
+		var f := _add(body, cone, flame_m, Vector3(x, CLEARANCE + 0.08, zr + 0.4))
+		f.rotation_degrees.x = 90
 		f.visible = false
-		body.add_child(f)
-		var fr := maxf(pr * 1.7, 0.1)
-		var glow_q := QuadMesh.new()
-		glow_q.size = Vector2(2, 2)
-		flame_glow.set_shader_parameter("size", clampf(fr * 3.2, 0.3, 0.45))
-		for layer in [[_flame_cone(fr, 0.9), flame_m, 0.45], [_flame_cone(fr * 0.55, 0.44), flame_core, 0.22], [glow_q, flame_glow, 0.04]]:
-			var fm := MeshInstance3D.new()
-			fm.mesh = layer[0]
-			fm.material_override = layer[1]
-			fm.position.y = layer[2]
-			fm.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-			f.add_child(fm)
+		f.set_meta("z0", zr + 0.05)  # Rohrmündung: die kurze Fehlzündungsflamme setzt hier an
 		flames.append(f)
-	var fl_light := OmniLight3D.new()
-	fl_light.light_color = Color(0.35, 0.55, 1.0)
-	fl_light.omni_range = 5.0
-	fl_light.omni_attenuation = 1.6
-	fl_light.light_specular = 0.4
-	fl_light.position = Vector3(0, CLEARANCE + 0.3, zr + 0.7)
-	fl_light.visible = false
-	body.add_child(fl_light)
-	root.set_meta("flame_light", fl_light)
-	root.set_meta("flame_mats", [flame_m, flame_core, flame_glow])
+	root.set_meta("flame_mats", [flame_m, fire_m])
 
 	# Räder: Reifen mit offener Mitte, darin das Felgenbett. Bremsscheibe und Sattel sitzen tief dahinter, die
 	# Speichen laufen von der zurückgesetzten Nabe nach außen zum Horn (konkav). Felgengröße in Zoll (rim_spec).
@@ -1190,8 +1167,6 @@ const FINISH := {
 	"chrome_matt": {"metal": 0.9, "rough": 0.42, "coat": 0.0, "coat_rough": 0.5, "rim": 0.5, "rim_tint": 0.7},
 }
 const PAINT_SHADER := preload("res://shaders/car_paint.gdshader")
-const FLAME_SHADER := preload("res://shaders/nitro_flame.gdshader")
-const GLOW_SHADER := preload("res://shaders/nitro_glow.gdshader")
 ## Lichtkarte der Strecke für den Lack: track_builder._bake_street_light setzt sie (tex, rect, gain), die Garage leert
 ## sie. Autos unter Laternen und im Tunnel bekommen so dasselbe Licht wie die Straße darunter.
 static var street := {}
@@ -1917,10 +1892,10 @@ static func _bodykit(body: Node3D, fb: Node3D, S: Dictionary, W: float, L: float
 	match kit:
 		3:
 			_add(fb, rbox(Vector3(fw * 2.0 - 0.06, 0.04, 0.2)), paint, Vector3(0, CLEARANCE + 0.025, zf + 0.07))
-			_add(fb, rbox(Vector3(fw * 2.0 - 0.1, 0.012, 0.21)), dark, Vector3(0, CLEARANCE + 0.0, zf + 0.07))
+			_add(fb, rbox(Vector3(fw * 2.0 - 0.1, 0.012, 0.21)), paint, Vector3(0, CLEARANCE + 0.0, zf + 0.07))
 			for s in [-1, 1]:
 				_add(body, rbox(Vector3(0.08, 0.1, skirt_l)), paint, Vector3(s * (sw + 0.015), CLEARANCE + 0.05, 0)).name = "SideSkirt"
-				_add(body, rbox(Vector3(0.012, 0.02, skirt_l)), dark, Vector3(s * (sw + 0.05), CLEARANCE + 0.0, 0))
+				_add(body, rbox(Vector3(0.012, 0.02, skirt_l)), paint, Vector3(s * (sw + 0.05), CLEARANCE + 0.0, 0))
 			_add(body, rbox(Vector3(rw * 2.0 - 0.2, 0.06, 0.18)), paint, Vector3(0, CLEARANCE + 0.07, zr - 0.11))
 		4:
 			var flap := mat(Color(0.75, 0.04, 0.04), 0.0, 0.8)
@@ -2109,9 +2084,9 @@ static func _extras(body: Node3D, fb: Node3D, rbm: Node3D, car_id: String, S: Di
 				# Gummipuffer (Hörner) an der Stoßstange
 				_add(par, box(Vector3(0.05, 0.07, 0.03)), dark, Vector3(s * 0.38, yb, ze + (-0.025 if end == 0.0 else 0.025)))
 	if S.get("overfenders", false):
-		# Verbreiterungen: schwarze Bögen um die Radläufe, außen auf die Flanke geschraubt
+		# Verbreiterungen: Bögen um die Radläufe in Wagenfarbe, außen auf die Flanke geschraubt
 		var ra := wheel_r(S) + 0.07
-		var flare_m := mat(Color(0.03, 0.03, 0.035), 0.1, 0.65)
+		var flare_m := paint
 		for wz in [-L / 2.0 + axle(S), L / 2.0 - axle(S)]:
 			for s in [-1, 1]:
 				for k in 11:
@@ -2298,39 +2273,65 @@ static func merge_static(n: Node3D) -> void:
 ## Materials in einem Draw Call; merge_buckets gleicht den Index an.
 static func collect_static(n: Node, xf: Transform3D, stops: Dictionary, canon: Dictionary, buckets: Dictionary, extra: Callable, loose := false) -> void:
 	for c in n.get_children():
-		if stops.has(c) or not c is Node3D:
-			continue
-		var cxf: Transform3D = xf * (c as Node3D).transform
-		if c is MeshInstance3D:
-			var mi := c as MeshInstance3D
-			if mi.mesh == null or mi.get_script() != null or mi.get_child_count() > 0 or not mi.visible or mi.material_overlay \
-					or mi.transparency > 0.0 or mi.visibility_range_end > 0.0 or mi.has_meta("no_merge"):
-				continue
-			var parts := []
-			for si in mi.mesh.get_surface_count():
-				var m: Material = mi.get_surface_override_material(si)
-				if m == null:
-					m = mi.material_override if mi.material_override else mi.mesh.surface_get_material(si)
-				var cm = merge_material(m, canon)
-				if cm == null or (mi.mesh is ArrayMesh and (mi.mesh as ArrayMesh).surface_get_primitive_type(si) != Mesh.PRIMITIVE_TRIANGLES):
-					parts = []
-					break
-				parts.append([cm, si])
-			for pt in parts:
-				var key := [pt[0], surface_format(mi.mesh, pt[1], loose), extra.call(mi, cxf)]
-				if not buckets.has(key):
-					buckets[key] = []
-				buckets[key].append([mi.mesh, pt[1], cxf, mi])
-		elif c.get_class() == "Node3D" and c.get_script() == null and (c as Node3D).visible:
-			collect_static(c, cxf, stops, canon, buckets, extra, loose)
+		collect_one(c, xf, stops, canon, buckets, extra, loose)
+
+
+## Ein Kind (mit allem darunter) in die Eimer sortieren; xf = Lage des Elternknotens
+static func collect_one(c: Node, xf: Transform3D, stops: Dictionary, canon: Dictionary, buckets: Dictionary, extra: Callable, loose := false) -> void:
+	if stops.has(c) or not c is Node3D:
+		return
+	var cxf: Transform3D = xf * (c as Node3D).transform
+	if c is MeshInstance3D:
+		var mi := c as MeshInstance3D
+		if mi.mesh == null or mi.get_script() != null or mi.get_child_count() > 0 or not mi.visible or mi.material_overlay \
+				or mi.transparency > 0.0 or mi.visibility_range_end > 0.0 or mi.has_meta("no_merge"):
+			return
+		var parts := []
+		for si in mi.mesh.get_surface_count():
+			var m: Material = mi.get_surface_override_material(si)
+			if m == null:
+				m = mi.material_override if mi.material_override else mi.mesh.surface_get_material(si)
+			var cm = merge_material(m, canon)
+			if cm == null or (mi.mesh is ArrayMesh and (mi.mesh as ArrayMesh).surface_get_primitive_type(si) != Mesh.PRIMITIVE_TRIANGLES):
+				parts = []
+				break
+			parts.append([cm, si])
+		for pt in parts:
+			var key := [pt[0], surface_format(mi.mesh, pt[1], loose), extra.call(mi, cxf)]
+			if not buckets.has(key):
+				buckets[key] = []
+			buckets[key].append([mi.mesh, pt[1], cxf, mi])
+	elif c.get_class() == "Node3D" and c.get_script() == null and (c as Node3D).visible:
+		collect_static(c, cxf, stops, canon, buckets, extra, loose)
 
 
 ## Verschmilzt jeden Eimer mit mindestens zwei Teilen zu einem Mesh unter parent und entfernt die Einzelteile.
 ## Liefert die neuen MeshInstances.
 static func merge_buckets(parent: Node3D, buckets: Dictionary, loose := false) -> Array:
-	var made := []
-	var gone := {}
-	for key in buckets:
+	var job := merge_begin(buckets, loose)
+	while not merge_step(parent, job, -1):
+		pass
+	return job["made"]
+
+
+## Verschmelzen in Stücken (Ladebildschirm): merge_begin() legt den Auftrag an, merge_step() arbeitet höchstens
+## budget_ms (-1 = alles) und gibt true zurück, wenn alles fertig ist; job["made"] sind dann die neuen Flächen,
+## job["done"] / job["keys"].size() ist der Fortschritt.
+static func merge_begin(buckets: Dictionary, loose := false) -> Dictionary:
+	return {"buckets": buckets, "keys": buckets.keys(), "done": 0, "loose": loose, "made": [], "gone": {}, "drop": null, "dropped": 0}
+
+
+static func merge_step(parent: Node3D, job: Dictionary, budget_ms: int) -> bool:
+	var t0 := Time.get_ticks_msec()
+	var buckets: Dictionary = job["buckets"]
+	var keys: Array = job["keys"]
+	var gone: Dictionary = job["gone"]
+	var loose: bool = job["loose"]
+	while job["done"] < keys.size():
+		if budget_ms >= 0 and Time.get_ticks_msec() - t0 >= budget_ms:
+			return false
+		var key = keys[job["done"]]
+		job["done"] += 1
 		var items: Array = buckets[key]
 		if items.size() < 2:
 			continue
@@ -2357,17 +2358,24 @@ static func merge_buckets(parent: Node3D, buckets: Dictionary, loose := false) -
 		mi.material_override = key[0]
 		mi.set_meta("merge_extra", key[2])
 		parent.add_child(mi)
-		made.append(mi)
+		job["made"].append(mi)
 	# Teile mit mehreren Flächen nur entfernen, wenn alle Flächen verschmolzen wurden
-	for key in buckets:
-		if buckets[key].size() < 2:
-			for it in buckets[key]:
-				gone.erase(it[3])
-	for old in gone:
+	if job["drop"] == null:
+		for key in buckets:
+			if buckets[key].size() < 2:
+				for it in buckets[key]:
+					gone.erase(it[3])
+		job["drop"] = gone.keys()
+	var drop: Array = job["drop"]
+	while job["dropped"] < drop.size():
+		if budget_ms >= 0 and Time.get_ticks_msec() - t0 >= budget_ms:
+			return false
+		var old = drop[job["dropped"]]
+		job["dropped"] += 1
 		if is_instance_valid(old):
 			old.get_parent().remove_child(old)
 			old.free()
-	return made
+	return true
 
 
 ## Material, das beim Verschmelzen stellvertretend für alle mit gleichen Werten steht, oder null, wenn es nicht geht
@@ -2689,8 +2697,6 @@ static func _skin(S: Dictionary, b: int, t: float, g: float, seam: bool, vinyl: 
 		8:  # Rallye: Rennstreifen und Seitenstreifen zusammen
 			if (b == 8 and inside) or (b == 4 and t > 0.1 and t < 0.9):
 				return "stripe"
-	if S.get("trim_low", false) and b == 3:
-		return "trim"
 	return "paint"
 
 
@@ -2791,10 +2797,6 @@ static func _shell(body: Node3D, S: Dictionary, W: float, L: float, flare: float
 				continue
 			var bj: int = band[j]
 			var key := _skin(S, bj, tm, gm, is_seam, vinyl, carbon_hood)
-			if key == "paint" and part != "Shell" and bj == 4 and S.get("black_bumpers", false):
-				key = "trim"
-			elif key == "trim" and part == "RearBumper" and not S.get("black_bumpers", false):
-				key = "paint"  # sonst wirken die schwarzen Ecken der Heckschürze wie ein Rahmen um das Heck
 			var st: SurfaceTool = get_st.call(part, key)
 			var q := [[i, j], [i, j + 1], [i + 1, j + 1], [i + 1, j]]
 			var pos := []
@@ -2915,43 +2917,22 @@ static func animate(car: Node3D, speed: float, steer: float, roll: float, pitch:
 	var body: Node3D = car.get_meta("body")
 	body.rotation.z = lerpf(body.rotation.z, roll, 8.0 * delta)
 	body.rotation.x = lerpf(body.rotation.x, pitch, 6.0 * delta)
-	var fl: Array = car.get_meta("flames")
-	if fl.is_empty():
-		return
-	# Nitro blendet schnell ein; beim Zünden ist die Flamme kurz länger und heller (Zündstoß). Fehlzündung (fire,
-	# 0..1 klingt in gut 0,1 s ab): kurzer, dicker, orangefarbener Stoß
-	var k: float = car.get_meta("nos_k", 0.0)
-	if k <= 0.0 and not nitro_on and fire <= 0.02:
-		return  # aus (Gegner, Verkehr, meistens auch der Spieler)
-	var kick: float = car.get_meta("nos_kick", 0.0)
-	if nitro_on and k < 0.05:
-		kick = 1.0
-	k = move_toward(k, 1.0 if nitro_on else 0.0, delta * (9.0 if nitro_on else 5.0))
-	kick = move_toward(kick, 0.0, delta * 2.2)
-	car.set_meta("nos_k", k)
-	car.set_meta("nos_kick", kick)
-	var fk := clampf(fire, 0.0, 1.0) * (1.0 - k)
-	var on := k > 0.01 or fk > 0.02
-	var light: OmniLight3D = car.get_meta("flame_light", null)
-	for f in fl:
-		f.visible = on
-	if light:
-		light.visible = on
-	if not on:
-		return
-	var flick := randf_range(0.88, 1.12)
-	var fmix := fk / maxf(k + fk, 0.001)
-	var lng := lerpf((0.72 + 0.28 * k + 0.6 * kick) * flick, (0.3 + 0.3 * fk) * flick, fmix)
-	var wid := lerpf(0.9 + 0.3 * kick, 1.3, fmix)
-	for f in fl:
-		f.scale = Vector3(wid, lng, wid)
-	for m in car.get_meta("flame_mats", []):
-		(m as ShaderMaterial).set_shader_parameter("power", maxf(k, fk))
-		(m as ShaderMaterial).set_shader_parameter("kick", kick)
-		(m as ShaderMaterial).set_shader_parameter("fire", fmix)
-	if light:
-		light.light_energy = (2.4 * k * (1.0 + 0.7 * kick) + 1.3 * fk) * flick  # Fehlzündung nur kurz aufblitzen
-		light.light_color = Color(0.35, 0.55, 1.0).lerp(Color(1.0, 0.55, 0.2), fmix)
+	var mats: Array = car.get_meta("flame_mats", [])
+	var pop := fire > 0.05 and not nitro_on
+	for f in car.get_meta("flames"):
+		f.visible = nitro_on or pop
+		if nitro_on:
+			if mats.size() > 1:
+				f.material_override = mats[0]
+			f.scale = Vector3.ONE * randf_range(0.7, 1.3)
+			f.position.z = f.get_meta("z0", f.position.z - 0.35) + 0.35
+		elif pop:
+			# Fehlzündung: kurz, an der Rohrmündung, orange
+			if mats.size() > 1:
+				f.material_override = mats[1]
+			var ln := (0.25 + 0.3 * clampf(fire, 0.0, 1.0)) * randf_range(0.85, 1.15)
+			f.scale = Vector3(1.1, ln, 1.1)
+			f.position.z = f.get_meta("z0", f.position.z) + 0.35 * ln
 
 
 static func mat(c: Color, metal := 0.0, rough := 0.5, emit := Color.BLACK, emit_e := 0.0) -> StandardMaterial3D:
@@ -2964,23 +2945,6 @@ static func mat(c: Color, metal := 0.0, rough := 0.5, emit := Color.BLACK, emit_
 		m.emission = emit
 		m.emission_energy_multiplier = emit_e
 	return m
-
-
-## Flammenkegel: Grundfläche unten (am Rohr), Spitze oben; genug Ringe, damit die Hülle im Shader flackern kann
-static func _flame_cone(r: float, h: float) -> CylinderMesh:
-	var key := "flame_%.3f_%.3f" % [r, h]
-	if _mesh_cache.has(key):
-		return _mesh_cache[key]
-	var c := CylinderMesh.new()
-	c.top_radius = 0.0
-	c.bottom_radius = r
-	c.height = h
-	c.radial_segments = 14
-	c.rings = 6
-	c.cap_top = false
-	c.cap_bottom = false
-	_mesh_cache[key] = c
-	return c
 
 
 ## Flache Scheibe (runde Lampe)

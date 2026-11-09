@@ -9,8 +9,6 @@ const Builder := preload("res://scripts/car_builder.gd")
 const Track := preload("res://scripts/track_builder.gd")
 const EngineAudio := preload("res://scripts/engine_audio.gd")
 ## Motorklang: ruhiger Vierzylinder; der Bus ein rauer Sechszylinder-Diesel
-const SND_CAR := {"cyl": 4, "harm": [1.0, 0.4, 0.18, 0.06], "sub": 0.25, "turbo": 0.0, "rough": 0.15}
-const SND_BUS := {"cyl": 6, "harm": [1.0, 0.62, 0.36, 0.16], "sub": 0.5, "turbo": 0.0, "rough": 0.6}
 
 const KINDS := ["sedan", "sedan", "sedan", "taxi", "van", "van", "bus"]
 const COLORS := [Color(0.5, 0.5, 0.52), Color(0.15, 0.15, 0.17), Color(0.25, 0.3, 0.4), Color(0.45, 0.1, 0.1),
@@ -123,9 +121,7 @@ static func prepare_sound() -> void:
 
 
 static func _loop_for(k: String) -> AudioStreamWAV:
-	if k == "bus":
-		return EngineAudio.render_loop(SND_BUS, 1300.0, 0.4, 0.9)
-	return EngineAudio.render_loop(SND_CAR, 2100.0, 0.4, 0.9)
+	return EngineAudio.traffic_loop("bus" if k == "bus" else "car")
 
 
 ## Motor und Abrollen an/aus (race.gd: nur die nächsten paar Autos)

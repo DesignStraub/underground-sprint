@@ -9,23 +9,9 @@ const UI := preload("res://scripts/ui_style.gd")
 const I18n := preload("res://scripts/i18n.gd")
 const CareerMap := preload("res://scripts/career_map.gd")
 
-## Tipps wie auf den Ladebildschirmen von NFS Underground
-const TIPS := [
-	"Zu schwer? Einstellungen > Schwierigkeit: Leicht. Dann lernst du die Strecken in Ruhe kennen.",
-	"Gib kurz vor LOS Gas: Drehzahl im grünen Bereich gibt einen perfekten Start.",
-	"Knapp am Verkehr vorbei gibt Punkte und füllt dein Nitro ein Stück.",
-	"Im Drag im grünen Bereich schalten: perfekter Schaltvorgang, mehr Schub.",
-	"Abkürzungen sparen Zeit, aber dort kommt dir Verkehr entgegen.",
-	"Handbremse und Lenken stellen das Auto quer. Drift-Ketten bringen Multiplikator.",
-	"Siege schalten neue Teile und Autos frei.",
-	"Spar dir Nitro für die letzte Gerade.",
-	"Über die Rampe am Bahnübergang springst du über die Gleise.",
-	"Motor-Tuning steigert Beschleunigung und Höchstgeschwindigkeit.",
-	"Im Drag nicht im Begrenzer bleiben: der Motor überhitzt.",
-	"Im Drag schaltest du von Hand: S hoch, X runter. A/D wechselt die Spur.",
-	"Tuningteile passen auf alle deine Autos: einmal einbauen, überall dran.",
-	"Driften, knapp vorbei und Sprünge geben Punkte, die Nitro etwas nachfüllen.",
-]
+const Loading := preload("res://scripts/loading_screen.gd")
+## Tipps wie auf den Ladebildschirmen von NFS Underground (stehen beim Ladebildschirm)
+const TIPS := Loading.TIPS
 
 var world: SubViewport
 var turntable: Node3D
@@ -34,6 +20,13 @@ var cam: Camera3D
 var menu: VBoxContainer
 var menu_scroll: ScrollContainer  # lange Listen (Karriere) scrollen mit dem Fokus mit
 var career_map: Control
+## Tuning wie in NFS Underground: waagerechte Leiste unten statt der Liste links
+var strip: Control
+var strip_box: HBoxContainer
+var _strip_mode := false
+var _fade_left: TextureRect
+var _info_panel: PanelContainer
+var _keys: Label
 var title: Label
 var info: Label
 var status: Label
@@ -51,6 +44,7 @@ var _back := Callable()
 
 func _ready() -> void:
 	Music.toast_corner = true
+	Music.menu()
 	_build_scene()
 	_build_ui()
 	if GameState.language == "":
@@ -185,6 +179,7 @@ func _build_ui() -> void:
 	# Abdunklung links (Menü) und unten (Tastenleiste), das Auto bleibt frei
 	var fade := UI.fade_rect(root, Color(0, 0, 0, 0.8))
 	fade.size = Vector2(330, 2000)
+	_fade_left = fade
 	var bar := ColorRect.new()
 	bar.color = Color(0, 0, 0, 0.7)
 	bar.anchor_top = 1.0
@@ -271,6 +266,7 @@ func _build_ui() -> void:
 
 	# Infotext in einer Glasfläche unten rechts
 	var panel := PanelContainer.new()
+	_info_panel = panel
 	panel.anchor_left = 1.0
 	panel.anchor_right = 1.0
 	panel.anchor_top = 1.0
@@ -287,7 +283,37 @@ func _build_ui() -> void:
 	info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	info.custom_minimum_size = Vector2(250, 0)
 
+	# Tuning-Leiste unten (Kacheln, die gewählte steht in der Mitte); Verlauf dahinter, damit sie vor dem Auto lesbar ist
+	strip = Control.new()
+	strip.anchor_top = 1.0
+	strip.anchor_bottom = 1.0
+	strip.anchor_right = 1.0
+	strip.offset_top = -86.0
+	strip.offset_bottom = -24.0
+	strip.clip_contents = true
+	strip.visible = false
+	strip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(strip)
+	var sfade := UI.fade_rect(strip, Color(0, 0, 0, 0.75), false)
+	sfade.set_anchors_preset(Control.PRESET_FULL_RECT)
+	sfade.flip_v = true
+	strip_box = HBoxContainer.new()
+	strip_box.add_theme_constant_override("separation", 8)
+	strip_box.position = Vector2(0, 8)
+	strip.add_child(strip_box)
+	for side in [-1, 1]:
+		var arrow := _label(strip, 16, HORIZONTAL_ALIGNMENT_CENTER)
+		arrow.text = "◀" if side < 0 else "▶"
+		arrow.label_settings.font_color = UI.GREEN
+		arrow.anchor_left = 0.0 if side < 0 else 1.0
+		arrow.anchor_right = arrow.anchor_left
+		arrow.offset_left = 2.0 if side < 0 else -20.0
+		arrow.offset_right = 20.0 if side < 0 else -2.0
+		arrow.offset_top = 20.0
+		arrow.set_meta("arrow", side)
+
 	var keys := _label(root, 9)
+	_keys = keys
 	keys.label_settings.font = UI.font("bold", 0.12)
 	keys.text = tr("ENTER  Auswählen      ESC  Zurück      ←/→ A/D  Ändern      F11  Vollbild")
 	keys.anchor_top = 1.0
@@ -429,10 +455,16 @@ func _process(dt: float) -> void:
 		goal_pos = v[0] + Vector3(0, sin(_t * 0.4) * 0.02, 0)
 		goal_look = v[1]
 		goal_off = -0.2 * goal_pos.distance_to(goal_look)
+	var goal_v := 0.0
+	if _strip_mode:
+		# Leiste unten: Auto mittig und etwas höher im Bild
+		goal_off = 0.0
+		goal_v = -0.1 * goal_pos.distance_to(goal_look)
 	var k := 1.0 - exp(-dt * 3.5)
 	_cam_pos = _cam_pos.lerp(goal_pos, k)
 	_cam_look = _cam_look.lerp(goal_look, k)
 	cam.h_offset = lerpf(cam.h_offset, goal_off, k)
+	cam.v_offset = lerpf(cam.v_offset, goal_v, k)
 	cam.position = _cam_pos
 	cam.look_at(_cam_look)
 	_work_light.light_energy = lerpf(_work_light.light_energy, 0.0 if _cam_view == "" else 1.4, k)
@@ -450,6 +482,7 @@ func _show_car(car_id: String, cfg: Dictionary) -> void:
 # --- Menüs ----------------------------------------------------------------
 
 func _clear_menu() -> void:
+	_strip_on(false)
 	career_map.visible = false
 	menu_scroll.scroll_vertical = 0
 	for c in menu.get_children():
@@ -463,10 +496,17 @@ func _button(text: String, cb: Callable, disabled := false) -> Button:
 	b.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
 	b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	b.disabled = disabled
-	b.focus_entered.connect(func(): Sfx.play("whoosh", -26.0, 2.4))
+	b.focus_entered.connect(func(): Sfx.ui("move"))
+	b.pressed.connect(func(): _press_sound(b))
 	b.pressed.connect(cb)
 	menu.add_child(b)
 	return b
+
+
+## Fokus setzen, falls der Knopf noch da ist (Menüs wechseln manchmal im selben Bild)
+func _grab(c: Control) -> void:
+	if is_instance_valid(c) and c.is_inside_tree():
+		c.grab_focus()
 
 
 func _focus_first() -> void:
@@ -479,7 +519,7 @@ func _focus_first() -> void:
 	tw.tween_property(section, "modulate:a", 1.0, 0.25)
 	for c in menu.get_children():
 		if c is Button and not c.disabled:
-			c.grab_focus.call_deferred()
+			_grab.call_deferred(c)
 			return
 
 
@@ -558,7 +598,7 @@ func _focus_key(key: String) -> void:
 		return
 	for c in menu.get_children():
 		if c.has_meta("key") and c.get_meta("key") == key:
-			(c as Control).grab_focus.call_deferred()
+			_grab.call_deferred(c as Control)
 			return
 
 
@@ -590,6 +630,7 @@ func _show_motion() -> void:
 func _setting_button(k: String) -> Button:
 	var b := _button(GameState.setting_text(k), func(): pass)
 	b.set_meta("setting", k)
+	b.set_meta("quiet", true)  # Umschalten hat seinen eigenen Ton
 	var change := func(dir: int):
 		if k == "language":
 			_show_language(false)
@@ -598,7 +639,7 @@ func _setting_button(k: String) -> Button:
 			GameState.toggle_fullscreen()
 		else:
 			GameState.cycle_setting(k, dir)
-		Sfx.play("whoosh", -22.0, 1.6)
+		Sfx.ui("change")
 		# Voreinstellung ändert alle Optionen, eine Option ggf. die Voreinstellung: alle Texte neu
 		for c in menu.get_children():
 			if c.has_meta("setting"):
@@ -632,7 +673,8 @@ func _show_races() -> void:
 				if GameState.career_open(name):
 					_start_race(ri)
 				else:
-					Sfx.play("thud", -14.0, 1.3))
+					Sfx.ui("locked"))
+			b.set_meta("quiet", true)
 			b.add_theme_font_size_override("font_size", 12)
 			b.clip_text = true
 			b.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
@@ -649,7 +691,7 @@ func _show_races() -> void:
 	_focus_first()
 	# Fokus auf das erste offene, noch nicht gewonnene Event der höchsten offenen Stufe
 	if target:
-		target.grab_focus.call_deferred()
+		_grab.call_deferred(target)
 	# erst wenn die Liste ausgelegt ist, stimmt die Position: dann dorthin scrollen
 	await get_tree().process_frame
 	await get_tree().process_frame
@@ -746,6 +788,7 @@ func _show_events(type: String) -> void:
 			txt += "   " + ("%d P" % int(best) if rt == "drift" else "%d:%05.2f" % [int(best) / 60, fmod(best, 60.0)])
 		var idx := i
 		var b := _button(txt, func(): _start_race(idx))
+		b.set_meta("quiet", true)
 		var extra := ""
 		if r.has("laps") and rt != "sprint":
 			extra = tr("%d Runden. ") % r["laps"]
@@ -758,53 +801,68 @@ func _show_events(type: String) -> void:
 	_focus_first()
 
 
+## Rennen starten: sofort den Ladebildschirm zeigen (das Rennen übernimmt ihn), Musik leiser, dann Szene wechseln.
+## Ohne das stand das Menü einige Sekunden still, während die Strecke gebaut wurde.
+var _starting := false
+
+
 func _start_race(i: int) -> void:
+	if _starting:
+		return
+	_starting = true
 	GameState.race_index = i
 	GameState.save_game()
+	Sfx.ui("go")
+	Music.race_loading()
+	Loading.next_tip()
+	add_child(Loading.new(Catalog.RACES[i], GameState.current_car))
+	await get_tree().process_frame
+	await get_tree().process_frame
 	get_tree().change_scene_to_file("res://scenes/race.tscn")
 
 
 func _show_tuning(focus := "") -> void:
 	_clear_menu()
-	_back = _show_main
+	_strip_on(true)
+	_back = func(): _cam_view = ""; _show_main()
 	_cam_view = ""
 	preview_cfg = GameState.get_config(preview_car).duplicate()
 	_show_car(preview_car, preview_cfg)
 	_set_section("TUNING", true)
-	var bo := _button("Optik", func(): _show_group("optik"))
-	bo.set_meta("key", "optik")
+	_tile(tr("Fertig"), "", _back, {"back": true})
+	var bo := _tile(tr("Optik"), tr("Lack, Felgen, Spoiler …"), func(): _show_group("optik"), {"key": "optik"})
 	bo.focus_entered.connect(func(): info.text = tr("Lack, Felgen, Spoiler, Bodykit, Haube, Auspuff, Folierung, Neon, Scheiben, Licht.") + "\n" + tr(TUNING_SHARED))
-	var bl := _button("Leistung", func(): _show_group("leistung"))
-	bl.set_meta("key", "leistung")
+	var bl := _tile(tr("Leistung"), tr("Motor, Turbo, Nitro …"), func(): _show_group("leistung"), {"key": "leistung"})
 	bl.focus_entered.connect(func(): info.text = tr("Motor, Turbo, Nitro, Fahrwerk, Reifen. Wirkt wirklich auf das Fahrverhalten.") + "\n" + tr(TUNING_SHARED))
-	_button("< Fertig", func(): _cam_view = ""; _show_main())
-	_focus_first()
-	_focus_key(focus)
+	_strip_ready(focus if focus != "" else "optik")
 
 
 const TUNING_SHARED := "Eingebaute Teile passen auf alle deine Autos."
 
 
-## Kategorien einer Gruppe, rechts daneben jeweils das eingebaute Teil
+## Kategorien einer Gruppe als Kacheln, unter dem Namen jeweils das eingebaute Teil
 func _show_group(group: String, focus := "") -> void:
 	_clear_menu()
+	_strip_on(true)
 	_back = _show_tuning.bind(group)
 	preview_cfg = GameState.get_config(preview_car).duplicate()
 	_show_car(preview_car, preview_cfg)
 	_set_section("OPTIK" if group == "optik" else "LEISTUNG", group == "leistung")
+	_tile(tr("Zurück"), "", _back, {"back": true})
+	var first := ""
 	for cat in Catalog.PART_GROUPS[group]:
 		var c: String = cat
+		if first == "":
+			first = c
 		var opt := Catalog.part_of(preview_cfg, c)
 		var oname := tr(opt["name"]) + _inch_suffix(c, preview_cfg)
-		var b := _button("%s:  %s" % [tr(Catalog.PARTS[c]["label"]), oname], func(): _show_parts(c, group))
-		b.set_meta("key", c)
+		var b := _tile(tr(Catalog.PARTS[c]["label"]), oname, func(): _show_parts(c, group),
+			{"key": c, "swatch": _swatch(c, int(preview_cfg.get(c, 0)))})
 		b.focus_entered.connect(func():
 			_cam_view = c
 			Builder.showcase(car_node, preview_car, preview_cfg, _showcase_mode(c))
 			info.text = tr(Catalog.PARTS[c]["label"]) + ": " + oname)
-	_button("< Zurück", _back)
-	_focus_first()
-	_focus_key(focus)
+	_strip_ready(focus if focus != "" else first)
 
 
 func _showcase_mode(cat: String) -> String:
@@ -815,43 +873,44 @@ func _showcase_mode(cat: String) -> String:
 	return ""
 
 
-## Teile einer Kategorie: Vorschau beim Auswählen, Einbauen mit Enter (wenn freigeschaltet)
+## Teile einer Kategorie als Kacheln: Vorschau beim Auswählen, Einbauen mit Enter (wenn freigeschaltet)
 func _show_parts(cat: String, group: String) -> void:
 	_clear_menu()
+	_strip_on(true)
 	_back = _show_group.bind(group, cat)
 	_cam_view = cat
 	section.text = tr(Catalog.PARTS[cat]["label"]).to_upper()
 	stats.get_parent().visible = group == "leistung"  # Optik-Teile ändern keine Fahrwerte: Balken weg, Auto frei
 	var installed: int = GameState.get_config(preview_car).get(cat, 0)
 	var opts: Array = Catalog.PARTS[cat]["options"]
+	_tile(tr("Zurück"), "", _back, {"back": true})
 	for i in opts.size():
 		var idx := i
-		var b := _button("", func(): _install(cat, idx, group))
-		b.set_meta("part", idx)
+		var b := _tile("", "", func(): _install(cat, idx, group), {"part": idx, "swatch": _swatch(cat, idx), "quiet": true})
 		b.focus_entered.connect(func(): _preview_part(cat, idx))
-	_button("< Zurück", _back)
 	_refresh_parts(cat)
-	_focus_first()
-	# Fokus auf das eingebaute Teil
-	if installed > 0 and installed < menu.get_child_count():
-		menu.get_child(installed).grab_focus.call_deferred()
+	_strip_ready("", installed + 1)
 
 
 func _refresh_parts(cat: String) -> void:
 	var installed: int = GameState.get_config(preview_car).get(cat, 0)
-	for b in menu.get_children():
+	for b in strip_box.get_children():
 		if not b.has_meta("part"):
 			continue
 		var i: int = b.get_meta("part")
 		var opt: Dictionary = Catalog.PARTS[cat]["options"][i]
-		var suffix := ""
+		var sub := ""
+		var locked := not GameState.is_part_unlocked(cat, i)
 		if i == installed:
-			suffix = "   " + tr("EINGEBAUT")
-		elif not GameState.is_part_unlocked(cat, i):
-			suffix = "   " + (tr("1 SIEG") if opt["wins"] == 1 else tr("%d SIEGE") % opt["wins"])
+			sub = tr("EINGEBAUT")
+		elif locked:
+			sub = tr("1 SIEG") if opt["wins"] == 1 else tr("%d SIEGE") % opt["wins"]
 		var c2 := GameState.get_config(preview_car).duplicate()
 		c2[cat] = i
-		b.text = (tr(opt["name"]) + _inch_suffix(cat, c2) + suffix).to_upper()
+		_tile_text(b, tr(opt["name"]) + _inch_suffix(cat, c2), sub)
+		b.set_meta("installed", i == installed)
+		b.set_meta("locked", locked)
+		_tile_colors(b)
 
 
 func _preview_part(cat: String, idx: int) -> void:
@@ -864,13 +923,220 @@ func _preview_part(cat: String, idx: int) -> void:
 	_part_info(cat, idx)
 
 
+func _press_sound(b: Button) -> void:
+	if not b.has_meta("quiet"):
+		Sfx.ui("select")
+
+
+# --- Tuning-Leiste ----------------------------------------------------------
+
+## Leiste an/aus: im Tuning verschwindet die Liste links, das Infofeld rückt nach links über die Leiste
+func _strip_on(on: bool) -> void:
+	_clear_strip()
+	if _strip_mode == on:
+		return
+	_strip_mode = on
+	strip.visible = on
+	menu_scroll.visible = not on
+	_fade_left.visible = not on
+	if on:
+		_info_panel.anchor_left = 0.0
+		_info_panel.anchor_right = 0.0
+		_info_panel.offset_left = 14.0
+		_info_panel.offset_right = 290.0
+		_info_panel.offset_top = -94.0  # wächst nach oben, so hoch wie der Text
+		_info_panel.offset_bottom = -94.0
+		_keys.text = tr("←/→  Auswählen      ENTER  Einbauen/Öffnen      ESC  Zurück      F11  Vollbild")
+	else:
+		_info_panel.anchor_left = 1.0
+		_info_panel.anchor_right = 1.0
+		_info_panel.offset_left = -300.0
+		_info_panel.offset_right = -14.0
+		_info_panel.offset_top = -92.0
+		_info_panel.offset_bottom = -26.0
+		_keys.text = tr("ENTER  Auswählen      ESC  Zurück      ←/→ A/D  Ändern      F11  Vollbild")
+
+
+func _clear_strip() -> void:
+	for c in strip_box.get_children():
+		strip_box.remove_child(c)
+		c.queue_free()
+	strip_box.position.x = 0.0
+	strip_box.size = Vector2.ZERO
+
+
+## Eine Kachel: Name groß, darunter klein (eingebautes Teil, Sperre). opts: key, part, swatch (Farbe), back, quiet
+func _tile(title_text: String, sub: String, cb: Callable, opts := {}) -> Button:
+	var b := Button.new()
+	var is_back: bool = opts.get("back", false)
+	b.custom_minimum_size = Vector2(76.0 if is_back else 118.0, 46.0)
+	b.focus_mode = Control.FOCUS_ALL
+	for k in opts:
+		if k != "swatch":
+			b.set_meta(k, opts[k])
+	var t := Label.new()
+	t.name = "T"
+	t.label_settings = LabelSettings.new()
+	t.label_settings.font = UI.font("cond", 0.2)
+	t.label_settings.font_size = 13
+	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	t.clip_text = true
+	t.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	t.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	t.offset_left = 9.0
+	t.offset_right = -5.0
+	t.offset_top = 6.0 if sub != "" or not is_back else 14.0
+	t.offset_bottom = t.offset_top + 17.0
+	t.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.add_child(t)
+	var u := Label.new()
+	u.name = "S"
+	u.label_settings = LabelSettings.new()
+	u.label_settings.font = UI.font("bold", 0.12)
+	u.label_settings.font_size = 8
+	u.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	u.clip_text = true
+	u.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	u.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	u.offset_left = 9.0
+	u.offset_right = -5.0
+	u.offset_top = 26.0
+	u.offset_bottom = 38.0
+	u.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.add_child(u)
+	var sw = opts.get("swatch", null)
+	if sw is Color:
+		# Farbfeld (Lack, Felgenfarbe, Folie, Neon, Licht)
+		var r := ColorRect.new()
+		r.name = "W"
+		r.color = sw
+		r.position = Vector2(10, 28)
+		r.size = Vector2(9, 9)
+		r.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var rim := ColorRect.new()  # heller Rand: Schwarz auf dunkler Kachel sichtbar
+		rim.color = Color(1, 1, 1, 0.5)
+		rim.position = r.position - Vector2.ONE
+		rim.size = r.size + Vector2(2, 2)
+		rim.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		b.add_child(rim)
+		b.add_child(r)
+		u.offset_left = 20.0
+	_tile_text(b, ("◀ " if is_back else "") + title_text, sub)
+	b.focus_entered.connect(func():
+		Sfx.ui("move")
+		_center_strip(b)
+		for c in strip_box.get_children():
+			_tile_colors(c))
+	b.focus_exited.connect(func(): _tile_colors(b))
+	b.pressed.connect(func():
+		if is_back:
+			Sfx.ui("back")
+		elif not opts.get("quiet", false):
+			Sfx.ui("select")
+		cb.call())
+	strip_box.add_child(b)
+	_tile_colors(b)
+	return b
+
+
+func _tile_text(b: Button, title_text: String, sub: String) -> void:
+	(b.get_node("T") as Label).text = title_text.to_upper()
+	(b.get_node("S") as Label).text = sub.to_upper()
+
+
+## Schriftfarben je Zustand: gewählt (grüne Kachel) dunkel, eingebaut grün, gesperrt grau
+func _tile_colors(b: Node) -> void:
+	if not b is Button or not b.has_node("T"):
+		return
+	var focused := (b as Button).has_focus()
+	var t: Label = b.get_node("T")
+	var u: Label = b.get_node("S")
+	var locked: bool = b.get_meta("locked", false)
+	t.label_settings.font_color = Color(0.02, 0.05, 0.02) if focused else (Color(0.62, 0.64, 0.68) if locked else Color(0.95, 0.97, 1.0))
+	u.label_settings.font_color = Color(0.05, 0.14, 0.05) if focused else (UI.GREEN if b.get_meta("installed", false) else
+		(Color(1.0, 0.45, 0.35) if locked else UI.CYAN))
+	(b as Button).modulate.a = 0.72 if locked and not focused else 1.0
+
+
+## Leiste fertig: Ränder verknüpfen (rechts vom letzten geht es zum ersten), hoch/runter gesperrt, Fokus setzen.
+## focus_key: Kachel mit meta "key", sonst Index focus_i (sonst die erste nach "Zurück").
+func _strip_ready(focus_key := "", focus_i := -1) -> void:
+	var tiles := strip_box.get_children()
+	if tiles.is_empty():
+		return
+	for i in tiles.size():
+		var b: Button = tiles[i]
+		b.focus_neighbor_left = b.get_path_to(tiles[(i - 1 + tiles.size()) % tiles.size()])
+		b.focus_neighbor_right = b.get_path_to(tiles[(i + 1) % tiles.size()])
+		b.focus_neighbor_top = NodePath(".")
+		b.focus_neighbor_bottom = NodePath(".")
+	var target: Button = tiles[mini(1, tiles.size() - 1)]
+	for b in tiles:
+		if focus_key != "" and b.get_meta("key", "") == focus_key:
+			target = b
+	if focus_i >= 0 and focus_i < tiles.size():
+		target = tiles[focus_i]
+	# Leiste fährt von unten ein
+	strip_box.modulate.a = 0.0
+	var tw := create_tween().set_parallel().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	tw.tween_property(strip_box, "modulate:a", 1.0, 0.2)
+	section.modulate.a = 0.0
+	tw.tween_property(section, "modulate:a", 1.0, 0.25)
+	_strip_focus.call_deferred(target)
+
+
+func _strip_focus(b: Button) -> void:
+	if not is_instance_valid(b) or not b.is_inside_tree():
+		return
+	strip_box.reset_size()
+	strip_box.position.y = 8.0
+	_center_strip(b, false)
+	b.grab_focus()
+
+
+## Gewählte Kachel in die Mitte schieben; Pfeile links/rechts nur, wenn dort noch Kacheln sind
+func _center_strip(b: Button, animate := true) -> void:
+	if not b.is_inside_tree():
+		return
+	var w := strip_box.size.x
+	var tx := strip.size.x / 2.0 - (b.position.x + b.size.x / 2.0)
+	if w + 48.0 <= strip.size.x:
+		tx = (strip.size.x - w) / 2.0  # passt ganz hinein: mittig
+	else:
+		tx = clampf(tx, strip.size.x - w - 24.0, 24.0)
+	if animate:
+		var tw := create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+		tw.tween_property(strip_box, "position:x", tx, 0.16)
+	else:
+		strip_box.position.x = tx
+	for c in strip.get_children():
+		if c.has_meta("arrow"):
+			var side: int = c.get_meta("arrow")
+			c.visible = (tx < 20.0) if side < 0 else (tx + w > strip.size.x - 20.0)
+
+
+## Farbfeld für eine Kachel: Lack, Felgenfarbe, Folienfarbe, Neon, Licht (sonst null)
+func _swatch(cat: String, idx: int):
+	var opt: Dictionary = Catalog.PARTS[cat]["options"][idx]
+	if cat == "paint" and idx == 0:
+		return Catalog.CARS[preview_car].get("paint", opt.get("color", Color.WHITE))
+	if opt.get("paint", false):
+		return Builder.paint_color(preview_car, GameState.get_config(preview_car))
+	if cat != "rims" and opt.get("color", null) is Color:
+		return opt["color"]
+	return null
+
+
 func _install(cat: String, idx: int, group: String) -> void:
 	if not GameState.is_part_unlocked(cat, idx):
-		Sfx.play("thud", -14.0, 1.3)
+		Sfx.ui("locked")
+		return
+	if GameState.get_config(preview_car).get(cat, 0) == idx:
+		Sfx.ui("select")
 		return
 	GameState.get_config(preview_car)[cat] = idx
 	GameState.save_game()
-	Sfx.play("clang", -16.0, 1.6)
+	Sfx.ui("install")
 	_refresh_parts(cat)
 	_show_stats(preview_car, preview_cfg, GameState.get_config(preview_car))
 	_part_info(cat, idx)
@@ -933,14 +1199,16 @@ func _show_cars() -> void:
 	_set_section("AUTOHAUS", true)
 	var b := _button("", func(): _cycle_car(1))
 	b.set_meta("car", true)
+	b.set_meta("quiet", true)
 	b.gui_input.connect(func(ev): _lr_input(ev, _cycle_car))
-	_button("Dieses Auto fahren", _choose_car)
+	_button("Dieses Auto fahren", _choose_car).set_meta("quiet", true)
 	_button("< Zurück", _show_main)
 	_refresh_car()
 	_focus_first()
 
 
 func _cycle_car(dir: int) -> void:
+	Sfx.ui("change")
 	var i := Catalog.CAR_ORDER.find(preview_car)
 	preview_car = Catalog.CAR_ORDER[posmod(i + dir, Catalog.CAR_ORDER.size())]
 	preview_cfg = GameState.get_config(preview_car).duplicate()
@@ -968,6 +1236,7 @@ func _stars(v: float, lo: float, hi: float) -> String:
 
 func _choose_car() -> void:
 	if GameState.is_car_unlocked(preview_car):
+		Sfx.ui("install")
 		GameState.current_car = preview_car
 		GameState.save_game()
 		_show_main()
@@ -984,8 +1253,9 @@ func _show_language(first: bool) -> void:
 		b.text = I18n.NAMES[l].to_upper()
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		b.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
-		b.focus_entered.connect(func(): Sfx.play("whoosh", -26.0, 2.4))
+		b.focus_entered.connect(func(): Sfx.ui("move"))
 		b.pressed.connect(func():
+			Sfx.ui("select")
 			GameState.set_language(l)
 			get_tree().reload_current_scene())  # alle Texte neu in der gewählten Sprache
 		menu.add_child(b)
@@ -995,7 +1265,7 @@ func _show_language(first: bool) -> void:
 	info.text = "Choose your language. Title, places and signs stay German.\nWähle deine Sprache. Titel, Orte und Schilder bleiben deutsch."
 	_focus_first()
 	if not first and GameState.language == "de":
-		menu.get_child(1).grab_focus.call_deferred()
+		_grab.call_deferred(menu.get_child(1))
 
 
 func _confirm_reset() -> void:
@@ -1005,7 +1275,7 @@ func _confirm_reset() -> void:
 	info.text = tr("Alle Siege und Tuningteile gehen verloren.")
 	_button("Ja, zurücksetzen", func(): GameState.reset_progress(); _show_main())
 	_button("Abbrechen", _show_main)
-	menu.get_child(1).grab_focus.call_deferred()
+	_grab.call_deferred(menu.get_child(1))
 
 
 func _lr_input(ev: InputEvent, cb: Callable) -> void:
@@ -1018,8 +1288,8 @@ func _lr_input(ev: InputEvent, cb: Callable) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed("ui_cancel") and GameState.language != "":
-		Sfx.play("whoosh", -24.0, 1.8)
+	if event.is_action_pressed("ui_cancel") and GameState.language != "" and not _starting:
+		Sfx.ui("back")
 		if _back.is_valid():
 			_back.call()
 		else:

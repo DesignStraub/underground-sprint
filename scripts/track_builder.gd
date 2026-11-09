@@ -156,7 +156,17 @@ static var _box_id := 0
 static var _box_tag := ""
 
 
+## Ganze Strecke auf einmal bauen (Prüfwerkzeuge). Das Rennen baut sie mit begin()/step() in Stücken, damit der
+## Ladebildschirm zwischendurch zeichnen kann.
 static func build(race: Dictionary) -> Dictionary:
+	var job := begin(race)
+	while step(job) < 1.0:
+		pass
+	return job["track"]
+
+
+## Planung (Mittellinie, Viertel, Abzweige, Tunnel ...): schnell. Gibt den Bauauftrag für step() zurück.
+static func begin(race: Dictionary) -> Dictionary:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = race["seed"]
 	var root := Node3D.new()
@@ -238,69 +248,115 @@ static func build(race: Dictionary) -> Dictionary:
 		_plan_medians(track, rng)
 	if not track["elev0"].is_empty():
 		curve.set_meta("elev", track["elev0"])
+	return {"race": race, "rng": rng, "root": root, "track": track, "city": city, "type": type, "loop": loop,
+		"occupied": [], "buildings": [], "i": 0, "us": []}
 
-	_build_road(root, track)
-	for p in track["paths"]:
-		if p["id"] != 0:
-			_build_branch(root, track, p, rng)
-	_build_lakes(root, track, rng)
-	_build_ramps(root, track)
-	if track["crossing_d"] > 0.0:
-		var rc := RailCrossing.new()
-		root.add_child(rc)
-		rc.setup(frame_at(curve, track["crossing_d"]), track["crossing_d"], HALF_W, WALK,
-			race.get("station", STATIONS[int(track["crossing_d"]) % STATIONS.size()]))
-		track["crossing"] = rc
-	_build_tunnels(root, track, rng)
-	_build_el(root, track, rng)
-	if not city.is_empty():
-		_build_rivers(root, track)
-		_build_hills(root, track, rng)
-	var occupied := _build_city_landmarks(root, track) if not city.is_empty() else _build_landmarks(root, track, rng)
-	occupied.append_array(_build_structures(root, track, rng))
-	_box_tag = "zeile"
-	var buildings := _build_city(root, track, rng, occupied)
-	_box_tag = "osm"
-	if not city.is_empty():
-		buildings.append_array(_build_osm_buildings(root, track, rng, occupied + buildings))
-	_box_tag = ""
-	if type != "drift":
-		_build_fences(root, track, buildings + occupied)
-	_build_lamps(root, track)
-	if type == "drift":
-		_build_barriers(root, track, rng)
-	else:
-		_build_props(root, track, rng)
-	_build_steam(root, track, rng)
-	_build_spectators(root, track, rng)
-	if type == "drag":
-		_drag_boards(root, track)
-	if not city.is_empty() or race.has("town"):
-		_build_city_signs(root, track, race)
-	if race.get("city", "") == "kreuzberg":
-		_east_side_gallery(root, track)
-	if loop:
-		_gate(root, track, track["start"] + 12.0, "START · ZIEL", Color(0.2, 1.0, 0.4))
-	else:
-		_gate(root, track, track["start"] + 12.0, "START", Color(0.2, 1.0, 0.4))
-		_gate(root, track, track["finish"], "ZIEL", Color(1.0, 0.2, 0.4))
 
-	# Boden (sichtbar, mit Löchern über den Trögen) + Boden-Kollision nur für umherfliegende Teile
-	_build_ground(root, track)
-	_bake_street_light(root, track)
-	var gb := StaticBody3D.new()
-	gb.collision_layer = Knockable.GROUND
-	gb.collision_mask = 0
-	var gs := CollisionShape3D.new()
-	gs.shape = WorldBoundaryShape3D.new()
-	gb.add_child(gs)
-	root.add_child(gb)
-	_bb_flush(root)
-	_finalize_walls(root)
-	_auto_collide(root, track)
-	if not OS.get_cmdline_user_args().has("--nobatch"):
-		batch_static(root)
-	return track
+## Gewicht je Bauschritt (ungefähre Dauer) für den Fortschrittsbalken
+const STEP_W := [4.0, 2.0, 2.0, 10.0, 3.0, 3.0, 1.0, 1.0, 2.0, 72.0]
+
+
+## Einen Bauschritt ausführen; gibt den Fortschritt 0..1 zurück (1 = fertig, job["track"] ist gebaut).
+## Die Reihenfolge ist dieselbe wie früher in einem Stück: gleiche Zufallszahlen, gleiche Strecke.
+static func step(job: Dictionary) -> float:
+	var race: Dictionary = job["race"]
+	var rng: RandomNumberGenerator = job["rng"]
+	var root: Node3D = job["root"]
+	var track: Dictionary = job["track"]
+	var city: Dictionary = job["city"]
+	var type: String = job["type"]
+	var curve: Curve3D = track["curve"]
+	var i: int = job["i"]
+	var t0 := Time.get_ticks_usec()
+	match i:
+		0:
+			_build_road(root, track)
+			for p in track["paths"]:
+				if p["id"] != 0:
+					_build_branch(root, track, p, rng)
+		1:
+			_build_lakes(root, track, rng)
+			_build_ramps(root, track)
+			if track["crossing_d"] > 0.0:
+				var rc := RailCrossing.new()
+				root.add_child(rc)
+				rc.setup(frame_at(curve, track["crossing_d"]), track["crossing_d"], HALF_W, WALK,
+					race.get("station", STATIONS[int(track["crossing_d"]) % STATIONS.size()]))
+				track["crossing"] = rc
+			_build_tunnels(root, track, rng)
+			_build_el(root, track, rng)
+			if not city.is_empty():
+				_build_rivers(root, track)
+				_build_hills(root, track, rng)
+		2:
+			var occupied: Array = _build_city_landmarks(root, track) if not city.is_empty() else _build_landmarks(root, track, rng)
+			occupied.append_array(_build_structures(root, track, rng))
+			job["occupied"] = occupied
+		3:
+			_box_tag = "zeile"
+			job["buildings"] = _build_city(root, track, rng, job["occupied"])
+			_box_tag = ""
+		4:
+			if not city.is_empty():
+				_box_tag = "osm"
+				job["buildings"].append_array(_build_osm_buildings(root, track, rng, job["occupied"] + job["buildings"]))
+				_box_tag = ""
+		5:
+			if type != "drift":
+				_build_fences(root, track, job["buildings"] + job["occupied"])
+			_build_lamps(root, track)
+			if type == "drift":
+				_build_barriers(root, track, rng)
+			else:
+				_build_props(root, track, rng)
+			_build_steam(root, track, rng)
+			_build_spectators(root, track, rng)
+			if type == "drag":
+				_drag_boards(root, track)
+			if not city.is_empty() or race.has("town"):
+				_build_city_signs(root, track, race)
+			if race.get("city", "") == "kreuzberg":
+				_east_side_gallery(root, track)
+			if job["loop"]:
+				_gate(root, track, track["start"] + 12.0, "START · ZIEL", Color(0.2, 1.0, 0.4))
+			else:
+				_gate(root, track, track["start"] + 12.0, "START", Color(0.2, 1.0, 0.4))
+				_gate(root, track, track["finish"], "ZIEL", Color(1.0, 0.2, 0.4))
+		6:
+			# Boden (sichtbar, mit Löchern über den Trögen) + Boden-Kollision nur für umherfliegende Teile
+			_build_ground(root, track)
+		7:
+			_bake_street_light(root, track)
+		8:
+			var gb := StaticBody3D.new()
+			gb.collision_layer = Knockable.GROUND
+			gb.collision_mask = 0
+			var gs := CollisionShape3D.new()
+			gs.shape = WorldBoundaryShape3D.new()
+			gb.add_child(gs)
+			root.add_child(gb)
+			_bb_flush(root)
+			_finalize_walls(root)
+			_auto_collide(root, track)
+		9:
+			# Verschmelzen dauert am längsten: in Stücken von gut 0,1 s, damit der Ladebalken weiterläuft
+			if not OS.get_cmdline_user_args().has("--nobatch"):
+				if not job.has("batch"):
+					job["batch"] = batch_begin(root)
+				if not batch_step(root, job["batch"], 110):
+					job["us"].append(Time.get_ticks_usec() - t0)
+					return (_steps_done(8) + STEP_W[9] * batch_progress(job["batch"])) / _steps_done(9)
+	job["us"].append(Time.get_ticks_usec() - t0)
+	job["i"] = i + 1
+	return 1.0 if i + 1 >= STEP_W.size() else _steps_done(i) / _steps_done(STEP_W.size() - 1)
+
+
+## Summe der Gewichte bis einschließlich Schritt i
+static func _steps_done(i: int) -> float:
+	var t := 0.0
+	for k in i + 1:
+		t += STEP_W[k]
+	return t
 
 
 ## Alles Feste und Schmale, das auf Fahrbahn oder Gehweg steht (Masten, Pfosten, Baumstämme, Schaltkästen,
@@ -359,23 +415,69 @@ const STATIC_CELL := [32.0, 64.0, 128.0]  # Zellgröße je Detailstufe (klein, m
 
 
 static func batch_static(root: Node3D) -> void:
-	var buckets := {}
-	Builder.collect_static(root, Transform3D.IDENTITY, {}, {}, buckets, func(mi: MeshInstance3D, xf: Transform3D) -> Array:
+	var job := batch_begin(root)
+	while not batch_step(root, job, -1):
+		pass
+
+
+## Häuser und Kleinteile zu großen Flächen verschmelzen, in Stücken (Ladebildschirm): batch_begin() legt den
+## Auftrag an, batch_step() arbeitet höchstens budget_ms (-1 = alles) und gibt true zurück, wenn alles fertig ist.
+## Erst sammeln (je Kind der Strecke), dann verschmelzen, dann die Einzelteile entfernen; batch_progress() 0..1.
+static func batch_begin(root: Node3D) -> Dictionary:
+	var fn := func(mi: MeshInstance3D, xf: Transform3D) -> Array:
 		var size := mi.get_aabb().size.length()
 		var cls := 0 if size < 4.0 else (1 if size < 15.0 else 2)
 		var c: Vector3 = xf * mi.get_aabb().get_center()
-		return [cls, Vector2i(floori(c.x / STATIC_CELL[cls]), floori(c.z / STATIC_CELL[cls]))])
-	for mi in Builder.merge_buckets(root, buckets):
-		mi.set_meta("lod_class", mi.get_meta("merge_extra")[0])
-	# Umfahrbares (Laternen, Schilder, Poller) bewegt sich als Ganzes: je Teil die Flächen pro Material zusammen
-	var stack: Array = [root]
-	while not stack.is_empty():
-		var nd: Node = stack.pop_back()
-		for c in nd.get_children():
-			if c is Knockable:
-				Builder.merge_static(c)
-			elif c.get_child_count() > 0:
-				stack.append(c)
+		return [cls, Vector2i(floori(c.x / STATIC_CELL[cls]), floori(c.z / STATIC_CELL[cls]))]
+	return {"kids": root.get_children(), "ci": 0, "buckets": {}, "canon": {}, "fn": fn, "merge": {}}
+
+
+static func batch_step(root: Node3D, job: Dictionary, budget_ms: int) -> bool:
+	var t0 := Time.get_ticks_msec()
+	var kids: Array = job["kids"]
+	while job["ci"] < kids.size():
+		if budget_ms >= 0 and Time.get_ticks_msec() - t0 >= budget_ms:
+			return false
+		Builder.collect_one(kids[job["ci"]], Transform3D.IDENTITY, {}, job["canon"], job["buckets"], job["fn"])
+		job["ci"] += 1
+	if job["merge"].is_empty():
+		job["merge"] = Builder.merge_begin(job["buckets"])
+	var rest := -1 if budget_ms < 0 else maxi(budget_ms - (Time.get_ticks_msec() - t0), 1)
+	if not Builder.merge_step(root, job["merge"], rest):
+		return false
+	if not job.has("knock"):
+		for mi in job["merge"]["made"]:
+			mi.set_meta("lod_class", mi.get_meta("merge_extra")[0])
+		# Umfahrbares (Laternen, Schilder, Poller) bewegt sich als Ganzes: je Teil die Flächen pro Material zusammen
+		var knock := []
+		var stack: Array = [root]
+		while not stack.is_empty():
+			var nd: Node = stack.pop_back()
+			for c in nd.get_children():
+				if c is Knockable:
+					knock.append(c)
+				elif c.get_child_count() > 0:
+					stack.append(c)
+		job["knock"] = knock
+		job["ki"] = 0
+	var kn: Array = job["knock"]
+	while job["ki"] < kn.size():
+		if budget_ms >= 0 and Time.get_ticks_msec() - t0 >= budget_ms:
+			return false
+		Builder.merge_static(kn[job["ki"]])
+		job["ki"] += 1
+	return true
+
+
+static func batch_progress(job: Dictionary) -> float:
+	var col := float(job["ci"]) / maxf(job["kids"].size(), 1.0)
+	var m: Dictionary = job["merge"]
+	if m.is_empty():
+		return 0.25 * col
+	var mg := float(m["done"]) / maxf(m["keys"].size(), 1.0)
+	var dr := 0.0 if m["drop"] == null else float(m["dropped"]) / maxf(m["drop"].size(), 1.0)
+	var kn := 0.0 if not job.has("knock") else float(job["ki"]) / maxf(job["knock"].size(), 1.0)
+	return 0.25 + 0.5 * mg + 0.1 * dr + 0.15 * kn
 
 
 ## Boden der Stadt als Quadtree: grobe Platten weit weg, feine Kacheln am Rand der offenen Tröge, über dem Trog

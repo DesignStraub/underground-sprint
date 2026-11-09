@@ -18,6 +18,7 @@ const RaceShow := preload("res://scripts/race_show.gd")
 const UI := preload("res://scripts/ui_style.gd")
 const TOUCH := preload("res://scripts/touch_controls.gd")
 const Moods := preload("res://scripts/moods.gd")
+const Loading := preload("res://scripts/loading_screen.gd")
 
 enum State { COUNTDOWN, RACING, FINISHED, INTRO }
 
@@ -90,6 +91,14 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	race = Catalog.RACES[GameState.race_index]
 	event_type = race.get("type", "sprint")
+	# Ladebildschirm (die Garage hat denselben schon gezeigt): Strecke und Autos werden in Schritten gebaut, dazwischen
+	# kommt jeweils ein Bild, damit der Balken läuft und das Fenster nicht hängt. Solange ist alles pausiert.
+	_warming = true
+	get_tree().paused = true
+	Music.race_loading()
+	_loading = Loading.new(race, GameState.current_car)
+	add_child(_loading)
+	await get_tree().process_frame
 	# 3D-Welt rendert in eine eigene (pixelige) Auflösung, die Oberfläche bleibt scharf
 	var view_layer := CanvasLayer.new()
 	view_layer.layer = -1
@@ -97,26 +106,45 @@ func _ready() -> void:
 	var pv := PixelView.new()
 	view_layer.add_child(pv)
 	world = pv.world
+	world.render_target_update_mode = SubViewport.UPDATE_DISABLED  # während des Ladens nichts zeichnen
 
-	track = Track.build(race)
+	var t_load := Time.get_ticks_msec()
+	var job := Track.begin(race)
+	_loading.progress = 0.04
+	await get_tree().process_frame
+	while true:
+		var tp := Track.step(job)
+		_loading.progress = 0.04 + 0.66 * tp
+		await get_tree().process_frame
+		if tp >= 1.0:
+			break
+	if OS.get_cmdline_user_args().has("--loadlog"):
+		print("LOAD Strecke %d ms, Schritte %s" % [Time.get_ticks_msec() - t_load, str(job["us"].map(func(u): return u / 1000))])
+	track = job["track"]
 	curve = track["curve"]
 	Track.apply_lod(track["node"], GameState.lod_ranges())
 	track["node"].process_mode = Node.PROCESS_MODE_PAUSABLE
 	world.add_child(track["node"])
 	_setup_environment()
 
+	_loading.progress = 0.72
+	await get_tree().process_frame
+
 	var car_id := GameState.current_car
-	player = PlayerCar.new()
-	player.process_mode = Node.PROCESS_MODE_PAUSABLE
-	player.track = track
-	world.add_child(player)
-	player.setup(car_id, GameState.get_config(car_id))
-	player.drift_mode = event_type == "drift"
-	player.drag_mode = event_type == "drag"
+	var pc := PlayerCar.new()
+	pc.process_mode = Node.PROCESS_MODE_PAUSABLE
+	pc.track = track
+	world.add_child(pc)
+	pc.setup(car_id, GameState.get_config(car_id))
+	pc.drift_mode = event_type == "drift"
+	pc.drag_mode = event_type == "drag"
 	# Tempo-Stufe gilt für alle gleich (Spieler und Gegner)
-	player.top_speed *= GameState.pace()
-	player.accel *= 0.8 + 0.2 * GameState.pace()
-	player.place(Track.xform_at(curve, track["start"], Track.LANES[2]))
+	pc.top_speed *= GameState.pace()
+	pc.accel *= 0.8 + 0.2 * GameState.pace()
+	pc.place(Track.xform_at(curve, track["start"], Track.LANES[2]))
+	player = pc  # erst fertig eingerichtet sichtbar machen (Testwerkzeug fragt race.player ab)
+	_loading.progress = 0.77
+	await get_tree().process_frame
 	if mood["rain"]:
 		_rain = Moods.rain([200, 340, 520][GameState.gv("fx")])
 		player.cam.add_child(_rain)
@@ -162,6 +190,8 @@ func _ready() -> void:
 		ai.accel *= 0.8 + 0.2 * GameState.pace()
 		ai.set_meta("hud_col", _hud_col(Builder.paint_color(id, cfg)))
 		ais.append(ai)
+		_loading.progress = 0.77 + 0.05 * (i + 1)
+		await get_tree().process_frame
 
 	for ai in ais:
 		ai.rivals = ais
@@ -180,6 +210,8 @@ func _ready() -> void:
 		_spawn_traffic()
 	if not traffic.is_empty():
 		Traffic.prepare_sound()
+	_loading.progress = 0.94
+	await get_tree().process_frame
 	_build_hud()
 	show = RaceShow.new()
 	show.process_mode = Node.PROCESS_MODE_PAUSABLE
@@ -195,41 +227,29 @@ func _ready() -> void:
 		Music.hold_toast(true)
 	else:
 		show.ready_set()
+		Music.hold_toast(false)
 	if RenderingServer.get_current_rendering_method() == "gl_compatibility" and not OS.get_cmdline_user_args().has("--nowarmup"):
-		_warmup()
+		await _warmup()
+	if OS.get_cmdline_user_args().has("--loadlog"):
+		print("LOAD gesamt %d ms" % (Time.get_ticks_msec() - t_load))
+	world.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	await get_tree().process_frame
+	_loading.finish()
+	_loading = null
+	get_tree().paused = false
+	_warming = false
 
 
 ## Im Browser (WebGL) übersetzt die Grafikkarte jeden Shader erst, wenn er zum ersten Mal im Bild ist; mitten im
-## Rennen ruckelt das spürbar. Deshalb vor dem Start hinter einem Ladebild: unsichtbare Kameras fahren die Strecke
-## in beide Richtungen ab und schauen auf die Autos (Nitroflammen und Rad-Unschärfe kurz an), bis alles einmal
+## Rennen ruckelt das spürbar. Deshalb noch hinter dem Ladebildschirm: unsichtbare Kameras fahren die Strecke in
+## beide Richtungen ab und schauen auf die Autos (Nitroflammen und Rad-Unschärfe kurz an), bis alles einmal
 ## gezeichnet wurde.
-var _warming := false
+var _warming := false  # Laden und Vorzeichnen: keine Eingaben
+var _loading: Loading
 
 
 func _warmup() -> void:
-	_warming = true
-	get_tree().paused = true
-	var cover := CanvasLayer.new()
-	cover.layer = 50
-	add_child(cover)
-	var bg := ColorRect.new()
-	bg.color = Color(0.01, 0.01, 0.02)
-	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
-	cover.add_child(bg)
-	var lbl := Label.new()
-	lbl.text = tr("STRECKE WIRD VORBEREITET")
-	lbl.label_settings = LabelSettings.new()
-	lbl.label_settings.font = UI.font("cond", 0.2)
-	lbl.label_settings.font_size = 16
-	lbl.label_settings.font_color = UI.CYAN
-	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_center(lbl, Rect2(-150, -24, 300, 24))
-	cover.add_child(lbl)
-	var bar := ColorRect.new()
-	bar.color = UI.PINK
-	_center(bar, Rect2(-120, 8, 0, 3))
-	cover.add_child(bar)
-	world.render_target_update_mode = SubViewport.UPDATE_DISABLED
+	var cover: Node = _loading
 	# Blickpunkte: alle Wege alle 150 m vorwärts, alle 300 m rückwärts, dazu die Autos am Start
 	var views := []
 	for p in track["paths"]:
@@ -249,8 +269,7 @@ func _warmup() -> void:
 	for car in [player] + ais:
 		var back: Vector3 = car.global_transform.basis.z
 		views.append([car.global_position + back * 7.0 + Vector3(0, 2.0, 0), car.global_position])
-		var lt = car.model.get_meta("flame_light", null)
-		for fl in car.model.get_meta("flames") + car.model.get_meta("blurs", []) + ([lt] if lt else []):
+		for fl in car.model.get_meta("flames") + car.model.get_meta("blurs", []):
 			if not fl.visible:
 				fl.visible = true
 				flames.append(fl)
@@ -278,25 +297,15 @@ func _warmup() -> void:
 				else:
 					cam.look_at_from_position(v[0], v[1], Vector3.UP)
 				i += 1
-		bar.offset_right = -120.0 + 240.0 * i / views.size()
+		_loading.progress = 0.95 + 0.05 * i / views.size()
 		await get_tree().process_frame
 	await get_tree().process_frame
 	for fl in flames:
 		fl.visible = false
-	world.render_target_update_mode = SubViewport.UPDATE_ALWAYS
-	await get_tree().process_frame
-	cover.queue_free()
-	get_tree().paused = false
-	_warming = false
+	for c in cams:
+		c.get_parent().queue_free()
 
 
-## Element um die Bildschirmmitte legen (r relativ zur Mitte)
-static func _center(c: Control, r: Rect2) -> void:
-	c.set_anchors_preset(Control.PRESET_CENTER)
-	c.offset_left = r.position.x
-	c.offset_top = r.position.y
-	c.offset_right = r.end.x
-	c.offset_bottom = r.end.y
 
 
 ## Drag: langsamer Verkehr auf allen Spuren in unsere Richtung, erst nach dem Start-Stück. Ausweichen per Spurwechsel.
@@ -780,10 +789,13 @@ func _process(dt: float) -> void:
 			var n := int(ceil(countdown - 1.0))
 			hud["center"].text = str(n) if n > 0 else tr("LOS!")
 			if n != _beep_n and n >= 0:
+				# Startampel: drei runde Töne, bei LOS eine Oktave höher; die Musik ist bis dahin leiser
 				_beep_n = n
-				var b := Sfx.play("beep" if n > 0 else "beep_go", -9.0 if n > 0 else -7.0)
+				var b := Sfx.play("beep" if n > 0 else "beep_go", -8.0 if n > 0 else -6.0)
 				if b:
 					b.bus = "Master"  # Ansage, kein Hall
+				if n == 0:
+					Music.race_go()  # neuer Track zum Start
 			hud["goal"].visible = true
 			if countdown <= 1.0 and not player.controls_enabled:
 				player.controls_enabled = true
@@ -1367,13 +1379,11 @@ func _update_speed_fx(sf: float) -> void:
 	if _bars_k > 0.0 or state != State.RACING:
 		blur = 0.0  # Sprungkamera, Countdown, Ziel: ruhiges Bild
 		sw = 0.0
-	var kick: float = player._nos_kick if lvl > 0.0 and state == State.RACING else 0.0
 	_fx_rect.visible = blur + absf(sw) > 0.0004 or nit > 0.001
 	if _fx_rect.visible:
 		fx_mat.set_shader_parameter("blur", blur)
 		fx_mat.set_shader_parameter("swing", sw)
 		fx_mat.set_shader_parameter("nitro", nit)
-		fx_mat.set_shader_parameter("kick", kick * minf(lvl, 1.0))
 
 
 ## Sprungkamera: schwarze Balken oben und unten einfahren, Bewegungsunschärfe aus, Ton in der Zeitlupe dumpf

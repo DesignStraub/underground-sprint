@@ -1,7 +1,9 @@
 extends Node
-## Musik wie ein durchgehender Mix: alle Tracks aus res://music/ (mp3, ogg, wav) in zufälliger Reihenfolge, über alle
-## Szenen hinweg. Ein Track läuft bis zum Ende (ein neues Rennen schneidet ihn nicht ab); kurz vor Schluss blendet
-## der nächste weich über. Ist die Liste einmal durch, wird neu gemischt (ohne denselben Track zweimal hintereinander).
+## Musik: alle Tracks aus res://music/ (mp3, ogg, wav) in zufälliger Reihenfolge; kurz vor Schluss blendet der
+## nächste weich über. Ist die Liste einmal durch, wird neu gemischt (ohne denselben Track zweimal hintereinander).
+## Menü und Rennen haben je ihren eigenen Track: beim Laden eines Rennens wird die Menümusik leiser und bleibt das
+## über Kameraflug und Countdown (Motoren und Starttöne sind gut zu hören), bei LOS setzt ein neuer Track voll ein.
+## Zurück im Menü beginnt wieder ein neuer.
 ## Die Tracks sind gleich laut gemacht (gemessen mit ffmpeg ebur128, Ziel -11 LUFS), Stille am Anfang und Ende wird
 ## übersprungen. Taste M springt mit kurzer Überblendung zum nächsten Track.
 ## Beim Trackwechsel klappt unten in der Mitte (Garage: rechts unten) kurz eine kleine Blase mit dem Titel auf und wieder zu (wie in NFS),
@@ -46,6 +48,10 @@ var _toast_artist := ""
 var _toast_pending := false
 var _toast_hold := false
 var toast_corner := false  # Garage: Blase rechts unten in der Tastenleiste (links Menü, darüber das Infofeld)
+var _duck := 0.0  # dB: leiser während Laden, Kameraflug und Countdown
+var _duck_to := 0.0
+var _in_race := false
+const DUCK_DB := -13.0
 
 
 func _ready() -> void:
@@ -64,7 +70,8 @@ func _ready() -> void:
 	_toast.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_toast.draw.connect(_draw_toast)
 	layer.add_child(_toast)
-	_scan()
+	if not OS.get_cmdline_user_args().has("--nomusic"):  # Tonaufnahmen beim Testen: nur Spielgeräusche
+		_scan()
 	_last_ms = Time.get_ticks_msec()
 	next()
 
@@ -124,6 +131,30 @@ func next(fade := FADE_SKIP) -> void:
 		_toast_pending = true  # erst nach dem Intro zeigen
 	else:
 		_start_toast()
+
+
+## Rennen wird geladen: Musik leiser bis zum Start
+func race_loading() -> void:
+	_in_race = true
+	_duck_to = DUCK_DB
+	hold_toast(true)  # keine Titel-Blase über dem Ladebalken
+	if _toast_t >= 0.0:
+		_toast_t = -1.0  # eine gerade offene Blase sofort weg
+		_toast.queue_redraw()
+
+
+## Start (LOS): neuer Track für das Rennen, voll
+func race_go() -> void:
+	_duck_to = 0.0
+	next(0.7)
+
+
+## Zurück im Menü: nach einem Rennen ein neuer Track
+func menu() -> void:
+	if _in_race:
+		_in_race = false
+		_duck_to = 0.0
+		next(1.5)
 
 
 func set_paused(p: bool) -> void:
@@ -210,15 +241,18 @@ func _process(_dt: float) -> void:
 	var cur := _players[_cur]
 	var old := _players[1 - _cur]
 	_age += dt
+	_duck = move_toward(_duck, _duck_to, dt * (30.0 if _duck_to > _duck else 18.0))
 	if _fade < 1.0:
 		_fade = minf(_fade + dt / _fade_len, 1.0)
 		# gleiche Leistung: in der Mitte nicht leiser
-		cur.volume_db = BASE_DB + _gain[_cur] + linear_to_db(maxf(sin(_fade * PI * 0.5), 0.0001))
-		old.volume_db = BASE_DB + _gain[1 - _cur] + linear_to_db(maxf(cos(_fade * PI * 0.5), 0.0001))
+		cur.volume_db = BASE_DB + _gain[_cur] + _duck + linear_to_db(maxf(sin(_fade * PI * 0.5), 0.0001))
+		old.volume_db = BASE_DB + _gain[1 - _cur] + _duck + linear_to_db(maxf(cos(_fade * PI * 0.5), 0.0001))
 		if _fade >= 1.0:
 			old.stop()
 			old.stream = null
-	elif (not cur.playing and _age > 2.0) or cur.get_playback_position() >= _end - FADE:
+	else:
+		cur.volume_db = BASE_DB + _gain[_cur] + _duck
+	if _fade >= 1.0 and ((not cur.playing and _age > 2.0) or cur.get_playback_position() >= _end - FADE):
 		next(FADE)
 
 

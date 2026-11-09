@@ -560,25 +560,128 @@ def wind_loop():
     return _loop_xfade(out, n, xf)
 
 
-def _beep(f, dur, rel):
+def _tone(f, dur, decay, harm=(1.0, 0.18, 0.06), attack=0.004, vib=0.0):
+    """Weicher Ton: Sinus mit leisen Obertönen, kurzer Anstieg, exponentiell abklingend (kein Rechteck)."""
     n = secs(dur)
     x = []
     for i in range(n):
         t = i / SR
-        env = min(1.0, t / 0.004) * min(1.0, (dur - t) / rel)
-        v = sum(math.sin(2.0 * math.pi * f * h * t) / h for h in (1, 3, 5, 7)) * 0.8 + 0.25 * math.sin(2.0 * math.pi * f * 2 * t)
-        x.append(v * env)
-    return lp(x, 5000.0)
+        env = min(1.0, t / attack) * math.exp(-t / decay) * min(1.0, (dur - t) / 0.01)
+        ph = 2.0 * math.pi * f * (t + vib * math.sin(2.0 * math.pi * 5.5 * t) / (2.0 * math.pi * 5.5))
+        x.append(env * sum(a * math.sin(ph * (h + 1)) for h, a in enumerate(harm)))
+    return x
+
+
+def _mix(*parts):
+    """Teile mit Versatz mischen: (Signal, Start s, Gain)"""
+    n = max(secs(st) + len(sig) for sig, st, g in parts)
+    out = [0.0] * n
+    for sig, st, g in parts:
+        o = secs(st)
+        for i, v in enumerate(sig):
+            out[o + i] += v * g
+    return out
 
 
 def beep():
-    """Countdown 3, 2, 1: kurzer, klarer Piepton (G5). 0,24 s."""
-    return _beep(784.0, 0.24, 0.04)
+    """Countdown 3, 2, 1: kurzer, runder Ton (A5) wie an der Startampel, ohne schnarrende Obertöne. 0,22 s."""
+    return _tone(880.0, 0.22, 0.09, (1.0, 0.12, 0.03))
 
 
 def beep_go():
-    """Countdown LOS: eine Oktave höher und länger. 0,75 s."""
-    return _beep(1568.0, 0.75, 0.3)
+    """Countdown LOS: eine Oktave höher, länger klingend, dazu ein tiefer, weicher Schlag. 0,9 s."""
+    hit = []
+    for i in range(secs(0.25)):
+        t = i / SR
+        hit.append(math.sin(2.0 * math.pi * (70.0 - 25.0 * t) * t) * math.exp(-t / 0.07))
+    return _mix((_tone(1760.0, 0.9, 0.32, (1.0, 0.1, 0.02)), 0.0, 1.0), (_tone(880.0, 0.6, 0.18, (1.0, 0.1)), 0.0, 0.35), (hit, 0.0, 0.7))
+
+
+def turbo_loop():
+    """Turbo-Pfeifen: heller Ton (1,1 kHz, geht in 1 s genau auf) mit leichtem Schweben und etwas Luftrauschen."""
+    n = secs(1.0)
+    xf = secs(0.1)
+    air = bandpass(noise(n + xf), 1400.0, 2.0)
+    x = []
+    for i in range(n + xf):
+        t = i / SR
+        ph = 2.0 * math.pi * 1100.0 * t + 0.4 * math.sin(2.0 * math.pi * 3.0 * t)
+        x.append(math.sin(ph) + 0.12 * math.sin(2 * ph) + air[i] * 0.8)
+    return _loop_xfade(x, n, xf)
+
+
+# --- Menü: kurze, saubere Klicks und Töne (bis 2.21 liefen hier Sprung-, Lande- und Laternen-Geräusche)
+
+def _click(dur, f, decay, bright=0.4):
+    """Kurzer Klick: Rauschstoß (hell) und ein kurzer Ton darunter"""
+    n = secs(dur)
+    nz = _hp(noise(n), 2500.0)
+    x = []
+    for i in range(n):
+        t = i / SR
+        x.append(nz[i] * bright * math.exp(-t / 0.004) + math.sin(2.0 * math.pi * f * t) * math.exp(-t / decay))
+    return x
+
+
+def ui_move():
+    """Auswahl wandert: sehr kurzes, weiches Ticken (55 ms)."""
+    return lp(_click(0.055, 2200.0, 0.012, 0.35), 7000.0)
+
+
+def ui_change():
+    """Wert umschalten (links/rechts, Teil durchblättern): Ticken mit kleinem Ton, eine Spur tiefer (80 ms)."""
+    return _mix((_click(0.05, 1500.0, 0.014, 0.3), 0.0, 1.0), (_tone(2400.0, 0.08, 0.02, (1.0,)), 0.0, 0.25))
+
+
+def ui_select():
+    """Bestätigen: zwei schnelle, aufsteigende Töne (E6, H6) mit Klick. 0,26 s."""
+    return _mix((_click(0.04, 1800.0, 0.01, 0.4), 0.0, 0.8), (_tone(1318.5, 0.16, 0.05), 0.0, 0.6),
+                (_tone(1975.5, 0.22, 0.07), 0.055, 0.55))
+
+
+def ui_back():
+    """Zurück: zwei absteigende, leisere Töne (H5, E5). 0,22 s."""
+    return _mix((_click(0.04, 1200.0, 0.01, 0.25), 0.0, 0.6), (_tone(987.8, 0.13, 0.045), 0.0, 0.5),
+                (_tone(659.3, 0.18, 0.06), 0.05, 0.5))
+
+
+def ui_install():
+    """Teil eingebaut: satter Schlag (Werkzeug) und ein heller, metallischer Ton darüber, der ausklingt. 0,6 s."""
+    n = secs(0.6)
+    thump = []
+    for i in range(n):
+        t = i / SR
+        thump.append(math.sin(2.0 * math.pi * (95.0 - 40.0 * t) * t) * math.exp(-t / 0.06))
+    ping = [0.0] * n
+    for f, a, d in ((2093.0, 1.0, 0.18), (3136.0, 0.45, 0.12), (5274.0, 0.18, 0.06)):
+        for i in range(n):
+            t = i / SR
+            ping[i] += a * math.sin(2.0 * math.pi * f * t) * math.exp(-t / d)
+    return _mix((thump, 0.0, 0.9), (_click(0.03, 900.0, 0.01, 0.6), 0.0, 0.6), (ping, 0.012, 0.35), (_tone(2637.0, 0.4, 0.12), 0.07, 0.25))
+
+
+def ui_locked():
+    """Gesperrt: zwei kurze, gedämpfte tiefe Töne. 0,22 s."""
+    a = lp(_tone(233.1, 0.08, 0.05, (1.0, 0.5, 0.3, 0.2)), 1500.0)
+    return _mix((a, 0.0, 1.0), (a, 0.11, 0.8))
+
+
+def ui_go():
+    """Rennen starten: Luftzug, der hochzieht, mit tiefem Schlag am Ende. 0,7 s."""
+    n = secs(0.7)
+    nz = noise(n)
+    fcs = [400.0 + 3600.0 * (i / n) ** 2 for i in range(n)]
+    air = lp_var(nz, fcs)
+    x = []
+    for i in range(n):
+        t = i / SR
+        env = (t / 0.5) ** 2 if t < 0.5 else math.exp(-(t - 0.5) / 0.05)
+        x.append(air[i] * env * 2.5)
+    hit = []
+    for i in range(secs(0.3)):
+        t = i / SR
+        hit.append(math.sin(2.0 * math.pi * (80.0 - 30.0 * t) * t) * math.exp(-t / 0.08))
+    return _mix((x, 0.0, 1.0), (hit, 0.48, 0.9), (_tone(1318.5, 0.25, 0.08), 0.48, 0.25))
 
 
 SOUNDS = {
@@ -587,7 +690,9 @@ SOUNDS = {
     "crowd": (crowd_loop, 0.6), "skid": (skid_loop, 0.8), "scrub": (scrub_loop, 0.8), "nitro": (nitro_loop, 0.8),
     "nitro_on": (nitro_on, 0.89), "nitro_off": (nitro_off, 0.85),
     "backfire": (backfire, 0.89), "bov": (bov, 0.85), "flutter": (flutter, 0.85), "scrape": (scrape_loop, 0.8),
-    "road": (road_loop, 0.8), "wind": (wind_loop, 0.8), "beep": (beep, 0.7), "beep_go": (beep_go, 0.7),
+    "road": (road_loop, 0.8), "wind": (wind_loop, 0.8), "beep": (beep, 0.6), "beep_go": (beep_go, 0.7),
+    "turbo": (turbo_loop, 0.8), "ui_move": (ui_move, 0.5), "ui_change": (ui_change, 0.5), "ui_select": (ui_select, 0.55),
+    "ui_back": (ui_back, 0.5), "ui_install": (ui_install, 0.7), "ui_locked": (ui_locked, 0.55), "ui_go": (ui_go, 0.7),
 }
 
 if __name__ == "__main__":

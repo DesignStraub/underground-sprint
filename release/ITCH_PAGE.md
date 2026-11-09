@@ -44,12 +44,12 @@ Berlin-Kreuzberg, mit Dom, Residenz, Festung, Oberbaumbrücke und Hochbahn an ih
 - Abkürzungen als Lichttunnel aus Neonbögen, Sprünge mit echter Flugphase, Überschläge bei harten Crashs, umfahrbare Laternen und Schilder
 - Sprungkamera wie in Underground: Bei großen Sprüngen fängt dich eine Kamera schräg von vorn ein, in leichter Zeitlupe
 - Asphalt wie damals: körnig, mit Rissen, Teerfugen und Radspuren, Lichtkreise unter jeder Laterne, nass spiegeln sich Laternen und Rücklichter; Gehwege aus Betonplatten, Kopfsteinpflaster in den Altstädten
-- Tempogefühl wie in Underground: Bewegungsunschärfe am Bildrand, Tempo-Zoom, Reifenquietschen in Kurven und Drifts; Nitro mit Flammen aus dem Auspuff, Lichtstreifen und Druckwelle beim Zünden – alles einzeln abschaltbar
-- 23 Autos in fünf Leistungsklassen: JDM-Klassiker, Kei-Wagen und Kleinwagen bis zu drei Exoten (Klasse S gleich stark, aber jedes mit eigenem Charakter) mit Front-, Heck-, Mittelmotor-, Heckmotor- oder Allradantrieb, Tuning wie in NFS, ein Satz Teile für alle Autos: Optik (21 Lacke, jeder als Glanz, Metallic, Matt oder Perlmutt, dazu Chrom, 23 Felgenarten mit eigener Felgenfarbe und Zoll-Einstellung, Werksfelge je Auto, Spoiler, Bodykits, Motorhauben mit Kohlefaser, Auspuff, Folien, Neon, Scheiben, Scheinwerfer) und Leistung (Motor, Turbo, Nitro, Fahrwerk, Reifen)
+- Tempogefühl wie in Underground: Bewegungsunschärfe am Bildrand, Tempo-Zoom, Reifenquietschen in Kurven und Drifts – alles einzeln abschaltbar
+- 23 Autos in fünf Leistungsklassen: JDM-Klassiker, Kei-Wagen und Kleinwagen bis zu drei Exoten (Klasse S gleich stark, aber jedes mit eigenem Charakter) mit Front-, Heck-, Mittelmotor-, Heckmotor- oder Allradantrieb, Tuning wie in NFS mit waagerechter Teile-Leiste, ein Satz Teile für alle Autos: Optik (21 Lacke, jeder als Glanz, Metallic, Matt oder Perlmutt, dazu Chrom, 23 Felgenarten mit eigener Felgenfarbe und Zoll-Einstellung, Werksfelge je Auto, Spoiler, Bodykits, Motorhauben mit Kohlefaser, Auspuff, Folien, Neon, Scheiben, Scheinwerfer) und Leistung (Motor, Turbo, Nitro, Fahrwerk, Reifen)
 - Kein Geld, kein Grind: Siege schalten Teile und Autos frei
 - Schwierigkeit Leicht / Normal / Schwer: Leicht zum entspannten Kennenlernen der Städte
 - Start- und Zielszene wie damals: Starterin, jubelnde Fans, Kamerafahrt; Zuschauer mit eigener Kleidung und Frisur
-- Motorsound in Echtzeit erzeugt – jedes Auto klingt anders, auch die Gegner (mit Dopplereffekt beim Überholen); Fehlzündungen beim Schalten, Blow-off-Ventil, Nitro faucht, Reifen schrubben und quietschen
+- Motorklang aus vorgerechneten Drehzahl-Schleifen je Auto (Reihen-Drei- bis Sechszylinder, Boxer, Wankel, V6, V10, V12) – jedes Auto klingt anders, auch die Gegner (mit Dopplereffekt beim Überholen); Fehlzündungen beim Schalten, Blow-off-Ventil, Nitro faucht, Reifen schrubben und quietschen
 - Musik als durchgehender Mix: sieben Tracks (Phonk, Trap, Drill), gleich laut, weich übergeblendet
 - Grafikmenü wie in großen PC-Spielen: Voreinstellungen Niedrig bis Ultra, dynamische Auflösung, Sichtweite, Details, Texturdetails, Kantenglättung, FPS-Anzeige
 - Englisch und Deutsch, Retro-Pixel-Look (einstellbar), läuft bis 4K und im Browser, auch auf Handy und Tablet
@@ -81,12 +81,12 @@ cathedral, palace, fortress, Oberbaum Bridge and elevated U-Bahn in their real p
 - Shortcuts as neon light tunnels, jumps with real air time, rollovers in hard crashes, lamps and signs you can knock over
 - Jump camera like in Underground: big jumps cut to a camera watching you from ahead at an angle, in slight slow motion
 - Asphalt like back then: grainy, with cracks, tar seams and wheel ruts, a pool of light under every street lamp, street lights and tail lights reflecting when wet; concrete-slab sidewalks, cobblestones in the old towns
-- Speed feel like Underground: motion blur at the screen edges, speed zoom, tyre squeal when drifting; nitro with exhaust flames, light streaks and a shockwave on ignition – each can be switched off
-- 23 cars in five performance classes: JDM classics, kei cars and hot hatches up to three exotics (class S equally strong, each with its own character) with front-, rear-, mid-engine, rear-engine or all-wheel drive, NFS-style tuning, one set of parts for all your cars: visual (21 paints, each in gloss, metallic, matte or pearl, plus chrome, 23 rim styles with their own rim colour and rim size, a factory wheel for every car, spoilers, body kits, carbon hoods, exhausts, vinyls, underglow, tint, headlights) and performance (engine, turbo, nitro, suspension, tires)
+- Speed feel like Underground: motion blur at the screen edges, speed zoom, tyre squeal when drifting – each can be switched off
+- 23 cars in five performance classes: JDM classics, kei cars and hot hatches up to three exotics (class S equally strong, each with its own character) with front-, rear-, mid-engine, rear-engine or all-wheel drive, NFS-style tuning with a horizontal parts bar, one set of parts for all your cars: visual (21 paints, each in gloss, metallic, matte or pearl, plus chrome, 23 rim styles with their own rim colour and rim size, a factory wheel for every car, spoilers, body kits, carbon hoods, exhausts, vinyls, underglow, tint, headlights) and performance (engine, turbo, nitro, suspension, tires)
 - No money, no grind: wins unlock parts and cars
 - Difficulty Easy / Normal / Hard: Easy for exploring the cities at your own pace
 - Start and finish scenes like back in the day: flag girl, cheering crowd, camera fly-in; spectators with their own clothes and hairstyles
-- Real-time engine sound – every car sounds different, rivals too (with Doppler as they pass); backfires on upshifts, blow-off valve, nitro hisses, tires scrub and squeal
+- Engine sound from pre-rendered rev loops per car (inline three to six, boxer, rotary, V6, V10, V12) – every car sounds different, rivals too (with Doppler as they pass); backfires on upshifts, blow-off valve, nitro hisses, tires scrub and squeal
 - Music as a continuous mix: seven tracks (phonk, trap, drill), levelled and crossfaded
 - Graphics menu like big PC games: Low to Ultra presets, dynamic resolution, view distance, detail, texture detail, anti-aliasing, FPS counter
 - English and German (choose at first start), retro pixel look, runs up to 4K and in the browser, also on phones and tablets

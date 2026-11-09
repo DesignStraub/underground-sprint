@@ -97,9 +97,10 @@ func setup(track_: Dictionary, car_id: String, cfg: Dictionary, start_progress: 
 	shortcut_rate = randf_range(0.35, 0.8)
 	global_transform = Track.xform_at(path["curve"], d, lane)
 	_last_yaw = rotation.y
-	var snd: Dictionary = Catalog.CARS[car_id]["sound"]
-	for spec in [[1500.0, 0.3], [4500.0, 1.0]]:
-		var w := EngineAudio.render_loop(snd, spec[0], spec[1])
+	# zwei Schleifen aus den Motorklängen des Autos: unten Schub/Teillast, oben Volllast
+	var bank := EngineAudio.bank(car_id)
+	for spec in ([["off", 2], ["on", 6]] if not bank.is_empty() else []):
+		var w: AudioStreamWAV = bank[spec[0]][spec[1]]
 		var a := AudioStreamPlayer3D.new()
 		a.stream = w
 		a.unit_size = 6.0
@@ -111,7 +112,7 @@ func setup(track_: Dictionary, car_id: String, cfg: Dictionary, start_progress: 
 		add_child(a)
 		a.play(randf() * w.get_length())
 		_eng.append(a)
-		_eng_ref[_eng.size() - 1] = w.get_meta("rpm")
+		_eng_ref[_eng.size() - 1] = EngineAudio.exact_rpm(EngineAudio.RPMS[spec[1]])
 
 
 ## Tonbus für den Motor (race.gd: Hall-Bus, sobald es ihn gibt)
