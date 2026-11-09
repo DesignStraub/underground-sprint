@@ -3,9 +3,14 @@ extends CharacterBody3D
 ## weicht gesperrten Spuren aus, bremst für den Spieler und hält am Bahnübergang. Bei einem Crash wird er weggeschleudert,
 ## bei einem harten Treffer hebt er ab, überschlägt sich und bleibt auf Seite oder Dach liegen.
 ## Fährt auf der Hauptstraße (mit Mittelstreifen-Versatz) oder in einer Gabelung (path_id).
+## Ton: race.gd schaltet bei den nächsten paar Autos Motor und Abrollen ein (sound()), mit Dopplereffekt im Vorbeifahren.
 
 const Builder := preload("res://scripts/car_builder.gd")
 const Track := preload("res://scripts/track_builder.gd")
+const EngineAudio := preload("res://scripts/engine_audio.gd")
+## Motorklang: ruhiger Vierzylinder; der Bus ein rauer Sechszylinder-Diesel
+const SND_CAR := {"cyl": 4, "harm": [1.0, 0.4, 0.18, 0.06], "sub": 0.25, "turbo": 0.0, "rough": 0.15}
+const SND_BUS := {"cyl": 6, "harm": [1.0, 0.62, 0.36, 0.16], "sub": 0.5, "turbo": 0.0, "rough": 0.6}
 
 const KINDS := ["sedan", "sedan", "sedan", "taxi", "van", "van", "bus"]
 const COLORS := [Color(0.5, 0.5, 0.52), Color(0.15, 0.15, 0.17), Color(0.25, 0.3, 0.4), Color(0.45, 0.1, 0.1),
@@ -37,10 +42,13 @@ var _wreck_roll := 0.0
 var _wreck_roll_v := 0.0
 var _wreck_ground := 0.0
 var _far_d2 := 0.0
+var kind := ""
+var _snd: AudioStreamPlayer3D
 var _far_t := 0.0
 
 
-func setup(kind: String, rng: RandomNumberGenerator) -> void:
+func setup(kind_: String, rng: RandomNumberGenerator) -> void:
+	kind = kind_
 	add_to_group("traffic")
 	_far_d2 = pow(GameState.view_distance() + 80.0, 2.0)
 	_far_t = rng.randf() * 0.5
@@ -98,7 +106,48 @@ func _body(fp: Vector2, h: float, col: Color, cabin: Vector2, cabin_h: float, ca
 			Builder._add(self, c, tire, Vector3(s * (fp.x / 2 - 0.1), 0.33, z * (fp.y / 2 - 0.9))).rotation_degrees.z = 90
 
 
+## Klang vorrechnen (race.gd beim Laden): sonst rechnete das erste nahe Auto mitten im Rennen und es ruckelte
+static func prepare_sound() -> void:
+	_loop_for("sedan")
+	_loop_for("bus")
+
+
+static func _loop_for(k: String) -> AudioStreamWAV:
+	if k == "bus":
+		return EngineAudio.render_loop(SND_BUS, 1300.0, 0.4, 0.9)
+	return EngineAudio.render_loop(SND_CAR, 2100.0, 0.4, 0.9)
+
+
+## Motor und Abrollen an/aus (race.gd: nur die nächsten paar Autos)
+func sound(on: bool, bus: String) -> void:
+	if wrecked:
+		on = false
+	if _snd == null:
+		if not on:
+			return
+		var bus_k := kind == "bus"
+		var w := _loop_for(kind)
+		_snd = AudioStreamPlayer3D.new()
+		_snd.stream = w
+		_snd.unit_size = 7.0 if bus_k else 5.0
+		_snd.max_distance = 100.0
+		_snd.doppler_tracking = AudioStreamPlayer3D.DOPPLER_TRACKING_PHYSICS_STEP
+		_snd.playback_type = AudioServer.PLAYBACK_TYPE_STREAM
+		_snd.volume_db = -16.0 if bus_k else -19.0  # leiser als der eigene Motor, auch knapp daneben
+		_snd.position.y = 0.6
+		add_child(_snd)
+	if on == _snd.playing:
+		return
+	_snd.bus = bus
+	if on:
+		_snd.play(randf() * _snd.stream.get_length())
+	else:
+		_snd.stop()
+
+
 func _physics_process(dt: float) -> void:
+	if _snd and _snd.playing:
+		_snd.pitch_scale = clampf(0.8 + 0.4 * speed / maxf(base_speed, 1.0), 0.6, 1.4)
 	if wrecked:
 		global_position += _wreck_vel * dt
 		_wreck_vel = _wreck_vel.move_toward(Vector3.ZERO, 9.0 * dt)

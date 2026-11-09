@@ -75,6 +75,9 @@ var _bars: Array[ColorRect] = []  # Kino-Balken bei der Sprungkamera
 var _bars_k := 0.0
 var _tunnel_k := 0.0
 var _in_tunnel := false
+var _beep_n := 4  # zuletzt gepiepte Countdown-Zahl
+var _traffic_snd_t := 0.0
+const TRAFFIC_VOICES := 4  # so viele Verkehrsautos sind gleichzeitig zu hören (die nächsten)
 var _district_i := -1
 var _area_t := 0.0
 var show: Node3D  # Publikum, Starterin, Kameraflug, Zielszene
@@ -166,6 +169,8 @@ func _ready() -> void:
 		track["crossing"].player = player
 	_setup_hall()
 	player.audio.bus = "Hall"
+	for ai in ais:
+		ai.set_bus("Hall")
 	for n in get_tree().get_nodes_in_group("ambient"):
 		n.target = player
 	# Verkehr nach Schwierigkeit: leicht ohne, mittel wenig, schwer voll
@@ -173,6 +178,8 @@ func _ready() -> void:
 		_spawn_drag_traffic()
 	elif event_type != "drift" and race.get("tier", 1) >= 2:
 		_spawn_traffic()
+	if not traffic.is_empty():
+		Traffic.prepare_sound()
 	_build_hud()
 	show = RaceShow.new()
 	show.process_mode = Node.PROCESS_MODE_PAUSABLE
@@ -242,7 +249,8 @@ func _warmup() -> void:
 	for car in [player] + ais:
 		var back: Vector3 = car.global_transform.basis.z
 		views.append([car.global_position + back * 7.0 + Vector3(0, 2.0, 0), car.global_position])
-		for fl in car.model.get_meta("flames") + car.model.get_meta("blurs", []):
+		var lt = car.model.get_meta("flame_light", null)
+		for fl in car.model.get_meta("flames") + car.model.get_meta("blurs", []) + ([lt] if lt else []):
 			if not fl.visible:
 				fl.visible = true
 				flames.append(fl)
@@ -771,6 +779,11 @@ func _process(dt: float) -> void:
 			countdown -= dt
 			var n := int(ceil(countdown - 1.0))
 			hud["center"].text = str(n) if n > 0 else tr("LOS!")
+			if n != _beep_n and n >= 0:
+				_beep_n = n
+				var b := Sfx.play("beep" if n > 0 else "beep_go", -9.0 if n > 0 else -7.0)
+				if b:
+					b.bus = "Master"  # Ansage, kein Hall
 			hud["goal"].visible = true
 			if countdown <= 1.0 and not player.controls_enabled:
 				player.controls_enabled = true
@@ -824,8 +837,30 @@ func _process(dt: float) -> void:
 	_update_cinema(dt)
 
 
+## Verkehr hören: die nächsten paar Autos im Umkreis von 80 m haben Motor und Abrollen an (Dopplereffekt im
+## Vorbeifahren), alle anderen sind still. Alle Viertelsekunde neu verteilt.
+func _update_traffic_sound(dt: float) -> void:
+	_traffic_snd_t -= dt
+	if _traffic_snd_t > 0.0 or traffic.is_empty():
+		return
+	_traffic_snd_t = 0.25
+	var near := []
+	var pp: Vector3 = player.global_position
+	for t in traffic:
+		var d2: float = (t.global_position - pp).length_squared()
+		if d2 < 6400.0 and not t.wrecked:
+			near.append([d2, t])
+	near.sort_custom(func(a, b): return a[0] < b[0])
+	var on := {}
+	for i in mini(near.size(), TRAFFIC_VOICES):
+		on[near[i][1]] = true
+	for t in traffic:
+		t.sound(on.has(t), "Hall")
+
+
 ## Tunnel: dunkler, Hall an, Wusch beim Reinfahren. Viertel: Name einblenden.
 func _update_world(dt: float) -> void:
+	_update_traffic_sound(dt)
 	var tun := Track.tunnel_at(track, player.progress) if player.path_id == 0 else {}
 	var inside := not tun.is_empty()
 	if inside != _in_tunnel:
@@ -1332,11 +1367,13 @@ func _update_speed_fx(sf: float) -> void:
 	if _bars_k > 0.0 or state != State.RACING:
 		blur = 0.0  # Sprungkamera, Countdown, Ziel: ruhiges Bild
 		sw = 0.0
+	var kick: float = player._nos_kick if lvl > 0.0 and state == State.RACING else 0.0
 	_fx_rect.visible = blur + absf(sw) > 0.0004 or nit > 0.001
 	if _fx_rect.visible:
 		fx_mat.set_shader_parameter("blur", blur)
 		fx_mat.set_shader_parameter("swing", sw)
 		fx_mat.set_shader_parameter("nitro", nit)
+		fx_mat.set_shader_parameter("kick", kick * minf(lvl, 1.0))
 
 
 ## Sprungkamera: schwarze Balken oben und unten einfahren, Bewegungsunschärfe aus, Ton in der Zeitlupe dumpf

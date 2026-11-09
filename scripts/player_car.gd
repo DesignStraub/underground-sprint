@@ -111,6 +111,16 @@ var _thr_s := 0.0  # Gas weich nachgeführt (kein Sprung von 0 auf volle Kraft)
 var _nos_k := 0.0  # Nitro-Schub, weich ein- und ausgeblendet
 var _launch_t := 0.0  # > 0: perfekter Start (mehr Zug), < 0: Räder drehen durch (weniger Zug)
 var _shift_boost := 0.0  # Drag: kurzer Schub nach perfektem Schalten
+var _nos_kick := 0.0  # Zündstoß beim Nitro-Start (1 → 0 in gut einer halben Sekunde): Kamera fällt zurück, Bild zuckt
+var _nos_prev := false
+var _backfire := 0.0  # Fehlzündung im Auspuff (Flamme), klingt schnell ab
+var _pops: Array = []  # anstehende Fehlzündungen: [Restzeit s, Stärke]
+var _crackle := 0.35  # Wahrscheinlichkeit für Knallen beim Schalten/Gaswegnehmen (Sportauspuff, Turbo: öfter)
+var _thr_prev := 0.0
+var _thr_held := 0.0  # wie lange schon Vollgas (s): nur danach knallt es beim Gaswegnehmen
+var _crackle_cool := 0.0  # nach einer Knall-Folge kurz Ruhe (sonst knattert es beim Gas-Antippen wie ein MG)
+var _scrape := 0.0  # Schrammen an der Wand (0..1), für den Ton
+var _scrape_hold := 0.0
 var drive_type := "rwd"  # Antrieb aus dem Katalog: fwd, rwd, mr (Mittelmotor, Heck), awd
 var _wheel_v := Vector2.ZERO  # Umfangsgeschwindigkeit der Räder vorn/hinten (m/s), nur Optik (_wheel_speeds)
 var reverse_gear := false  # Rückwärtsgang eingelegt (Tacho zeigt R)
@@ -250,6 +260,7 @@ func setup(car_id: String, cfg: Dictionary) -> void:
 	cam = Camera3D.new()
 	cam.far = GameState.view_distance()  # dahinter verschluckt ohnehin der Nebel fast alles
 	cam.near = 0.05
+	cam.doppler_tracking = Camera3D.DOPPLER_TRACKING_PHYSICS_STEP  # Gegner und Verkehr ziehen mit Dopplereffekt vorbei
 	add_child(cam)
 	cam.make_current()
 	_apply_cam()
@@ -259,8 +270,11 @@ func setup(car_id: String, cfg: Dictionary) -> void:
 	var turbo_stage := int(cfg.get("turbo", 0))
 	if turbo_stage > 0:
 		snd["turbo"] = maxf(snd.get("turbo", 0.0), 0.35 + 0.2 * turbo_stage)  # nachgerüsteter Lader zischt hörbar
+		snd["bov"] = "bov"  # mit Blow-off-Ventil; der Serienlader flattert
 	audio.configure(snd)
 	add_child(audio)
+	var ex := int(cfg.get("exhaust", 0))
+	_crackle = clampf(0.35 + (0.25 if ex > 0 else 0.0) + (0.15 if ex == 5 else 0.0) + (0.1 if snd.get("turbo", 0.0) > 0.3 else 0.0), 0.0, 0.9)
 
 
 func _apply_cam() -> void:
@@ -391,6 +405,7 @@ func _physics_process(dt: float) -> void:
 			g_ratio = maxf(spd, hvel.length()) / top_speed
 		if gear < 6 and g_ratio > GEARS[gear]:
 			gear += 1
+			_upshift(thr)
 		elif gear > 1 and g_ratio < GEARS[gear - 1] * 0.88:
 			gear -= 1
 	if controls_enabled or finished:
@@ -438,6 +453,13 @@ func _physics_process(dt: float) -> void:
 		# langsam von selbst; Drift, knapp vorbei und Sprünge geben Punkte, die etwas nachfüllen (race.gd)
 		nitro = minf(nitro + dt * 0.022 / nitro_cap, 1.0)
 	_nos_k = move_toward(_nos_k, 1.0 if nitro_on else 0.0, dt * (2.8 if nitro_on else 5.0))
+	if nitro_on and not _nos_prev:
+		_nos_kick = 1.0
+		_shake = minf(_shake + 0.3, 1.0)
+		audio.backfire(1.0, 0.75)  # dumpfer Schlag beim Zünden
+	_nos_prev = nitro_on
+	_nos_kick = move_toward(_nos_kick, 0.0, dt * 1.7)
+	_update_pops(thr, dt)
 
 	# --- Längsbeschleunigung (Drehmoment über die Drehzahl, unten herum Traktionsgrenze)
 	_thr_s = move_toward(_thr_s, thr, dt * (3.0 if thr > _thr_s else 7.0))
@@ -606,13 +628,13 @@ func _physics_process(dt: float) -> void:
 	var sf := clampf(spd / top_speed, 0.0, 1.0)
 	# Gewichtsverlagerung: Nase taucht beim Bremsen ein, hebt sich beim Beschleunigen; Wanken nach der echten
 	# Querbeschleunigung (Gierrate * Tempo) nach außen, im Rutschen zusätzlich zur Rutschseite
-	var pitch := clampf(a * 0.0028, -0.05, 0.035)
+	var pitch := clampf(a * 0.0028, -0.05, 0.035) + 0.03 * _nos_kick  # Nitro-Zündung: Heck geht in die Knie
 	if airborne:
 		pitch = 0.0  # in der Luft dreht sich das ganze Auto (unten), nicht die Karosserie
 	var yaw_now := wrapf(global_rotation.y - _yaw_prev, -PI, PI) / maxf(dt, 0.0001)
 	_yaw_prev = global_rotation.y
 	var roll := clampf(-yaw_now * spd / 9.81 * 0.022, -0.065, 0.065) - clampf(l2 * 0.003, -0.035, 0.035)
-	Builder.animate(model, speed_fwd, steer, 0.0 if airborne else roll, pitch, nitro_on, dt, _wheel_speeds(thr, brk, hb, spd, dt))
+	Builder.animate(model, speed_fwd, steer, 0.0 if airborne else roll, pitch, nitro_on, dt, _wheel_speeds(thr, brk, hb, spd, dt), _backfire)
 	# Ganzes Auto in die Steigung neigen (Trog, Bergstraße)
 	if not airborne:
 		model.rotation.x = lerp_angle(model.rotation.x, _slope_pitch, 1.0 - exp(-dt * 12.0))
@@ -653,6 +675,10 @@ func _physics_process(dt: float) -> void:
 		tire = maxf(tire, 0.7)
 	audio.slip = tire
 	audio.speed = spd
+	_scrape_hold = maxf(_scrape_hold - dt, 0.0)
+	if _scrape_hold <= 0.0:
+		_scrape = move_toward(_scrape, 0.0, dt * 6.0)
+	audio.scrape = _scrape
 
 
 ## Umfangsgeschwindigkeit der Räder vorn/hinten (m/s) für die Optik: sie rollen mit dem Tempo, blockieren bei der
@@ -750,6 +776,43 @@ func _brake_and_reverse(thr: float, brk: float, dt: float) -> float:
 	return a
 
 
+## Hochschalten unter Last: der Motor nimmt kurz die Zündung weg (hörbar), bei hoher Drehzahl knallt es manchmal im
+## Auspuff, mit Flamme. Sportauspuff und Turbo knallen öfter.
+func _upshift(thr: float) -> void:
+	if not controls_enabled or thr < 0.5:
+		return
+	audio.shift()
+	if rpm > 5200.0 and _crackle_cool <= 0.0 and randf() < _crackle:
+		_pops.append([randf_range(0.04, 0.08), randf_range(0.75, 1.0)])
+		_crackle_cool = 0.6
+
+
+## Fehlzündungen: Gas weg bei hoher Drehzahl knallt und blubbert es ein paar Mal nach (unverbranntes Gemisch). Die
+## Knalle stehen in _pops und kommen nacheinander, jeder mit Flamme und Ton.
+func _update_pops(thr: float, dt: float) -> void:
+	_crackle_cool = maxf(_crackle_cool - dt, 0.0)
+	if controls_enabled and _thr_prev > 0.5 and thr < 0.1 and rpm > 4500.0 and not nitro_on and _thr_held > 0.5 \
+			and _crackle_cool <= 0.0 and randf() < _crackle + 0.15:
+		var t := randf_range(0.03, 0.09)
+		for i in randi_range(1, 4):
+			_pops.append([t, randf_range(0.45, 0.9) * (1.0 - i * 0.15)])
+			t += randf_range(0.07, 0.2)
+		_crackle_cool = 1.5
+	_thr_held = _thr_held + dt if thr > 0.5 else 0.0
+	_thr_prev = thr
+	_backfire = move_toward(_backfire, 0.0, dt * 9.0)
+	var i := 0
+	while i < _pops.size():
+		_pops[i][0] -= dt
+		if _pops[i][0] <= 0.0:
+			var st: float = _pops[i][1]
+			_backfire = maxf(_backfire, st)
+			audio.backfire(st)
+			_pops.remove_at(i)
+		else:
+			i += 1
+
+
 func _gear_rpm(g: int, r: float, thr: float, hb: bool, spd: float, spin: float) -> float:
 	var per_ratio: float = SHIFT_RPM / GEARS[g] if g < 6 else TOP_RPM
 	var t := clampf(maxf(900.0 + thr * 600.0, r * per_ratio), 900.0, SHIFT_RPM + 300.0)
@@ -782,6 +845,7 @@ func _drag_shift(dir: int) -> void:
 		shift_result = "early"
 		_shift_timer = 0.2
 	gear += 1
+	_upshift(1.0)
 
 
 ## Drag wie in NFSU: das Auto läuft auf einer Schiene. Die Querlage folgt der gewählten Spur als gedämpfte Feder
@@ -1082,6 +1146,7 @@ func _update_tumble(dt: float) -> void:
 	audio.rpm = rpm
 	audio.throttle = 0.0
 	audio.speed = h.length()
+	audio.scrape = 0.0
 	audio.slip = 0.6 if not airborne and h.length() > 3.0 else 0.0
 	_update_camera(dt, 0.0)
 
@@ -1136,6 +1201,7 @@ func _update_sinking(dt: float) -> void:
 	audio.rpm = rpm
 	audio.throttle = 0.0
 	audio.speed = 0.0
+	audio.scrape = 0.0
 	_update_camera(dt, 0.0)
 	if sinking <= 0.0:
 		sinking = 0.0
@@ -1147,14 +1213,16 @@ func _update_camera(dt: float, sf: float) -> void:
 		_update_jump_cam(dt)
 		return
 	var base := 58.0 if cam_mode == 0 else 70.0
-	var zoom := (14.0 if cam_mode == 0 else 24.0) * sf + (8.0 if nitro_on else 0.0)
+	# Nitro: Sichtfeld weiter, beim Zünden kurz noch weiter (der Zündstoß zieht das Bild auf)
+	var zoom := (14.0 if cam_mode == 0 else 24.0) * sf + 9.0 * _nos_k + 9.0 * _nos_kick
 	if not GameState.speed_fov:
 		zoom = (7.0 if cam_mode == 0 else 12.0)  # Tempo-Zoom aus: festes, mittleres Sichtfeld
 	var target_fov := base + zoom
-	_fov = lerpf(_fov, target_fov, dt * (6.0 if nitro_on else 2.5))
+	_fov = lerpf(_fov, target_fov, dt * (7.0 if nitro_on else 2.5))
 	cam.fov = _fov
-	# Kein Dauerwackeln bei Tempo: nur kurze, weiche Stöße bei Einschlägen und Landungen
-	var amp := _shake * (0.06 if GameState.cam_shake else 0.0)
+	# Kein Dauerwackeln bei Tempo: nur kurze, weiche Stöße bei Einschlägen und Landungen; mit Nitro ein feines
+	# Vibrieren (der Motor drückt), beim Zünden ein Ruck
+	var amp := (_shake * 0.06 + _nos_k * 0.007 + _nos_kick * 0.03) * (1.0 if GameState.cam_shake else 0.0)
 	var drift_look := clampf((drift_angle - 6.0) / 24.0, 0.0, 1.0) * 0.45 if velocity.length() > 5.0 else 0.0
 	_cam_drift = lerpf(_cam_drift, drift_look, 1.0 - exp(-dt * 3.0))
 	if cam_mode == 0:
@@ -1163,7 +1231,8 @@ func _update_camera(dt: float, sf: float) -> void:
 		var yaw := global_rotation.y
 		if velocity.length() > 2.0:
 			yaw = lerp_angle(yaw, atan2(-velocity.x, -velocity.z), _cam_drift)
-		var dist := 4.4 + sf * 0.6 + (0.4 if nitro_on else 0.0)
+		# Nitro: das Auto schießt der Kamera davon (beim Zünden ein gutes Stück, dann bleibt sie etwas weiter hinten)
+		var dist := 4.4 + sf * 0.6 + 0.45 * _nos_k + 1.1 * _nos_kick * (1.0 - _nos_kick * 0.5)
 		var height := 1.6 - sf * 0.2
 		if not _cam_init:
 			_cam_yaw = yaw
@@ -1204,6 +1273,9 @@ func place(xform: Transform3D) -> void:
 	_rail_init = false
 	_launch_t = 0.0
 	_nos_k = 0.0
+	_nos_kick = 0.0
+	_pops.clear()
+	_scrape = 0.0
 	_end_jump_cam()
 	_cam_init = false
 	_base_ok = false
@@ -1265,6 +1337,9 @@ func _hit_wall(pre: Vector3, n: Vector3, small := false, pole := false) -> void:
 			head_on = maxf(head_on, 0.85)
 	var tang := pre + n * vn
 	var keep := 1.0 - 0.55 * head_on * head_on
+	if tang.length() > 3.0 and not small:
+		_scrape = maxf(_scrape, clampf(tang.length() / 30.0, 0.25, 1.0))
+		_scrape_hold = 0.12
 	# kein Zurückfedern: nur bei harten Einschlägen ein Hauch, damit das Auto nicht im Hindernis klebt
 	var new_v := n * (0.6 if vn > 6.0 else 0.0)
 	if tang.length() > 0.1:

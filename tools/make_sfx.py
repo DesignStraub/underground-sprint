@@ -415,11 +415,179 @@ def nitro_off():
     return out
 
 
+def _bp_noise(rng, n, fc, q):
+    return _norm(bandpass([rng.uniform(-1.0, 1.0) for _ in range(n)], fc, q))
+
+
+def backfire():
+    """Fehlzündung im Auspuff (Hochschalten, Gaswegnehmen, Nitro-Zündung): scharfer Knall (breitbandiger Stoß), dumpfer
+    Druckschlag aus dem Rohr und ein kurzes Nachknistern. 0,5 s."""
+    rng = random.Random(53)
+    n = secs(0.5)
+    crack = lp([rng.uniform(-1.0, 1.0) for _ in range(n)], 6500.0)
+    body = _bp_noise(rng, n, 420.0, 1.4)
+    x = []
+    ph = 0.0
+    for i in range(n):
+        t = i / SR
+        f = 55.0 + 70.0 * math.exp(-t * 30.0)
+        ph += 2.0 * math.pi * f / SR
+        boom = math.sin(ph) * math.exp(-t * 16.0) * min(1.0, t / 0.002)
+        v = crack[i] * 3.2 * math.exp(-t * 140.0) + body[i] * 0.55 * math.exp(-t * 30.0) + boom * 1.1
+        x.append(v)
+    # Nachknistern: ein paar kleine Knackser, immer leiser
+    t = 0.05
+    while t < 0.3:
+        o = secs(t)
+        a = 0.35 * math.exp(-(t - 0.05) * 9.0) * rng.uniform(0.5, 1.0)
+        for j in range(secs(0.004)):
+            if o + j < n:
+                x[o + j] += rng.uniform(-1.0, 1.0) * a * (1.0 - j / secs(0.004))
+        t += rng.uniform(0.012, 0.04)
+    x = [math.tanh(1.4 * v) for v in x]
+    k = secs(0.05)
+    for i in range(k):
+        x[n - k + i] *= 1.0 - i / k
+    return x
+
+
+def bov():
+    """Blow-off-Ventil (nachgerüsteter Turbo, Gas weg): scharfes "Pschhh" – Rauschen über 1,2 kHz, das hell einsetzt
+    und schnell dumpfer wird, mit Klacken des Ventils. 0,55 s."""
+    rng = random.Random(59)
+    n = secs(0.55)
+    nz = [rng.uniform(-1.0, 1.0) for _ in range(n)]
+    fcs = [3200.0 + 6500.0 * math.exp(-(i / SR) * 7.0) for i in range(n)]
+    hiss = _norm(_hp(_hp(lp_var(nz, fcs), 1200.0), 1200.0))
+    x = []
+    for i in range(n):
+        t = i / SR
+        env = min(1.0, t / 0.006) * (0.35 * math.exp(-t * 3.0) + 0.65 * math.exp(-t * 9.0))
+        click = rng.uniform(-1.0, 1.0) * math.exp(-t * 600.0)
+        x.append(hiss[i] * env + click * 0.5)
+    k = secs(0.06)
+    for i in range(k):
+        x[n - k + i] *= 1.0 - i / k
+    return x
+
+
+def flutter():
+    """Turbo-Flattern (Serienlader ohne Ventil, Gas weg): die Luft schlägt im Lader zurück, "tschu-tu-tu-tu" – ein
+    Pulszug aus gefiltertem Rauschen, der langsamer und leiser wird, darunter ein fallendes Pfeifen. 0,7 s."""
+    rng = random.Random(61)
+    n = secs(0.7)
+    band = _norm(_hp(lp([rng.uniform(-1.0, 1.0) for _ in range(n)], 2600.0), 450.0))
+    x = []
+    ph = 0.0
+    wph = 0.0
+    for i in range(n):
+        t = i / SR
+        rate = 17.0 - 7.0 * min(1.0, t / 0.6)
+        ph += rate / SR
+        p = ph % 1.0
+        puls = math.exp(-p * 7.0)
+        env = min(1.0, t / 0.005) * math.exp(-t * 4.0)
+        wph += 2.0 * math.pi * (3000.0 - 1300.0 * min(1.0, t / 0.6)) / SR
+        x.append(band[i] * puls * env + math.sin(wph) * 0.05 * env)
+    k = secs(0.06)
+    for i in range(k):
+        x[n - k + i] *= 1.0 - i / k
+    return x
+
+
+def scrape_loop():
+    """Blech schrammt an der Wand: körniges Kratzen (Rauschen, schnell zerhackt), metallische Teiltöne der Karosserie,
+    die immer wieder angeregt werden, und dumpfes Rumpeln. 2 s nahtlos."""
+    rng = random.Random(67)
+    n = secs(2.0)
+    xf = secs(0.25)
+    m = n + xf
+    grit = _bp_noise(rng, m, 2400.0, 0.7)
+    chop = _wander(rng, m, 60.0)
+    exc = [0.0] * m
+    i = 0
+    while i < m:
+        exc[i] = rng.uniform(0.4, 1.0) * (1 if rng.random() < 0.5 else -1)
+        i += int(rng.uniform(0.003, 0.02) * SR)
+    ring = [0.0] * m
+    for fc, q, g in [(1850.0, 18.0, 1.0), (2970.0, 22.0, 0.7), (4410.0, 25.0, 0.45), (1230.0, 14.0, 0.5)]:
+        for j, v in enumerate(bandpass(exc, fc, q)):
+            ring[j] += v * g
+    ring = _norm(ring)
+    rum = _norm(lp(lp([rng.uniform(-1.0, 1.0) for _ in range(m)], 220.0), 220.0))
+    lvl = _wander(rng, m, 4.0)
+    out = []
+    for j in range(m):
+        g = grit[j] * (0.55 + 0.45 * max(0.0, chop[j]))
+        v = (g * 0.75 + ring[j] * 0.6 + rum[j] * 0.5) * (0.85 + 0.15 * lvl[j])
+        out.append(math.tanh(1.3 * v))
+    return _loop_xfade(out, n, xf)
+
+
+def road_loop():
+    """Abrollen auf Asphalt: Reifen-Brummen (breites Band um 350 Hz) mit feiner Körnung von der Fahrbahn und leichtem
+    Schwanken. 2 s nahtlos; die Tonhöhe folgt im Spiel dem Tempo."""
+    rng = random.Random(71)
+    n = secs(2.0)
+    xf = secs(0.3)
+    m = n + xf
+    hum = _norm([a + 0.5 * b for a, b in zip(bandpass([rng.uniform(-1.0, 1.0) for _ in range(m)], 330.0, 0.7),
+                                             bandpass([rng.uniform(-1.0, 1.0) for _ in range(m)], 900.0, 1.1))])
+    grit = [0.0] * m
+    i = 0
+    while i < m:
+        grit[i] = rng.uniform(0.2, 1.0) * (1 if rng.random() < 0.5 else -1)
+        i += int(rng.uniform(0.001, 0.006) * SR)
+    grit = _norm(bandpass(grit, 1400.0, 1.5))
+    am = _wander(rng, m, 2.5)
+    out = [(hum[j] * 0.85 + grit[j] * 0.2) * (0.88 + 0.12 * am[j]) for j in range(m)]
+    return _loop_xfade(out, n, xf)
+
+
+def wind_loop():
+    """Fahrtwind: breites Rauschen (250 Hz – 2,5 kHz) mit langsamen Böen und einem leisen Pfeifen an den Spiegeln.
+    3 s nahtlos."""
+    rng = random.Random(73)
+    n = secs(3.0)
+    xf = secs(0.4)
+    m = n + xf
+    nz = [rng.uniform(-1.0, 1.0) for _ in range(m)]
+    body = _norm(_hp(lp(lp(nz, 2500.0), 2500.0), 250.0))
+    gust = _wander(rng, m, 0.7)
+    gust2 = _wander(rng, m, 3.0)
+    whistle = _bp_noise(rng, m, 1700.0, 12.0)
+    out = [body[j] * (0.75 + 0.18 * gust[j] + 0.07 * gust2[j]) + whistle[j] * 0.06 * (0.5 + 0.5 * gust[j]) for j in range(m)]
+    return _loop_xfade(out, n, xf)
+
+
+def _beep(f, dur, rel):
+    n = secs(dur)
+    x = []
+    for i in range(n):
+        t = i / SR
+        env = min(1.0, t / 0.004) * min(1.0, (dur - t) / rel)
+        v = sum(math.sin(2.0 * math.pi * f * h * t) / h for h in (1, 3, 5, 7)) * 0.8 + 0.25 * math.sin(2.0 * math.pi * f * 2 * t)
+        x.append(v * env)
+    return lp(x, 5000.0)
+
+
+def beep():
+    """Countdown 3, 2, 1: kurzer, klarer Piepton (G5). 0,24 s."""
+    return _beep(784.0, 0.24, 0.04)
+
+
+def beep_go():
+    """Countdown LOS: eine Oktave höher und länger. 0,75 s."""
+    return _beep(1568.0, 0.75, 0.3)
+
+
 SOUNDS = {
     "horn": (horn, 0.89), "bell": (bell_loop, 0.7), "rumble": (rumble_loop, 0.89), "thud": (thud, 0.89),
     "whoosh": (whoosh, 0.7), "splash": (splash, 0.89), "clang": (clang, 0.75), "tunnel": (tunnel, 0.8),
     "crowd": (crowd_loop, 0.6), "skid": (skid_loop, 0.8), "scrub": (scrub_loop, 0.8), "nitro": (nitro_loop, 0.8),
     "nitro_on": (nitro_on, 0.89), "nitro_off": (nitro_off, 0.85),
+    "backfire": (backfire, 0.89), "bov": (bov, 0.85), "flutter": (flutter, 0.85), "scrape": (scrape_loop, 0.8),
+    "road": (road_loop, 0.8), "wind": (wind_loop, 0.8), "beep": (beep, 0.7), "beep_go": (beep_go, 0.7),
 }
 
 if __name__ == "__main__":

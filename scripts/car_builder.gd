@@ -922,11 +922,18 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 			ol.position = Vector3(0, 0.12, z * L * 0.3)
 			body.add_child(ol)
 
-	# Auspuff + Nitroflammen
+	# Auspuff + Flammen (Nitro, Fehlzündung): je Rohr ein Drehpunkt an der Rohrmündung mit einem langen Kegel (Hülle)
+	# und einem kurzen, hellen Kern; animate() streckt den Drehpunkt. Dazu ein Licht, das die Straße dahinter anstrahlt.
 	var flames := []
-	var flame_m := mat(Color(0.3, 0.6, 1), 0, 0.5, Color(0.3, 0.6, 1.0), 6.0)
-	flame_m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	flame_m.albedo_color.a = 0.8
+	var flame_m := ShaderMaterial.new()
+	flame_m.shader = FLAME_SHADER
+	flame_m.set_shader_parameter("half_h", 0.45)
+	var flame_core := ShaderMaterial.new()
+	flame_core.shader = FLAME_SHADER
+	flame_core.set_shader_parameter("half_h", 0.22)
+	flame_core.set_shader_parameter("core", 1.0)
+	var flame_glow := ShaderMaterial.new()
+	flame_glow.shader = GLOW_SHADER
 	var pr: float = S.get("pipe_r", 0.05) * (1.25 if int(cfg.get("engine", 0)) + int(cfg.get("turbo", 0)) >= 2 else 1.0)
 	var chrome := mat(Color(0.75, 0.75, 0.78), 0.95, 0.15)
 	var pipe_m: Material = chrome
@@ -964,14 +971,33 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 		var inner := _add(body, _disc(pr * 0.72, 0.01), dark, Vector3(x, CLEARANCE + 0.08, zr + 0.112))
 		inner.rotation_degrees.x = 90
 		inner.scale = Vector3(1, 1, oval)
-		var cone := CylinderMesh.new()
-		cone.top_radius = 0.0
-		cone.bottom_radius = 0.09
-		cone.height = 0.7
-		var f := _add(body, cone, flame_m, Vector3(x, CLEARANCE + 0.08, zr + 0.4))
-		f.rotation_degrees.x = 90
+		var f := Node3D.new()
+		f.position = Vector3(x, CLEARANCE + 0.08, zr + 0.1)
+		f.rotation_degrees.x = 90  # Kegelachse (Y) zeigt nach hinten
 		f.visible = false
+		body.add_child(f)
+		var fr := maxf(pr * 1.7, 0.1)
+		var glow_q := QuadMesh.new()
+		glow_q.size = Vector2(2, 2)
+		flame_glow.set_shader_parameter("size", clampf(fr * 3.2, 0.3, 0.45))
+		for layer in [[_flame_cone(fr, 0.9), flame_m, 0.45], [_flame_cone(fr * 0.55, 0.44), flame_core, 0.22], [glow_q, flame_glow, 0.04]]:
+			var fm := MeshInstance3D.new()
+			fm.mesh = layer[0]
+			fm.material_override = layer[1]
+			fm.position.y = layer[2]
+			fm.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			f.add_child(fm)
 		flames.append(f)
+	var fl_light := OmniLight3D.new()
+	fl_light.light_color = Color(0.35, 0.55, 1.0)
+	fl_light.omni_range = 5.0
+	fl_light.omni_attenuation = 1.6
+	fl_light.light_specular = 0.4
+	fl_light.position = Vector3(0, CLEARANCE + 0.3, zr + 0.7)
+	fl_light.visible = false
+	body.add_child(fl_light)
+	root.set_meta("flame_light", fl_light)
+	root.set_meta("flame_mats", [flame_m, flame_core, flame_glow])
 
 	# Räder: Reifen mit offener Mitte, darin das Felgenbett. Bremsscheibe und Sattel sitzen tief dahinter, die
 	# Speichen laufen von der zurückgesetzten Nabe nach außen zum Horn (konkav). Felgengröße in Zoll (rim_spec).
@@ -1132,6 +1158,8 @@ const FINISH := {
 	"chrome_matt": {"metal": 0.9, "rough": 0.42, "coat": 0.0, "coat_rough": 0.5, "rim": 0.5, "rim_tint": 0.7},
 }
 const PAINT_SHADER := preload("res://shaders/car_paint.gdshader")
+const FLAME_SHADER := preload("res://shaders/nitro_flame.gdshader")
+const GLOW_SHADER := preload("res://shaders/nitro_glow.gdshader")
 ## Lichtkarte der Strecke für den Lack: track_builder._bake_street_light setzt sie (tex, rect, gain), die Garage leert
 ## sie. Autos unter Laternen und im Tunnel bekommen so dasselbe Licht wie die Straße darunter.
 static var street := {}
@@ -2624,9 +2652,10 @@ static func engine_rear(S: Dictionary) -> bool:
 	return S.get("mid", false) or S.get("rear_engine", false)
 
 
-## Animiert Räder, Lenkung, Karosserie-Neigung und Nitroflammen. wheel_v (optional, Vector2): Umfangsgeschwindigkeit
+## Animiert Räder, Lenkung, Karosserie-Neigung und Auspuffflammen. wheel_v (optional, Vector2): Umfangsgeschwindigkeit
 ## der Räder vorn und hinten in m/s, wenn sie nicht zum Tempo passt (blockiert = 0, durchdrehend = mehr als speed).
-static func animate(car: Node3D, speed: float, steer: float, roll: float, pitch: float, nitro_on: bool, delta: float, wheel_v = null) -> void:
+## fire: Fehlzündung beim Schalten oder Gaswegnehmen (0..1, der Aufrufer lässt sie schnell abklingen).
+static func animate(car: Node3D, speed: float, steer: float, roll: float, pitch: float, nitro_on: bool, delta: float, wheel_v = null, fire := 0.0) -> void:
 	for p in car.get_meta("front_pivots"):
 		p.rotation.y = -steer * 0.5
 	var wr: float = car.get_meta("wheel_r", WHEEL_R)
@@ -2653,10 +2682,43 @@ static func animate(car: Node3D, speed: float, steer: float, roll: float, pitch:
 	var body: Node3D = car.get_meta("body")
 	body.rotation.z = lerpf(body.rotation.z, roll, 8.0 * delta)
 	body.rotation.x = lerpf(body.rotation.x, pitch, 6.0 * delta)
-	for f in car.get_meta("flames"):
-		f.visible = nitro_on
-		if nitro_on:
-			f.scale = Vector3.ONE * randf_range(0.7, 1.3)
+	var fl: Array = car.get_meta("flames")
+	if fl.is_empty():
+		return
+	# Nitro blendet schnell ein; beim Zünden ist die Flamme kurz länger und heller (Zündstoß). Fehlzündung (fire,
+	# 0..1 klingt in gut 0,1 s ab): kurzer, dicker, orangefarbener Stoß
+	var k: float = car.get_meta("nos_k", 0.0)
+	if k <= 0.0 and not nitro_on and fire <= 0.02:
+		return  # aus (Gegner, Verkehr, meistens auch der Spieler)
+	var kick: float = car.get_meta("nos_kick", 0.0)
+	if nitro_on and k < 0.05:
+		kick = 1.0
+	k = move_toward(k, 1.0 if nitro_on else 0.0, delta * (9.0 if nitro_on else 5.0))
+	kick = move_toward(kick, 0.0, delta * 2.2)
+	car.set_meta("nos_k", k)
+	car.set_meta("nos_kick", kick)
+	var fk := clampf(fire, 0.0, 1.0) * (1.0 - k)
+	var on := k > 0.01 or fk > 0.02
+	var light: OmniLight3D = car.get_meta("flame_light", null)
+	for f in fl:
+		f.visible = on
+	if light:
+		light.visible = on
+	if not on:
+		return
+	var flick := randf_range(0.88, 1.12)
+	var fmix := fk / maxf(k + fk, 0.001)
+	var lng := lerpf((0.72 + 0.28 * k + 0.6 * kick) * flick, (0.3 + 0.3 * fk) * flick, fmix)
+	var wid := lerpf(0.9 + 0.3 * kick, 1.3, fmix)
+	for f in fl:
+		f.scale = Vector3(wid, lng, wid)
+	for m in car.get_meta("flame_mats", []):
+		(m as ShaderMaterial).set_shader_parameter("power", maxf(k, fk))
+		(m as ShaderMaterial).set_shader_parameter("kick", kick)
+		(m as ShaderMaterial).set_shader_parameter("fire", fmix)
+	if light:
+		light.light_energy = (2.4 * k * (1.0 + 0.7 * kick) + 1.3 * fk) * flick  # Fehlzündung nur kurz aufblitzen
+		light.light_color = Color(0.35, 0.55, 1.0).lerp(Color(1.0, 0.55, 0.2), fmix)
 
 
 static func mat(c: Color, metal := 0.0, rough := 0.5, emit := Color.BLACK, emit_e := 0.0) -> StandardMaterial3D:
@@ -2669,6 +2731,23 @@ static func mat(c: Color, metal := 0.0, rough := 0.5, emit := Color.BLACK, emit_
 		m.emission = emit
 		m.emission_energy_multiplier = emit_e
 	return m
+
+
+## Flammenkegel: Grundfläche unten (am Rohr), Spitze oben; genug Ringe, damit die Hülle im Shader flackern kann
+static func _flame_cone(r: float, h: float) -> CylinderMesh:
+	var key := "flame_%.3f_%.3f" % [r, h]
+	if _mesh_cache.has(key):
+		return _mesh_cache[key]
+	var c := CylinderMesh.new()
+	c.top_radius = 0.0
+	c.bottom_radius = r
+	c.height = h
+	c.radial_segments = 14
+	c.rings = 6
+	c.cap_top = false
+	c.cap_bottom = false
+	_mesh_cache[key] = c
+	return c
 
 
 ## Flache Scheibe (runde Lampe)

@@ -258,8 +258,23 @@ Tabelle `TRACKS`), Stille am Anfang und Ende wird übersprungen. M springt mit k
 mp3/ogg-Dateien in `music/` laufen automatisch mit (ohne Eintrag in der Tabelle ohne Angleich).
 
 Motorsound, Nitro und Crashs werden im Spiel erzeugt. Der Motor ist seit 2.13 heller: zu den Obertönen kommen die
-Druckstöße im Auspuff (ein schmaler Puls je Zündung), unter Last ein leises Rasseln im Takt und beim Gaswegnehmen
-bei hoher Drehzahl ab und zu ein Plopp; der Tiefpass reicht bis knapp 2 kHz statt 1 kHz. Zug, Glocke, Landung, Platschen, Tunnel, Stadion,
+Druckstöße im Auspuff (ein schmaler Puls je Zündung) und unter Last ein leises Rasseln im Takt; der Tiefpass reicht bis
+knapp 2 kHz statt 1 kHz.
+- **Seit 2.20 hört man die anderen:** Jeder Gegner hat seinen eigenen Motorklang (derselbe Synthesizer wie beim
+  Spieler, beim Laden einmal als kurze Schleife vorgerechnet, `EngineAudio.render_loop`), mit Gängen, Gas und Bremse,
+  zwei Schleifen (Teillast, Volllast) nach der Drehzahl überblendet. An der Startlinie lassen die Gegner den Motor
+  aufheulen, beim Überholen zieht der Klang mit Dopplereffekt vorbei. Vom Verkehr sind die vier nächsten Autos im
+  Umkreis von 80 m zu hören (Motor und Abrollen, der Bus als rauer Diesel), ebenfalls mit Doppler.
+- **Schalten (seit 2.20):** beim Hochschalten unter Last ist die Zündung kurz weg (der Motor setzt hörbar aus und
+  wieder ein), bei hoher Drehzahl knallt es manchmal im Auspuff, mit Flamme (`backfire.wav`). Gas weg bei hoher
+  Drehzahl nach mindestens einer halben Sekunde Vollgas: ein bis vier Fehlzündungen nacheinander, jede mit kleiner
+  orangefarbener Flamme, danach 1,5 s Ruhe (sonst knattert es beim Gas-Antippen wie ein Maschinengewehr). Sportauspuff
+  und Turbo knallen öfter. Turbo und Gas weg: nachgerüsteter Lader mit Blow-off-Ventil (`bov.wav`, „Pschhh“), Serienlader
+  flattert (`flutter.wav`); beim Hochschalten bläst das Ventil kurz ab.
+- **Außerdem seit 2.20:** Abrollen der Reifen (`road.wav`, schon bei Stadttempo, mit dem Tempo höher) und Fahrtwind
+  (`wind.wav`, mit Böen, wächst mit dem Quadrat des Tempos) als Schleifen statt im Skript gerechnet; Blech, das an der
+  Wand entlangschrammt (`scrape.wav`); Countdown-Piepser 3, 2, 1 und ein höherer, längerer bei LOS (`beep.wav`,
+  `beep_go.wav`). Zug, Glocke, Landung, Platschen, Tunnel, Stadion,
 Reifenquietschen usw. sind synthetisch erzeugte WAVs in `assets/sfx/` (`python3 tools/make_sfx.py`, einzelne mit
 `python3 tools/make_sfx.py skid`).
 - **Reifen (seit 2.14):** zwei Schleifen. `scrub.wav` ist das Schrubben schon bei leichtem Rutschen (raues, eher tiefes
@@ -273,7 +288,8 @@ Reifenquietschen usw. sind synthetisch erzeugte WAVs in `assets/sfx/` (`python3 
   Vollbremsung, Drift und durchdrehenden Rädern. Gut 3 dB lauter als vorher.
 - **Nitro (seit 2.14):** beim Zünden `nitro_on.wav` (Ventil-Klacken, dumpfer Stoß, aufschießendes Zischen und ein
   Wusch), solange es läuft `nitro.wav` (Fauchen der Düsen, Brausen der Flamme, leiser Pfeifton), beim Loslassen
-  `nitro_off.wav` (Abblasen, seit 2.16); der Motor klingt dabei heller. Seit 2.16 4 dB lauter: vorher lag das
+  `nitro_off.wav` (Abblasen, seit 2.16); der Motor klingt dabei heller, seit 2.20 auch voller und lauter (tiefer
+  Halbton, +2 dB), und beim Zünden kommt ein dumpfer Knall dazu. Seit 2.16 4 dB lauter: vorher lag das
   Fauchen etwa so laut wie der Motor und ging unter der Musik unter, jetzt steht es im Hochton rund 10 dB über der
   Musik. Reifen- und Nitro-Schleifen laufen im Stream-Modus wie der Motor (im Browser lassen sich fertige Samples nicht
   zuverlässig in jedem Bild in Lautstärke und Tonhöhe nachführen). Der Motor schaltet im Drift nicht mehr herunter: Gang und
@@ -408,6 +424,17 @@ dann steht „Benutzerdefiniert“ da. Werte in `GameState.GFX`.
   40 % Tempo verwischt der Bildrand entlang der Fahrtrichtung (Zoom-Unschärfe vom Fluchtpunkt aus, zehn versetzte
   Proben je Bildpunkt), die Mitte mit dem eigenen Auto bleibt scharf; beim Einlenken verwischt das Bild zusätzlich
   seitlich, mit Nitro stärker, dazu ein blauer Schimmer und leichte Farbsäume. Steht nichts an, ist der Effekt ganz aus.
+  Seit 2.20 mit Nitro krasser: helle Lichter (Laternen, Neon, Rücklichter) ziehen lange Streifen, der blaue Schein am
+  Rand flackert wie die Flamme, der Rand wird dunkler (Tunnelblick), und beim Zünden läuft eine Druckwelle von der Mitte
+  nach außen über das Bild.
+- **Nitro (seit 2.20):** Aus jedem Endrohr schießt eine Flamme (`shaders/nitro_flame.gdshader`): weißblauer Kern,
+  außen blau bis violett, sie lodert, franst zur Spitze aus und zeigt die Rauten eines Gasstrahls; an der Mündung
+  ein flackernder Feuerball, der immer zur Kamera zeigt (`shaders/nitro_glow.gdshader`, von hinten sieht man die
+  Flamme sonst fast nur von vorn), dazu ein blaues Licht auf der Straße hinter dem Auto. Beim Zünden ist die Flamme
+  kurz länger und heller, das Heck geht in die Knie, das Auto schießt der Kamera ein Stück davon, das Sichtfeld zieht
+  weiter auf und das Bild ruckt einmal; solange Nitro läuft, vibriert die Kamera leicht (beides nur mit
+  Kamerawackeln an). Fehlzündungen nutzen dieselbe Flamme, kurz, dick und orange. Bis 2.19 war es ein blauer Kegel,
+  der zufällig in der Größe sprang.
   Seit 2.14 rechnet er in der 3D-Auflösung (Ebene im Welt-Viewport) statt im ganzen Fenster: auf 4K-Bildschirmen nur
   noch ein Viertel bis die Hälfte der Bildpunkte, ohne eigene Kopie des Fensterbilds. Spiegelungen auf „Niedrig“
   laufen in halber Auflösung.
@@ -418,8 +445,11 @@ dann steht „Benutzerdefiniert“ da. Werte in `GameState.GFX`.
   vor dem Start eine unsichtbare Kamera die Strecke ab, damit alle Shader übersetzt sind, bevor es losgeht
   („Strecke wird vorbereitet“), sonst ruckelt es beim ersten Anblick jedes neuen Materials. Verkehr außer
   Sichtweite wird ausgeblendet und nur zweimal pro Sekunde bewegt, der Motorsound rechnet auf Handy/Tablet mit
-  halber Abtastrate. Messmodus: `-- --race=N --drive --quit=32 --bench` (Bildzeit, Draw Calls, Ruckler,
-  was im Bild ist); `--nobatch` schaltet das Verschmelzen zum Vergleich ab, `--gfx=ssr:0,bloom:0,blur:0` stellt
+  halber Abtastrate. Seit 2.20 liest er eine Periode des Klangs aus Tabellen (je Auto einmal gerechnet) statt je
+  Sample zehnmal den Sinus zu rechnen, Drehzahl und Gas werden je Block geglättet: gut die halbe Rechenzeit
+  (am Rechner 0,2–0,5 statt 0,6–0,9 ms je Bild; im Browser läuft das Skript mehrfach langsamer, dort zählt das mehr).
+  Wind und Abrollen sind Schleifen statt Rechnung je Sample. Messmodus: `-- --race=N --drive --quit=32 --bench` (Bildzeit, Draw Calls, Ruckler,
+  was im Bild ist, `BENCH audio=` die Rechenzeit des Motorklangs je Bild); `--nobatch` schaltet das Verschmelzen zum Vergleich ab, `--gfx=ssr:0,bloom:0,blur:0` stellt
   einzelne Grafikoptionen nur für den Test um. GPU-Zeiten liefert Godot unter macOS nur mit
   `--rendering-driver vulkan`.
 - Verkehr nach Schwierigkeit: 1 Stern ohne, 2 Sterne wenig, 3 Sterne voller Verkehr.
@@ -523,6 +553,9 @@ ein, wie auf echten Aufnahmen. Kostet im Rennen etwa 4 % mehr Draw Calls und Dre
 Vergleichsbilder aus der Entwicklung liegen in `update_bilder/` (Godot ignoriert den Ordner, sie landen nicht im
 Spiel). Die wichtigsten:
 
+- **2.20 – Nitro:** oben bis 2.19 (blauer Kegel), unten mit Flamme, Feuerball, Licht auf der Straße und Lichtstreifen;
+  links kurz nach dem Zünden (Sichtfeld zieht auf, die Kamera fällt zurück), rechts eine Sekunde später.
+  <br><img src="update_bilder/nitro_2_20.jpg" alt="Nitro" width="720">
 - **2.19 – Lackarten:** je Zeile eine Farbe (Rot, Schwarz, Weiß, Blau), von links Glanz, Metallic, Matt, Perlmutt.
   Aufgenommen in der Garage mit den neuen Spiegelungen (Lichtbänder an der Decke, Neonröhren).
   <br><img src="update_bilder/lackarten_2_19.jpg" alt="Lackarten" width="720">
@@ -575,7 +608,8 @@ Texte, Cover und Screenshots für die itch.io-Seite: `release/`.
 ## Aufbau
 - `scripts/catalog.gd` – Autos, Teile, Rennen
 - `scripts/player_car.gd` – Fahrphysik, Kamera, Geschwindigkeitsgefühl
-- `scripts/engine_audio.gd` – synthetischer Motorsound (Turbo, Blow-off, Wind) und Reifenquietschen
+- `scripts/engine_audio.gd` – synthetischer Motorsound (Turbo, Blow-off, Schalten, Fehlzündungen), Reifen, Wind,
+  Abrollen, Schrammen; `render_loop` rechnet den Klang als Schleife für Gegner und Verkehr vor
 - `scripts/track_builder.gd` – prozedurale Stadtstrecke
 - `scripts/ai_car.gd` – Gegner
 - `scripts/garage.gd` / `scripts/race.gd` – Menü und Rennen

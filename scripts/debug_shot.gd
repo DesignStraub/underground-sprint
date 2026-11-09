@@ -16,6 +16,7 @@ extends Node
 ##   -- --block=d:spur     Spieler steht ab dem Start bei Strecke d auf Spur 0–3 und blockiert; gibt Abstände der
 ##                         Gegner zum Spieler und untereinander aus (Schiebe-Logik)
 ##   -- --bench            misst während des Rennens Bildzeit, GPU-Zeit und Draw Calls, gibt am Ende "BENCH ..." aus
+##   -- --evlog            gibt Nitro-Zündung, Fehlzündungen und Gangwechsel mit Zeit aus ("EV ...")
 ##   -- --revtest          Gas 4 s, Bremse 4 s (bis rückwärts), Gas 3 s: gibt alle 0,1 s Tempo, Gang und R aus
 ##   -- --fulltest         Autopilot fährt das ganze Rennen; meldet Hänger, Stürze, Fahrten neben der Strecke, Ruckler,
 ##                         hängende Gegner und das Ergebnis ("FT ..."), beendet sich 3 s nach dem Ziel
@@ -30,6 +31,7 @@ extends Node
 
 const Track := preload("res://scripts/track_builder.gd")
 const Catalog := preload("res://scripts/catalog.gd")
+const EngineAudioScript := preload("res://scripts/engine_audio.gd")
 
 var prefix := ""
 var drive := false
@@ -57,6 +59,9 @@ var _vcam: Camera3D
 var _drift_t := -1.0  # laufendes Drift-Manöver (--drifty)
 var _drift_dir := 0.0
 var bench := false
+var _ev_nos := false
+var _ev_bf := 0.0
+var _ev_gear := 1
 var _bench := []  # je Bild: [Bildzeit ms, GPU ms, CPU-Render ms, Draw Calls, Objekte, Dreiecke]
 var _bench_vp := RID()
 var _crash: PackedStringArray = []
@@ -260,9 +265,9 @@ func _process(dt: float) -> void:
 				pl.speed_lat, pl.steer, pl._slip_hold, pl.drift_angle, pl._wall_t, pl.stun, Input.is_action_pressed("handbrake")])
 		if fmod(st, 0.2) < dt:
 			var au = pl.audio
-			print("snd t=%.1f v=%.1f nos=%s nos_db=%.1f slip=%.2f skid_db=%.1f scrub_db=%.1f winkel=%.0f" % [st,
-				pl.velocity.length(), pl.nitro_on, au._nos.volume_db, au.slip, au._skid.volume_db, au._scrub.volume_db,
-				pl.drift_angle])
+			print("snd t=%.1f T=%.2f v=%.1f nos=%s nos_db=%.1f slip=%.2f skid_db=%.1f scrub_db=%.1f winkel=%.0f road_db=%.1f wind_db=%.1f gang=%d rpm=%d" % [st,
+				_t, pl.velocity.length(), pl.nitro_on, au._nos.volume_db, au.slip, au._skid.volume_db, au._scrub.volume_db,
+				pl.drift_angle, au._road.volume_db, au._wind.volume_db, pl.gear, int(pl.rpm)])
 	# --slidetest: festes Drift-Manöver auf der Geraden (Fahrmodell prüfen): 0,25 s Handbremse + links, dann nur Gas
 	elif OS.get_cmdline_user_args().has("--slidetest") and race and "curve" in race and race.player and race.state == 1:
 		var pl = race.player
@@ -402,6 +407,18 @@ func _process(dt: float) -> void:
 			get_tree().quit()
 	if bench and race and "curve" in race and race.player:
 		_bench_sample(race, dt)
+	# --evlog: Nitro-Zündung, Fehlzündungen und Gangwechsel mit Zeit (zum Abgleich mit den Rucklern im Bench)
+	if OS.get_cmdline_user_args().has("--evlog") and race and "curve" in race and race.player:
+		var ep = race.player
+		if ep.nitro_on and not _ev_nos:
+			print("EV %.2fs nitro" % _t)
+		_ev_nos = ep.nitro_on
+		if ep._backfire > _ev_bf + 0.2:
+			print("EV %.2fs fehlzündung %.2f" % [_t, ep._backfire])
+		_ev_bf = ep._backfire
+		if ep.gear != _ev_gear:
+			print("EV %.2fs gang %d" % [_t, ep.gear])
+			_ev_gear = ep.gear
 	if OS.get_cmdline_user_args().has("--airlog") and race and "curve" in race and race.player and race.state == 1 and fmod(_t, 0.1) < dt:
 		var p2 = race.player
 		print("air t=%.1f v=%.1f y=%.2f vy=%.1f luft=%s nick=%.2f roll=%.2f d=%.0f pfad=%d wasser=%.1f" % [_t, p2.velocity.length(), p2.position.y, p2.vy,
@@ -486,6 +503,8 @@ func _bench_sample(race, dt: float) -> void:
 		return
 	if race.state != 1:
 		return
+	if _bench.is_empty():
+		EngineAudioScript.bench_us = 0
 	if _bench.size() == 600:
 		_bench_breakdown(race)
 	var rs := RenderingServer
@@ -575,6 +594,7 @@ func _bench_report(race) -> void:
 	print("BENCH race=%s q=%d frames=%d frame=%.2fms med=%.2fms p99=%.2fms gpu=%.2fms gpu3d=%.2fms process=%.2fms physics=%.2fms draws=%d objs=%d tris=%dk %s" % [
 		race.race["name"], GameState.preset, _bench.size(), sums[0] / n, med, worst[int(n * 0.99) - 1], sums[1] / n, sums[2] / n,
 		sums[6] / n, sums[7] / n, int(sums[3] / n), int(sums[4] / n), int(sums[5] / n / 1000.0), counts])
+	print("BENCH audio=%.3fms" % [EngineAudioScript.bench_us / 1000.0 / n])
 	print("BENCH spikes=%d %s" % [spikes.size(), " ".join(spikes.slice(0, 40))])
 	print("BENCH vram=%dMB tex=%dMB buf=%dMB" % [Performance.get_monitor(Performance.RENDER_VIDEO_MEM_USED) / 1048576.0,
 		Performance.get_monitor(Performance.RENDER_TEXTURE_MEM_USED) / 1048576.0, Performance.get_monitor(Performance.RENDER_BUFFER_MEM_USED) / 1048576.0])

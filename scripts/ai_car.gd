@@ -6,9 +6,14 @@ extends CharacterBody3D
 ## Berührt er den Spieler oder einen anderen Gegner, fährt er nicht hindurch: von hinten bleibt er an der Stoßstange und
 ## schiebt mit (gleich schwere Autos teilen sich das Tempo), seitlich drücken sich beide auseinander; wer blockiert
 ## wird, sucht eine andere Spur.
+## Man hört ihn: sein Motor (derselbe Klang wie beim Spieler, als Schleife vorgerechnet) kommt aus seinem Heck, mit
+## Gängen, Gas und Dopplereffekt beim Überholen; an der Startlinie lässt er den Motor aufheulen.
 
 const Builder := preload("res://scripts/car_builder.gd")
 const Track := preload("res://scripts/track_builder.gd")
+const Catalog := preload("res://scripts/catalog.gd")
+const EngineAudio := preload("res://scripts/engine_audio.gd")
+const GEARS := [0.0, 0.16, 0.31, 0.47, 0.63, 0.81, 1.3]  # wie player_car
 const GRAVITY := 30.0
 const MAX_LAUNCH_VY := 10.0  # kurze, knackige Sprünge statt Weitflug
 
@@ -55,6 +60,13 @@ var _decided := {}
 var rivals: Array = []  # alle Gegner (race.gd), für Kontakte untereinander
 var width := 1.8
 var _blocked_t := 0.0  # wie lange schon jemand direkt vor der Stoßstange klebt
+var _eng: Array = []  # Motorklang: [unten (wenig Gas), oben (Volllast)], je AudioStreamPlayer3D
+var _eng_ref := [1500.0, 4500.0]
+var _rpm := 900.0
+var _gear := 1
+var _thr := 0.0
+var _rev_t := 0.0
+var _rev_on := false
 var _blocker_lat := 0.0
 
 
@@ -85,6 +97,70 @@ func setup(track_: Dictionary, car_id: String, cfg: Dictionary, start_progress: 
 	shortcut_rate = randf_range(0.35, 0.8)
 	global_transform = Track.xform_at(path["curve"], d, lane)
 	_last_yaw = rotation.y
+	var snd: Dictionary = Catalog.CARS[car_id]["sound"]
+	for spec in [[1500.0, 0.3], [4500.0, 1.0]]:
+		var w := EngineAudio.render_loop(snd, spec[0], spec[1])
+		var a := AudioStreamPlayer3D.new()
+		a.stream = w
+		a.unit_size = 6.0
+		a.max_distance = 160.0
+		a.volume_db = -80.0
+		a.doppler_tracking = AudioStreamPlayer3D.DOPPLER_TRACKING_PHYSICS_STEP
+		a.playback_type = AudioServer.PLAYBACK_TYPE_STREAM
+		a.position = Vector3(0, 0.5, length * 0.4)
+		add_child(a)
+		a.play(randf() * w.get_length())
+		_eng.append(a)
+		_eng_ref[_eng.size() - 1] = w.get_meta("rpm")
+
+
+## Tonbus für den Motor (race.gd: Hall-Bus, sobald es ihn gibt)
+func set_bus(b: String) -> void:
+	for a in _eng:
+		(a as AudioStreamPlayer3D).bus = b
+
+
+## Motorklang: Gang und Drehzahl aus dem Tempo wie beim Spieler, Gas aus dem, was er gerade will (beschleunigen,
+## halten, bremsen). Zwei Schleifen (Teillast unten, Volllast oben) werden nach der Drehzahl überblendet.
+func _update_engine(dt: float, target: float) -> void:
+	if _eng.is_empty():
+		return
+	var r := speed / maxf(top, 1.0)
+	if _gear < 6 and r > GEARS[_gear]:
+		_gear += 1
+	elif _gear > 1 and r < GEARS[_gear - 1] * 0.88:
+		_gear -= 1
+	var thr := 0.0
+	var want := 900.0
+	if not running:
+		# an der Startlinie: Gas geben und wieder lassen, jeder in seinem Takt
+		_rev_t -= dt
+		if _rev_t <= 0.0:
+			_rev_t = randf_range(0.35, 1.3)
+			_rev_on = randf() < 0.5
+		thr = 0.85 if _rev_on else 0.0
+		want = 900.0 + thr * 4800.0
+	else:
+		thr = 1.0 if target > speed + 0.5 else (0.35 if target > speed - 1.5 else 0.0)
+		if total >= finish:
+			thr = 0.0
+		var per: float = 7400.0 / GEARS[_gear] if _gear < 6 else 6600.0
+		want = clampf(maxf(900.0 + thr * 600.0, r * per), 900.0, 7700.0)
+		if _gear == 1 and speed < 6.0 and thr > 0.5:
+			want = maxf(want, 3500.0)  # Anfahren: Kupplung schleift
+	if airborne:
+		want = 1500.0 + thr * 5800.0
+	_rpm = move_toward(_rpm, want, dt * (20000.0 if running else 9000.0))
+	_thr = move_toward(_thr, thr, dt * 6.0)
+	var hi := smoothstep(1800.0, 4000.0, _rpm)
+	var lvl := 0.45 + 0.35 * _thr + 0.2 * clampf((_rpm - 900.0) / 6500.0, 0.0, 1.0)
+	for i in 2:
+		var a: AudioStreamPlayer3D = _eng[i]
+		var g := (1.0 - hi) if i == 0 else hi
+		# Schleife ist voll ausgesteuert: -13 dB, damit ein Gegner in 6 m Abstand unter Volllast etwa so laut ist wie
+		# der eigene Motor (aus der Verfolgerkamera)
+		a.volume_db = -80.0 if g * lvl < 0.01 else linear_to_db(g * lvl) - 13.0
+		a.pitch_scale = clampf(_rpm / _eng_ref[i], 0.3, 2.5)
 
 
 ## Ist die Spur bei `lat` zwischen d+from und d+to frei? (nur Hauptstraße)
@@ -246,6 +322,7 @@ func _physics_process(dt: float) -> void:
 	if airborne:
 		pitch = clampf(atan2(vy, maxf(speed, 1.0)) * 0.8, -0.35, 0.3)
 	Builder.animate(model, speed, _steer, _steer * 0.04, pitch, false, dt, Vector2.ZERO if _locked else null)
+	_update_engine(dt, target)
 	model.rotation.x = lerp_angle(model.rotation.x, 0.0 if airborne else atan(Track.slope_at(c, d)), 1.0 - exp(-dt * 12.0))
 
 
