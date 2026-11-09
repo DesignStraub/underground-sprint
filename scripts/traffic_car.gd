@@ -87,23 +87,33 @@ func _body(fp: Vector2, h: float, col: Color, cabin: Vector2, cabin_h: float, ca
 	var paint := Builder.gloss_mat(col, 0.3, 0.4)
 	var glass := Builder.mat(Color(0.03, 0.04, 0.06), 0.7, 0.1)
 	var clear := 0.25
-	Builder._add(self, Builder.tapered_box(fp, fp - Vector2(0.08, 0.2), h, 0.0), paint, Vector3(0, clear, 0))
+	# Karosserie und Kabine mit runden Kanten (bis 2.20 scharfkantige Kisten), dazu Stoßfänger, Spiegel und Felgen
+	Builder._add(self, Builder.rtapered_box(fp, fp - Vector2(0.08, 0.2), h, 0.0, minf(0.14, h * 0.3)), paint, Vector3(0, clear, 0))
 	if cabin.x > 0.0:
-		Builder._add(self, Builder.tapered_box(cabin, cabin - Vector2(0.25, 0.5), cabin_h, 0.1), glass, Vector3(0, clear + h, cabin_z))
+		Builder._add(self, Builder.rtapered_box(cabin, cabin - Vector2(0.25, 0.5), cabin_h, 0.1, 0.1), glass, Vector3(0, clear + h, cabin_z))
 	var head := Builder.mat(Color(1, 1, 0.9), 0, 0.3, Color(1, 0.95, 0.8), 4.0)
 	var tail := Builder.mat(Color(0.6, 0, 0), 0, 0.3, Color(1, 0.05, 0.02), 3.0)
+	var trim := Builder.mat(Color(0.06, 0.06, 0.07), 0.2, 0.7)
 	for s in [-1, 1]:
-		Builder._add(self, Builder.box(Vector3(0.35, 0.15, 0.05)), head, Vector3(s * (fp.x / 2 - 0.3), clear + 0.35, -fp.y / 2 - 0.01))
-		Builder._add(self, Builder.box(Vector3(0.35, 0.15, 0.05)), tail, Vector3(s * (fp.x / 2 - 0.3), clear + 0.4, fp.y / 2 + 0.01))
+		Builder._add(self, Builder.rbox(Vector3(0.35, 0.15, 0.05), 0.02), head, Vector3(s * (fp.x / 2 - 0.3), clear + 0.35, -fp.y / 2 - 0.01))
+		Builder._add(self, Builder.rbox(Vector3(0.35, 0.15, 0.05), 0.02), tail, Vector3(s * (fp.x / 2 - 0.3), clear + 0.4, fp.y / 2 + 0.01))
+		if cabin.x > 0.0:
+			Builder._add(self, Builder.rbox(Vector3(0.16, 0.09, 0.07), 0.03), paint, Vector3(s * (fp.x / 2 + 0.05), clear + h + 0.05, cabin_z - cabin.y / 2 + 0.25))
+	for z in [-1, 1]:
+		Builder._add(self, Builder.rbox(Vector3(fp.x - 0.06, 0.12, 0.1), 0.04), trim, Vector3(0, clear + 0.08, z * (fp.y / 2 - 0.02)))
 	var tire := Builder.mat(Color(0.05, 0.05, 0.05), 0, 0.9)
+	var hub := Builder.mat(Color(0.55, 0.56, 0.58), 0.7, 0.35)
 	for s in [-1, 1]:
 		for z in [-1, 1]:
 			var c := CylinderMesh.new()
 			c.top_radius = 0.33
 			c.bottom_radius = 0.33
 			c.height = 0.24
-			c.radial_segments = 10
-			Builder._add(self, c, tire, Vector3(s * (fp.x / 2 - 0.1), 0.33, z * (fp.y / 2 - 0.9))).rotation_degrees.z = 90
+			c.radial_segments = 16
+			c.rings = 1
+			var wp := Vector3(s * (fp.x / 2 - 0.1), 0.33, z * (fp.y / 2 - 0.9))
+			Builder._add(self, c, tire, wp).rotation_degrees.z = 90
+			Builder._add(self, Builder._disc(0.2, 0.01), hub, wp + Vector3(s * 0.121, 0, 0)).rotation_degrees.z = 90
 
 
 ## Klang vorrechnen (race.gd beim Laden): sonst rechnete das erste nahe Auto mitten im Rennen und es ruckelte

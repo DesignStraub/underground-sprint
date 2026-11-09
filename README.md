@@ -512,6 +512,22 @@ ein, wie auf echten Aufnahmen. Kostet im Rennen etwa 4 % mehr Draw Calls und Dre
   der der Flanke auf gleicher Höhe um die Ecke folgt, so sitzen Rücklicht-Ecke und Band nie versetzt (vorher wirkte das
   wie ein Auto im Auto). Türfugen, Spiegel, Griffe, Scheibenwischer, Kennzeichen mit Schrift („NF-G 86“); Anbauteile der Schürzen werden mit der Karosserie
   verschmolzen (~15 Draw Calls weniger je Auto) und sind auch in der Fernansicht zu sehen. Unterbodenneon ist ein Lichtteppich auf der Straße.
+- **Runder seit 2.21** (vorher sah vieles nach Lego aus):
+  - Jeder Querschnitt hat 25 statt 11 Punkte: zwischen den alten Punkten läuft eine Kurve (Catmull-Rom, zentripetal,
+    `_refine`). Flanke, Schulter und Dachkante sind rund statt geknickt; die Bänder (Lack, Glas, Leuchten, Folien, Fugen)
+    bleiben, wo sie waren. Leuchten, die um die Ecke laufen, folgen derselben Kurve (`_side_x`).
+  - Bug und Heck enden nicht mehr in einer senkrechten Wand: in den letzten 7 cm rückt der Querschnitt nach innen
+    (Viertelkreis, `edge_f`/`edge_r` je Auto möglich). Hinten rundum, vorn nur seitlich, weil bei vielen Autos die
+    Scheinwerfer bis an die Haubenkante reichen. Die Unterkante bleibt (Lippe, Einlass, Diffusor).
+  - Anbauteile mit runden Kanten (`rbox`): Schweller, Lippen, Bodykits, Spiegel, Flügelstützen. Flügelblätter sind
+    Profile mit runder Nase statt Bretter, Endplatten haben eine schräge Form mit runden Ecken (`_endplate`), Hutzen
+    sind gerundet (`rtapered_box`).
+  - Neue Details: Spiegel mit Gehäuse quer zur Fahrt und dunklem Glas, gerollte Radlaufkanten (`_arch_lips`),
+    seitliche Begrenzungsleuchten vorn (orange) und hinten (rot), Tankdeckel, dritte Bremsleuchte.
+  - Verkehrsautos mit runden Kanten, Stoßfängern, Spiegeln und Radkappen.
+  - Kosten: gut 10 % mehr Dreiecke im Bild, aber weniger Draw Calls als vorher: beim Verschmelzen von Autos und
+    Verkehr trennen Texturkoordinaten und Index nicht mehr (`collect_static(..., loose)`), so landen fertige Formen und
+    selbst gebaute Teile desselben Materials in einem Draw Call (Bankenviertel 369 → 364, Hafenrunde 563 → 518).
 - **Straße wie in Underground** (`shaders/road.gdshader`): dunkler, körniger Asphalt mit Splitt, Flecken, Rissen und
   Teerfugen aus einer nahtlosen Detail-Textur samt Normal-Map (8 x 8 m, eine zweite, gedrehte Lage gegen sichtbare
   Kachelung). Immer etwas feucht glänzend, bei Regen deutlich; das Relief bricht trocken die Lichtreflexe in Körnung
@@ -553,6 +569,9 @@ ein, wie auf echten Aufnahmen. Kostet im Rennen etwa 4 % mehr Draw Calls und Dre
 Vergleichsbilder aus der Entwicklung liegen in `update_bilder/` (Godot ignoriert den Ordner, sie landen nicht im
 Spiel). Die wichtigsten:
 
+- **2.21 – Rundungen:** links bis 2.20, rechts mit runden Querschnitten, runden Heckkanten, Spiegeln, Schwellern,
+  Radlaufkanten und Flügelprofil.
+  <br><img src="update_bilder/rundungen_2_21.jpg" alt="Rundungen" width="720">
 - **2.20 – Nitro:** oben bis 2.19 (blauer Kegel), unten mit Flamme, Feuerball, Licht auf der Straße und Lichtstreifen;
   links kurz nach dem Zünden (Sichtfeld zieht auf, die Kamera fällt zurück), rechts eine Sekunde später.
   <br><img src="update_bilder/nitro_2_20.jpg" alt="Nitro" width="720">
