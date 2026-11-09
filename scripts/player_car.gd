@@ -563,6 +563,10 @@ func _physics_process(dt: float) -> void:
 		# schenken kein Tempo); nur das Rutschen radiert je nach Winkel etwas ab.
 		if not airborne:
 			var gk := grip_k * lerpf(1.0, lerpf(0.35, 0.2, drift_k), _slip_hold) * (1.0 - 0.3 * po)
+			# Am Grip-Limit (stark eingelenkt bei Tempo) arbeiten die Reifen sichtbar: das Auto steht ein paar Grad
+			# schräg in der Kurve und radiert, wie in NFSU, ohne zu driften (bleibt unter der Drift-Schwelle). Der
+			# Kurvenradius bleibt gleich, die Drehrate gibt weiter die Lenkung vor.
+			gk *= 1.0 - 0.5 * smoothstep(0.5, 1.0, absf(steer)) * smoothstep(14.0, 24.0, spd) * (1.0 - _slip_hold)
 			if hb:
 				gk *= lerpf(0.45, 0.35, drift_k)
 			if drift_mode:

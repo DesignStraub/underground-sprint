@@ -76,7 +76,7 @@ func setup(kind: String, rng: RandomNumberGenerator) -> void:
 
 
 func _body(fp: Vector2, h: float, col: Color, cabin: Vector2, cabin_h: float, cabin_z := 0.2) -> void:
-	var paint := Builder.mat(col, 0.3, 0.4)
+	var paint := Builder.gloss_mat(col, 0.3, 0.4)
 	var glass := Builder.mat(Color(0.03, 0.04, 0.06), 0.7, 0.1)
 	var clear := 0.25
 	Builder._add(self, Builder.tapered_box(fp, fp - Vector2(0.08, 0.2), h, 0.0), paint, Vector3(0, clear, 0))

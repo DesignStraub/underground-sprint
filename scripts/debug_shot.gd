@@ -8,6 +8,7 @@ extends Node
 ##   -- --keys=1.5:ui_cancel,2.0:ui_down   drückt Aktionen zu festen Zeiten (Menüs testen, z. B. Zurück im Tuning)
 ##   -- --race=2           wählt die Strecke (Index in Catalog.RACES)
 ##   -- --car=shiden       fährt mit diesem Auto (auch in der Garage vorausgewählt)
+##   -- --cfg=paint:2,finish:4   Tuning für diesen Lauf (Kategorie:Option, GameState)
 ##   -- --lang=de          Sprache für Bilder (de/en)
 ##   -- --times=1.5,4,8    Zeitpunkte für Screenshots
 ##   -- --crash=30:90[:d]  (oder 30:q quer rutschend, 30:k auf die nächste Laterne) setzt das Auto (bei Strecke d) mit 30 m/s im Winkel 90° nach rechts auf die Wand zu,

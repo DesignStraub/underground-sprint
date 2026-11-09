@@ -3588,6 +3588,7 @@ static func _bake_street_light(root: Node3D, track: Dictionary) -> void:
 				pools.append([p.x, p.z, r, l.light_color * k])
 			if c.get_child_count() > 0:
 				stack.append([c, xf])
+	Builder.street = {}
 	if pools.is_empty():
 		for m in _road_mats.values():
 			m.set_shader_parameter("street_gain", 0.0)  # sonst blieben die Lichtkreise der vorigen Strecke
@@ -3634,6 +3635,7 @@ static func _bake_street_light(root: Node3D, track: Dictionary) -> void:
 		m.set_shader_parameter("street_gain", STREET_GAIN)
 		m.set_shader_parameter("street_floor", STREET_FLOOR)
 	track["street_light"] = tex
+	Builder.street = {"tex": tex, "rect": rect, "gain": STREET_GAIN}
 	if OS.get_cmdline_user_args().has("--lightlog"):
 		print("LICHTKARTE %dx%d (%.1f m) Kreise=%d Punkte=%d %.0f ms" % [w, h, cell, pools.size(), acc.size(), (Time.get_ticks_usec() - t0) / 1000.0])
 	for a in OS.get_cmdline_user_args():

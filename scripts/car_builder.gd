@@ -1121,31 +1121,92 @@ static func paint_color(car_id: String, cfg: Dictionary) -> Color:
 	return opt["color"]
 
 
-## Lack mit Oberfläche: glänzend mit Klarlack (Standard), stark metallisch, Perlmutt (heller Schimmer an den Kanten),
-## matt (ohne Klarlack) oder Chrom
-static func paint_mat(car_id: String, cfg: Dictionary) -> StandardMaterial3D:
+## Lackarten (Shader car_paint): metal/rough = Grundlack, coat = Klarlack, flakes = Metallic-Flitter, flop = zur Seite
+## dunkler, pearl = Anteil des Schimmertons am Rand, rim = helle Kanten (Chrom spiegelt nachts sonst fast nur Schwarz)
+const FINISH := {
+	"gloss": {"metal": 0.2, "rough": 0.3, "coat": 1.0, "coat_rough": 0.03},
+	"metal": {"metal": 0.78, "rough": 0.36, "coat": 1.0, "coat_rough": 0.04, "flakes": 1.0, "flop": 0.65},
+	"matt": {"metal": 0.08, "rough": 0.82, "coat": 0.0, "coat_rough": 0.5},
+	"pearl": {"metal": 0.35, "rough": 0.24, "coat": 1.0, "coat_rough": 0.03, "flakes": 0.45, "pearl": 0.6, "rim": 0.35, "rim_tint": 0.2},
+	"chrome": {"metal": 0.85, "rough": 0.08, "coat": 0.6, "coat_rough": 0.02, "rim": 1.0, "rim_tint": 0.6},
+	"chrome_matt": {"metal": 0.9, "rough": 0.42, "coat": 0.0, "coat_rough": 0.5, "rim": 0.5, "rim_tint": 0.7},
+}
+const PAINT_SHADER := preload("res://shaders/car_paint.gdshader")
+## Lichtkarte der Strecke für den Lack: track_builder._bake_street_light setzt sie (tex, rect, gain), die Garage leert
+## sie. Autos unter Laternen und im Tunnel bekommen so dasselbe Licht wie die Straße darunter.
+static var street := {}
+
+
+## Lackart: "Standard" in der Kategorie Lackart nimmt die der Farbe (Candyblau metallic, Mattschwarz matt, Werkslack
+## je Auto), sonst die gewählte. Chrom bleibt Chrom (matt gewählt: gebürstet).
+static func paint_finish(car_id: String, cfg: Dictionary) -> String:
+	var own: String
+	if int(cfg.get("paint", 0)) == 0:
+		var spec: Dictionary = Catalog.CARS[car_id]
+		own = str(spec.get("finish", "" if spec.has("paint") else "metal"))  # ohne eigene Farbe: Silbermetallic
+	else:
+		own = str(Catalog.part_of(cfg, "paint").get("finish", ""))
+	var pick := str(Catalog.part_of(cfg, "finish").get("finish", ""))
+	if own == "chrome":
+		return "chrome_matt" if pick == "matt" else "chrome"
+	if pick != "":
+		return pick
+	return own if own != "" else "gloss"
+
+
+## Schimmerton für Perlmutt: bunte Lacke kippen etwas im Farbton und werden heller, Weiß/Silber schimmern kühl
+## lavendel, Schwarz tiefblau
+static func pearl_tint(c: Color) -> Color:
+	if c.s < 0.25:
+		if c.v < 0.3:
+			return Color(0.16, 0.2, 0.45)
+		return Color(0.84, 0.85, 1.0) * clampf(c.v * 1.05, 0.5, 1.0)
+	return Color.from_hsv(fposmod(c.h + 0.06, 1.0), c.s * 0.75, minf(c.v * 1.2 + 0.15, 1.0))
+
+
+static func paint_mat(car_id: String, cfg: Dictionary) -> Material:
 	var c := paint_color(car_id, cfg)
-	var m: StandardMaterial3D
-	match str(Catalog.part_of(cfg, "paint").get("finish", "")):
-		"matt":
-			return mat(c, 0.1, 0.78)
-		"chrome":
-			# echtes Chrom spiegelt nachts fast nur Schwarz: etwas Eigenhelligkeit und helle Kanten, damit es glänzt
-			m = mat(c, 0.75, 0.1)
-			m.rim_enabled = true
-			m.rim = 1.0
-			m.rim_tint = 0.6
-		"metal":
-			m = mat(c, 0.85, 0.2)
-		"pearl":
-			m = mat(c, 0.25, 0.15)
-			m.rim_enabled = true
-			m.rim = 0.7
-			m.rim_tint = 0.15
-		_:
-			m = mat(c, 0.55, 0.22)
-	m.clearcoat_enabled = true
-	m.clearcoat = 1.0
+	var f: Dictionary = FINISH[paint_finish(car_id, cfg)]
+	var m := ShaderMaterial.new()
+	m.shader = PAINT_SHADER
+	m.set_shader_parameter("base_color", c)
+	m.set_shader_parameter("metal", f["metal"])
+	m.set_shader_parameter("rough", f["rough"])
+	m.set_shader_parameter("coat", f["coat"])
+	m.set_shader_parameter("coat_rough", f["coat_rough"])
+	m.set_shader_parameter("flakes", f.get("flakes", 0.0))
+	m.set_shader_parameter("flop", f.get("flop", 0.0))
+	m.set_shader_parameter("pearl", f.get("pearl", 0.0))
+	m.set_shader_parameter("pearl_color", pearl_tint(c))
+	m.set_shader_parameter("rim_k", f.get("rim", 0.0))
+	m.set_shader_parameter("rim_tint_k", f.get("rim_tint", 0.5))
+	m.set_meta("lod_color", c)  # Fernansicht (_build_lod) malt den Lack als Vertexfarbe
+	light_paint(m)
+	return m
+
+
+## Lichtkarte der Strecke auf einen Lack (auch für den Lack der Verkehrsautos)
+static func light_paint(m: ShaderMaterial) -> void:
+	if street.is_empty():
+		m.set_shader_parameter("street_car", 0.0)
+		return
+	m.set_shader_parameter("street_light", street["tex"])
+	m.set_shader_parameter("street_rect", street["rect"])
+	m.set_shader_parameter("street_gain", street["gain"])
+	m.set_shader_parameter("street_car", 1.0)
+
+
+## Einfacher Glanzlack (Verkehr): dieselbe Lackoberfläche und dasselbe Laternenlicht wie bei den Rennautos
+static func gloss_mat(c: Color, metal := 0.3, rough := 0.4) -> ShaderMaterial:
+	var m := ShaderMaterial.new()
+	m.shader = PAINT_SHADER
+	m.set_shader_parameter("base_color", c)
+	m.set_shader_parameter("metal", metal)
+	m.set_shader_parameter("rough", rough)
+	m.set_shader_parameter("coat", 0.6)
+	m.set_shader_parameter("coat_rough", 0.08)
+	m.set_meta("lod_color", c)
+	light_paint(m)
 	return m
 
 
@@ -2009,8 +2070,8 @@ static func _build_lod(root: Node3D, flames: Array, dist: float) -> void:
 		for it in buckets[key]:
 			st.append_from(it[0], it[1], it[2])
 		var m: Material = key[0]
-		var plain: bool = m is StandardMaterial3D and not (m as StandardMaterial3D).emission_enabled \
-			and (m as StandardMaterial3D).albedo_texture == null and key[1][0]
+		var plain: bool = (m is StandardMaterial3D and not (m as StandardMaterial3D).emission_enabled \
+			and (m as StandardMaterial3D).albedo_texture == null or m.has_meta("lod_color")) and key[1][0]
 		if not plain:
 			st.commit(mesh)
 			mesh.surface_set_material(mesh.get_surface_count() - 1, m)
@@ -2022,7 +2083,7 @@ static func _build_lod(root: Node3D, flames: Array, dist: float) -> void:
 		nrm.append_array(arr[Mesh.ARRAY_NORMAL])
 		var c := PackedColorArray()
 		c.resize(n)
-		c.fill((m as StandardMaterial3D).albedo_color)
+		c.fill(m.get_meta("lod_color") if m.has_meta("lod_color") else (m as StandardMaterial3D).albedo_color)
 		col.append_array(c)
 	if not pos.is_empty():
 		var arrays := []

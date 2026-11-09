@@ -98,6 +98,10 @@ func _ready() -> void:
 			pixel_look = a.substr(8) == "1"
 		elif a.begins_with("--car=") and Catalog.CARS.has(a.substr(6)):  # nur für Tests: mit diesem Auto fahren
 			current_car = a.substr(6)
+		elif a.begins_with("--cfg="):  # nur für Tests: Tuning setzen, z. B. --cfg=paint:5,finish:2
+			for kv in a.substr(6).split(","):
+				if ":" in kv and Catalog.PARTS.has(kv.get_slice(":", 0)):
+					tuning[kv.get_slice(":", 0)] = int(kv.get_slice(":", 1))
 		elif a.begins_with("--lang="):  # nur für Tests und Bilder: Sprache (de/en)
 			language = a.substr(7)
 			I18n.setup(language)

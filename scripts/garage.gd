@@ -60,6 +60,7 @@ func _ready() -> void:
 
 
 func _build_scene() -> void:
+	Builder.street = {}  # Lichtkarte der letzten Strecke gilt hier nicht
 	var view_layer := CanvasLayer.new()
 	view_layer.layer = -1
 	add_child(view_layer)
@@ -76,6 +77,14 @@ func _build_scene() -> void:
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	env.glow_intensity = 1.0
 	env.glow_hdr_threshold = 0.9
+	# Spiegelungen: ohne sie spiegelt der Lack nur das Schwarz der Halle, Glanz und Matt sähen gleich aus.
+	# Ein unsichtbarer Studio-Himmel (Lichtbänder an der Decke, Neonröhren) steht nur im Lack und im Boden.
+	var sky_m := ShaderMaterial.new()
+	sky_m.shader = preload("res://shaders/studio_sky.gdshader")
+	env.sky = Sky.new()
+	env.sky.sky_material = sky_m
+	env.sky.radiance_size = Sky.RADIANCE_SIZE_256
+	env.reflected_light_source = Environment.REFLECTION_SOURCE_SKY
 	var apply_gfx := func():
 		env.glow_enabled = GameState.gv("bloom")
 		env.ssr_enabled = GameState.gfx_available("ssr") and GameState.gv("ssr") > 0
@@ -360,6 +369,8 @@ func _view_for(cat: String) -> Array:
 	match cat:
 		"paint":
 			return [Vector3(3.4, 1.35, -3.4), Vector3(0.2, 0.55, 0.0)]
+		"finish":
+			return [Vector3(4.1, 1.65, -3.8), Vector3(0.0, 0.55, 0.25)]
 		"rims", "rimcol", "rimsize", "tires":
 			return [Vector3(W / 2.0 + 1.3, 0.45, fz - 0.9), Vector3(W / 2.0, 0.32, fz)]
 		"suspension":
@@ -886,6 +897,19 @@ func _part_info(cat: String, idx: int) -> void:
 				roundi(opt["steer"] / Catalog.CARS[preview_car]["steer"] * 100.0), roundi(opt["drop"] * 1000.0)]
 		"tires":
 			t += "\n" + tr("Grip +%d %%") % roundi(opt["grip"] / Catalog.CARS[preview_car]["grip"] * 100.0)
+		"finish":
+			var c3 := GameState.get_config(preview_car).duplicate()
+			c3[cat] = idx
+			var fk := Builder.paint_finish(preview_car, c3)
+			var desc := {"gloss": "Uni-Lack unter Klarlack: satte Farbe, scharfe Spiegelungen.",
+				"metal": "Feiner Flitter im Lack, frontal hell, zur Seite dunkler.", "matt": "Ohne Klarlack: stumpf, ohne Spiegelungen.",
+				"pearl": "Die Farbe kippt zum Rand hin in einen hellen Schimmer."}
+			if fk.begins_with("chrome"):
+				t += "\n" + tr("Chrom bleibt Chrom, matt wird es gebürstet.")
+			else:
+				if idx == 0:
+					t += "\n" + tr("Wie die Farbe: %s") % tr({"gloss": "Glanz", "metal": "Metallic", "matt": "Matt", "pearl": "Perlmutt"}[fk])
+				t += "\n" + tr(desc[fk])
 		"rims", "rimsize":
 			var c2 := GameState.get_config(preview_car).duplicate()
 			c2[cat] = idx

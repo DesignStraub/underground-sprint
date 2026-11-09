@@ -135,7 +135,9 @@ func _ready() -> void:
 		var id: String = pool[rng.randi() % pool.size()]
 		var cfg := {}
 		for cat in Catalog.PART_ORDER:
-			cfg[cat] = rng.randi() % Catalog.PARTS[cat]["options"].size()
+			if cat != "finish":  # Lackart ohne Zufallszahl: sonst änderten sich seit 2.19 alle Gegnerfelder
+				cfg[cat] = rng.randi() % Catalog.PARTS[cat]["options"].size()
+		cfg["finish"] = (int(race["seed"]) + i * 3 + GameState.wins) % Catalog.PARTS["finish"]["options"].size()
 		var ai := AICar.new()
 		ai.process_mode = Node.PROCESS_MODE_PAUSABLE
 		ai.player = player

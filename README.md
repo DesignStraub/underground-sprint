@@ -321,8 +321,15 @@ Autowechsel bleibt alles dran. Rücktaste und Esc gehen eine Ebene zurück (Teil
 Garage), der Fokus steht wieder auf dem Eintrag, aus dem man kam.
 
 Garage → Tuning → **Optik** oder **Leistung** (Motor, Turbo, Nitro, Fahrwerk, Reifen) → Teil wählen. Optik:
-- **Lack:** 21 Farben, dazu Oberflächen: glänzend mit Klarlack, stark metallisch (Candyblau, Bronze, Gold), matt
-  (Mattschwarz, Mattgrau), Perlweiß mit Schimmer an den Kanten, Chrom.
+- **Lack:** 21 Farben, einige mit eigener Oberfläche (Candyblau, Bronze und Gold metallic, Mattschwarz und Mattgrau
+  matt, Perlweiß Perlmutt, Chrom).
+- **Lackart (seit 2.19):** Standard (die Oberfläche der Farbe bzw. des Werkslacks), Glanz, Metallic, Matt, Perlmutt,
+  für jede Farbe frei wählbar. Eigener Shader (`shaders/car_paint.gdshader`): Glanz ist Uni-Lack unter Klarlack,
+  Metallic hat feinen Flitter (nur aus der Nähe, in den Glanzlichtern) und wird zur Seite dunkler, Matt hat keinen
+  Klarlack und spiegelt nicht, bei Perlmutt kippt die Farbe zum Rand hin in einen helleren Schimmerton (Weiß und Silber
+  lavendel, Schwarz tiefblau, bunte Lacke etwas im Farbton verschoben). Chrom bleibt Chrom, matt wird es gebürstet.
+  Werkslacke: Silber-Autos ab Werk metallic, Kumo, Ryujin, Falke, Tanuki und Kaido metallic, Shiden, Kagura und Furia
+  Perlmutt.
 - **Felgen:** 23 Bauarten, jede eigens gebaut: Serie (je Auto eine eigene Werksfelge), Fünfspeichen, Gitter,
   Tiefbett (poliertes breites Horn), Doppelspeichen, Y-Speichen, Mehrspeichen, Stahlfelge mit Löchern, Turbine,
   Rennsport-Sechs, Kreuzspeichen mit Zwischenring, Aero-Scheibe, Tiefbett Stern, dazu seit 2.18 Konkav-Stern,
@@ -439,7 +446,8 @@ dann steht „Benutzerdefiniert“ da. Werte in `GameState.GFX`.
   der perfekte Start gibt gut eine Sekunde mehr Zug statt 30 km/h auf einen Schlag, Nitro setzt in einer
   Drittelsekunde ein, im Drag gibt perfektes Schalten einen kurzen Schub statt eines Satzes nach vorn. Langsam begrenzt der Wendekreis (5,2 m), bei Tempo die Querbeschleunigung (2,1–2,7 g je
   Auto, bei Topspeed etwas weniger). Kurven kosten kein Tempo, an der Haftgrenze rutscht das Auto sichtbar ein paar
-  Grad; Rutschen radiert etwas ab, würgt das Tempo aber nicht ab. Anbremsen in die Kurve lässt das Heck leicht kommen,
+  Grad (seit 2.19 bei 80–120 km/h 4–8°, bei 200 km/h knapp 3°; vorher 1–2°, das wirkte wie auf Schienen; Radius und
+  Querbeschleunigung bleiben gleich, unter der Drift-Schwelle); Rutschen radiert etwas ab, würgt das Tempo aber nicht ab. Anbremsen in die Kurve lässt das Heck leicht kommen,
   Handbremse dreht bei 80 km/h in 0,8 s um gut 90°. Bremsen ~2,4 g, Gegenlenken geht schneller als Einlenken.
   Karosserie wankt nach der echten Querbeschleunigung, taucht beim Bremsen ein; die Verfolgerkamera dreht leicht
   verzögert mit und bleibt nah am Auto (im Stand 4,7 m, bei Tempo knapp 7 m, Blickwinkel 58°–80°). Messwerte aller Autos: `tools/handling_lab.tscn`.
@@ -487,6 +495,12 @@ ein, wie auf echten Aufnahmen. Kostet im Rennen etwa 4 % mehr Draw Calls und Dre
   dazu ein durchgehendes Lichtband. Fahrbahn, Gehweg und Tunnelwände lesen sie im Shader: Jede Laterne beleuchtet
   sichtbar die Straße, auch im Browser, wo jedes Objekt nur von wenigen echten Lampen Licht bekommt (lange
   Straßenstücke und Tunnel blieben dort stellenweise schwarz). Überlagern sich viele Kreise, sättigt es weich.
+  Seit 2.19 liest auch der Autolack die Lichtkarte (Rennautos und Verkehr): unter einer Laterne leuchten Dach und Haube
+  in ihrer Farbe auf, im Tunnel stehen Autos im Tunnellicht. Vorher bekam ein Auto im hell erleuchteten Tunnel nur das
+  stark gedimmte Umgebungslicht und war fast schwarz, während Wand und Straße leuchteten.
+- **Garage:** Ein unsichtbarer Studio-Himmel (`shaders/studio_sky.gdshader`) steht nur in den Spiegelungen: drei
+  Lichtbänder an der Decke und die Neonröhren der Wände. Vorher spiegelte der Lack nur die schwarze Halle, Glanz und
+  Matt sahen gleich aus.
 - **Kopfsteinpflaster:** kleine, gewölbte Steine in Reihen quer zur Fahrtrichtung, jede Reihe mit eigener Steinbreite
   und zufällig versetzt; in der Ferne geht das Muster in den mittleren Farbton über (kein Flimmern). Vorher waren es
   große Rechtecke im Ziegelverband, die im Dunkeln wie eine Hauswand aussahen.
@@ -509,6 +523,12 @@ ein, wie auf echten Aufnahmen. Kostet im Rennen etwa 4 % mehr Draw Calls und Dre
 Vergleichsbilder aus der Entwicklung liegen in `update_bilder/` (Godot ignoriert den Ordner, sie landen nicht im
 Spiel). Die wichtigsten:
 
+- **2.19 – Lackarten:** je Zeile eine Farbe (Rot, Schwarz, Weiß, Blau), von links Glanz, Metallic, Matt, Perlmutt.
+  Aufgenommen in der Garage mit den neuen Spiegelungen (Lichtbänder an der Decke, Neonröhren).
+  <br><img src="update_bilder/lackarten_2_19.jpg" alt="Lackarten" width="720">
+- **2.19 – Tunnellicht:** links bis 2.18 (das Auto bekam im Tunnel kaum Licht und stand schwarz vor den hellen
+  Wänden), rechts mit Laternenlicht aus der Lichtkarte auch auf dem Lack.
+  <br><img src="update_bilder/tunnellicht_2_19.jpg" alt="Auto im Tunnel vorher und nachher" width="640">
 - **2.18 – Felgen:** alle 23 Bauarten am Kaizen in ihrer Standardgröße, je Zeile von links: Serie (Kaizen),
   Fünfspeichen, Gitter Gold, Tiefbett Schwarz, Doppelspeichen, Y-Speichen · Mehrspeichen, Stahlfelge, Turbine,
   Rennsport-Sechs, Kreuzspeichen, Aero-Scheibe · Tiefbett Stern, Konkav-Stern, Retro-Loch, Radkappe, Rallye, Sichel ·

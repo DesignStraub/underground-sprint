@@ -74,7 +74,7 @@ const CARS := {
 		"sound": {"cyl": 4, "harm": [1.0, 0.5, 0.32, 0.14], "sub": 0.35, "turbo": 0.85, "rough": 0.25},
 	},
 	"kumo": {
-		"drive": "rwd", "name": "Kumo JX6", "style": "sedan", "class": "A", "unlock": {"race": 8, "drift": 2}, "drift": 0.85, "paint": Color(0.3, 0.32, 0.36),
+		"drive": "rwd", "name": "Kumo JX6", "style": "sedan", "class": "A", "unlock": {"race": 8, "drift": 2}, "drift": 0.85, "paint": Color(0.3, 0.32, 0.36), "finish": "metal",
 		"length": 4.72, "width": 1.75,
 		"accel": 12.4, "top_speed": 68.0, "grip": 23.5, "steer": 2.3,
 		"desc": "Viertürer mit Turbo-Reihensechser und Heckantrieb. Unauffällig, bis er quer steht.",
@@ -106,7 +106,7 @@ const CARS := {
 		"sound": {"cyl": 8, "harm": [1.0, 0.7, 0.35, 0.15], "sub": 0.6, "turbo": 0.0, "rough": 0.4},
 	},
 	"shiden": {
-		"drive": "mr", "name": "Shiden NX-1", "style": "coupe", "class": "S", "unlock": {"race": 12}, "drift": 0.45, "paint": Color(0.36, 0.1, 0.56),
+		"drive": "mr", "name": "Shiden NX-1", "style": "coupe", "class": "S", "unlock": {"race": 12}, "drift": 0.45, "paint": Color(0.36, 0.1, 0.56), "finish": "pearl",
 		"length": 4.43, "width": 1.81,
 		"accel": 13.2, "top_speed": 71.0, "grip": 31.0, "steer": 2.65,
 		"desc": "Flacher Mittelmotor-Sportwagen. Die präziseste Lenkung und der meiste Grip im Spiel.",
@@ -114,7 +114,7 @@ const CARS := {
 		"sound": {"cyl": 6, "harm": [1.0, 0.42, 0.36, 0.2], "sub": 0.12, "turbo": 0.0, "rough": 0.1},
 	},
 	"ryujin": {
-		"drive": "rwd", "name": "Ryujin 30Z", "style": "coupe", "class": "S", "unlock": {"race": 13}, "drift": 0.4, "paint": Color(0.04, 0.3, 0.3),
+		"drive": "rwd", "name": "Ryujin 30Z", "style": "coupe", "class": "S", "unlock": {"race": 13}, "drift": 0.4, "paint": Color(0.04, 0.3, 0.3), "finish": "metal",
 		"length": 4.52, "width": 1.8,
 		"accel": 13.2, "top_speed": 73.0, "grip": 25.5, "steer": 2.05,
 		"desc": "Breites Biturbo-Coupé. Schiebt brutal an und bleibt bei Höchsttempo ruhig.",
@@ -147,7 +147,7 @@ const CARS := {
 		"sound": {"cyl": 3, "harm": [1.0, 0.42, 0.34, 0.22], "sub": 0.35, "turbo": 0.0, "rough": 0.22},
 	},
 	"tanuki": {
-		"drive": "awd", "name": "Tanuki R4", "style": "hatch", "class": "B", "unlock": {"race": 7}, "drift": 0.4, "paint": Color(0.88, 0.89, 0.9),
+		"drive": "awd", "name": "Tanuki R4", "style": "hatch", "class": "B", "unlock": {"race": 7}, "drift": 0.4, "paint": Color(0.88, 0.89, 0.9), "finish": "metal",
 		"length": 3.99, "width": 1.8,
 		"accel": 11.9, "top_speed": 63.5, "grip": 29.0, "steer": 2.6,
 		"desc": "Kleinwagen mit Allrad, Turbo-Dreizylinder und Rallye-Genen. Schießt aus engen Kurven.",
@@ -156,7 +156,7 @@ const CARS := {
 	},
 	# --- JDM-Klassiker ---
 	"kaido": {
-		"drive": "rwd", "name": "Kaido 2000GT", "style": "sedan", "class": "C", "unlock": {"race": 3, "drift": 1}, "drift": 0.75, "paint": Color(0.6, 0.62, 0.64),
+		"drive": "rwd", "name": "Kaido 2000GT", "style": "sedan", "class": "C", "unlock": {"race": 3, "drift": 1}, "drift": 0.75, "paint": Color(0.6, 0.62, 0.64), "finish": "metal",
 		"length": 4.4, "width": 1.66,
 		"accel": 10.6, "top_speed": 61.0, "grip": 24.0, "steer": 2.35,
 		"desc": "70er-Hardtop mit Reihensechser, Chrom und aufgeschraubten Verbreiterungen. Kantig, laut, gutmütig.",
@@ -173,7 +173,7 @@ const CARS := {
 	},
 	# --- Exoten ---
 	"kagura": {
-		"drive": "rwd", "name": "Kagura V10", "style": "coupe", "class": "S", "unlock": {"race": 15}, "drift": 0.45, "paint": Color(0.95, 0.95, 0.94),
+		"drive": "rwd", "name": "Kagura V10", "style": "coupe", "class": "S", "unlock": {"race": 15}, "drift": 0.45, "paint": Color(0.95, 0.95, 0.94), "finish": "pearl",
 		"length": 4.5, "width": 1.9,
 		"accel": 13.6, "top_speed": 71.5, "grip": 26.5, "steer": 2.35,
 		"desc": "Japanischer Supersportwagen mit V10 vorn. Der stärkste Antritt im Spiel und ein Schrei bis 9.000/min.",
@@ -181,7 +181,7 @@ const CARS := {
 		"sound": {"cyl": 10, "harm": [1.0, 0.34, 0.4, 0.26], "sub": 0.08, "turbo": 0.0, "rough": 0.08},
 	},
 	"falke": {
-		"drive": "rr", "name": "Falke 9 RS", "style": "coupe", "class": "S", "unlock": {"race": 16}, "drift": 0.5, "paint": Color(0.45, 0.7, 0.85),
+		"drive": "rr", "name": "Falke 9 RS", "style": "coupe", "class": "S", "unlock": {"race": 16}, "drift": 0.5, "paint": Color(0.45, 0.7, 0.85), "finish": "metal",
 		"length": 4.55, "width": 1.85,
 		"accel": 13.0, "top_speed": 71.5, "grip": 31.0, "steer": 2.55,
 		"desc": "Sportwagen mit Boxer im Heck. Enorme Traktion, das Heck will aber mit Gefühl gefahren werden.",
@@ -189,7 +189,7 @@ const CARS := {
 		"sound": {"cyl": 6, "harm": [1.0, 0.48, 0.44, 0.26], "sub": 0.3, "turbo": 0.0, "rough": 0.28},
 	},
 	"furia": {
-		"drive": "awd", "name": "Furia V12", "style": "coupe", "class": "S", "unlock": {"race": 17}, "drift": 0.35, "paint": Color(0.55, 0.85, 0.1),
+		"drive": "awd", "name": "Furia V12", "style": "coupe", "class": "S", "unlock": {"race": 17}, "drift": 0.35, "paint": Color(0.55, 0.85, 0.1), "finish": "pearl",
 		"length": 4.8, "width": 2.03,
 		"accel": 12.3, "top_speed": 75.0, "grip": 28.5, "steer": 2.0,
 		"desc": "Flacher V12-Keil mit Allrad, breiter als jeder Gegner. Zieht ewig, lenkt aber träge ein.",
@@ -261,6 +261,17 @@ const PARTS := {
 			{"name": "Perlweiß", "wins": 4, "color": Color(0.93, 0.92, 0.9), "finish": "pearl"},
 			{"name": "Gold", "wins": 6, "color": Color(0.85, 0.62, 0.2), "finish": "metal"},
 			{"name": "Chrom", "wins": 8, "color": Color(0.85, 0.86, 0.88), "finish": "chrome"},
+		],
+	},
+	# Lackart (car_builder.FINISH): Standard nimmt die der Farbe bzw. den Werkslack des Autos
+	"finish": {
+		"label": "Lackart",
+		"options": [
+			{"name": "Standard", "wins": 0},
+			{"name": "Glanz", "wins": 0, "finish": "gloss"},
+			{"name": "Metallic", "wins": 0, "finish": "metal"},
+			{"name": "Matt", "wins": 0, "finish": "matt"},
+			{"name": "Perlmutt", "wins": 0, "finish": "pearl"},
 		],
 	},
 	# style: Bauart der Felge (car_builder._rim), spokes: Zahl der Speichen (bzw. Löcher, Schlitze), plus: so viel Zoll
@@ -489,10 +500,10 @@ const PARTS := {
 	},
 }
 
-const PART_ORDER := ["paint", "rims", "rimcol", "rimsize", "spoiler", "bodykit", "hood", "exhaust", "vinyl", "vinylcol", "neon", "tint",
+const PART_ORDER := ["paint", "finish", "rims", "rimcol", "rimsize", "spoiler", "bodykit", "hood", "exhaust", "vinyl", "vinylcol", "neon", "tint",
 	"lights", "engine", "turbo", "nitro", "suspension", "tires"]
 ## Tuning-Menü wie in NFS: erst Optik oder Leistung, dann die Kategorie, dann das Teil
-const PART_GROUPS := {"optik": ["paint", "rims", "rimcol", "rimsize", "spoiler", "bodykit", "hood", "exhaust", "vinyl", "vinylcol", "neon",
+const PART_GROUPS := {"optik": ["paint", "finish", "rims", "rimcol", "rimsize", "spoiler", "bodykit", "hood", "exhaust", "vinyl", "vinylcol", "neon",
 	"tint", "lights"],
 	"leistung": ["engine", "turbo", "nitro", "suspension", "tires"]}
 
