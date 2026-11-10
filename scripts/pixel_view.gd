@@ -65,6 +65,9 @@ func _resize() -> void:
 		var mobile := GameState.is_mobile()
 		lines = maxf(lines, 900.0 if mobile else 1440.0)
 		aa = "msaa2" if mobile else "msaa4"
+	if Engine.get_write_movie_path() != "":
+		lines = px.y  # Videoaufnahme (--write-movie): immer volle Auflösung, unabhängig von Einstellung und Bildrate
+		dyn_scale = 1.0
 	var scale := minf(1.0, lines / maxf(px.y, 1.0)) * dyn_scale
 	world.size = Vector2i(maxi(int(px.x * scale), 16), maxi(int(px.y * scale), 16))
 	world.msaa_3d = {"msaa2": Viewport.MSAA_2X, "msaa4": Viewport.MSAA_4X}.get(aa, Viewport.MSAA_DISABLED)
@@ -75,7 +78,7 @@ func _resize() -> void:
 
 
 func _process(dt: float) -> void:
-	if GameState.pixel_look or not GameState.gv("dynres") or get_tree().paused:
+	if GameState.pixel_look or not GameState.gv("dynres") or get_tree().paused or Engine.get_write_movie_path() != "":
 		return
 	_win_ms += dt * 1000.0
 	_win.append(dt * 1000.0)

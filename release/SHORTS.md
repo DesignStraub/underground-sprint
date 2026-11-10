@@ -115,3 +115,56 @@ Szene: Deutschlandkarte im Menü, die Route leuchtet Stadt für Stadt auf, Schni
 
 Titel: Quer durch Deutschland – die Karriere
 Beschreibung: Jeder Sieg öffnet die nächste Stadt. Regen, Nebel, Natriumlicht, Neon: jede Strecke mit eigener Nacht.
+
+## 13. Im Browser spielbar (Englisch, Stand 2.27)
+Datei: `release/need_for_geschwindigkeit_short_browser_en.mp4` (1080×1920, 30,9 s, nur Spielton, liegt nicht im Repo).
+Schnitt auf 140 BPM (ein Takt = 1,714 s), 18 Takte. Gebaut mit `tools/promo_overlays.gd` (Browserfenster, Texte in Saira)
+und Aufnahmen per `--write-movie` (Hochformat, Musik aus mit `--nomusic`, Drift mit `--drifty`).
+
+| Takte | Sekunden | Bild | Text |
+|---|---|---|---|
+| 1–2 | 0,0–3,4 | Spiel im Browserfenster (onehumanity.itch.io/need-for-geschwindigkeit) | NO DOWNLOAD. / JUST PLAY. right in your browser |
+| 3–4 | 3,4–6,9 | Start in Frankfurt, GO! | NEED FOR GESCHWINDIGKEIT · street racing after dark |
+| 5–6 | 6,9–10,3 | Würzburg in der Dämmerung, Kreuzberg unter der U1 | REAL GERMAN CITIES + gelbes Ortsschild |
+| 7–8 | 10,3–13,7 | Regen, Nitro, in den Tunnel | NITRO |
+| 9–10 | 13,7–17,1 | Drift im Tunnel, Drift am Hafen | DRIFT |
+| 11–12 | 17,1–20,6 | Schranke geht runter, Zug rauscht durch | BEAT THE TRAIN |
+| 13–14 | 20,6–24,0 | Lackraster in der Garage, im Browserfenster | TUNE YOUR RIDE · 23 CARS |
+| 15–18 | 24,0–30,9 | Endtafel über unscharfer Fahrt | PLAY FREE · right in your browser · onehumanity.itch.io |
+
+Titel: Street racing in your browser – no download
+Beschreibung: Need for Geschwindigkeit – night street racing through real German cities. Nitro, drift, tuning, 23 cars. Free, right in your browser: onehumanity.itch.io
+Hashtags: `#needforgeschwindigkeit #indiegame #browsergame #racinggame #streetracing #godot #gamedev`
+
+**Song (ElevenLabs Music), Länge 31 s:**
+
+Stil-Prompt:
+> High-energy street-racing anthem, 140 BPM, D minor, exactly 31 seconds. Hard trap/electro beat with distorted 808 bass, drift-phonk cowbell, gritty electric guitar stabs and a synth riser into each hook. Male hype-rap vocals: fast and aggressive in the verse, shouted gang-chant hook. Neon night city, nitro, early-2000s racing-game energy. "Geschwindigkeit" is German, sung as geh-SHVIN-dikh-kite. Hard stop on the last word, no fade.
+
+Abschnitte (passen auf die Schnitte): Intro 3,4 s · Hook 3,4 s · Verse 17,1 s · Outro 6,9 s
+
+```
+[Intro]
+No download...
+Just play!
+
+[Hook]
+Need for Geschwindigkeit!
+Need for Geschwindigkeit!
+
+[Verse]
+Würzburg, Kreuzberg, real streets at night
+Neon on the asphalt, city burnin' bright
+Hit the nitro, blue flame, gone
+Traffic in the mirror and we keep it on
+Throw it sideways, hold the slide
+Smoke off the tires on the outside line
+Red lights flashin', gates comin' down
+Beat the train, now we own this town
+Paint it, tune it, neon glow
+Twenty-three cars, pick one, let's go!
+
+[Outro]
+Play it free, right in your browser!
+Need for Geschwindigkeit!
+```

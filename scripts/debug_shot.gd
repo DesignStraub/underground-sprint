@@ -26,6 +26,7 @@ extends Node
 ##                         Mit --write-movie aufnehmen, --nomusic für die Effekte allein, --sndtrace für jedes Bild
 ##   -- --lightlog         Größe und Aufbauzeit der Lichtkarte (Laternenlicht auf der Straße)
 ##   -- --lightpng=/pfad.png  speichert die Lichtkarte als Bild
+##   -- --nomusic         Musik aus (Aufnahmen, unter die später eigene Musik kommt)
 ##   -- --wheelcam         Kamera fährt neben dem rechten Vorderrad des Spielers mit (Felgen, Unschärfe, Blockieren);
 ##                         mit --revtest: Gas, Vollbremsung, Gas; loggt die Raddrehung ("WHEEL ...")
 
@@ -56,7 +57,7 @@ var view: PackedStringArray = []  # --view=pfad:d:quer:höhe:ziel_d:ziel_quer:zi
 var _menu_done := false
 var look: PackedStringArray = []  # --look=wahrzeichen:höhe:blickhöhe:abstand[:d]  Kamera von der Straße auf ein Wahrzeichen (Orts-Strecken)
 var _vcam: Camera3D
-var _drift_t := -1.0  # laufendes Drift-Manöver (--drifty)
+var _drift_t := -0.4  # laufendes Drift-Manöver (--drifty): >= 0 läuft, -0.4 bereit, -1 gesperrt bis Kurvenende
 var _drift_dir := 0.0
 var bench := false
 var _ev_nos := false
@@ -137,6 +138,9 @@ func _process(dt: float) -> void:
 			Input.parse_input_event(ev)
 		_step += 1
 	var race = get_tree().current_scene
+	if OS.get_cmdline_user_args().has("--nomusic"):
+		for mp in Music._players:
+			mp.volume_db = -80.0  # Musik aus (Aufnahmen mit eigener Musik, Effekte allein)
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--keys="):
 			# Test: Aktionen zu festen Zeiten drücken, z. B. --keys=1.5:ui_cancel,2.5:ui_down
@@ -176,6 +180,10 @@ func _process(dt: float) -> void:
 			for ch in race.get_children():
 				if ch is CanvasLayer and ch.layer >= 0:
 					ch.visible = false  # HUD aus, nur die Welt
+		for ch in race.get_children():
+			if ch is CanvasLayer and ch.layer >= 0:
+				ch.visible = false  # HUD entsteht erst nach dem Laden: jedes Bild ausblenden
+		GameState.motion_blur = 0  # feste Kamera: keine Tempo-Unschärfe vom Spielerauto
 		var vc: Curve3D = race.track["paths"][int(view[0])]["curve"]
 		# Weg-Meter mit "c" davor zählen ab dem Bahnübergang (z. B. c-40), "s" ab dem Stadion
 		var vd := func(t: String) -> float:
@@ -241,9 +249,6 @@ func _process(dt: float) -> void:
 	# (--nomusic: Musik aus, um die Effekte allein aufzunehmen)
 	if OS.get_cmdline_user_args().has("--sndtest") and race and "curve" in race and race.player and race.state == 1:
 		var pl = race.player
-		if OS.get_cmdline_user_args().has("--nomusic"):
-			for mp in Music._players:
-				mp.volume_db = -80.0
 		if _drift_t < 0.0:
 			_drift_t = 0.0
 		_drift_t += dt
@@ -337,24 +342,32 @@ func _process(dt: float) -> void:
 		if p["kind"] == "lake":
 			limit = 40.0
 			bend = 0.0
-		# --drifty: vor Kurven ein Drift-Manöver wie ein Mensch (Handbremse, voll einlenken, mit Gas quer halten)
+		# --drifty: vor Kurven ein Drift wie ein Mensch: kurz Handbremse und voll einlenken, dann lenkt der Spurfolger
+		# weiter (zeigt das Heck nach außen, liegt das Ziel quer: er lenkt von selbst gegen) und das Gas hält ihn quer.
+		# Erst wenn die Kurve vorbei ist, darf der nächste Drift beginnen (bis 2.27 fest gelenkt, endete oft an der Bande).
 		if OS.get_cmdline_user_args().has("--drifty"):
-			if _drift_t < 0.0 and bend > 0.3 and pl.speed_fwd > 18.0:
+			if _drift_t < -0.5 and bend < 0.2:
+				_drift_t = -0.4  # Kurve vorbei: wieder bereit
+			if _drift_t > -0.45 and _drift_t < 0.0 and bend > 0.3 and pl.speed_fwd > 18.0:
 				_drift_t = 0.0
 				_drift_dir = signf((f1["fwd"] as Vector3).cross(f0["fwd"]).y)
 			if _drift_t >= 0.0:
 				_drift_t += dt
-				Input.action_release("steer_left")
-				Input.action_release("steer_right")
-				var hard := 1.0 if _drift_t < 0.35 else 0.55
-				Input.action_press("steer_left" if _drift_dir > 0.0 else "steer_right", hard)
-				if _drift_t < 0.35:
+				if _drift_t < 0.3:
+					Input.action_release("steer_left")
+					Input.action_release("steer_right")
+					Input.action_press("steer_left" if _drift_dir > 0.0 else "steer_right", 1.0)
 					Input.action_press("handbrake")
 				else:
 					Input.action_release("handbrake")
-				Input.action_press("accelerate")
-				if _drift_t > 1.3:
-					_drift_t = -1.0
+				Input.action_release("brake")
+				Input.action_release("nitro")
+				if pl.speed_fwd < 30.0:
+					Input.action_press("accelerate")
+				else:
+					Input.action_release("accelerate")
+				if _drift_t > 1.8:
+					_drift_t = -1.0  # gesperrt, bis die Kurve vorbei ist
 				return
 		Input.action_release("brake")
 		if fulltest and bend > 0.5:

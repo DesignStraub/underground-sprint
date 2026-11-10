@@ -17,7 +17,7 @@ Alles, was du auf der neuen itch.io-Seite eintragen musst (das Spiel hieß früh
 | Tags | racing, street-racing, arcade, 3d, low-poly, retro, nitro, drift, tuning, night |
 | AI generation disclosure | Ja – Code mit KI-Unterstützung erstellt (itch.io fragt das ab) |
 | Cover image | `itch_seite/need_for_geschwindigkeit_cover_630x500.png` |
-| Screenshots | alle Bilder aus `screenshots/` (1600×900) |
+| Screenshots | die acht Bilder aus `screenshots_2_27/` (1920×1080, Stand 2.27); die alten aus `screenshots/` können weg |
 | Trailer | YouTube-Link zu `need_for_geschwindigkeit_trailer.mp4` (itch.io nimmt nur YouTube/Vimeo-Links) |
 
 ## Handy im Browser
