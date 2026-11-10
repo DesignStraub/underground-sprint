@@ -1,6 +1,8 @@
 # Bilder für itch.io
 
 Neu erzeugen: `Godot --path . res://tools/itch_art.tscn` (Hintergründe sind echte Szenen aus dem Spiel).
+Das Cover ist seit 2.27 neu (Saira-Schrift, Kagura in der Würzburger Startaufstellung): `tools/promo_overlays.tscn -- --cover=<Spielbild>`,
+Spielbild per `--carcam` aufgenommen (siehe `scripts/debug_shot.gd`).
 
 ## Spielseite Need for Geschwindigkeit
 

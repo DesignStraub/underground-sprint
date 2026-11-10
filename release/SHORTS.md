@@ -132,9 +132,8 @@ und Aufnahmen per `--write-movie` (Hochformat, Musik aus mit `--nomusic`, Drift 
 | 13–14 | 20,6–24,0 | Lackraster in der Garage, im Browserfenster | TUNE YOUR RIDE · 23 CARS |
 | 15–18 | 24,0–30,9 | Endtafel über unscharfer Fahrt | PLAY FREE · right in your browser · onehumanity.itch.io |
 
-Titel: Street racing in your browser – no download
-Beschreibung: Need for Geschwindigkeit – night street racing through real German cities. Nitro, drift, tuning, 23 cars. Free, right in your browser: onehumanity.itch.io
-Hashtags: `#needforgeschwindigkeit #indiegame #browsergame #racinggame #streetracing #godot #gamedev`
+Titel, Beschreibung, Hashtags und angepinnter Kommentar für YouTube, TikTok und Instagram: `release/SHORT_TEXTE_EN.txt`.
+Titelbild: `release/need_for_geschwindigkeit_short_cover_1080x1920.png`.
 
 **Fassung mit Sprecher:** `release/need_for_geschwindigkeit_short_browser_en_voice.mp4` (38 s). Die Zeilen unten als
 Sprachaufnahme (ElevenLabs, Stimme „Roger – Laid-Back, Casual, Resonant“, Version 2), neu geschnitten: jede Szene beginnt

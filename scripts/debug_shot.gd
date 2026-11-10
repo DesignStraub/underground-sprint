@@ -26,6 +26,7 @@ extends Node
 ##                         Mit --write-movie aufnehmen, --nomusic für die Effekte allein, --sndtrace für jedes Bild
 ##   -- --lightlog         Größe und Aufbauzeit der Lichtkarte (Laternenlicht auf der Straße)
 ##   -- --lightpng=/pfad.png  speichert die Lichtkarte als Bild
+##   -- --carcam=d:w:h:bh[:fov]  Kamera fest am Spielerauto (Abstand, Winkel um das Auto, Höhe, Blickhöhe), HUD aus
 ##   -- --nomusic         Musik aus (Aufnahmen, unter die später eigene Musik kommt)
 ##   -- --wheelcam         Kamera fährt neben dem rechten Vorderrad des Spielers mit (Felgen, Unschärfe, Blockieren);
 ##                         mit --revtest: Gas, Vollbremsung, Gas; loggt die Raddrehung ("WHEEL ...")
@@ -199,6 +200,27 @@ func _process(dt: float) -> void:
 		_vcam.global_position = fa["pos"] + fa["right"] * float(view[2]) + Vector3(0, float(view[3]), 0)
 		_vcam.look_at(fb["pos"] + fb["right"] * float(view[5]) + Vector3(0, float(view[6]), 0), Vector3.UP)
 		_vcam.make_current()
+	for a in OS.get_cmdline_user_args():
+		# --carcam=abstand:winkel:höhe:blickhöhe[:fov]  Kamera fest am Spielerauto (Winkel 0 = genau von vorn, 35 = vorn
+		# links schräg, 180 = von hinten), z. B. fürs Titelbild: das Auto in der Startaufstellung mit Licht und Neon
+		if a.begins_with("--carcam=") and race and "curve" in race and race.world and race.player:
+			var cc := a.substr(9).split(":")
+			if _vcam == null:
+				_vcam = Camera3D.new()
+				_vcam.far = 2000.0
+				race.world.add_child(_vcam)
+			_vcam.fov = float(cc[4]) if cc.size() > 4 else 50.0
+			for ch in race.get_children():
+				if ch is CanvasLayer and ch.layer >= 0:
+					ch.visible = false
+			GameState.motion_blur = 0
+			var pb: Basis = race.player.global_basis
+			var fwd := -pb.z
+			var dir := fwd.rotated(Vector3.UP, deg_to_rad(float(cc[1])))
+			var cp: Vector3 = race.player.global_position
+			_vcam.global_position = cp + dir * float(cc[0]) + Vector3.UP * float(cc[2])
+			_vcam.look_at(cp + Vector3.UP * float(cc[3]), Vector3.UP)
+			_vcam.make_current()
 	if OS.get_cmdline_user_args().has("--wheelcam") and race and "curve" in race and race.world and race.player:
 		if _vcam == null:
 			_vcam = Camera3D.new()

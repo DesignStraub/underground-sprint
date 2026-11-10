@@ -2,6 +2,8 @@ extends Node
 ## Werkzeug: Overlays (1080x1920, transparent) für das Browser-Short (seit 2.27): Browserfenster mit Adresszeile,
 ## Texteinblendungen in der Spielschrift (Saira, schräg, Neon) und die Endtafel "Play free in your browser".
 ## Aufruf: Godot --path . res://tools/promo_overlays.tscn -- --out=/pfad
+##   [--cover=bild.png]  zusätzlich itch-Cover 1260x1000 und 630x500 aus einem Spielbild (Querformat, Auto in der Mitte)
+##   [--scover=bild.png] zusätzlich Titelbild fürs Short 1080x1920 aus einem Spielbild im Hochformat
 ## Das Fenster lässt den Inhalt frei (transparent): darunter legt ffmpeg das Querformat-Video (1000x563 bei x 40, y 700).
 
 const UiStyle := preload("res://scripts/ui_style.gd")
@@ -19,9 +21,24 @@ var out := "."
 
 
 func _ready() -> void:
+	var cover_src := ""
+	var scover_src := ""
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--out="):
 			out = a.substr(6)
+		elif a.begins_with("--cover="):
+			cover_src = a.substr(8)
+		elif a.begins_with("--scover="):
+			scover_src = a.substr(9)
+	if cover_src != "" or scover_src != "":
+		if cover_src != "":
+			var img := await _render(_cover(_tex(cover_src), Vector2(1260, 1000)), "need_for_geschwindigkeit_cover_1260x1000", Vector2i(1260, 1000), false)
+			img.resize(630, 500, Image.INTERPOLATE_LANCZOS)
+			img.save_png("%s/need_for_geschwindigkeit_cover_630x500.png" % out)
+		if scover_src != "":
+			await _render(_short_cover(_tex(scover_src)), "short_cover_1080x1920", SIZE, false)
+		get_tree().quit()
+		return
 	# Einstieg im Browser: erst "NO DOWNLOAD.", im zweiten Takt "JUST PLAY." dazu
 	await _render(_hook(false), "o_hook1")
 	await _render(_hook(true), "o_hook2")
@@ -312,14 +329,104 @@ func _end_card() -> Control:
 	return root
 
 
-func _render(content: Control, name: String) -> void:
+func _tex(path: String) -> ImageTexture:
+	return ImageTexture.create_from_image(Image.load_from_file(path))
+
+
+## Bild füllt die Fläche (zugeschnitten); fx/fy: welcher Bildteil bleibt (0 links/oben, 1 rechts/unten)
+func _fill(parent: Control, tex: Texture2D, size: Vector2, fx := 0.5, fy := 0.5) -> void:
+	var ts := tex.get_size()
+	var k := maxf(size.x / ts.x, size.y / ts.y)
+	var r := TextureRect.new()
+	r.texture = tex
+	r.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	r.size = ts * k
+	r.position = Vector2((size.x - ts.x * k) * fx, (size.y - ts.y * k) * fy)
+	parent.add_child(r)
+
+
+func _grad(parent: Control, rect: Rect2, top: Color, bottom: Color) -> void:
+	var g := Gradient.new()
+	g.set_color(0, top)
+	g.set_color(1, bottom)
+	var gt := GradientTexture2D.new()
+	gt.gradient = g
+	gt.fill_from = Vector2(0, 0)
+	gt.fill_to = Vector2(0, 1)
+	var r := TextureRect.new()
+	r.texture = gt
+	r.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	r.position = rect.position
+	r.size = rect.size
+	parent.add_child(r)
+
+
+func _pill(parent: Control, text: String, center: Vector2, px: int, bg: Color, fg: Color) -> void:
+	var l := Label.new()
+	l.text = text
+	var ls := LabelSettings.new()
+	ls.font = UiStyle.font("wide", 0.2)
+	ls.font_size = px
+	ls.font_color = fg
+	l.label_settings = ls
+	var ms := l.get_minimum_size()
+	var p := Panel.new()
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = bg
+	sb.set_corner_radius_all(int(px * 0.3))
+	sb.skew = Vector2(0.2, 0)
+	sb.shadow_color = Color(bg.r, bg.g, bg.b, 0.5)
+	sb.shadow_size = 16
+	p.add_theme_stylebox_override("panel", sb)
+	p.size = ms + Vector2(px * 1.1, px * 0.1)
+	p.position = center - p.size / 2.0
+	parent.add_child(p)
+	l.position = p.position + Vector2(px * 0.55, px * 0.05)
+	parent.add_child(l)
+
+
+## itch-Cover: Auto in der Startaufstellung, Titel oben im Himmel, unten "Free · play in your browser"
+func _cover(bg: Texture2D, size: Vector2) -> Control:
+	var root := Control.new()
+	root.size = size
+	_fill(root, bg, size, 0.62, 0.5)
+	_grad(root, Rect2(0, 0, size.x, size.y * 0.5), Color(0, 0, 0.03, 0.78), Color(0, 0, 0.03, 0.0))
+	_grad(root, Rect2(0, size.y * 0.72, size.x, size.y * 0.28), Color(0, 0, 0.03, 0.0), Color(0, 0, 0.03, 0.7))
+	var w := size.x
+	var t1 := _label(root, "NEED FOR", "wide", 92, CYAN, 46, CYAN, 10)
+	t1.size.x = w
+	var t2 := _label(root, "GESCHWINDIGKEIT", "wide", 150, Color.WHITE, 112, CYAN, 16)
+	t2.size.x = w
+	_bar(root, w / 2.0, 112 + t2.get_minimum_size().y - 4.0, 760.0, PINK, 12.0)
+	_pill(root, "FREE · PLAY IN YOUR BROWSER", Vector2(w / 2.0, size.y - 92), 56, GREEN, Color(0.02, 0.06, 0.03))
+	return root
+
+
+## Titelbild fürs Short (Hochformat): Titel oben, Botschaft unten über der Tacho-Ecke
+func _short_cover(bg: Texture2D) -> Control:
+	var root := Control.new()
+	root.size = SIZE
+	_fill(root, bg, Vector2(SIZE), 0.5, 0.5)
+	_grad(root, Rect2(0, 0, SIZE.x, 900), Color(0, 0, 0.03, 0.97), Color(0, 0, 0.03, 0.0))
+	_grad(root, Rect2(0, 1080, SIZE.x, 840), Color(0, 0, 0.03, 0.0), Color(0, 0, 0.03, 0.98))
+	_label(root, "NEED FOR", "wide", 110, CYAN, 210, CYAN, 12)
+	var t2 := _label(root, "GESCHWINDIGKEIT", "wide", 132, Color.WHITE, 310, CYAN, 16)
+	_bar(root, SIZE.x / 2.0, 310 + t2.get_minimum_size().y - 4.0, 640.0, PINK, 12.0)
+	_label(root, "STREET RACING\nIN YOUR BROWSER", "wide", 112, Color.WHITE, 1320, PINK, 14)
+	_pill(root, "PLAY FREE · NO DOWNLOAD", Vector2(SIZE.x / 2.0, 1790), 60, GREEN, Color(0.02, 0.06, 0.03))
+	return root
+
+
+func _render(content: Control, name: String, size := SIZE, transparent := true) -> Image:
 	var vp := SubViewport.new()
-	vp.size = SIZE
-	vp.transparent_bg = true
+	vp.size = size
+	vp.transparent_bg = transparent
 	vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 	add_child(vp)
 	vp.add_child(content)
 	for i in 3:
 		await RenderingServer.frame_post_draw
-	vp.get_texture().get_image().save_png("%s/%s.png" % [out, name])
+	var img := vp.get_texture().get_image()
+	img.save_png("%s/%s.png" % [out, name])
 	vp.queue_free()
+	return img
