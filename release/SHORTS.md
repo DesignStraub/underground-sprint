@@ -117,6 +117,17 @@ Titel: Quer durch Deutschland – die Karriere
 Beschreibung: Jeder Sieg öffnet die nächste Stadt. Regen, Nebel, Natriumlicht, Neon: jede Strecke mit eigener Nacht.
 
 ## 13. Im Browser spielbar (Englisch, Stand 2.27)
+
+**Aktuelle Fassung: Skizzen-Trailer** `release/need_for_geschwindigkeit_short_sketch_en.mp4` (25 s, 1080×1920).
+Keine Stimme, kaum Text (Kleinschrift, kein Neon): Schwarzbild „made a street racing game.“ → Start mit „GO!“ genau
+auf dem Drop → Browserfenster „it runs in your browser.“ → Würzburg und Kreuzberg nur mit Ortsschild → Oberbaumbrücke
+mit Nitro, Regen in den Tunnel, zwei Drifts, Schranke, Zug → Lackraster im Browserfenster → „need for geschwindigkeit ·
+free · onehumanity.itch.io“. Musik „Drift Phonk“ von sub_clair (96 BPM, ein Schlag 0,625 s, Drop bei 10,03 s im Stück),
+jede Szene zwei oder drei Schläge lang, Spielton leise darunter. Aufgenommen mit `--nopool` (ohne Lichtteppich vor dem
+Auto, der in Aufnahmen als heller Kasten auf der Straße störte), Texte mit `tools/promo_overlays.tscn -- --sketch`.
+Die Fassungen unten (Neon-Überschriften, Sprecherstimme) sind verworfen: gereimter Text und KI-Stimme wirkten gezwungen.
+
+### Erste Fassung (verworfen)
 Datei: `release/need_for_geschwindigkeit_short_browser_en.mp4` (1080×1920, 30,9 s, nur Spielton, liegt nicht im Repo).
 Schnitt auf 140 BPM (ein Takt = 1,714 s), 18 Takte. Gebaut mit `tools/promo_overlays.gd` (Browserfenster, Texte in Saira)
 und Aufnahmen per `--write-movie` (Hochformat, Musik aus mit `--nomusic`, Drift mit `--drifty`).

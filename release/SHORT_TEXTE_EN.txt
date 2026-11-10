@@ -1,4 +1,4 @@
-NEED FOR GESCHWINDIGKEIT – Texte zum Short "Street racing in your browser"
+NEED FOR GESCHWINDIGKEIT – Texte zum Short (need_for_geschwindigkeit_short_sketch_en.mp4)
 Link: https://onehumanity.itch.io/need-for-geschwindigkeit
 
 ==================== YOUTUBE SHORTS ====================
@@ -14,7 +14,7 @@ Nitro, drifts, rail crossings and 23 cars to tune. Free and playable right in yo
 Also on Windows, Mac & Linux.
 
 Made with Godot by ONE HUMANITY.
-Music: "Drift Phonk" by sub_clair (Pixabay) · Voice: AI (ElevenLabs)
+Music: "Drift Phonk" by sub_clair (Pixabay)
 
 #needforgeschwindigkeit #indiegame #browsergame #racinggame #streetracing #godot #gamedev #shorts
 
@@ -39,6 +39,4 @@ Need for Geschwindigkeit: night street racing through Würzburg, Berlin-Kreuzber
 
 - Titelbild beim Hochladen: short_cover_1080x1920.png (TikTok und Instagram: "Cover bearbeiten" → aus Datei).
   YouTube Shorts nimmt nur ein Bild aus dem Video; dort einfach die erste Sekunde lassen.
-- KI-Kennzeichnung: Die Stimme ist KI-generiert. Bei TikTok "KI-generierter Inhalt" einschalten,
-  bei YouTube reicht der Hinweis in der Beschreibung (kein realistischer Mensch, keine echte Szene).
 - Link: TikTok und Instagram zeigen Links nur im Profil ("Link in bio"), also dort onehumanity.itch.io eintragen.

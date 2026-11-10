@@ -2596,6 +2596,8 @@ static func _lamp_glows(body: Node3D, heads: Array, tails: Array, light_c: Color
 ## einen roten Schein dahinter. Decal (liegt auf dem Asphalt, auch am Hang), im Browser additive Flächen.
 static func _light_pools(root: Node3D, W: float, L: float, light_c: Color) -> void:
 	var compat := RenderingServer.get_current_rendering_method() == "gl_compatibility"
+	if OS.get_cmdline_user_args().has("--nopool"):
+		return  # nur Aufnahmen: ohne Lichtteppich (der Scheinwerfer leuchtet trotzdem)
 	for spec in [[_beam_texture(), Vector3(W + 1.6, 1.6, 22.0), -L / 2.0 - 11.2, light_c, 0.7],
 			[_halo_texture(), Vector3(W * 0.95, 1.4, 1.7), L / 2.0 + 0.45, Color(1.0, 0.06, 0.03), 0.22]]:
 		var size: Vector3 = spec[1]

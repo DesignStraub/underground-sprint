@@ -4,6 +4,7 @@ extends Node
 ## Aufruf: Godot --path . res://tools/promo_overlays.tscn -- --out=/pfad
 ##   [--cover=bild.png]  zusätzlich itch-Cover 1260x1000 und 630x500 aus einem Spielbild (Querformat, Auto in der Mitte)
 ##   [--scover=bild.png] zusätzlich Titelbild fürs Short 1080x1920 aus einem Spielbild im Hochformat
+##   [--sketch]          schlichte Einblendungen für den Skizzen-Trailer (Kleinschrift, kein Neon, nur Ortsschilder)
 ## Das Fenster lässt den Inhalt frei (transparent): darunter legt ffmpeg das Querformat-Video (1000x563 bei x 40, y 700).
 
 const UiStyle := preload("res://scripts/ui_style.gd")
@@ -30,6 +31,22 @@ func _ready() -> void:
 			cover_src = a.substr(8)
 		elif a.begins_with("--scover="):
 			scover_src = a.substr(9)
+	if OS.get_cmdline_user_args().has("--sketch"):
+		await _render(_sketch_text("made a street racing game.", 900.0), "s_intro")
+		var br := Control.new()
+		br.size = SIZE
+		_browser(br)
+		_sketch_line(br, "it runs in your browser.", 1340.0)
+		await _render(br, "s_browser")
+		var bp := Control.new()
+		bp.size = SIZE
+		_browser(bp)
+		await _render(bp, "s_browser_plain")
+		await _render(_sign_only("WÜRZBURG"), "s_sign_wue")
+		await _render(_sign_only("BERLIN-KREUZBERG"), "s_sign_xberg")
+		await _render(_sketch_end(), "s_end")
+		get_tree().quit()
+		return
 	if cover_src != "" or scover_src != "":
 		if cover_src != "":
 			var img := await _render(_cover(_tex(cover_src), Vector2(1260, 1000)), "need_for_geschwindigkeit_cover_1260x1000", Vector2i(1260, 1000), false)
@@ -104,9 +121,60 @@ func _caption(title: String, sub: String, col: Color, size: int) -> Control:
 	return root
 
 
+## Skizzen-Trailer: schlichte Zeile, Kleinschrift, weiß, leichter Schatten statt Neon
+func _sketch_line(parent: Control, text: String, y: float, px := 66, col := Color.WHITE) -> Label:
+	var l := Label.new()
+	l.text = text
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var ls := LabelSettings.new()
+	ls.font = UiStyle.font("bold", 0.0)
+	ls.font_size = px
+	ls.font_color = col
+	ls.shadow_size = 10
+	ls.shadow_color = Color(0, 0, 0, 0.8)
+	ls.shadow_offset = Vector2(0, 2)
+	l.label_settings = ls
+	l.position = Vector2(0, y)
+	l.size = Vector2(SIZE.x, 10)
+	parent.add_child(l)
+	return l
+
+
+func _sketch_text(text: String, y: float) -> Control:
+	var root := Control.new()
+	root.size = SIZE
+	_sketch_line(root, text, y)
+	return root
+
+
+func _sketch_end() -> Control:
+	var root := Control.new()
+	root.size = SIZE
+	var dim := ColorRect.new()
+	dim.color = Color(0, 0, 0.01, 0.72)
+	dim.size = SIZE
+	root.add_child(dim)
+	_sketch_line(root, "need for geschwindigkeit", 840.0, 92)
+	_sketch_line(root, "free · onehumanity.itch.io", 975.0, 56, Color(0.78, 0.82, 0.9))
+	return root
+
+
+func _sign_only(name: String) -> Control:
+	var root := Control.new()
+	root.size = SIZE
+	root.set_meta("bottom", 230.0)
+	_add_sign(root, name)
+	return root
+
+
 ## Ortsschild wie an der Ortseinfahrt: gelb, schwarzer Rand, schwarze Schrift
 func _city(name: String) -> Control:
 	var root := _caption("REAL GERMAN\nCITIES", "", GREEN, 132)
+	_add_sign(root, name)
+	return root
+
+
+func _add_sign(root: Control, name: String) -> void:
 	var w := 120.0 + name.length() * 42.0
 	var sign := Panel.new()
 	var sb := StyleBoxFlat.new()
@@ -132,7 +200,6 @@ func _city(name: String) -> Control:
 	t.position = sign.position
 	t.size = sign.size
 	root.add_child(t)
-	return root
 
 
 ## Browserfenster (neutral, keine echte Marke): Titelleiste mit Tab, Adresszeile mit Schloss, Inhalt frei
