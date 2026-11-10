@@ -622,7 +622,12 @@ static func _centerline(race: Dictionary, rng: RandomNumberGenerator) -> Diction
 	pts.append(p)
 	var bulges := []
 	var plan: Dictionary = race.get("bulges", {})
-	for i in race["segments"]:
+	# Seit 2.27 kurviger: kürzere Abschnitte (55–115 statt 70–150 m), stärkere Knicke (x1,35, höchstens 85°), dafür
+	# gut ein Drittel mehr Abschnitte (gleiche Länge). Drag bleibt gerade.
+	var curvy: bool = race.get("type", "") != "drag"
+	var nseg: int = int(round(race["segments"] * 1.3)) if curvy else race["segments"]
+	var turn: float = minf(race["max_turn"] * 1.35, 85.0) if curvy else race["max_turn"]
+	for i in nseg:
 		if plan.has(i):
 			var kind: String = plan[i]
 			var a := 150.0 if kind == "lake" else (170.0 if kind == "fork" else 120.0)
@@ -639,8 +644,8 @@ static func _centerline(race: Dictionary, rng: RandomNumberGenerator) -> Diction
 			pts.append(p)
 			bulges.append({"kind": kind, "p0": p0, "p1": p1, "p2": p2, "heading": heading, "a": a})
 			continue
-		heading = clampf(heading + deg_to_rad(rng.randf_range(-race["max_turn"], race["max_turn"])), -1.3, 1.3)
-		p += _dir(heading) * rng.randf_range(70.0, 150.0)
+		heading = clampf(heading + deg_to_rad(rng.randf_range(-turn, turn)), -1.3, 1.3)
+		p += _dir(heading) * (rng.randf_range(55.0, 115.0) if curvy else rng.randf_range(70.0, 150.0))
 		pts.append(p)
 	p += _dir(heading) * 200.0
 	pts.append(p)
@@ -669,6 +674,12 @@ static func _loop_centerline(race: Dictionary, rng: RandomNumberGenerator) -> Di
 		var b: Vector3 = corners[(i + 1) % n]
 		pts.append(a)
 		if not plan.has(i):
+			# Seit 2.27: lange Geraden bekommen einen seitlichen Versatz in der Mitte (S-Kurve statt Gerade)
+			var e2 := b - a
+			if not drift and e2.length() > 150.0:
+				var n2 := Vector3(-e2.z, 0, e2.x).normalized()
+				var off := rng.randf_range(0.11, 0.2) * e2.length() * (1.0 if rng.randf() < 0.5 else -1.0)
+				pts.append(a + e2 * rng.randf_range(0.42, 0.58) + n2 * off)
 			continue
 		var kind: String = plan[i]
 		var size := 150.0 if kind == "lake" else (170.0 if kind == "fork" else 120.0)
@@ -895,13 +906,18 @@ static func _plan_shortcut(track: Dictionary, b: Dictionary, rng: RandomNumberGe
 	var fork: bool = b["kind"] == "fork"
 	var half := SC_HALF if lake else (FORK_HALF if fork else ALLEY_HALF)
 	var uv: Array
+	# Seit 2.27 zweigen Gasse und Seedamm seitlich ab, wie eine Seitenstraße (zur Innenseite der Kurve, weg von der
+	# Hauptstraße), und münden ebenso wieder ein. Vorher liefen sie geradeaus weiter, während die Hauptstraße abbog:
+	# man fuhr fast von selbst hinein, statt sie zu entdecken.
+	var sd := -vb
 	if fork:
 		uv = [[0.0, 0.0], [0.22, 5.0 * w], [0.5, -4.0 * w], [0.78, 4.0 * w], [1.0, 0.0]]
 	elif lake:
-		uv = [[0.0, 0.0], [0.16, 6.0 * w], [0.3, -4.0 * w], [0.4, 0.0], [0.5, 0.0], [0.6, 0.0], [0.7, 0.0],
-			[0.78, 0.0], [0.9, 5.0 * w], [1.0, 0.0]]
+		uv = [[0.0, 0.0], [0.08, 6.0 * sd], [0.18, 7.0 * sd + 2.5 * w], [0.3, 7.0 * sd - 2.0 * w], [0.4, 7.0 * sd], [0.5, 7.0 * sd],
+			[0.6, 7.0 * sd], [0.7, 7.0 * sd], [0.8, 7.0 * sd], [0.9, 6.5 * sd + 2.0 * w], [1.0, 0.0]]
 	else:
-		uv = [[0.0, 0.0], [0.18, 3.5 * w], [0.36, -3.5 * w], [0.54, 3.5 * w], [0.72, -3.5 * w], [0.88, 2.5 * w], [1.0, 0.0]]
+		uv = [[0.0, 0.0], [0.09, 6.5 * sd], [0.24, 7.5 * sd + 2.5 * w], [0.42, 7.5 * sd - 2.5 * w], [0.6, 7.5 * sd + 2.5 * w],
+			[0.77, 7.5 * sd - 2.0 * w], [0.91, 6.5 * sd], [1.0, 0.0]]
 	var pts := []
 	for e in uv:
 		pts.append(p0 + du * (e[0] * a) + dv * e[1])
@@ -1530,7 +1546,9 @@ static func _build_branch(root: Node3D, track: Dictionary, p: Dictionary, rng: R
 	if n_ret > 0:
 		_flush(root, ret, concrete)
 
-	if kind in SHORTCUT_COL:
+	# Seit 2.27 ohne Lichttunnel und ohne "ABKÜRZUNG"-Schild: Abkürzungen sollen entdeckt werden, nicht leuchten
+	# (_shortcut_lights und _shortcut_sign bleiben im Code; die Gabelung zur Altstadt behält ihre Lichter)
+	if kind == "fork":
 		_shortcut_lights(root, track, p, gap0, gap1)
 	match kind:
 		"fork":
@@ -1538,7 +1556,6 @@ static func _build_branch(root: Node3D, track: Dictionary, p: Dictionary, rng: R
 		"alley":
 			_alley_details(root, track, p, rng)
 		"lake":
-			_shortcut_sign(root, track, p)
 			var lamp_m := Builder.mat(Color(1, 0.85, 0.6), 0.0, 0.3, Color(1.0, 0.75, 0.45), 4.0)
 			var dl := 12.0
 			var s := 1.0
@@ -1739,12 +1756,11 @@ static func _fork_details(root: Node3D, track: Dictionary, p: Dictionary, rng: R
 		dl += 32.0
 
 
-## Gasse: Lichterketten, Müllcontainer, Kisten, Hinweisschild (Licht kommt von den Bögen, _shortcut_lights)
+## Gasse: Lichterketten, Müllcontainer, Kisten (seit 2.27 ohne Lichtbögen und Hinweisschild)
 static func _alley_details(root: Node3D, track: Dictionary, p: Dictionary, rng: RandomNumberGenerator) -> void:
 	var c: Curve3D = p["curve"]
 	var len: float = p["length"]
 	var half: float = p["half_w"]
-	_shortcut_sign(root, track, p)
 	var bulb_cols := [Color(1, 0.8, 0.45), Color(1, 0.4, 0.6), Color(0.5, 0.8, 1), Color(0.6, 1, 0.5)]
 	var cable := Builder.mat(Color(0.03, 0.03, 0.03), 0.3, 0.6)
 	var d := 18.0

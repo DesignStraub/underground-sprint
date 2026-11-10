@@ -208,9 +208,12 @@ Skript), schreibt `scripts/city_data.gd`.
   schiebt es. Viele Seitenstraßen steigen hinter ihrer Absperrung sichtbar den Hang hinauf.
 - **Abkürzungen:** kurvige Gassen (Kopfsteinpflaster, Lichterketten) und ein Damm durch einen See (bis 2.23 eine
   Sprungschanze über eine Lücke im Damm; wirkte wie eine Schanze im Nirgendwo). Sie sparen 100–150 m, sind aber enger.
-  Damit man sie nicht im Dunkeln suchen muss: Gabelungen und Gassen sind Lichttunnel aus leuchtenden Bögen alle
-  12 m (cyan bzw. pink, mit Lampen), am ersten Bogen groß „ABKÜRZUNG“, Leuchtbänder an beiden Rändern zeigen den
-  Weg; der Seedamm hat warme Leuchtbänder (`Track._shortcut_lights`).
+  Seit 2.27 muss man sie entdecken: keine Lichttunnel aus leuchtenden Bögen und kein „ABKÜRZUNG“-Schild mehr, und sie
+  zweigen wie eine Seitenstraße zur Innenseite der Kurve ab (vorher liefen sie geradeaus weiter, während die
+  Hauptstraße abbog, man fuhr fast von selbst hinein). Nur die Gabelung zur Altstadt (zwei gleichwertige Wege) behält
+  ihre Lichter (`Track._shortcut_lights`).
+- **Mehr Kurven (seit 2.27):** Sprints aus kürzeren Abschnitten (55–115 statt 70–150 m) mit stärkeren Knicken (x1,35),
+  dafür gut ein Drittel mehr davon; Rundkurse bekommen auf langen Geraden einen seitlichen Versatz (S-Kurve).
 - **Bahnübergang mit Bahnhof:** zweigleisig mit Oberleitung, daneben ein kleiner Bahnhof (Bahnsteige mit Dach und
   Stationsschildern, Wartende, Fußgängerbrücke, Empfangsgebäude mit Uhr, S-Bahn-Säule an der Straße, Signale).
   Seit 2.24 liegt alles auf einem flachen Bahndamm: die Straße steigt über gut 25 m sanft um 0,85 m an, liegt über
@@ -407,6 +410,13 @@ Bis 2.24 galt auch die Optik für alle Autos, eine einmal angebrachte Folie war 
 behalten ihre Optik am zuletzt gefahrenen Auto (`GameState.looks`). Rücktaste und Esc gehen eine Ebene zurück (Teileliste → Kategorie → Optik/Leistung →
 Garage), der Fokus steht wieder auf dem Eintrag, aus dem man kam.
 
+**Alles frei bis auf edle Lacke (seit 2.27):** alle Teile sind von Anfang an eingebaut-bereit, Leistung wie Optik;
+nur Metallic, Matt und Perlmutt (Lackart) und die Farben Mattschwarz, Mattgrau, Perlweiß, Gold und Chrom kommen mit
+Siegen. **Farben im Raster:** Lack, Felgenfarbe, Folienfarbe, Neon und Licht wählt man in einem Farbraster (acht
+Spalten, Pfeiltasten in alle Richtungen, Name und Zustand darüber) statt in der Leiste. **Flüssiges Blättern:** die
+Garage baut das Vorschau-Auto ohne das Verschmelzen der Teile (das kostete je Teil gut 0,4 s, jetzt rund 50 ms) und
+erst, wenn man kurz auf einer Kachel stehen bleibt.
+
 **Seit 2.22 waagerecht wie in NFS Underground:** Tuning läuft in einer Leiste aus Kacheln unten im Bild statt in
 der Liste links. Links/Rechts blättert (vom letzten geht es zum ersten), die gewählte Kachel rutscht in die Mitte,
 Pfeile zeigen, wo es weitergeht. Jede Kachel zeigt den Namen und darunter klein das eingebaute Teil, „Eingebaut“
@@ -482,8 +492,10 @@ in der Welt bleiben deutsch.
 
 ## Schrift und Texte
 Alles auf Deutsch, im Ton von NFS Underground (KNAPP VORBEI +300, DRIFT +240, SPRUNG, Tuning-Marken auf den
-Dächern, Ladetipps im Menü). Schrift überall im Stil der deutschen Straßenschilder (DIN 1451):
-D-DIN von Datto, SIL Open Font License 1.1 (`assets/fonts/COPYING.txt`). Alte englische Eventnamen werden im
+Dächern, Ladetipps im Menü). Menüs und Anzeigen seit 2.27 in Saira Condensed (Omnibus-Type, SIL Open Font License
+1.1, `assets/fonts/saira/`), schräg gestellt wie in NFS; bis 2.26 D-DIN im Stil der Straßenschilder, das wirkte eher
+verspielt als nach Rennen. Ladenschilder und Kennzeichen bleiben D-DIN von Datto, SIL Open Font License 1.1
+(`assets/fonts/COPYING.txt`). Alte englische Eventnamen werden im
 Spielstand automatisch umgeschrieben, der Spielstand aus „Underground Sprint“ wird beim ersten Start übernommen.
 
 ## Grafik
@@ -653,10 +665,12 @@ ein, wie auf echten Aufnahmen. Kostet im Rennen etwa 4 % mehr Draw Calls und Dre
 ## Autos und Licht (seit 2.25)
 - **Scheiben** (`shaders/car_glass.gdshader`): getönt und glatt, mit einer leichten, falschen Spiegelung der Stadt
   (Horizontstreifen mit warmen Lichtern, oben etwas Himmel, im flachen Winkel stärker). Bis 2.24 fast schwarz.
-- **Leuchthöfe** (`Builder._lamp_glows`): weiche Lichtflecken auf Scheinwerfern und Rückleuchten, nur von vorn bzw.
-  hinten sichtbar; die Lage misst `_lamp_spots` an den Leuchtflächen jedes Autos (ohne dritte Bremsleuchte am Dach).
-- **Lichtteppiche** (`Builder._light_pools`): die Scheinwerfer legen einen 24 m langen, nach vorn breiter werdenden
-  Lichtkegel auf die Straße, die Rückleuchten einen kleinen roten Schein dahinter (Decal, im Browser additive Fläche).
+- **Leuchthöfe** (`Builder._lamp_glows`): weiche Lichtflecken eng an Scheinwerfern und Rückleuchten (seit 2.27 nur
+  wenig größer als die Leuchte und schwächer, vorher wirkten sie wie Kugeln), nur von vorn bzw. hinten sichtbar; die
+  Lage misst `_lamp_spots` an den Leuchtflächen jedes Autos (ohne dritte Bremsleuchte am Dach).
+- **Lichtteppiche** (`Builder._light_pools`): die Scheinwerfer legen einen 22 m langen Lichtkegel vor das Auto, seit
+  2.27 schmal wie echtes Abblendlicht (fast autobreit, nach vorn nur wenig breiter statt zur Seite hinaus) und
+  schwächer; die Rückleuchten einen kleinen roten Schein dahinter (Decal, im Browser additive Fläche).
 - **Kaido 2000GT** flacher und runder (Dach 1,30 statt 1,37 m, Gürtellinie tiefer, mehr Rundung, größere Räder).
   Die aufgeschraubten Verbreiterungen sind bei allen Autos ein glatter, gerundeter Bogen statt elf Klötzchen.
 

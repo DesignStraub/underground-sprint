@@ -15,7 +15,9 @@ static var _theme: Theme
 static var _fonts := {}
 
 
-## Schräggestellte Schrift (kursiv wie die NFS-Menüs). kind: cond, bold, wide
+## Schräggestellte Schrift (kursiv wie die NFS-Menüs). kind: cond, bold, wide. Seit 2.27 Saira Condensed (renniger als
+## D-DIN, das nach Straßenschild aussah): cond = ExtraBold (Überschriften, Knöpfe), bold = SemiBold (Text), wide = Black
+## mit etwas mehr Abstand (Logo, große Zahlen)
 static func font(kind := "cond", slant := 0.2) -> Font:
 	var key := "%s_%.2f" % [kind, slant]
 	if _fonts.has(key):
@@ -23,13 +25,15 @@ static func font(kind := "cond", slant := 0.2) -> Font:
 	var base: Font
 	match kind:
 		"wide":
-			base = load("res://assets/fonts/D-DINExp-Bold.otf")
+			base = load("res://assets/fonts/saira/SairaCondensed-Black.ttf")
 		"bold":
-			base = load("res://assets/fonts/D-DIN-Bold.otf")
+			base = load("res://assets/fonts/saira/SairaCondensed-SemiBold.ttf")
 		_:
-			base = load("res://assets/fonts/D-DINCondensed-Bold.otf")
+			base = load("res://assets/fonts/saira/SairaCondensed-ExtraBold.ttf")
 	var fv := FontVariation.new()
 	fv.base_font = base
+	if kind == "wide":
+		fv.spacing_glyph = 2
 	fv.variation_transform = Transform2D(Vector2(1.0, 0.0), Vector2(-slant, 1.0), Vector2.ZERO)
 	_fonts[key] = fv
 	return fv

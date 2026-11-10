@@ -37,7 +37,9 @@ Schleife geschnitten.
 Tracks in `music/` und der Intro-Sound: Pixabay (Pixabay Content License).
 
 ## Schrift
-D-DIN von Datto, SIL Open Font License 1.1 (`assets/fonts/COPYING.txt`).
+Menüs und Anzeigen seit 2.27: Saira Condensed von Omnibus-Type (The Saira Project Authors), SIL Open Font License 1.1
+(`assets/fonts/saira/OFL.txt`), von Google Fonts. Ladenschilder und Kennzeichen: D-DIN von Datto, SIL Open Font
+License 1.1 (`assets/fonts/COPYING.txt`).
 
 ## Kartendaten
 Straßen und Gebäude der Städte-Strecken: © OpenStreetMap-Mitwirkende, ODbL (openstreetmap.org/copyright).

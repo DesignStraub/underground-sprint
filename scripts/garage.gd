@@ -438,6 +438,7 @@ func _label(parent: Node, size: int, align := HORIZONTAL_ALIGNMENT_LEFT) -> Labe
 
 func _process(dt: float) -> void:
 	_t += dt
+	_update_preview(dt)
 	_tip_t += dt
 	if _tip_t > 6.0:
 		_tip_t = 0.0
@@ -472,16 +473,23 @@ func _process(dt: float) -> void:
 
 
 func _show_car(car_id: String, cfg: Dictionary) -> void:
+	var t0 := Time.get_ticks_usec()
 	if car_node:
 		car_node.queue_free()
-	car_node = Builder.build(car_id, cfg, false, false)
+	car_node = Builder.build(car_id, cfg, false, false, false)
 	turntable.add_child(car_node)
 	car_node.position.y = 0.06
+	if OS.get_cmdline_user_args().has("--loadlog"):
+		print("GARAGE build %s %.1f ms" % [car_id, (Time.get_ticks_usec() - t0) / 1000.0])
 
 
 # --- Menüs ----------------------------------------------------------------
 
 func _clear_menu() -> void:
+	if color_grid:
+		color_grid.queue_free()
+		color_grid = null
+	_info_panel.visible = true
 	_strip_on(false)
 	career_map.visible = false
 	menu_scroll.scroll_vertical = 0
@@ -543,7 +551,7 @@ func _show_main() -> void:
 	_focus_first()
 
 
-const CREDITS_TEXT := "Motorklänge aus echten Aufnahmen (Wikimedia Commons, CC BY 3.0/4.0): prone, Y Racing, Tyler Riddle, Great Explorer, NEW CARS 2015 Official, Fabio Rojas Pichardo, Taz Ringer, asTUBE, Super Cars for you, Work With Sounds / Technisches Museum Slowenien. Reifenquietschen: Joseph Sardin, BigSoundBank (CC0). Bahnübergang: Renardo la vulpo (CC0), Work With Sounds / Konrad Gutkowski (CC BY 4.0), Extemporalist (CC0). Musik: Pixabay. Schrift: D-DIN (Datto, OFL). Karten © OpenStreetMap-Mitwirkende."
+const CREDITS_TEXT := "Motorklänge aus echten Aufnahmen (Wikimedia Commons, CC BY 3.0/4.0): prone, Y Racing, Tyler Riddle, Great Explorer, NEW CARS 2015 Official, Fabio Rojas Pichardo, Taz Ringer, asTUBE, Super Cars for you, Work With Sounds / Technisches Museum Slowenien. Reifenquietschen: Joseph Sardin, BigSoundBank (CC0). Bahnübergang: Renardo la vulpo (CC0), Work With Sounds / Konrad Gutkowski (CC BY 4.0), Extemporalist (CC0). Musik: Pixabay. Schrift: Saira Condensed (Omnibus-Type, OFL), D-DIN (Datto, OFL). Karten © OpenStreetMap-Mitwirkende."
 
 ## Erklärung je Einstellung (unten im Infofeld)
 const SETTING_HINTS := {
@@ -884,6 +892,9 @@ func _showcase_mode(cat: String) -> String:
 
 ## Teile einer Kategorie als Kacheln: Vorschau beim Auswählen, Einbauen mit Enter (wenn freigeschaltet)
 func _show_parts(cat: String, group: String) -> void:
+	if cat in COLOR_CATS:
+		_show_color_grid(cat, group)
+		return
 	_clear_menu()
 	_strip_on(true)
 	_back = _show_group.bind(group, cat)
@@ -899,6 +910,124 @@ func _show_parts(cat: String, group: String) -> void:
 		b.focus_entered.connect(func(): _preview_part(cat, idx))
 	_refresh_parts(cat)
 	_strip_ready("", installed + 1)
+
+
+## Farben (Lack, Felgenfarbe, Folienfarbe, Neon, Licht) als Raster statt als Leiste (seit 2.27): alle Farben auf einen
+## Blick, Pfeiltasten in alle Richtungen. Über dem Raster Name und Zustand der gewählten Farbe.
+const COLOR_CATS := ["paint", "rimcol", "vinylcol", "neon", "lights"]
+var color_grid: Control
+
+
+func _show_color_grid(cat: String, group: String) -> void:
+	_clear_menu()
+	_strip_on(true)
+	strip.visible = false
+	_back = _show_group.bind(group, cat)
+	_cam_view = cat
+	section.text = tr(Catalog.PARTS[cat]["label"]).to_upper()
+	stats.get_parent().visible = false
+	_keys.text = tr("PFEILE  Farbe wählen      ENTER  Einbauen      ESC  Zurück      F11  Vollbild")
+	var opts: Array = Catalog.PARTS[cat]["options"]
+	var panel := PanelContainer.new()
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.02, 0.025, 0.05, 0.82)
+	sb.border_color = Color(UI.CYAN.r, UI.CYAN.g, UI.CYAN.b, 0.35)
+	sb.set_border_width_all(1)
+	sb.set_corner_radius_all(4)
+	sb.set_content_margin_all(8)
+	panel.add_theme_stylebox_override("panel", sb)
+	panel.anchor_left = 0.5
+	panel.anchor_right = 0.5
+	panel.anchor_top = 1.0
+	panel.anchor_bottom = 1.0
+	panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	panel.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	panel.offset_bottom = -26.0
+	var vb := VBoxContainer.new()
+	vb.add_theme_constant_override("separation", 6)
+	panel.add_child(vb)
+	var head := HBoxContainer.new()
+	head.add_theme_constant_override("separation", 10)
+	vb.add_child(head)
+	var back := Button.new()
+	back.text = "◀ " + tr("Zurück").to_upper()
+	back.add_theme_font_size_override("font_size", 10)
+	back.focus_mode = Control.FOCUS_NONE
+	back.pressed.connect(func():
+		Sfx.ui("back")
+		_back.call())
+	head.add_child(back)
+	var title := _label(head, 13)
+	title.label_settings.font = UI.font("cond", 0.2)
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var grid := GridContainer.new()
+	grid.columns = mini(8, opts.size())
+	grid.add_theme_constant_override("h_separation", 5)
+	grid.add_theme_constant_override("v_separation", 5)
+	vb.add_child(grid)
+	var cells := []
+	for i in opts.size():
+		var idx := i
+		var b := Button.new()
+		b.custom_minimum_size = Vector2(40, 30)
+		b.focus_mode = Control.FOCUS_ALL
+		var sw = _swatch(cat, idx)
+		var r := ColorRect.new()
+		r.color = sw if sw is Color else Color(0.08, 0.08, 0.1)
+		r.set_anchors_preset(Control.PRESET_FULL_RECT)
+		r.offset_left = 4.0
+		r.offset_top = 4.0
+		r.offset_right = -4.0
+		r.offset_bottom = -4.0
+		r.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		b.add_child(r)
+		if not sw is Color:
+			# "Aus" bzw. ohne eigene Farbe: Schrägstrich
+			var x := _label(r, 12, HORIZONTAL_ALIGNMENT_CENTER)
+			x.text = "/"
+			x.set_anchors_preset(Control.PRESET_FULL_RECT)
+			x.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		var mark := ColorRect.new()  # eingebaut: grüner Punkt in der Ecke
+		mark.name = "M"
+		mark.color = UI.GREEN
+		mark.size = Vector2(7, 7)
+		mark.position = Vector2(2, 2)
+		mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		b.add_child(mark)
+		b.focus_entered.connect(func():
+			Sfx.ui("move")
+			_preview_part(cat, idx)
+			title.text = _color_title(cat, idx))
+		b.pressed.connect(func():
+			_install(cat, idx, group)
+			_mark_grid(cells, cat)
+			title.text = _color_title(cat, idx))
+		grid.add_child(b)
+		cells.append(b)
+	strip.get_parent().add_child(panel)
+	color_grid = panel
+	_info_panel.visible = false  # Name und Zustand stehen über dem Raster
+	_mark_grid(cells, cat)
+	var installed: int = GameState.get_config(preview_car).get(cat, 0)
+	_grab.call_deferred(cells[clampi(installed, 0, cells.size() - 1)])
+
+
+func _mark_grid(cells: Array, cat: String) -> void:
+	var installed: int = GameState.get_config(preview_car).get(cat, 0)
+	for i in cells.size():
+		var b: Button = cells[i]
+		b.get_node("M").visible = i == installed
+		b.modulate.a = 1.0 if GameState.is_part_unlocked(cat, i) else 0.35
+
+
+func _color_title(cat: String, idx: int) -> String:
+	var opt: Dictionary = Catalog.PARTS[cat]["options"][idx]
+	var t := tr(opt["name"]).to_upper()
+	if idx == GameState.get_config(preview_car).get(cat, 0):
+		t += "   ·   " + tr("EINGEBAUT")
+	elif not GameState.is_part_unlocked(cat, idx):
+		t += "   ·   " + (tr("1 SIEG") if opt["wins"] == 1 else tr("%d SIEGE") % opt["wins"])
+	return t
 
 
 func _refresh_parts(cat: String) -> void:
@@ -922,14 +1051,33 @@ func _refresh_parts(cat: String) -> void:
 		_tile_colors(b)
 
 
+## Vorschau eines Teils: Werte und Text sofort, das Auto erst, wenn man kurz auf der Kachel bleibt (beim schnellen
+## Durchblättern wird nicht jedes Teil gebaut, das Blättern bleibt flüssig)
+var _pv_pending := false
+var _pv_t := 0.0
+var _pv_cat := ""
+
+
 func _preview_part(cat: String, idx: int) -> void:
 	var base := GameState.get_config(preview_car).duplicate()
 	preview_cfg = base.duplicate()
 	preview_cfg[cat] = idx
-	_show_car(preview_car, preview_cfg)
-	Builder.showcase(car_node, preview_car, preview_cfg, _showcase_mode(cat))
 	_show_stats(preview_car, preview_cfg, base)
 	_part_info(cat, idx)
+	_pv_cat = cat
+	_pv_pending = true
+	_pv_t = 0.07
+
+
+func _update_preview(dt: float) -> void:
+	if not _pv_pending:
+		return
+	_pv_t -= dt
+	if _pv_t > 0.0:
+		return
+	_pv_pending = false
+	_show_car(preview_car, preview_cfg)
+	Builder.showcase(car_node, preview_car, preview_cfg, _showcase_mode(_pv_cat))
 
 
 func _press_sound(b: Button) -> void:

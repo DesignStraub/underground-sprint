@@ -14,9 +14,9 @@ const TEST_SAVE_PATH := "user://save_test.json"
 var save_path := SAVE_PATH
 ## Im Browser: Schlüssel der Kopie im localStorage (falls der Browser das Dateisystem im Rahmen nicht dauerhaft hält)
 const WEB_KEY := "nfg_save"
-## D-DIN (Datto, SIL Open Font License 1.1, siehe assets/fonts/COPYING.txt)
-const FONT := preload("res://assets/fonts/D-DIN-Bold.otf")
-const FONT_WIDE := preload("res://assets/fonts/D-DINExp-Bold.otf")
+## Saira Condensed (Omnibus-Type, SIL Open Font License 1.1, siehe assets/fonts/saira/OFL.txt), seit 2.27 statt D-DIN
+const FONT := preload("res://assets/fonts/saira/SairaCondensed-Bold.ttf")
+const FONT_WIDE := preload("res://assets/fonts/saira/SairaCondensed-Black.ttf")
 ## Grafik wie in großen PC-Spielen: eine Voreinstellung (Niedrig bis Ultra) setzt alle Einzeloptionen, jede lässt
 ## sich danach einzeln verstellen (dann "Benutzerdefiniert"). Je Option: Stufen, Werte je Stufe, Stufe je Voreinstellung.
 ##   res: höchste 3D-Auflösung (Zeilen), darüber wird weich hochskaliert. dynres: senkt sie, wenn die Bildrate fällt.

@@ -197,7 +197,9 @@ const SHAPES := {
 }
 
 
-static func build(car_id: String, cfg: Dictionary, headlights := true, lod := true) -> Node3D:
+## batch: Teile zu wenigen Meshes verschmelzen (spart im Rennen Zeichenaufrufe, kostet aber gut 0,4 s; die Garage
+## mit nur einem Auto baut ohne, damit das Blättern im Tuning flüssig bleibt)
+static func build(car_id: String, cfg: Dictionary, headlights := true, lod := true, batch := true) -> Node3D:
 	var spec: Dictionary = Catalog.CARS[car_id]
 	var S: Dictionary = SHAPES.get(car_id, SHAPES["kaizen"])
 	var P: Dictionary = Catalog.PARTS
@@ -1114,7 +1116,7 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 	var head_spots := _lamp_spots(body, mats["head"])
 	var tail_spots := _lamp_spots(body, mats["tail"])
 	body.position.y -= Catalog.part_of(cfg, "suspension")["drop"] + S.get("drop", 0.0)
-	if not OS.get_cmdline_user_args().has("--nobatch"):
+	if batch and not OS.get_cmdline_user_args().has("--nobatch"):
 		_merge_parts(root, body, fronts, spinners, flames)
 		if lod:
 			_build_lod(root, flames, GameState.car_lod_distance())
@@ -2549,7 +2551,7 @@ static func _lamp_spots(body: Node3D, lamp: Material) -> Array:
 ## Leuchthöfe (seit 2.25): weiche, additive Lichtflecken auf den Scheinwerfern und Rückleuchten, damit man sie als
 ## Lichter erkennt (bis 2.24 nur helle Flächen). Nur von vorn bzw. hinten sichtbar, wie echte Lampen.
 static func _lamp_glows(body: Node3D, heads: Array, tails: Array, light_c: Color) -> void:
-	for kind in [[heads, -1.0, Color(light_c.r, light_c.g, light_c.b) * 0.7], [tails, 1.0, Color(1.0, 0.08, 0.04) * 0.65]]:
+	for kind in [[heads, -1.0, Color(light_c.r, light_c.g, light_c.b) * 0.38], [tails, 1.0, Color(1.0, 0.08, 0.04) * 0.45]]:
 		var spots: Array = kind[0]
 		if spots.is_empty():
 			continue
@@ -2558,8 +2560,9 @@ static func _lamp_glows(body: Node3D, heads: Array, tails: Array, light_c: Color
 		st.begin(Mesh.PRIMITIVE_TRIANGLES)
 		for sp in spots:
 			var sz: Vector3 = sp["size"]
-			var w := clampf(sz.x * 1.5 + 0.18, 0.3, 1.6)
-			var h := clampf(sz.y * 1.8 + 0.16, 0.22, 0.6)
+			# eng an der Leuchte (seit 2.27; vorher fast doppelt so groß und rund, das wirkte wie eine Kugel vor der Lampe)
+			var w := clampf(sz.x * 1.15 + 0.08, 0.16, 1.4)
+			var h := clampf(sz.y * 1.3 + 0.06, 0.08, 0.3)
 			var c: Vector3 = sp["c"]
 			c.z = (sp["zmin"] if dir < 0.0 else sp["zmax"]) + dir * 0.04
 			var hx := w / 2.0
@@ -2577,7 +2580,7 @@ static func _lamp_glows(body: Node3D, heads: Array, tails: Array, light_c: Color
 		gm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 		gm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		gm.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
-		gm.albedo_texture = _halo_texture()
+		gm.albedo_texture = _lamp_halo_texture()
 		gm.albedo_color = kind[2]
 		gm.disable_receive_shadows = true
 		gm.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
@@ -2593,7 +2596,7 @@ static func _lamp_glows(body: Node3D, heads: Array, tails: Array, light_c: Color
 ## einen roten Schein dahinter. Decal (liegt auf dem Asphalt, auch am Hang), im Browser additive Flächen.
 static func _light_pools(root: Node3D, W: float, L: float, light_c: Color) -> void:
 	var compat := RenderingServer.get_current_rendering_method() == "gl_compatibility"
-	for spec in [[_beam_texture(), Vector3(W + 5.0, 1.6, 24.0), -L / 2.0 - 12.3, light_c, 1.2],
+	for spec in [[_beam_texture(), Vector3(W + 1.6, 1.6, 22.0), -L / 2.0 - 11.2, light_c, 0.7],
 			[_halo_texture(), Vector3(W * 0.95, 1.4, 1.7), L / 2.0 + 0.45, Color(1.0, 0.06, 0.03), 0.22]]:
 		var size: Vector3 = spec[1]
 		if compat:
@@ -2618,7 +2621,7 @@ static func _light_pools(root: Node3D, W: float, L: float, light_c: Color) -> vo
 		dc.size = size
 		dc.texture_emission = spec[0]
 		# mit dem vollen Renderer leuchtet zusätzlich der echte Scheinwerfer: Teppich nur halb so hell (sonst im Tunnel grell)
-		dc.emission_energy = spec[4] * 0.45
+		dc.emission_energy = spec[4] * 0.4
 		dc.modulate = spec[3]
 		dc.albedo_mix = 0.0
 		dc.upper_fade = 0.3
@@ -2633,6 +2636,23 @@ static func _light_pools(root: Node3D, W: float, L: float, light_c: Color) -> vo
 
 static var _halo_tex: ImageTexture
 static var _beam_tex: ImageTexture
+
+
+## Leuchthof um eine Lampe: weich, ohne hellen Kern (das Leuchten der Lampe selbst macht ihr Material)
+static var _lamp_halo_tex: ImageTexture
+
+
+static func _lamp_halo_texture() -> ImageTexture:
+	if _lamp_halo_tex:
+		return _lamp_halo_tex
+	var img := Image.create(64, 32, false, Image.FORMAT_RGBA8)
+	for y in 32:
+		for x in 64:
+			var d := Vector2((x + 0.5) / 32.0 - 1.0, (y + 0.5) / 16.0 - 1.0).length()
+			var k := pow(maxf(1.0 - d, 0.0), 1.6)
+			img.set_pixel(x, y, Color(k, k, k, k))
+	_lamp_halo_tex = ImageTexture.create_from_image(img)
+	return _lamp_halo_tex
 
 
 ## Leuchthof: heller Kern, weich auslaufend
@@ -2656,8 +2676,8 @@ static func _beam_texture() -> ImageTexture:
 	var img := Image.create(64, 128, false, Image.FORMAT_RGBA8)
 	for y in 128:
 		var a := 1.0 - (y + 0.5) / 128.0  # 0 am Auto, 1 weit vorn
-		var along := smoothstep(0.0, 0.06, a) * (1.0 - smoothstep(0.45, 1.0, a))
-		var hw := 0.14 + 0.32 * a
+		var along := smoothstep(0.0, 0.08, a) * (1.0 - smoothstep(0.35, 1.0, a))
+		var hw := 0.3 + 0.16 * a  # fast so breit wie das Auto, nach vorn nur wenig breiter (nicht zur Seite hinaus)
 		for x in 64:
 			var u := absf((x + 0.5) / 64.0 - 0.5)
 			var across := 1.0 - smoothstep(hw * 0.55, hw, u)
