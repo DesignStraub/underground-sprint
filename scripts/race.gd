@@ -973,7 +973,7 @@ func _update_drift(dt: float) -> void:
 		_zone_mat.set_shader_parameter("active", _zone_k)
 
 
-## Bonuszonen: Außenrand jeder engeren Kurve (Radius unter 75 m) der Hauptstrecke, je ein leuchtender Streifen
+## Bonuszonen: Außenrand jeder engeren Kurve (Radius unter 75 m) der Hauptstrecke, je eine aufgemalte Außenspur (seit 2.24 statt eines leuchtenden Streifens)
 ## von 2,4 m Breite an der Bande. Kurvenrichtung aus der Drehung der Fahrtrichtung über 10 m.
 func _build_drift_zones() -> void:
 	var curve: Curve3D = track["curve"]
@@ -1239,7 +1239,7 @@ func _on_player_finished() -> void:
 			if not was_open and GameState.stage_open(nxt):
 				unlocked.push_front(tr("STUFE %d: %d neue Events") % [nxt + 1, Catalog.STAGES[nxt]["events"].size()])
 			elif not was_open:
-				var left: int = Catalog.STAGE_WINS - GameState.stage_wins(stage)
+				var left: int = Catalog.stage_need(stage) - GameState.stage_wins(stage)
 				unlocked.push_front(tr("Noch %d Sieg bis Stufe %d" if left == 1 else "Noch %d Siege bis Stufe %d") % [left, nxt + 1])
 	var key: String = race["name"]
 	var best: float = GameState.best_times.get(key, 0.0)

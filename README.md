@@ -36,7 +36,7 @@ Ordner in Godot 4.7 öffnen (Import), dann F5. Das Spiel startet mit dem ONE-HUM
 | Leertaste | B | Handbremse (Drift) |
 | Shift / N | A | Nitro (leer ist leer: erst loslassen, dann lädt es nach; seit 2.22 brennt es nach dem Zünden mindestens eine halbe Sekunde und zündet danach erst nach knapp einer Sekunde wieder, kein Dauerfeuer durch Tippen) |
 | S / X (oder E / Q) | RB / LB | Drag: hoch-/runterschalten (A/D wechselt dort die Spur); steht klein neben dem Drehzahlmesser |
-| C | Y | Kamera: Verfolger (Standard) / Stoßstange / Motorhaube |
+| C | Y | Kamera: Verfolger (Standard) / Verfolger weit / Stoßstange / Motorhaube; die Wahl wird gespeichert |
 | R | Back | Auto auf die Straße zurücksetzen |
 | M | | Nächster Musiktrack |
 | Esc / Enter / P | Start | Pause (im Browser-Vollbild beendet Esc nur das Vollbild, dann Enter oder P) |
@@ -47,12 +47,15 @@ Nitro lädt sich langsam von selbst auf. Driften, knapp am Verkehr vorbei und Sp
 links), die Nitro ein Stück nachfüllen: eine schöne Drift-Kette etwa ein Zehntel, gedeckelt, damit Driften kein
 Nitro-Automat wird. In der Bildmitte steht nur noch Countdown und Ergebnis.
 
-**Fahrgefühl seit 2.23 mit Gewicht:** Die Drehrate folgt der Lenkung mit kurzer Verzögerung statt sofort (bei Tempo
-etwas träger als beim Rangieren), das Lenkrad schlägt mit der Tastatur ruhiger ein, die Karosserie wankt und nickt
-etwas stärker und federt einmal sanft nach (Feder mit knapp 1,6 Hz), die Kamera folgt der Drehung etwas weicher,
-und die Querhaftung liegt gut 7 % niedriger (2,1–2,5 g statt 2,3–2,7 g). Gemessen mit `tools/handling_lab.tscn`:
-nach einem Lenkimpuls bei 120 km/h ist die Drehrate nach 0,25 s auf 63 % (bis 2.22 nach 0,12 s). Vorher fühlte sich
-das Auto zu direkt an, wie ohne Gewicht.
+**Fahrgefühl wie Underground (seit 2.24):** direkt und griffig. 2.23 hatte nach einem Forza-Vergleich eine deutliche
+Trägheit in der Drehrate, ein ruhigeres Lenkrad und 7 % weniger Querhaftung; das war zu träge und ist zurückgenommen.
+Geblieben ist nur eine kleine Glättung der Drehrate (nach einem Lenkimpuls bei 120 km/h ist sie nach 0,15 s auf 63 %,
+in 2.22 nach 0,12 s, in 2.23 nach 0,25 s; gemessen mit `tools/handling_lab.tscn`) und die Karosserie, die beim
+Einlenken und Bremsen etwas wankt und einmal sanft nachfedert (Feder mit knapp 1,6 Hz).
+
+**Kamera (seit 2.24):** der Verfolger sitzt ein Stück höher (1,95 m statt 1,6 m, 4,6 m statt 4,4 m hinter dem Auto)
+wie in NFSU, dazu gibt es „Verfolger weit“ (2,55 m hoch, 6,4 m dahinter). C schaltet durch alle vier Kameras, die Wahl
+steht im Spielstand.
 
 ## Events
 **Karriere:** Garage → Rennen fahren zeigt alle 21 Events als Liste neben einer Deutschlandkarte. Jedes Event liegt in
@@ -63,6 +66,12 @@ fahrbar, **3 Siege in einer Stufe** öffnen die nächste. Ein Event, das einem n
 Jede Stufe mischt die Arten, die Schwierigkeit steigt von Stufe zu Stufe. Was nach der alten Kette (bis 2.15) schon
 offen war, bleibt offen. Auf der Karte sind gesperrte Städte grau, offene grün, gewonnene gold, die gewählte pulsiert.
 Umriss: Natural Earth (gemeinfrei).
+
+**Drag-Rennen sind seit 2.24 vorerst draußen:** sie passten nicht und hätten viel Umbau gebraucht. Die drei Events
+(Hafenmeile, Neon-Gerade, Schnellstraßen-Drag) stehen in keiner Karriere-Stufe mehr, der Code bleibt im Projekt; der
+letzte Stand mit Drag in der Karriere ist der Git-Tag `drag-2.23`. Die Stufen haben jetzt 4, 4, 4, 3 und 3 Events,
+bei Stufen mit drei Events reichen zwei Siege (`Catalog.stage_need`). Die letzten drei Autos brauchen einen Rennsieg
+weniger (Kagura 14, Falke 15, Furia 16), so reicht ein Sieg in jedem Rennen.
 
 **Events auf einen Blick (seit 2.16):** jede Art hat ihre Farbe, überall gleich: Sprint cyan, Rundkurs grün, Drag
 pink, Drift orange (`UI.TYPE_COL`). In der Karriere-Liste trägt jede Zeile rechts ein Abzeichen der Art und die
@@ -83,9 +92,10 @@ Countdown steht das Ziel noch einmal unter der Zahl und blendet gut zwei Sekunde
 - **Drift** (2): allein auf kleinen, rundum abgesperrten Kursen. Eigenes Fahrverhalten: ist das Auto
   quer, hält Gas den Winkel, Lenken steuert ihn, Gas weg richtet es auf. Querfahren ab 12° gibt Punkte
   (Winkel × Tempo), verkettete Drifts steigern den Multiplikator bis x5, jede Bandenberührung kostet die laufende
-  Kette. **Bonuszonen** wie in Underground (seit 2.15): am Außenrand jeder engeren Kurve (Radius unter 75 m) leuchtet
-  ein oranger Pfeilstreifen an der Bande; wer darin driftet, bekommt doppelte Punkte, der Streifen wird grün und im
-  HUD steht „ZONE x2“. Zielpunkte für Platz 3/2/1 stehen im HUD.
+  Kette. **Bonuszonen** wie in Underground (seit 2.15): am Außenrand jeder engeren Kurve (Radius unter 75 m), dort wo
+  man im starken Winkel an der Wand entlang driftet. Seit 2.24 eine aufgemalte Außenspur (durchgezogene weiße Linie,
+  zur Bande hin schwache Schraffur) statt eines grell leuchtenden orangen Pfeilstreifens; wer darin driftet, bekommt
+  doppelte Punkte, die Farbe wird etwas heller und im HUD steht „ZONE x2“. Zielpunkte für Platz 3/2/1 stehen im HUD.
 - **Städte** (6): echte Strecken durch Aachen, Würzburg, Bad Kissingen, Tauberbischofsheim, Hammelburg und
   Berlin-Kreuzberg (siehe unten).
 - **Wie in Underground:** Near Miss am Verkehr gibt Punkte und etwas Nitro; wer kurz vor GO Gas gibt (Drehzahl im
@@ -103,6 +113,10 @@ Handy am Ohr), Hände, Turnschuhe, ein Gesicht mit Augen, Brauen, Nase und Mund.
 T-Shirt (manche mit Aufdruck), Langarm, Hoodie mit Kapuze und Kordeln, offene Jacke; Jeans mit Gürtel, Shorts, Rock;
 kurze oder lange Haare, Zopf, Dutt, Glatze, Kappe, Mütze; dazu schmale und kräftige Statur. In der Ferne (je nach
 Detaildichte ab 30–96 m) zeigt das Spiel die einfache Blockfigur, die kostet kaum etwas.
+Seit 2.24 haben sie Knie und feinere Rundungen (Arme und Beine 12 statt 8 Seiten, kleinere Schulter- und
+Ellbogenkugeln, die vorher abstanden): beim Jubeln gehen sie vor dem Absprung und nach der Landung in die Knie, beim
+Tanzen federn sie auf jedem Schlag, und es gibt drei Tanzarten (Arme schwingen, Faust pumpen mit Kopfnicken, Schritt
+zur Seite); Wartende stehen mit einem Spielbein, Rennende beugen die Knie.
 
 **Freischalten:** Rennsiege (Sprint + Rundkurs) und Driftsiege werden getrennt gezählt. 23 Autos: zwei sind von
 Anfang an frei (Kaizen Rally S und der Kei-Wagen Chibi K-Turbo), danach kommt mit fast jedem Rennsieg bis zum 17. ein
@@ -192,16 +206,22 @@ Skript), schreibt `scripts/city_data.gd`.
 - **Höhen:** Die Altstadt-Route der Gabelungen zweigt nach oben ab und führt als Bergstraße über eine Kuppe (gut 5 m,
   Häuser stehen am Hang, Stützmauern). Mit viel Tempo hebt man an der Kuppe kurz ab. Bergauf zieht es etwas, bergab
   schiebt es. Viele Seitenstraßen steigen hinter ihrer Absperrung sichtbar den Hang hinauf.
-- **Abkürzungen:** kurvige Gassen (Kopfsteinpflaster, Lichterketten) und ein Seesprung über eine Schanze. Sie sparen 100–150 m, sind aber enger bzw. brauchen Tempo (ab ca. 120 km/h über den See, sonst Platsch).
+- **Abkürzungen:** kurvige Gassen (Kopfsteinpflaster, Lichterketten) und ein Damm durch einen See (bis 2.23 eine
+  Sprungschanze über eine Lücke im Damm; wirkte wie eine Schanze im Nirgendwo). Sie sparen 100–150 m, sind aber enger.
   Damit man sie nicht im Dunkeln suchen muss: Gabelungen und Gassen sind Lichttunnel aus leuchtenden Bögen alle
   12 m (cyan bzw. pink, mit Lampen), am ersten Bogen groß „ABKÜRZUNG“, Leuchtbänder an beiden Rändern zeigen den
   Weg; der Seedamm hat warme Leuchtbänder (`Track._shortcut_lights`).
 - **Bahnübergang mit Bahnhof:** zweigleisig mit Oberleitung, daneben ein kleiner Bahnhof (Bahnsteige mit Dach und
   Stationsschildern, Wartende, Fußgängerbrücke, Empfangsgebäude mit Uhr, S-Bahn-Säule an der Straße, Signale).
-  Kommt der Zug, gehen Schranken runter. Wer drauf zufährt, crasht. Auf der rechten Außenspur steht eine Rampe, mit
-  genug Tempo springt man über den Zug.
-- **Sprünge und Fallen:** Schwerkraft knapp 2 g, Rampen werfen das Auto mit bis zu 14 m/s nach oben (Seesprung gut
-  1 s Flug, 3 m hoch). In der Luft hebt sich erst die Nase und kippt dann mit der Flugbahn ab; wer seitlich über eine
+  Seit 2.24 liegt alles auf einem flachen Bahndamm: die Straße steigt über gut 25 m sanft um 0,85 m an, liegt über
+  den Gleisen flach und fällt wieder ab (mit Tempo hebt man kurz ab), Gleise und Bahnhof stehen auf Schotterdamm bzw.
+  einer Fläche in Dammhöhe. Bis 2.23 stand auf der rechten Spur eine 3,7 m hohe Rampe, mit der man über den Zug
+  sprang. Jetzt kommt der Zug so, dass man bei gleichem Tempo gut eine Sekunde vor ihm drüber ist: erst blinkt und
+  läutet es (4 s vorher, Gegner halten an), 2,4 s vorher senken sich die Schranken, man huscht durch, und hinter einem
+  rauscht der Zug vorbei. Wer langsamer wird, muss warten. Warnton, Signalhorn und Rollen des Zugs sind seit 2.24
+  echte Aufnahmen (`CREDITS.md`).
+- **Sprünge und Fallen:** Schwerkraft knapp 2 g. Seit 2.24 gibt es keine Rampen mehr, abgehoben wird nur noch an
+  Kuppen (Bergstraße, Bahndamm). In der Luft hebt sich erst die Nase und kippt dann mit der Flugbahn ab; wer seitlich über eine
   Kante fährt, kippt zur freien Seite. Harte Landungen federn kurz nach, schiefe kosten Tempo. In der Luft kann man
   nicht lenken, Nitro schiebt aber weiter. Wer am See zu kurz springt, fällt ins Wasser.
 - **Sprungkamera** wie in NFSU: Beim Absprung rechnet das Spiel die Flugbahn voraus. Wird der Sprung mindestens 1,6 m
@@ -606,8 +626,13 @@ ein, wie auf echten Aufnahmen. Kostet im Rennen etwa 4 % mehr Draw Calls und Dre
   Lichtfarbe je Haus (Wohnhaus warm, Büro kühl). Dazu Fensterkreuze, Vorhänge oder Jalousien, Deckenlicht (oben
   heller), Schaufenster mit Regalen und Theke, Graffiti als Stücke mit Kontur. In der Ferne geht alles in den
   Mittelwert über (kein Flimmern). Giebel und Sockel am Hang bleiben ohne Fenster.
-- **Schilder:** Ladennamen sitzen auf Leuchtkästen (dunkler Kasten mit Neonrahmen, `Track._sign_box`), dazu senkrechte
-  Leuchtschilder und Dachwerbung. Frei an der Fassade schwebende Schriftzüge gibt es nicht mehr.
+- **Schilder:** seit 2.24 je Ladenart ein eigener Stil (`Track._shop_sign`, `shaders/shop_sign.gdshader`): Kasten
+  mit Farbverlauf, als Leuchtkasten oder angestrahlt, Schrift und Zeichen passend. Apotheke grün mit rotem A,
+  Friseur dunkel mit Drehsäule, Bäckerei warmes Braun, Metzgerei rot, Pizzeria hell mit Grün-Weiß-Rot, Imbiss gelb-orange
+  leuchtend, Kiosk blau mit gelber Schrift, Lotto rot-gelb, Café creme, Eiscafé pastell, Juwelier schwarz-gold, Bank
+  blau, Post gelb, Optiker weiß-blau, Buchladen dunkelgrün, Tuning schwarz mit Schachbrett und so weiter. Bars,
+  Tattoo, Spielhallen und Wettbüros behalten den Neon-Stil (dunkler Kasten mit Neonrahmen, `Track._sign_box`). Bis
+  2.23 sah jedes Ladenschild so aus, mit Zufallsfarbe. Dazu senkrechte Leuchtschilder und Dachwerbung. Frei an der Fassade schwebende Schriftzüge gibt es nicht mehr.
 - **Gehweg** (`shaders/pavement.gdshader`): Betonplatten 1,5 x 1,5 m mit Fugen, je Platte etwas anders getönt,
   Flecken und Kaugummi-Punkte, an beiden Rändern eine Reihe heller Bordsteine, Bordsteinkanten aus hellem Beton.
   Wo kein Haus die Streckenbegrenzung verdeckt, steht ein Zaun.

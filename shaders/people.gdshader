@@ -1,7 +1,8 @@
 shader_type spatial;
 // Leute (Zuschauer, Fans, Starterin, Wartende), Modelle aus scripts/people.gd; Bewegung, Kleidung und Gesicht macht
 // der Shader.
-// UV.x = Körperteil (0 Rumpf, 1/2 Oberarm l/r, 3/4 Bein l/r, 5 Kopf, 6/7 Unterarm mit Hand l/r)
+// UV.x = Körperteil (0 Rumpf, 1/2 Oberarm l/r, 3/4 Oberschenkel l/r, 5 Kopf, 6/7 Unterarm mit Hand l/r,
+//        8/9 Unterschenkel mit Schuh l/r: seit 2.24 mit Knie, die Leute federn beim Tanzen und Jubeln in die Knie)
 // UV.y = Farbgruppe (0 Oberteil, 1 Hose, 2 Haut, 3 Haare, 4 Schuhe, 5 Leuchtstab, 6 Unterarm: Ärmel oder Haut,
 //        7 Schienbein: Hose oder Haut, 8 Sohle, 9 Jacke, 10 Kappe/Mütze/Haargummi, 11 Handy, 12 Bildschirm, 13 Rock,
 //        14 Oberschenkel unten: Hose oder Haut)
@@ -79,28 +80,55 @@ void vertex() {
 	float al_z = 0.0, ar_z = 0.0, al_x = 0.0, ar_x = 0.0, ll_x = 0.0, lr_x = 0.0;
 	float el_l = 0.15, el_r = 0.15;
 	float lift = 0.0, sway = 0.0, nod = 0.0, lean = 0.0;
+	float sq = 0.0;  // in die Knie gehen (Oberschenkel vor, Unterschenkel zurück, Körper tiefer)
+	float kn_l = 0.0, kn_r = 0.0;  // Knie beugen (negativ: Unterschenkel nach hinten, wie ein echtes Knie)
 	if (mode < 0.5) {
-		// jubeln: hüpfen, Arme hoch, Fäuste pumpen
+		// jubeln: hüpfen, Arme hoch, Fäuste pumpen; vor dem Absprung und nach der Landung in die Knie
 		float s = t * (5.0 + fract(cu.a * 7.0) * 2.0) + ph;
 		lift = max(sin(s), 0.0) * 0.22 * energy;
+		sq = max(-sin(s), 0.0) * 0.32 * energy;
 		al_z = -2.5 - 0.35 * sin(s * 2.0) * energy;
 		ar_z = 2.5 + 0.35 * sin(s * 2.0 + 1.3) * energy;
 		el_l = 0.35 + 0.35 * max(sin(s * 2.0), 0.0);
 		el_r = 0.35 + 0.35 * max(sin(s * 2.0 + 1.3), 0.0);
 	} else if (mode < 1.5) {
-		// tanzen: Hüfte wiegen, Arme im Takt
+		// tanzen, drei Arten je Figur: im Takt in die Knie federn und Arme schwingen, Faust pumpen mit Kopfnicken,
+		// Schritt zur Seite mit Hüfte; alle wippen auf jedem Schlag
 		float s = t * 6.5 + ph;
-		sway = sin(s * 0.5) * 0.1;
-		lift = abs(sin(s * 0.5)) * 0.07;
-		al_z = -1.2 - 1.2 * max(sin(s), 0.0);
-		ar_z = 1.2 + 1.2 * max(-sin(s), 0.0);
-		al_x = 0.5 + sin(s) * 0.5;
-		ar_x = 0.5 - sin(s) * 0.5;
-		el_l = 0.9 + 0.5 * sin(s);
-		el_r = 0.9 - 0.5 * sin(s);
-		ll_x = sin(s * 0.5) * 0.3;
-		lr_x = -ll_x;
+		float beat = 0.5 + 0.5 * cos(s * 2.0);  // jeder Schlag ein Federn
+		sq = (0.08 + 0.22 * beat) * energy;
 		nod = sin(s) * 0.12;
+		if (h5 < 0.4) {
+			sway = sin(s * 0.5) * 0.1;
+			al_z = -1.2 - 1.2 * max(sin(s), 0.0);
+			ar_z = 1.2 + 1.2 * max(-sin(s), 0.0);
+			al_x = 0.5 + sin(s) * 0.5;
+			ar_x = 0.5 - sin(s) * 0.5;
+			el_l = 0.9 + 0.5 * sin(s);
+			el_r = 0.9 - 0.5 * sin(s);
+		} else if (h5 < 0.7) {
+			// Faust pumpen (rechts hoch, links locker), Kopf nickt kräftig mit
+			ar_z = 2.4 + 0.25 * sin(s * 2.0);
+			el_r = 0.4 + 0.5 * max(sin(s * 2.0), 0.0);
+			al_x = 0.35;
+			al_z = -0.25;
+			el_l = 1.2;
+			nod = 0.06 + sin(s * 2.0) * 0.16;
+		} else {
+			// Schritt zur Seite: Gewicht wechselt, ein Knie geht mit, Arme angewinkelt vor dem Körper
+			float w = sin(s * 0.5);
+			sway = w * 0.14;
+			kn_l = -max(w, 0.0) * 0.5;
+			kn_r = -max(-w, 0.0) * 0.5;
+			ll_x = max(w, 0.0) * 0.25;
+			lr_x = max(-w, 0.0) * 0.25;
+			al_x = 0.55 + 0.25 * sin(s);
+			ar_x = 0.55 - 0.25 * sin(s);
+			el_l = 1.4;
+			el_r = 1.4;
+			al_z = 0.2;
+			ar_z = -0.2;
+		}
 	} else if (mode < 2.5) {
 		// warten: atmen, Gewicht verlagern, manche mit verschränkten Armen
 		lift = sin(t * 1.3 + ph) * 0.008;
@@ -108,6 +136,9 @@ void vertex() {
 		al_x = sin(t * 0.9 + ph) * 0.05;
 		ar_x = -al_x;
 		nod = sin(t * 0.3 + ph * 2.0) * 0.1;
+		// Standbein und Spielbein: ein Knie leicht gebeugt
+		kn_l = h4 < 0.5 ? -0.18 : 0.0;
+		kn_r = h4 < 0.5 ? 0.0 : -0.18;
 		if (h5 < 0.4) {
 			al_x = 0.35;
 			ar_x = 0.35;
@@ -141,6 +172,8 @@ void vertex() {
 		el_r = 1.3;
 		ll_x = -sin(s) * 0.8;
 		lr_x = -ll_x;
+		kn_l = -0.9 * max(sin(s), 0.0) - 0.2;
+		kn_r = -0.9 * max(-sin(s), 0.0) - 0.2;
 		lift = abs(sin(s)) * 0.08;
 		lean = 0.15;
 	} else if (mode < 6.5) {
@@ -165,7 +198,23 @@ void vertex() {
 	vec3 v = VERTEX;
 	vec3 n = NORMAL;
 	rest = v;
-	if (part > 5.5) {
+	// in die Knie: Oberschenkel nach vorn, Unterschenkel doppelt zurück, Körper so viel tiefer, dass die Füße am Boden
+	// bleiben (Oberschenkel 0,36 m, Unterschenkel 0,5 m)
+	ll_x += sq;
+	lr_x += sq;
+	kn_l -= 2.0 * sq;
+	kn_r -= 2.0 * sq;
+	lift -= 0.86 * (1.0 - cos(sq));
+	lean += sq * 0.35;
+	if (part > 7.5) {
+		// Unterschenkel: erst im Knie beugen, dann wie der Oberschenkel in der Hüfte drehen
+		bool left = part < 8.5;
+		vec3 kp = vec3(left ? -0.09 : 0.09, 0.5, 0.0);
+		mat3 mk = rot_x(left ? kn_l : kn_r);
+		v = kp + mk * (v - kp);
+		n = mk * n;
+	}
+	if (part > 5.5 && part < 7.5) {
 		// Unterarm: erst im Ellbogen beugen, dann wie der Oberarm in der Schulter drehen
 		bool left = part < 6.5;
 		vec3 ep = vec3(left ? -0.255 : 0.255, 1.13, 0.0);
@@ -175,22 +224,22 @@ void vertex() {
 	}
 	mat3 m = mat3(1.0);
 	vec3 pivot = vec3(0.0);
-	if ((part > 0.5 && part < 2.5) || part > 5.5) {
+	if ((part > 0.5 && part < 2.5) || (part > 5.5 && part < 7.5)) {
 		bool left = part < 1.5 || (part > 5.5 && part < 6.5);
 		pivot = vec3(left ? -0.22 : 0.22, 1.39, 0.0);
 		m = rot_x(left ? al_x : ar_x) * rot_z(left ? al_z : ar_z);
-	} else if (part > 2.5 && part < 4.5) {
-		bool left = part < 3.5;
+	} else if ((part > 2.5 && part < 4.5) || part > 7.5) {
+		bool left = part < 3.5 || (part > 7.5 && part < 8.5);
 		pivot = vec3(left ? -0.09 : 0.09, 0.86, 0.0);
 		m = rot_x(left ? ll_x : lr_x);
-	} else if (part > 4.5) {
+	} else if (part > 4.5 && part < 5.5) {
 		pivot = vec3(0.0, 1.5, 0.0);
 		m = rot_x(nod);
 	}
 	v = pivot + m * (v - pivot);
 	n = m * n;
 	// Oberkörper (alles über der Hüfte) neigen und wiegen
-	if (part < 2.5 || part > 4.5) {
+	if (part < 2.5 || (part > 4.5 && part < 7.5)) {
 		mat3 b = rot_x(lean) * rot_z(sway);
 		vec3 hip = vec3(0.0, 0.86, 0.0);
 		v = hip + b * (v - hip);
@@ -215,7 +264,7 @@ void vertex() {
 	vec3 jacket = pick4(fract(cu.a * 5.3 + cu.r), vec3(0.05), vec3(0.25, 0.14, 0.07), vec3(0.06, 0.08, 0.18), fract(cu.r * 9.0) > 0.5 ? vec3(0.2, 0.24, 0.12) : vec3(0.18, 0.27, 0.45));
 	vec3 cap = pick4(fract(cu.g * 4.7 + cu.a), vec3(0.05), top, vec3(0.9), vec3(0.08, 0.12, 0.3));
 	vec3 skirt = pick4(fract(cu.r * 6.1 + cu.g), vec3(0.05), vec3(0.55, 0.06, 0.1), vec3(0.18, 0.27, 0.45), vec3(0.15, 0.15, 0.17));
-	bool arm_part = (part > 0.5 && part < 2.5) || part > 5.5;
+	bool arm_part = (part > 0.5 && part < 2.5) || (part > 5.5 && part < 7.5);
 	glow = 0.0;
 	detail_col = hair_c * 0.8;
 	if (grp < 0.5) {

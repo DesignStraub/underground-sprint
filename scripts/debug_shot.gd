@@ -167,7 +167,7 @@ func _process(dt: float) -> void:
 	if not sweep.is_empty() and race and "curve" in race and race.world and race.track:
 		_sweep(race)
 		return
-	if view.size() >= 7 and race and "curve" in race and race.world:
+	if view.size() >= 7 and race and "curve" in race and race.world and race.track.has("paths"):
 		if _vcam == null:
 			_vcam = Camera3D.new()
 			_vcam.fov = 60.0
@@ -177,8 +177,15 @@ func _process(dt: float) -> void:
 				if ch is CanvasLayer and ch.layer >= 0:
 					ch.visible = false  # HUD aus, nur die Welt
 		var vc: Curve3D = race.track["paths"][int(view[0])]["curve"]
-		var fa := Track.frame_at(vc, float(view[1]))
-		var fb := Track.frame_at(vc, float(view[4]))
+		# Weg-Meter mit "c" davor zählen ab dem Bahnübergang (z. B. c-40), "s" ab dem Stadion
+		var vd := func(t: String) -> float:
+			if t.begins_with("c"):
+				return race.track["crossing_d"] + float(t.substr(1))
+			if t.begins_with("s"):
+				return race.track["stadium_d"] + float(t.substr(1))
+			return float(t)
+		var fa := Track.frame_at(vc, vd.call(view[1]))
+		var fb := Track.frame_at(vc, vd.call(view[4]))
 		_vcam.global_position = fa["pos"] + fa["right"] * float(view[2]) + Vector3(0, float(view[3]), 0)
 		_vcam.look_at(fb["pos"] + fb["right"] * float(view[5]) + Vector3(0, float(view[6]), 0), Vector3.UP)
 		_vcam.make_current()
@@ -747,7 +754,7 @@ func _place_at(race) -> void:
 					t.progress = tr["length"] - 30.0
 			var rc = tr["crossing"]
 			rc._triggered = true
-			rc._t_arrive = rc._clock + 150.0 / 46.0 + 0.15
+			rc._t_arrive = rc._clock + 150.0 / 44.0 + rc.LEAD + rc.train_len / 2.0 / rc.SPEED
 			rc._dir = 1.0
 		"tunnel", "el", "stadium":
 			var d := 0.0

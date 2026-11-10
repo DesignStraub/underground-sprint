@@ -18,7 +18,10 @@ const SHIRTS := [Color(0.85, 0.1, 0.12), Color(0.1, 0.35, 0.85), Color(0.95, 0.8
 const CELL := 30.0
 
 ## Körperteile (UV.x) für die Bewegung im Shader
-enum { P_BODY, P_ARM_L, P_ARM_R, P_LEG_L, P_LEG_R, P_HEAD, P_FORE_L, P_FORE_R }
+enum { P_BODY, P_ARM_L, P_ARM_R, P_LEG_L, P_LEG_R, P_HEAD, P_FORE_L, P_FORE_R, P_SHIN_L, P_SHIN_R }
+## Rundungen (seit 2.24 feiner: Arme und Beine 12 statt 8 Seiten, Rumpf 14 statt 10, Kopf 14 x 10)
+const LIMB := 12
+const TORSO := 14
 ## Farbgruppen (UV.y), siehe people.gdshader
 enum { G_TOP, G_PANTS, G_SKIN, G_HAIR, G_SHOES, G_GLOW, G_ARM, G_SHIN, G_SOLE, G_JACKET, G_CAP, G_PHONE, G_SCREEN,
 	G_SKIRT, G_THIGH }
@@ -46,39 +49,42 @@ static func _detail_mesh(sticks: bool) -> ArrayMesh:
 	# Beine: Oberschenkel (oben Hose, unten Hose oder Haut bei Shorts/Rock), Schienbein, Turnschuh mit heller Sohle
 	for s in [-1.0, 1.0]:
 		var leg := P_LEG_L if s < 0.0 else P_LEG_R
+		var shin := P_SHIN_L if s < 0.0 else P_SHIN_R
 		var x: float = s * 0.09
-		_tube(st, [[Vector3(x, 0.94, 0.0), 0.098, 0.102], [Vector3(x, 0.72, -0.006), 0.079, 0.084]], 8, leg, G_PANTS, O_ALL, false, false)
-		_tube(st, [[Vector3(x, 0.72, -0.006), 0.079, 0.084], [Vector3(x * 1.02, 0.5, 0.0), 0.062, 0.066]], 8, leg, G_THIGH, O_ALL, false, false)
+		_tube(st, [[Vector3(x, 0.94, 0.0), 0.098, 0.102], [Vector3(x, 0.72, -0.006), 0.079, 0.084]], LIMB, leg, G_PANTS, O_ALL, false, false)
+		_tube(st, [[Vector3(x, 0.72, -0.006), 0.079, 0.084], [Vector3(x * 1.02, 0.5, 0.0), 0.062, 0.066]], LIMB, leg, G_THIGH, O_ALL, false, false)
+		# Knie: kleine Kugel, damit beim Beugen keine Lücke aufgeht
+		_ellipsoid(st, Vector3(x * 1.02, 0.5, 0.0), Vector3(0.061, 0.06, 0.064), 10, 6, shin, G_SHIN, O_ALL)
 		_tube(st, [[Vector3(x * 1.02, 0.5, 0.0), 0.061, 0.064], [Vector3(x * 1.04, 0.32, 0.014), 0.055, 0.062],
-			[Vector3(x * 1.05, 0.11, 0.0), 0.04, 0.043]], 8, leg, G_SHIN, O_ALL, false, false)
-		_ellipsoid(st, Vector3(x * 1.05, 0.035, -0.035), Vector3(0.052, 0.075, 0.125), 8, 6, leg, G_SHOES, O_ALL, 0.0, 0.5)
-		_box(st, Vector3(x * 1.05, 0.016, -0.035), Vector3(0.1, 0.032, 0.25), leg, G_SOLE, O_ALL)
+			[Vector3(x * 1.05, 0.11, 0.0), 0.04, 0.043]], LIMB, shin, G_SHIN, O_ALL, false, false)
+		_ellipsoid(st, Vector3(x * 1.05, 0.035, -0.035), Vector3(0.052, 0.075, 0.125), 10, 6, shin, G_SHOES, O_ALL, 0.0, 0.5)
+		_box(st, Vector3(x * 1.05, 0.016, -0.035), Vector3(0.1, 0.032, 0.25), shin, G_SOLE, O_ALL)
 	# Hüfte, Rumpf (Taille schmal, Brust und Schultern breiter), Hals
 	_tube(st, [[Vector3(0, 0.8, 0.0), 0.1, 0.075], [Vector3(0, 0.86, 0.0), 0.15, 0.096], [Vector3(0, 0.99, 0.0), 0.148, 0.098]],
-		10, P_BODY, G_PANTS, O_ALL, true, true)
+		TORSO, P_BODY, G_PANTS, O_ALL, true, true)
 	_tube(st, [[Vector3(0, 0.98, 0.0), 0.146, 0.097], [Vector3(0, 1.12, 0.0), 0.153, 0.1], [Vector3(0, 1.27, -0.004), 0.178, 0.115],
 		[Vector3(0, 1.38, 0.0), 0.198, 0.105], [Vector3(0, 1.44, 0.004), 0.13, 0.085], [Vector3(0, 1.47, 0.006), 0.06, 0.05]],
-		10, P_BODY, G_TOP, O_ALL, false, true)
-	_tube(st, [[Vector3(0, 1.42, 0.008), 0.047, 0.045], [Vector3(0, 1.545, 0.0), 0.044, 0.044]], 8, P_BODY, G_SKIN, O_ALL, false, false)
+		TORSO, P_BODY, G_TOP, O_ALL, false, true)
+	_tube(st, [[Vector3(0, 1.42, 0.008), 0.047, 0.045], [Vector3(0, 1.545, 0.0), 0.044, 0.044]], LIMB, P_BODY, G_SKIN, O_ALL, false, false)
 	# offene Jacke: Hülle um den Rumpf, vorn in der Mitte offen (dort sieht man das Shirt)
 	_tube(st, [[Vector3(0, 0.9, 0.0), 0.162, 0.11], [Vector3(0, 1.12, 0.0), 0.166, 0.112], [Vector3(0, 1.27, -0.004), 0.19, 0.126],
-		[Vector3(0, 1.38, 0.0), 0.208, 0.115], [Vector3(0, 1.45, 0.006), 0.13, 0.092]], 10, P_BODY, G_JACKET, O_JACKET, false, false, 0.2)
+		[Vector3(0, 1.38, 0.0), 0.208, 0.115], [Vector3(0, 1.45, 0.006), 0.13, 0.092]], TORSO, P_BODY, G_JACKET, O_JACKET, false, false, 0.2)
 	# Kapuze des Hoodies, im Nacken
 	_ellipsoid(st, Vector3(0, 1.45, 0.085), Vector3(0.13, 0.075, 0.075), 8, 5, P_BODY, G_TOP, O_HOOD)
 	# Rock
 	_tube(st, [[Vector3(0, 0.99, 0.0), 0.158, 0.106], [Vector3(0, 0.9, 0.0), 0.205, 0.14], [Vector3(0, 0.6, 0.0), 0.25, 0.2]],
-		10, P_BODY, G_SKIRT, O_SKIRT, false, false)
+		TORSO, P_BODY, G_SKIRT, O_SKIRT, false, false)
 	# Arme: Schulter, Oberarm (oben immer Ärmel, unten Ärmel oder Haut), Unterarm, Hand mit Daumen
 	for s in [-1.0, 1.0]:
 		var up := P_ARM_L if s < 0.0 else P_ARM_R
 		var fo := P_FORE_L if s < 0.0 else P_FORE_R
-		_ellipsoid(st, Vector3(s * 0.2, 1.38, 0.0), Vector3(0.064, 0.062, 0.066), 8, 6, up, G_TOP, O_ALL)
-		_tube(st, [[Vector3(s * 0.235, 1.39, 0.0), 0.062, 0.064], [Vector3(s * 0.248, 1.26, 0.0), 0.056, 0.058]], 8, up, G_TOP, O_ALL, false, false)
-		_tube(st, [[Vector3(s * 0.248, 1.26, 0.0), 0.054, 0.056], [Vector3(s * 0.255, 1.13, 0.0), 0.048, 0.049]], 8, up, G_ARM, O_ALL, false, false)
-		_ellipsoid(st, Vector3(s * 0.255, 1.13, 0.0), Vector3(0.047, 0.047, 0.048), 6, 4, fo, G_ARM, O_ALL)
-		_tube(st, [[Vector3(s * 0.255, 1.13, 0.0), 0.047, 0.048], [Vector3(s * 0.262, 1.0, -0.004), 0.043, 0.045],
-			[Vector3(s * 0.266, 0.89, 0.0), 0.034, 0.036]], 8, fo, G_ARM, O_ALL, false, false)
-		_ellipsoid(st, Vector3(s * 0.268, 0.84, -0.006), Vector3(0.026, 0.056, 0.042), 6, 5, fo, G_SKIN, O_ALL)
+		_ellipsoid(st, Vector3(s * 0.205, 1.38, 0.0), Vector3(0.058, 0.056, 0.06), 10, 7, up, G_TOP, O_ALL)
+		_tube(st, [[Vector3(s * 0.235, 1.39, 0.0), 0.059, 0.061], [Vector3(s * 0.248, 1.26, 0.0), 0.054, 0.056]], LIMB, up, G_TOP, O_ALL, false, false)
+		_tube(st, [[Vector3(s * 0.248, 1.26, 0.0), 0.052, 0.054], [Vector3(s * 0.255, 1.13, 0.0), 0.046, 0.047]], LIMB, up, G_ARM, O_ALL, false, false)
+		_ellipsoid(st, Vector3(s * 0.255, 1.13, 0.0), Vector3(0.044, 0.044, 0.045), 10, 6, fo, G_ARM, O_ALL)
+		_tube(st, [[Vector3(s * 0.255, 1.13, 0.0), 0.045, 0.046], [Vector3(s * 0.262, 1.0, -0.004), 0.042, 0.044],
+			[Vector3(s * 0.266, 0.89, 0.0), 0.034, 0.036]], LIMB, fo, G_ARM, O_ALL, false, false)
+		_ellipsoid(st, Vector3(s * 0.268, 0.84, -0.006), Vector3(0.026, 0.056, 0.042), 8, 6, fo, G_SKIN, O_ALL)
 		_ellipsoid(st, Vector3(s * 0.258, 0.855, -0.042), Vector3(0.015, 0.03, 0.016), 5, 4, fo, G_SKIN, O_ALL)
 		if sticks:
 			_box(st, Vector3(s * 0.268, 0.74, -0.02), Vector3(0.04, 0.24, 0.04), fo, G_GLOW, O_ALL)
@@ -86,7 +92,7 @@ static func _detail_mesh(sticks: bool) -> ArrayMesh:
 	_box(st, Vector3(0.245, 0.83, -0.035), Vector3(0.014, 0.13, 0.068), P_FORE_R, G_PHONE, O_PHONE)
 	_box(st, Vector3(0.237, 0.83, -0.035), Vector3(0.003, 0.115, 0.058), P_FORE_R, G_SCREEN, O_PHONE)
 	# Kopf: leicht länglich, Nase, Ohren; Augen, Brauen und Mund malt der Shader
-	_ellipsoid(st, Vector3(0, 1.627, 0.004), Vector3(0.093, 0.115, 0.104), 10, 8, P_HEAD, G_SKIN, O_ALL)
+	_ellipsoid(st, Vector3(0, 1.627, 0.004), Vector3(0.093, 0.115, 0.104), 14, 10, P_HEAD, G_SKIN, O_ALL)
 	_ellipsoid(st, Vector3(0, 1.606, -0.1), Vector3(0.016, 0.03, 0.022), 6, 4, P_HEAD, G_SKIN, O_ALL)
 	for s in [-1.0, 1.0]:
 		_ellipsoid(st, Vector3(s * 0.093, 1.618, 0.012), Vector3(0.014, 0.027, 0.019), 6, 4, P_HEAD, G_SKIN, O_ALL)

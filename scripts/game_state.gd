@@ -60,6 +60,8 @@ var motion_blur := 2
 const MOTION_BLUR_NAMES := ["Aus", "Dezent", "Normal", "Stark"]
 var speed_fov := true
 var cam_shake := true
+## Kamera im Rennen (PlayerCar.CAM_NAMES), wird gespeichert
+var cam_mode := 0
 ## Schwierigkeit: wie stark die Gegner fahren (und wie viele Driftpunkte es braucht). 0 Leicht, 1 Normal, 2 Schwer
 var difficulty := 1
 const DIFFICULTY_NAMES := ["Leicht", "Normal", "Schwer"]
@@ -329,7 +331,7 @@ func stage_wins(s: int) -> int:
 func stage_open(s: int) -> bool:
 	if s <= 0:
 		return true
-	return stage_open(s - 1) and stage_wins(s - 1) >= Catalog.STAGE_WINS
+	return stage_open(s - 1) and stage_wins(s - 1) >= Catalog.stage_need(s - 1)
 
 
 ## Karriere-Event frei: seine Stufe ist offen, oder es war nach der alten Kette (bis 2.15) schon offen
@@ -506,7 +508,7 @@ func save_game() -> void:
 		"best_times": best_times, "tuning": tuning, "won_events": won_events, "kept_cars": kept_cars,
 		"gfx": {"preset": preset, "opts": gfx, "pixel": pixel_look, "vsync": vsync, "fps": fps_limit, "fullscreen": fullscreen,
 			"touch": touch_mode, "show_fps": show_fps, "jump_cam": jump_cam, "motion_blur": motion_blur,
-			"speed_fov": speed_fov, "cam_shake": cam_shake},
+			"speed_fov": speed_fov, "cam_shake": cam_shake, "cam": cam_mode},
 		"language": language, "difficulty": difficulty,
 	}, "\t")
 	var f := FileAccess.open(save_path, FileAccess.WRITE)
@@ -584,6 +586,7 @@ func load_game() -> void:
 	motion_blur = clampi(int(g.get("motion_blur", 2)), 0, 3)
 	speed_fov = bool(g.get("speed_fov", true))
 	cam_shake = bool(g.get("cam_shake", true))
+	cam_mode = clampi(int(g.get("cam", 0)), 0, 3)
 	difficulty = clampi(int(data.get("difficulty", 1)), 0, 2)
 	# Bis 2.12 hatte jedes Auto sein eigenes Tuning: übernommen wird das des zuletzt gefahrenen Autos
 	var src: Dictionary = data.get("tuning", {})

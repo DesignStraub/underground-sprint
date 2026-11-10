@@ -543,7 +543,7 @@ func _show_main() -> void:
 	_focus_first()
 
 
-const CREDITS_TEXT := "Motorklänge aus echten Aufnahmen (Wikimedia Commons, CC BY 3.0/4.0): prone, Y Racing, Tyler Riddle, Great Explorer, NEW CARS 2015 Official, Fabio Rojas Pichardo, Taz Ringer, asTUBE, Super Cars for you, Work With Sounds / Technisches Museum Slowenien. Reifenquietschen: Joseph Sardin, BigSoundBank (CC0). Musik: Pixabay. Schrift: D-DIN (Datto, OFL). Karten © OpenStreetMap-Mitwirkende."
+const CREDITS_TEXT := "Motorklänge aus echten Aufnahmen (Wikimedia Commons, CC BY 3.0/4.0): prone, Y Racing, Tyler Riddle, Great Explorer, NEW CARS 2015 Official, Fabio Rojas Pichardo, Taz Ringer, asTUBE, Super Cars for you, Work With Sounds / Technisches Museum Slowenien. Reifenquietschen: Joseph Sardin, BigSoundBank (CC0). Bahnübergang: Renardo la vulpo (CC0), Work With Sounds / Konrad Gutkowski (CC BY 4.0), Extemporalist (CC0). Musik: Pixabay. Schrift: D-DIN (Datto, OFL). Karten © OpenStreetMap-Mitwirkende."
 
 ## Erklärung je Einstellung (unten im Infofeld)
 const SETTING_HINTS := {
@@ -716,10 +716,10 @@ func _stage_header(s: int) -> Control:
 	c.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var open := GameState.stage_open(s)
 	var w := GameState.stage_wins(s)
-	var done := w >= Catalog.STAGE_WINS
+	var done := w >= Catalog.stage_need(s)
 	var col: Color = UI.GOLD if open and done else (UI.CYAN if open else Color(0.5, 0.53, 0.58))
 	var left := tr("STUFE %d · %s") % [s + 1, tr(Catalog.STAGES[s]["name"]).to_upper()]
-	var right := tr("GESPERRT") if not open else (tr("FERTIG") if done else tr("%d/%d SIEGE") % [w, Catalog.STAGE_WINS])
+	var right := tr("GESPERRT") if not open else (tr("FERTIG") if done else tr("%d/%d SIEGE") % [w, Catalog.stage_need(s)])
 	c.draw.connect(func():
 		var f := UI.font("cond", 0.2)
 		var y := c.size.y - 4.0
@@ -766,7 +766,7 @@ func _career_info(ev: String) -> String:
 	var t := head + "\n" + tr("Ziel: ") + goal + "\n" + tr(r.get("desc", Catalog.EVENT_TYPES[rt]["desc"]))
 	var s := Catalog.stage_of(ev)
 	if not GameState.career_open(ev):
-		var left: int = Catalog.STAGE_WINS - GameState.stage_wins(s - 1)
+		var left: int = Catalog.stage_need(s - 1) - GameState.stage_wins(s - 1)
 		t = head + "\n" + tr("Ziel: ") + goal + "\n" + (tr("Gesperrt: gewinne noch %d Event in Stufe %d." if left == 1 else
 			"Gesperrt: gewinne noch %d Events in Stufe %d.") % [left, s])
 	elif GameState.best_times.has(ev):

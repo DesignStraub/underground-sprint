@@ -19,6 +19,8 @@ const ASPHALT_N := preload("res://assets/textures/asphalt_n.png")
 const BUILDING_SHADER := preload("res://shaders/building.gdshader")
 const WATER_SHADER := preload("res://shaders/water.gdshader")
 const RAMP_SHADER := preload("res://shaders/ramp.gdshader")
+const SIGN_SHADER := preload("res://shaders/shop_sign.gdshader")
+const SIGN_FONTS := {"cond": preload("res://assets/fonts/D-DINCondensed-Bold.otf"), "wide": preload("res://assets/fonts/D-DINExp-Bold.otf")}
 const BLINK_SHADER := preload("res://shaders/blink.gdshader")
 const LIGHT_SHADER := preload("res://shaders/traffic_light.gdshader")
 const TUNNEL_SHADER := preload("res://shaders/tunnel.gdshader")
@@ -37,9 +39,10 @@ const WALK := 5.0  # Gehwegbreite
 const CURB_H := 0.2
 const WALL_H := 12.0  # hoch genug, dass man auch im Sprung nicht rausfliegt
 const LAMP_STEP := 38.0
-const RAMP_H := 1.7
 const WATER_DROP := 1.8  # Seen: so tief fällt man (Physik), gespritzt wird beim Eintauchen in die Oberfläche
-const RAIL_RAMP_H := 3.7
+## Bahnübergang auf einem Bahndamm (seit 2.24 statt einer 3,7 m hohen Rampe auf der rechten Spur): die Straße steigt
+## über gut 25 m sanft an, liegt über den Gleisen flach und fällt wieder ab. Bei Renntempo hebt das Auto kurz ab.
+const RAIL_DAM_H := 0.85
 const SC_HALF := 5.0
 const ALLEY_HALF := 5.0
 const SPUR_HALF := 6.0
@@ -922,18 +925,16 @@ static func _plan_shortcut(track: Dictionary, b: Dictionary, rng: RandomNumberGe
 	track["zones"].append({"from": path["from"] - 30.0, "to": path["from"] + 45.0})
 	track["zones"].append({"from": path["to"] - 45.0, "to": path["to"] + 30.0})
 	if lake:
-		var r0 := sc.get_closest_offset(p0 + du * (0.47 * a))
-		var r1 := sc.get_closest_offset(p0 + du * (0.535 * a))
-		var g1 := sc.get_closest_offset(p0 + du * (0.68 * a))
-		track["ramps"].append({"path": path["id"], "d0": r0, "d1": r1, "lat0": -half, "lat1": half, "h": RAMP_H})
+		# Seit 2.24 ohne Sprungschanze und Lücke (wirkte wie eine Schanze im Nirgendwo): die Abkürzung führt auf einem
+		# Damm mit niedrigen Mauern durch den See. gap0 > gap1 heißt: keine Lücke.
 		# Der See bleibt im Dreieck zwischen Abkürzung und Hauptstraße (die Ecken mit gut 16 m Abstand zu deren Mitte),
 		# sonst stünde an der Ausfahrt die Hauptstraße unter Wasser
 		track["lakes"].append({"path": path["id"], "center": p0 + du * (0.52 * a) + dv * vb * 6.0,
-			"au": du, "av": dv * vb, "hu": 0.22 * a, "hv": 29.0, "gap0": r1, "gap1": g1})
+			"au": du, "av": dv * vb, "hu": 0.22 * a, "hv": 29.0, "gap0": 1e9, "gap1": -1e9})
 		track["parks"].append([p0, b["p1"], b["p2"]])
 
 
-## Bahnübergang auf einem geraden Stück, mit Rampe auf der rechten Außenspur
+## Bahnübergang auf einem geraden Stück, auf einem flachen Bahndamm
 static func _plan_crossing(track: Dictionary, rng: RandomNumberGenerator) -> void:
 	var curve: Curve3D = track["curve"]
 	var L: float = track["length"]
@@ -951,9 +952,8 @@ static func _plan_crossing(track: Dictionary, rng: RandomNumberGenerator) -> voi
 
 static func _set_crossing(track: Dictionary, d: float) -> void:
 	track["crossing_d"] = d
-	track["zones"].append({"from": d - 80.0, "to": d + 30.0})
-	track["ramps"].append({"path": 0, "d0": d - 23.0, "d1": d - 9.5, "lat0": 4.6, "lat1": HALF_W - 0.1, "h": RAIL_RAMP_H})
-	track["blocks"].append({"from": d - 70.0, "to": d + 5.0, "lane": LANES[3]})
+	track["zones"].append({"from": d - 80.0, "to": d + 45.0})
+	track["elev0"].append({"a": d - 32.0, "b": d - 6.0, "c": d + 6.0, "e": d + 32.0, "h": RAIL_DAM_H})
 
 
 ## Kreuzungen: kurze Seitenstraßen nach links und rechts (Sackgassen) mit Ampeln und Zebrastreifen
@@ -2181,6 +2181,172 @@ static func _label(parent: Node3D, text: String, col: Color, size: int, pos: Vec
 	l.rotation_degrees.y = 180.0  # Label ist von +Z lesbar, Straße liegt bei -Z
 	parent.add_child(l)
 	return l
+
+
+static func _any(text: String, keys: Array) -> bool:
+	for k in keys:
+		if k in text:
+			return true
+	return false
+
+
+## Stil eines Ladenschilds nach der Ladenart (seit 2.24; bis 2.23 sah jedes Schild gleich aus: dunkler Kasten mit
+## Neonrahmen in Zufallsfarbe). top/bottom: Farbverlauf, text: Schriftfarbe, glow: Leuchtkasten (1) oder angestrahlt
+## (0), font: "cond", "wide" oder normal, band: 1 Grün-Weiß-Rot, 2 Schachbrett, emblem: "apo" (rotes Apotheken-A),
+## "pole" (Friseur-Drehsäule), neon: alter Neon-Stil (Bars, Spielhallen, Tattoo).
+static func _sign_style(name: String, rng: RandomNumberGenerator) -> Dictionary:
+	var n := name.to_upper()
+	if _any(n, ["APOTHEKE"]):
+		return {"top": Color(0.08, 0.6, 0.3), "bottom": Color(0.02, 0.38, 0.16), "text": Color(1, 1, 1), "glow": 0.9, "emblem": "apo"}
+	if _any(n, ["FRISEUR", "BARBIER", "HAIR"]):
+		return {"top": Color(0.1, 0.12, 0.22), "bottom": Color(0.02, 0.03, 0.08), "text": Color(0.95, 0.95, 0.92), "glow": 0.15, "font": "wide", "emblem": "pole"}
+	if _any(n, ["NAGEL", "KOSMETIK", "BEAUTY"]):
+		return {"top": Color(1.0, 0.72, 0.86), "bottom": Color(0.95, 0.45, 0.66), "text": Color(0.38, 0.05, 0.22), "glow": 0.8}
+	if _any(n, ["BÄCKER", "KONDITOR", "BACK"]):
+		return {"top": Color(0.6, 0.36, 0.14), "bottom": Color(0.33, 0.17, 0.06), "text": Color(1.0, 0.88, 0.6), "glow": 0.45}
+	if _any(n, ["METZGER", "FLEISCH"]):
+		return {"top": Color(0.88, 0.12, 0.1), "bottom": Color(0.6, 0.04, 0.04), "text": Color(1, 1, 1), "glow": 0.8}
+	if _any(n, ["PIZZA", "PIZZERIA", "TRATTORIA"]):
+		return {"top": Color(0.98, 0.96, 0.9), "bottom": Color(0.86, 0.82, 0.74), "text": Color(0.68, 0.05, 0.08), "glow": 0.85, "band": 1, "font": "cond"}
+	if _any(n, ["DÖNER", "CURRYWURST", "IMBISS", "SCHNITZEL", "WOK", "GRILL", "BURGER"]):
+		return {"top": Color(1.0, 0.84, 0.12), "bottom": Color(0.96, 0.46, 0.05), "text": Color(0.5, 0.04, 0.02), "glow": 1.0, "font": "wide"}
+	if _any(n, ["LOTTO"]):
+		return {"top": Color(0.92, 0.14, 0.1), "bottom": Color(0.7, 0.05, 0.05), "text": Color(1.0, 0.9, 0.15), "glow": 0.9, "font": "wide"}
+	if _any(n, ["KIOSK", "SPÄTI", "SPÄTKAUF", "24/7"]):
+		return {"top": Color(0.12, 0.32, 0.78), "bottom": Color(0.04, 0.15, 0.5), "text": Color(1.0, 0.86, 0.12), "glow": 0.9, "font": "wide"}
+	if _any(n, ["EISCAFÉ", "EIS", "BUBBLE"]):
+		return {"top": Color(0.7, 0.96, 0.86), "bottom": Color(1.0, 0.74, 0.86), "text": Color(0.32, 0.08, 0.26), "glow": 0.75}
+	if _any(n, ["CAFÉ", "KAFFEE", "TEEHAUS", "TEE"]):
+		return {"top": Color(0.96, 0.91, 0.8), "bottom": Color(0.78, 0.65, 0.48), "text": Color(0.3, 0.16, 0.07), "glow": 0.6}
+	if _any(n, ["JUWELIER", "GOLD", "JADE", "UHREN"]):
+		return {"top": Color(0.1, 0.1, 0.1), "bottom": Color(0.01, 0.01, 0.01), "text": Color(1.0, 0.8, 0.36), "glow": 0.0, "font": "wide"}
+	if _any(n, ["BANK", "SPARKASSE"]):
+		return {"top": Color(0.08, 0.24, 0.6), "bottom": Color(0.02, 0.1, 0.36), "text": Color(1, 1, 1), "glow": 0.8, "font": "wide"}
+	if n == "POST" or n.begins_with("POST"):
+		return {"top": Color(1.0, 0.82, 0.0), "bottom": Color(0.95, 0.7, 0.0), "text": Color(0.05, 0.05, 0.05), "glow": 0.9, "font": "wide"}
+	if _any(n, ["OPTIK"]):
+		return {"top": Color(0.98, 0.98, 0.98), "bottom": Color(0.82, 0.85, 0.9), "text": Color(0.08, 0.24, 0.6), "glow": 0.8, "font": "wide"}
+	if _any(n, ["BLUMEN", "GARTEN"]) and not "BIER" in n:
+		return {"top": Color(0.38, 0.68, 0.26), "bottom": Color(0.14, 0.4, 0.12), "text": Color(1, 1, 0.95), "glow": 0.6}
+	if _any(n, ["BUCH"]):
+		return {"top": Color(0.09, 0.26, 0.16), "bottom": Color(0.03, 0.12, 0.07), "text": Color(0.96, 0.9, 0.74), "glow": 0.0}
+	if _any(n, ["HANDY", "TELEFON"]):
+		return {"top": Color(0.12, 0.62, 0.96), "bottom": Color(0.05, 0.3, 0.72), "text": Color(1, 1, 1), "glow": 1.0, "font": "wide"}
+	if _any(n, ["WÄSCHE", "REINIGUNG"]):
+		return {"top": Color(0.78, 0.92, 1.0), "bottom": Color(0.5, 0.75, 0.95), "text": Color(0.05, 0.2, 0.46), "glow": 0.8}
+	if _any(n, ["TUNING", "REIFEN", "AUTOTEILE", "WERKSTATT"]):
+		return {"top": Color(0.14, 0.14, 0.15), "bottom": Color(0.03, 0.03, 0.03), "text": Color(1.0, 0.5, 0.05), "glow": 0.1, "band": 2, "font": "wide"}
+	if _any(n, ["FITNESS", "BOXEN"]):
+		return {"top": Color(0.13, 0.13, 0.13), "bottom": Color(0.02, 0.02, 0.02), "text": Color(1.0, 0.16, 0.1), "glow": 0.0, "font": "wide"}
+	if _any(n, ["WEIN", "GASTHAUS", "BRAUHAUS", "BIERGARTEN", "WIRTSHAUS"]):
+		return {"top": Color(0.34, 0.19, 0.08), "bottom": Color(0.18, 0.09, 0.03), "text": Color(0.96, 0.8, 0.42), "glow": 0.0}
+	if _any(n, ["SCHUH", "TURNSCHUH", "MODE", "BOUTIQUE"]):
+		return {"top": Color(0.98, 0.98, 0.98), "bottom": Color(0.8, 0.8, 0.82), "text": Color(0.05, 0.05, 0.05), "glow": 0.85, "font": "wide"}
+	if _any(n, ["DROGERIE"]):
+		return {"top": Color(1, 1, 1), "bottom": Color(0.86, 0.9, 1.0), "text": Color(0.8, 0.05, 0.12), "glow": 0.9, "font": "wide"}
+	if _any(n, ["REISE"]):
+		return {"top": Color(0.25, 0.65, 1.0), "bottom": Color(1.0, 0.75, 0.3), "text": Color(1, 1, 1), "glow": 0.8}
+	if _any(n, ["MUSIK", "VIDEO", "SPIELE", "GAMES"]):
+		return {"top": Color(0.48, 0.12, 0.72), "bottom": Color(0.14, 0.03, 0.34), "text": Color(0.45, 1.0, 1.0), "glow": 0.7, "font": "wide"}
+	if _any(n, ["SUSHI", "RAMEN", "NUDEL", "DIM SUM", "PHO", "ASIA", "DRACHE", "LOTUS", "PANDA", "TOFU", "FEUERTOPF", "GLÜCKS"]):
+		return {"top": Color(0.78, 0.07, 0.05), "bottom": Color(0.45, 0.02, 0.02), "text": Color(1.0, 0.84, 0.36), "glow": 0.7}
+	if _any(n, ["PFAND"]):
+		return {"top": Color(0.08, 0.22, 0.14), "bottom": Color(0.02, 0.08, 0.05), "text": Color(1.0, 0.82, 0.4), "glow": 0.0, "font": "wide"}
+	if _any(n, ["TATTOO", "SHISHA", "SPIELHALLE", "WETT", "KNEIPE", "KARAOKE", "MAHJONG", "BAR", "CLUB"]):
+		return {"neon": true}
+	# unbekannte Läden (z. B. echte Namen aus den Städten): meist ein ruhiger Leuchtkasten, manchmal Neon
+	if rng.randf() < 0.3:
+		return {"neon": true}
+	var pal := [[Color(0.98, 0.98, 0.96), Color(0.82, 0.82, 0.8), Color(0.1, 0.1, 0.12)],
+		[Color(0.12, 0.3, 0.62), Color(0.05, 0.14, 0.38), Color(1, 1, 1)],
+		[Color(0.7, 0.08, 0.1), Color(0.42, 0.03, 0.05), Color(1, 0.95, 0.85)],
+		[Color(0.16, 0.45, 0.3), Color(0.06, 0.24, 0.15), Color(1, 1, 0.95)],
+		[Color(0.2, 0.2, 0.22), Color(0.06, 0.06, 0.07), Color(0.95, 0.85, 0.55)]]
+	var c: Array = pal[rng.randi() % pal.size()]
+	return {"top": c[0], "bottom": c[1], "text": c[2], "glow": rng.randf_range(0.4, 0.9), "font": ["", "cond", "wide"][rng.randi() % 3]}
+
+
+## Ladenschild über der Markise: Kasten mit Farbverlauf (Leuchtkasten oder angestrahlt), Schrift und Zeichen je nach
+## Ladenart (_sign_style). xf: Mitte des Kastens, +Z zeigt zur Straße; das Schild wird höchstens max_w breit.
+static func _shop_sign(root: Node3D, text: String, xf: Transform3D, max_w: float, rng: RandomNumberGenerator) -> void:
+	var st := _sign_style(text, rng)
+	if st.get("neon", false):
+		_sign_box(root, text, NEON[rng.randi() % NEON.size()], 64, 0.02, xf, max_w)
+		return
+	var size := 64
+	var px := 0.02
+	var font: Font = SIGN_FONTS.get(st.get("font", ""), ThemeDB.fallback_font)
+	var tw := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x * px
+	var pad := size * px * 0.5
+	var bh := size * px * 0.85 + pad
+	var em := bh * 0.78 if st.get("emblem", "") == "apo" else 0.0
+	if tw + em + 2.0 * pad > max_w:
+		var k := maxf(max_w - em - 2.0 * pad, 0.5) / tw
+		px *= k
+		tw *= k
+	var bw := tw + em + 2.0 * pad
+	var d := 0.18
+	var n := Node3D.new()
+	n.transform = xf
+	root.add_child(n)
+	Builder._add(n, Builder.box(Vector3(bw, bh, d)), Builder.mat(Color(0.08, 0.08, 0.09), 0.6, 0.45), Vector3.ZERO)
+	var q := QuadMesh.new()
+	q.size = Vector2(bw - 0.05, bh - 0.05)
+	var m := ShaderMaterial.new()
+	m.shader = SIGN_SHADER
+	m.set_shader_parameter("top_col", st["top"])
+	m.set_shader_parameter("bottom_col", st["bottom"])
+	m.set_shader_parameter("glow", st["glow"])
+	m.set_shader_parameter("band", st.get("band", 0))
+	var qi := MeshInstance3D.new()
+	qi.mesh = q
+	qi.material_override = m
+	qi.position = Vector3(0, 0, d / 2.0 + 0.004)
+	qi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	n.add_child(qi)
+	var l := Label3D.new()
+	l.text = text
+	l.font = font
+	l.font_size = size
+	l.pixel_size = px
+	var tc: Color = st["text"]
+	# Leuchtkasten: dunkle Schrift bleibt dunkel; angestrahlte Schilder: helle Schrift leicht leuchtend
+	l.modulate = tc if st["glow"] > 0.3 else Color(tc.r * 1.25, tc.g * 1.25, tc.b * 1.25)
+	l.outline_size = 0
+	l.shaded = false
+	l.double_sided = false
+	l.position = Vector3(em / 2.0, 0.0 if st.get("band", 0) == 0 else bh * 0.05, d / 2.0 + 0.02)
+	n.add_child(l)
+	match st.get("emblem", ""):
+		"apo":
+			# rotes Apotheken-A auf weißem Grund links im Schild
+			var ax := -bw / 2.0 + pad * 0.6 + em / 2.0
+			Builder._add(n, Builder.box(Vector3(em, em, 0.03)), Builder.mat(Color(0.95, 0.95, 0.95), 0.0, 0.5, Color(1, 1, 1), 0.9), Vector3(ax, 0, d / 2.0 + 0.015))
+			var al := Label3D.new()
+			al.text = "A"
+			al.font = SIGN_FONTS["wide"]
+			al.font_size = 64
+			al.pixel_size = em / 64.0 * 0.95
+			al.modulate = Color(0.85, 0.04, 0.06)
+			al.shaded = false
+			al.double_sided = false
+			al.position = Vector3(ax, 0, d / 2.0 + 0.035)
+			n.add_child(al)
+		"pole":
+			# Friseur-Drehsäule neben dem Schild: weiß mit roten und blauen Ringen, leuchtend
+			var cols := [Color(0.95, 0.95, 0.95), Color(0.85, 0.05, 0.05), Color(0.95, 0.95, 0.95), Color(0.05, 0.15, 0.75)]
+			var ring := CylinderMesh.new()
+			ring.top_radius = 0.13
+			ring.bottom_radius = 0.13
+			ring.height = 0.12
+			ring.radial_segments = 12
+			ring.rings = 1
+			var px0 := bw / 2.0 + 0.32
+			for i in 8:
+				var c: Color = cols[i % 4]
+				Builder._add(n, ring, Builder.mat(c, 0.0, 0.3, c, 0.8), Vector3(px0, -0.42 + i * 0.12, 0.15))
+			for s in [-1.0, 1.0]:
+				Builder._add(n, Builder.box(Vector3(0.3, 0.06, 0.3)), Builder.mat(Color(0.75, 0.75, 0.78), 0.9, 0.3), Vector3(px0, s * 0.52, 0.15))
 
 
 ## Leuchtkasten an einer Fassade: dunkler Kasten mit Neonrahmen, die Schrift leuchtet darauf. xf: Mitte des Kastens,
@@ -3467,9 +3633,8 @@ static func _building(root: Node3D, center: Vector3, basis: Basis, w: float, dep
 				bl.transform = Transform3D(basis if s > 0.0 else basis.rotated(Vector3.UP, PI), bp + basis.z * s * 0.14)
 				root.add_child(bl)
 	if shop:
-		# Ladenschild über der Markise: Leuchtkasten statt frei an der Wand schwebender Buchstaben
-		_sign_box(root, names[rng.randi() % names.size()], NEON[rng.randi() % NEON.size()], 64, 0.02,
-			Transform3D(face_basis, face_pos + Vector3(0, 4.75, 0)), w * 0.8)
+		# Ladenschild über der Markise, im Stil der Ladenart (Apotheke, Friseur, Imbiss ...)
+		_shop_sign(root, names[rng.randi() % names.size()], Transform3D(face_basis, face_pos + Vector3(0, 4.75, 0)), w * 0.8, rng)
 	if style == 4.0 and h > 10.0 and rng.randf() < dist.get("fire_escape", 0.0):
 		_fire_escape(root, face_pos + basis.z * rng.randf_range(-w * 0.25, w * 0.25), Basis.looking_at(-face_dir, Vector3.UP),
 			mini(int((h - 4.2) / 3.2), 6))

@@ -8,7 +8,7 @@ Alles, was du auf der neuen itch.io-Seite eintragen musst (das Spiel hieß früh
 |---|---|
 | Title | Need for Geschwindigkeit |
 | Project URL | wie beim Anlegen gewählt, z. B. `need-for-geschwindigkeit` (für `push_itch.sh` als 3. Angabe) |
-| Short description / tagline | Illegale Straßenrennen bei Nacht durch echte deutsche Städte. Tunen, Nitro, Drift, Drag. Kostenlos. |
+| Short description / tagline | Illegale Straßenrennen bei Nacht durch echte deutsche Städte. Tunen, Nitro, Drift. Kostenlos. |
 | Classification | Games |
 | Kind of project | Downloadable + HTML |
 | Release status | In development |
@@ -38,10 +38,10 @@ Berlin-Kreuzberg, mit Dom, Residenz, Festung, Oberbaumbrücke und Hochbahn an ih
 
 **Features**
 - Karriere mit Deutschlandkarte: 21 Events in fünf Stufen, drei Siege öffnen die nächste – die Reihenfolge wählst du
-- Sprint, Rundkurs, Drag (auf Schienen mit Spurwechsel und Handschaltung), Drift (mit Bonuszonen am Kurvenrand) – sechs Strecken auf echten Straßen (OpenStreetMap)
+- Sprint, Rundkurs, Drift (mit markierten Außenspuren an der Bande) – sechs Strecken auf echten Straßen (OpenStreetMap)
 - Jede Stadt mit eigener Stimmung: Regen auf nasser Fahrbahn, Nebel, Natriumlicht, Dämmerung, Neon, Kiez
 - Tunnel, Hochbahn, Bahnübergang mit Zug, Brücken, Abkürzungen, Verkehr in beide Richtungen
-- Abkürzungen als Lichttunnel aus Neonbögen, Sprünge mit echter Flugphase, Überschläge bei harten Crashs, umfahrbare Laternen und Schilder
+- Abkürzungen als Lichttunnel aus Neonbögen, Kuppen, an denen man abhebt, Überschläge bei harten Crashs, umfahrbare Laternen und Schilder
 - Sprungkamera wie in Underground: Bei großen Sprüngen fängt dich eine Kamera schräg von vorn ein, in leichter Zeitlupe
 - Asphalt wie damals: körnig, mit Rissen, Teerfugen und Radspuren, Lichtkreise unter jeder Laterne, nass spiegeln sich Laternen und Rücklichter; Gehwege aus Betonplatten, Kopfsteinpflaster in den Altstädten
 - Tempogefühl wie in Underground: Bewegungsunschärfe am Bildrand, Tempo-Zoom, Reifenquietschen in Kurven und Drifts – alles einzeln abschaltbar
@@ -55,7 +55,7 @@ Berlin-Kreuzberg, mit Dom, Residenz, Festung, Oberbaumbrücke und Hochbahn an ih
 - Englisch und Deutsch, Retro-Pixel-Look (einstellbar), läuft bis 4K und im Browser, auch auf Handy und Tablet
 
 **Steuerung**
-W/S Gas/Bremse · A/D Lenken · Leertaste Handbremse · Shift Nitro · S/X Schalten (Drag) · C Kamera · R Zurücksetzen · M Musik · F11 Vollbild · Esc/Enter/P Pause · Menüs auch mit WASD, zurück mit Esc oder Rücktaste
+W/S Gas/Bremse · A/D Lenken · Leertaste Handbremse · Shift Nitro · C Kamera (vier Ansichten) · R Zurücksetzen · M Musik · F11 Vollbild · Esc/Enter/P Pause · Menüs auch mit WASD, zurück mit Esc oder Rücktaste
 Gamepad wird unterstützt.
 
 **macOS-Hinweis:** Das Spiel ist nicht von Apple signiert. Beim ersten Start Rechtsklick auf die App → „Öffnen“.
@@ -76,10 +76,10 @@ cathedral, palace, fortress, Oberbaum Bridge and elevated U-Bahn in their real p
 
 **Features**
 - Career with a map of Germany: 21 events, unlocked one after another
-- Sprint, circuit, drag (on rails with lane changes and manual shifting), drift (with bonus zones on the corner edges) – six tracks on real streets (OpenStreetMap)
+- Sprint, circuit, drift (with marked outer lanes along the wall) – six tracks on real streets (OpenStreetMap)
 - Every city has its own mood: rain on wet asphalt, fog, sodium light, dusk, neon, Kiez
 - Tunnels, elevated railway, rail crossing with train, bridges, shortcuts, two-way traffic
-- Shortcuts as neon light tunnels, jumps with real air time, rollovers in hard crashes, lamps and signs you can knock over
+- Shortcuts as neon light tunnels, crests that lift you off, rollovers in hard crashes, lamps and signs you can knock over
 - Jump camera like in Underground: big jumps cut to a camera watching you from ahead at an angle, in slight slow motion
 - Asphalt like back then: grainy, with cracks, tar seams and wheel ruts, a pool of light under every street lamp, street lights and tail lights reflecting when wet; concrete-slab sidewalks, cobblestones in the old towns
 - Speed feel like Underground: motion blur at the screen edges, speed zoom, tyre squeal when drifting – each can be switched off
@@ -93,10 +93,10 @@ cathedral, palace, fortress, Oberbaum Bridge and elevated U-Bahn in their real p
 - English and German (choose at first start), retro pixel look, runs up to 4K and in the browser, also on phones and tablets
 
 **Controls**
-W/S throttle/brake · A/D steer · Space handbrake · Shift nitro · S/X shift (drag) · C camera · R reset · M music · F11 fullscreen · Esc/Enter/P pause · menus also with WASD, back with Esc or Backspace
+W/S throttle/brake · A/D steer · Space handbrake · Shift nitro · C camera (four views) · R reset · M music · F11 fullscreen · Esc/Enter/P pause · menus also with WASD, back with Esc or Backspace
 Gamepad supported.
 
-Tagline: Illegal street racing at night through real German towns. Tuning, nitro, drift, drag. Free.
+Tagline: Illegal street racing at night through real German towns. Tuning, nitro, drift. Free.
 
 Music: tracks from Pixabay (Pixabay Content License). Map data of the cities © OpenStreetMap contributors (ODbL).
 Engine sounds: real recordings from Wikimedia Commons (CC BY 3.0/4.0) by prone, Y Racing, Tyler Riddle, Great Explorer, NEW CARS 2015 Official, Fabio Rojas Pichardo, Taz Ringer, asTUBE, Super Cars for you and Work With Sounds / Technical Museum of Slovenia, edited (cut, smoothed, filtered). Tyre squeal: Joseph Sardin, BigSoundBank (CC0).

@@ -53,7 +53,7 @@ const EN := {
 	"Handbremse und Lenken stellen das Auto quer. Drift-Ketten bringen Multiplikator.": "Handbrake and steering get you sideways. Drift chains build a multiplier.",
 	"Siege schalten neue Teile und Autos frei.": "Wins unlock new parts and cars.",
 	"Spar dir Nitro für die letzte Gerade.": "Save some nitro for the final straight.",
-	"Über die Rampe am Bahnübergang springst du über die Gleise.": "Hit the ramp at the rail crossing to jump the tracks.",
+	"Bahnübergang: Blinkt es schon, kommst du mit Vollgas noch knapp vor dem Zug drüber.": "Rail crossing: if the lights are already flashing, flat out you can still just beat the train.",
 	"Motor-Tuning steigert Beschleunigung und Höchstgeschwindigkeit.": "Engine tuning raises acceleration and top speed.",
 	"Im Drag nicht im Begrenzer bleiben: der Motor überhitzt.": "In drag races, stay off the rev limiter or the engine overheats.",
 	"Zu schwer? Einstellungen > Schwierigkeit: Leicht": "Too hard? Settings > Difficulty: Easy",
@@ -98,8 +98,8 @@ const EN := {
 		"Point to point against 3 rivals. Forks and shortcuts: your call. Diamonds: 1 no traffic, 2 light, 3 heavy.",
 	"Rundkurs gegen 3 Gegner. Wer die beste Linie findet, gewinnt. Rauten: 1 ohne Verkehr, 2 wenig, 3 voll.":
 		"Circuit against 3 rivals. Best line wins. Diamonds: 1 no traffic, 2 light, 3 heavy.",
-	"Allein auf der Strecke. Querfahren gibt Punkte, Ketten geben Multiplikator, die leuchtenden Zonen am Kurvenrand zählen doppelt, ein Crash kostet die Kette.":
-		"Alone on the track. Sliding earns points, chains build a multiplier, the glowing zones on the outside of corners count double, a crash costs the chain.",
+	"Allein auf der Strecke. Querfahren gibt Punkte, Ketten geben Multiplikator, die markierten Außenspuren an der Bande zählen doppelt, ein Crash kostet die Kette.":
+		"Alone on the track. Sliding earns points, chains build a multiplier, the marked outer lanes along the wall count double, a crash costs the chain.",
 	"Geradeaus gegen 3 Gegner, das Auto fährt wie auf Schienen. A/D wechselt die Spur, S schaltet hoch, X runter: im grünen Bereich perfekt. Zu lange im Begrenzer: Motorschaden. Crash mit Verkehr: Totalschaden.":
 		"Straight line against 3 rivals, the car runs as if on rails. A/D changes lanes, S shifts up, X down: perfect in the green zone. Too long on the limiter: blown engine. Hit traffic: totaled.",
 	"Echte Straßen aus Aachen, Würzburg, Bad Kissingen, Tauberbischofsheim und Hammelburg, die Wahrzeichen stehen an ihrem Platz. Kartendaten © OpenStreetMap-Mitwirkende.":
@@ -141,7 +141,7 @@ const EN := {
 	"ZU VIEL GAS": "WHEELSPIN", "KNAPP VORBEI  +NITRO": "NEAR MISS  +NITRO", "RUNDE %d": "LAP %d", "LETZTE RUNDE": "FINAL LAP",
 	"PLATZ": "POS", "ZEIT": "TIME", "RUNDE": "LAP", "PUNKTE": "POINTS", "DRIFT  +NITRO": "DRIFT  +NITRO", "SPRUNG": "AIR", "SPRUNG  %.1f s": "AIR  %.1f s",
 	"Platz %d: %d": "Place %d: %d", "ABKÜRZUNG!": "SHORTCUT!", "ALTSTADT · GEGENVERKEHR!": "OLD TOWN · ONCOMING TRAFFIC!",
-	"Kamera: ": "Camera: ", "Verfolger": "Chase", "Stoßstange": "Bumper", "Motorhaube": "Hood",
+	"Kamera: ": "Camera: ", "Verfolger": "Chase", "Verfolger weit": "Chase far", "Stoßstange": "Bumper", "Motorhaube": "Hood",
 	"PERFEKT GESCHALTET": "PERFECT SHIFT", "GUT GESCHALTET": "GOOD SHIFT", "ZU FRÜH GESCHALTET": "EARLY SHIFT",
 	"MOTOR ÜBERHITZT – SCHALTEN!": "ENGINE OVERHEATING – SHIFT!", "MOTORSCHADEN": "ENGINE BLOWN", "TOTALSCHADEN": "TOTALED",
 	"SIEG!": "WINNER!", "2. PLATZ": "2ND PLACE", "3. PLATZ": "3RD PLACE", "4. PLATZ": "4TH PLACE",
@@ -235,8 +235,8 @@ const EN := {
 	"Achtung: Dein Browser speichert hier keinen Spielstand. Öffne das Spiel über den Knopf oben rechts in einem eigenen Tab, dann bleibt dein Fortschritt erhalten.": "Note: your browser does not keep save data here. Open the game in its own tab with the button at the top right to keep your progress.",
 	"LÄDT": "LOADING", "Fertig": "Done", "Zurück": "Back",
 	"Quellen & Lizenzen": "Sources & licences",
-	"Motorklänge aus echten Aufnahmen (Wikimedia Commons, CC BY 3.0/4.0): prone, Y Racing, Tyler Riddle, Great Explorer, NEW CARS 2015 Official, Fabio Rojas Pichardo, Taz Ringer, asTUBE, Super Cars for you, Work With Sounds / Technisches Museum Slowenien. Reifenquietschen: Joseph Sardin, BigSoundBank (CC0). Musik: Pixabay. Schrift: D-DIN (Datto, OFL). Karten © OpenStreetMap-Mitwirkende.":
-		"Engine sounds from real recordings (Wikimedia Commons, CC BY 3.0/4.0): prone, Y Racing, Tyler Riddle, Great Explorer, NEW CARS 2015 Official, Fabio Rojas Pichardo, Taz Ringer, asTUBE, Super Cars for you, Work With Sounds / Technical Museum of Slovenia. Tyre squeal: Joseph Sardin, BigSoundBank (CC0). Music: Pixabay. Font: D-DIN (Datto, OFL). Maps © OpenStreetMap contributors.",
+	"Motorklänge aus echten Aufnahmen (Wikimedia Commons, CC BY 3.0/4.0): prone, Y Racing, Tyler Riddle, Great Explorer, NEW CARS 2015 Official, Fabio Rojas Pichardo, Taz Ringer, asTUBE, Super Cars for you, Work With Sounds / Technisches Museum Slowenien. Reifenquietschen: Joseph Sardin, BigSoundBank (CC0). Bahnübergang: Renardo la vulpo (CC0), Work With Sounds / Konrad Gutkowski (CC BY 4.0), Extemporalist (CC0). Musik: Pixabay. Schrift: D-DIN (Datto, OFL). Karten © OpenStreetMap-Mitwirkende.":
+		"Engine sounds from real recordings (Wikimedia Commons, CC BY 3.0/4.0): prone, Y Racing, Tyler Riddle, Great Explorer, NEW CARS 2015 Official, Fabio Rojas Pichardo, Taz Ringer, asTUBE, Super Cars for you, Work With Sounds / Technical Museum of Slovenia. Tyre squeal: Joseph Sardin, BigSoundBank (CC0). Rail crossing: Renardo la vulpo (CC0), Work With Sounds / Konrad Gutkowski (CC BY 4.0), Extemporalist (CC0). Music: Pixabay. Font: D-DIN (Datto, OFL). Maps © OpenStreetMap contributors.",
 	"Lack, Felgen, Spoiler …": "Paint, rims, spoiler …", "Motor, Turbo, Nitro …": "Engine, turbo, nitro …",
 	"←/→  Auswählen      ENTER  Einbauen/Öffnen      ESC  Zurück      F11  Vollbild": "←/→  Select      ENTER  Install/Open      ESC  Back      F11  Fullscreen", "DEIN AUTO": "YOUR CAR", "KLASSE %s": "CLASS %s",
 	"Nitro brennt nach dem Zünden ein kurzes Stück und braucht danach einen Moment, bis es wieder zündet.": "Once lit, nitro burns for a short moment and needs a second before it fires again.",

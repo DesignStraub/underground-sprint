@@ -685,8 +685,9 @@ def ui_go():
     return _mix((x, 0.0, 1.0), (hit, 0.48, 0.9), (_tone(1318.5, 0.25, 0.08), 0.48, 0.25))
 
 
+# horn, bell und rumble sind seit 2.24 echte Aufnahmen (CREDITS.md); die Funktionen bleiben zum Vergleich.
 SOUNDS = {
-    "horn": (horn, 0.89), "bell": (bell_loop, 0.7), "rumble": (rumble_loop, 0.89), "thud": (thud, 0.89),
+    "thud": (thud, 0.89),
     "whoosh": (whoosh, 0.7), "splash": (splash, 0.89), "clang": (clang, 0.75), "tunnel": (tunnel, 0.8),
     "crowd": (crowd_loop, 0.6), "scrub": (scrub_loop, 0.8), "nitro": (nitro_loop, 0.8),
     "nitro_on": (nitro_on, 0.89), "nitro_off": (nitro_off, 0.85),

@@ -173,7 +173,7 @@ const CARS := {
 	},
 	# --- Exoten ---
 	"kagura": {
-		"drive": "rwd", "name": "Kagura V10", "style": "coupe", "class": "S", "unlock": {"race": 15}, "drift": 0.45, "paint": Color(0.95, 0.95, 0.94), "finish": "pearl",
+		"drive": "rwd", "name": "Kagura V10", "style": "coupe", "class": "S", "unlock": {"race": 14}, "drift": 0.45, "paint": Color(0.95, 0.95, 0.94), "finish": "pearl",
 		"length": 4.5, "width": 1.9,
 		"accel": 13.6, "top_speed": 71.5, "grip": 26.5, "steer": 2.35,
 		"desc": "Japanischer Supersportwagen mit V10 vorn. Der stärkste Antritt im Spiel und ein Schrei bis 9.000/min.",
@@ -181,7 +181,7 @@ const CARS := {
 		"sound": {"cyl": 10, "harm": [1.0, 0.34, 0.4, 0.26], "sub": 0.08, "turbo": 0.0, "rough": 0.08},
 	},
 	"falke": {
-		"drive": "rr", "name": "Falke 9 RS", "style": "coupe", "class": "S", "unlock": {"race": 16}, "drift": 0.5, "paint": Color(0.45, 0.7, 0.85), "finish": "metal",
+		"drive": "rr", "name": "Falke 9 RS", "style": "coupe", "class": "S", "unlock": {"race": 15}, "drift": 0.5, "paint": Color(0.45, 0.7, 0.85), "finish": "metal",
 		"length": 4.55, "width": 1.85,
 		"accel": 13.0, "top_speed": 71.5, "grip": 31.0, "steer": 2.55,
 		"desc": "Sportwagen mit Boxer im Heck. Enorme Traktion, das Heck will aber mit Gefühl gefahren werden.",
@@ -189,7 +189,7 @@ const CARS := {
 		"sound": {"cyl": 6, "harm": [1.0, 0.48, 0.44, 0.26], "sub": 0.3, "turbo": 0.0, "rough": 0.28},
 	},
 	"furia": {
-		"drive": "awd", "name": "Furia V12", "style": "coupe", "class": "S", "unlock": {"race": 17}, "drift": 0.35, "paint": Color(0.55, 0.85, 0.1), "finish": "pearl",
+		"drive": "awd", "name": "Furia V12", "style": "coupe", "class": "S", "unlock": {"race": 16}, "drift": 0.35, "paint": Color(0.55, 0.85, 0.1), "finish": "pearl",
 		"length": 4.8, "width": 2.03,
 		"accel": 12.3, "top_speed": 75.0, "grip": 28.5, "steer": 2.0,
 		"desc": "Flacher V12-Keil mit Allrad, breiter als jeder Gegner. Zieht ewig, lenkt aber träge ein.",
@@ -619,27 +619,31 @@ const RACES := [
 const EVENT_TYPES := {
 	"sprint": {"label": "Sprint", "goal": "Als Erster von A nach B.", "desc": "Von A nach B gegen 3 Gegner. Gabelungen und Abkürzungen: du entscheidest. Rauten: 1 ohne Verkehr, 2 wenig, 3 voll."},
 	"circuit": {"label": "Rundkurs", "goal": "Nach %d Runden als Erster über die Linie.", "desc": "Rundkurs gegen 3 Gegner. Wer die beste Linie findet, gewinnt. Rauten: 1 ohne Verkehr, 2 wenig, 3 voll."},
-	"drift": {"label": "Drift", "goal": "Die meisten Driftpunkte: die Marke für Platz 1 steht am Start.", "desc": "Allein auf der Strecke. Querfahren gibt Punkte, Ketten geben Multiplikator, die leuchtenden Zonen am Kurvenrand zählen doppelt, ein Crash kostet die Kette."},
+	"drift": {"label": "Drift", "goal": "Die meisten Driftpunkte: die Marke für Platz 1 steht am Start.", "desc": "Allein auf der Strecke. Querfahren gibt Punkte, Ketten geben Multiplikator, die markierten Außenspuren an der Bande zählen doppelt, ein Crash kostet die Kette."},
 	"drag": {"label": "Drag", "goal": "Als Erster über die Linie: perfekt schalten, dem Verkehr ausweichen.", "desc": "Geradeaus gegen 3 Gegner, das Auto fährt wie auf Schienen. A/D wechselt die Spur, S schaltet hoch, X runter: im grünen Bereich perfekt. Zu lange im Begrenzer: Motorschaden. Crash mit Verkehr: Totalschaden."},
 }
-const TYPE_ORDER := ["sprint", "circuit", "drag", "drift"]
+## Drag-Rennen sind seit 2.24 vorerst draußen (passten nicht, zu viel Umbau): die Events stehen weiter in RACES und
+## der Code in player_car/track_builder/race bleibt, sie stehen nur in keiner Karriere-Stufe. Letzter Stand mit Drag
+## in der Karriere: Git-Tag drag-2.23.
+const TYPE_ORDER := ["sprint", "circuit", "drift"]
 ## Karriere in Stufen wie in NFSU2: alle Events einer Stufe sind gleichzeitig offen und in beliebiger Reihenfolge
 ## fahrbar. STAGE_WINS Siege in einer Stufe öffnen die nächste, ein Event, das einem nicht liegt, kann man also
 ## auslassen. Jede Stufe mischt die Arten, die Schwierigkeit steigt von Stufe zu Stufe.
 const STAGES := [
-	{"name": "Einstieg", "events": ["Bankenviertel-Sprint", "Tauberbischofsheim Altstadt", "Hafenmeile", "Bad Kissingen Kurmeile"]},
-	{"name": "Szene", "events": ["Prachtallee-Sprint", "Innenstadtring", "Hafen-Drift", "Hammelburg Saaleck"]},
-	{"name": "Hafen und Altstadt", "events": ["Hafenrunde", "Neon-Gerade", "Aachen Grabenring", "Altstadt-Hügel", "Hafenring"]},
-	{"name": "Großstadt", "events": ["Altstadtring", "Berlin Kreuzberg", "Schnellstraßen-Sprint", "Stadion-Drift"]},
-	{"name": "Finale", "events": ["Schnellstraßen-Drag", "Hafen-Sprint", "Nachtschicht", "Würzburg Mainufer"]},
+	{"name": "Einstieg", "events": ["Bankenviertel-Sprint", "Tauberbischofsheim Altstadt", "Bad Kissingen Kurmeile", "Innenstadtring"]},
+	{"name": "Szene", "events": ["Prachtallee-Sprint", "Hafen-Drift", "Hammelburg Saaleck", "Altstadt-Hügel"]},
+	{"name": "Hafen und Altstadt", "events": ["Hafenrunde", "Aachen Grabenring", "Hafenring", "Altstadtring"]},
+	{"name": "Großstadt", "events": ["Berlin Kreuzberg", "Schnellstraßen-Sprint", "Stadion-Drift"]},
+	{"name": "Finale", "events": ["Hafen-Sprint", "Nachtschicht", "Würzburg Mainufer"]},
 ]
+## Siege, die eine Stufe öffnen: 3, bei Stufen mit nur drei Events 2 (eins darf man auslassen)
 const STAGE_WINS := 3
 ## Alle Karriere-Events Stufe für Stufe (Reihenfolge der Liste in der Garage)
-const CAREER := ["Bankenviertel-Sprint", "Tauberbischofsheim Altstadt", "Hafenmeile", "Bad Kissingen Kurmeile",
-	"Prachtallee-Sprint", "Innenstadtring", "Hafen-Drift", "Hammelburg Saaleck",
-	"Hafenrunde", "Neon-Gerade", "Aachen Grabenring", "Altstadt-Hügel", "Hafenring",
-	"Altstadtring", "Berlin Kreuzberg", "Schnellstraßen-Sprint", "Stadion-Drift",
-	"Schnellstraßen-Drag", "Hafen-Sprint", "Nachtschicht", "Würzburg Mainufer"]
+const CAREER := ["Bankenviertel-Sprint", "Tauberbischofsheim Altstadt", "Bad Kissingen Kurmeile", "Innenstadtring",
+	"Prachtallee-Sprint", "Hafen-Drift", "Hammelburg Saaleck", "Altstadt-Hügel",
+	"Hafenrunde", "Aachen Grabenring", "Hafenring", "Altstadtring",
+	"Berlin Kreuzberg", "Schnellstraßen-Sprint", "Stadion-Drift",
+	"Hafen-Sprint", "Nachtschicht", "Würzburg Mainufer"]
 ## Bis 2.15 eine Kette (ein Sieg öffnete das nächste Event): was danach schon offen war, bleibt offen
 const CAREER_V1 := ["Bankenviertel-Sprint", "Tauberbischofsheim Altstadt", "Hafenmeile", "Bad Kissingen Kurmeile",
 	"Prachtallee-Sprint", "Innenstadtring", "Hafenrunde", "Hammelburg Saaleck", "Neon-Gerade", "Aachen Grabenring",
@@ -652,6 +656,11 @@ static func drift_targets(r: Dictionary, diff: int) -> Array:
 	var tier: int = r.get("tier", 1)
 	var k: float = [1.0, 1.0, 1.35, 1.7][tier] * [0.65, 0.85, 1.0][diff] * r.get("laps", 2) * r.get("corners", 12) / 24.0
 	return [int(700 * k / 10.0) * 10, int(1500 * k / 10.0) * 10, int(2600 * k / 10.0) * 10]
+
+
+## Siege in Stufe s, die die nächste öffnen
+static func stage_need(s: int) -> int:
+	return mini(STAGE_WINS, STAGES[s]["events"].size() - 1)
 
 
 ## Stufe (0..) eines Karriere-Events, -1 wenn es in keiner steht

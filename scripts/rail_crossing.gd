@@ -1,8 +1,11 @@
 extends Node3D
 ## Bahnübergang mit Bahnhof: zwei Gleise quer zur Straße, Schranken, Andreaskreuz mit Blinklicht, Glocke,
 ## Oberleitung, daneben ein kleiner Bahnhof (Bahnsteige, Fußgängerbrücke, Empfangsgebäude, Wartende) und ein Zug.
-## Der Zug startet, wenn sich der Spieler nähert, so dass er ungefähr gleichzeitig ankommt.
-## Er ist ein hartes Hindernis (Gruppe "traffic"). Mit der Rampe auf der rechten Außenspur springt man drüber.
+## Seit 2.24 liegt alles auf einem flachen Bahndamm (Straße, Gleise, Bahnhof; Track.RAIL_DAM_H), die Rampe zum
+## Drüberspringen ist weg. Der Zug startet, wenn sich der Spieler nähert, und zwar so, dass man bei gleichem Tempo gut
+## eine Sekunde vor ihm drüber ist: erst blinkt und läutet es, dann senken sich die Schranken, man huscht durch und
+## hinter einem rauscht der Zug vorbei. Wer langsamer wird, muss warten. Der Zug ist ein hartes Hindernis (Gruppe
+## "traffic").
 
 const Builder := preload("res://scripts/car_builder.gd")
 const BLINK_SHADER := preload("res://shaders/blink.gdshader")
@@ -15,7 +18,9 @@ const RAIL_HALF := 560.0
 const TRACK_OFF := 2.25  # zwei Gleise, je so weit vor und hinter der Mitte
 const PLAT_LEN := 95.0
 const STATION_SIDE := -1.0  # Bahnhof links der Straße (in Fahrtrichtung)
-const WARN_TIME := 5.0  # so viele Sekunden vor dem Zug gehen die Schranken runter
+const WARN_TIME := 4.0  # so viele Sekunden vor dem Zug blinkt und läutet es (Gegner halten dann an)
+const GATE_TIME := 2.4  # so viele Sekunden vor dem Zug senken sich die Schranken
+const LEAD := 1.2  # so viele Sekunden vor der Zugspitze ist der Spieler bei gleichem Tempo am Übergang
 
 var d_cross := 0.0
 var player: Node3D
@@ -39,6 +44,7 @@ var _rumble: AudioStreamPlayer
 func setup(frame: Dictionary, d: float, half_w: float, walk: float, station := "MARKTPLATZ") -> void:
 	d_cross = d
 	origin = frame["pos"]
+	origin.y = frame["y"]  # Bahndamm: Gleise und Bahnhof liegen so hoch wie die Straße über den Gleisen
 	fwd = frame["fwd"]
 	axis = frame["right"]
 	var right: Vector3 = frame["right"]
@@ -80,6 +86,8 @@ func setup(frame: Dictionary, d: float, half_w: float, walk: float, station := "
 		var side_dir: Vector3 = right * s
 		_cross_sign(origin + approach * (TRACK_OFF + 8.0) + side_dir * (half_w + 1.4), -approach)
 		_gate(origin + approach * (TRACK_OFF + 5.0) + side_dir * (half_w + 0.6), -approach, half_w)
+	if origin.y > 0.05:
+		_embankment(road_edge, gravel)
 	_catenary(road_edge)
 	_station(road_edge, station)
 	_build_train()
@@ -87,6 +95,45 @@ func setup(frame: Dictionary, d: float, half_w: float, walk: float, station := "
 	add_child(_bell)
 	_rumble = Sfx.looping("rumble")
 	add_child(_rumble)
+
+
+## Bahndamm unter den Gleisen (Trapez, beidseits der Straße bis zum Ende der Gleise) und auf der Bahnhofsseite eine
+## Fläche in Dammhöhe mit Stützmauer, auf der Bahnsteige und Empfangsgebäude stehen
+func _embankment(road_edge: float, gravel: Material) -> void:
+	var h := origin.y + 0.05
+	var top := TRACK_OFF + 3.3
+	var foot := top + 1.8
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for s in [-1.0, 1.0]:
+		var x0: float = s * road_edge
+		var x1: float = s * RAIL_HALF
+		var prof := [[-foot, -h], [-top, -0.03], [top, -0.03], [foot, -h]]
+		for i in 3:
+			var a: Array = prof[i]
+			var b: Array = prof[i + 1]
+			var q := [_p(x0, a[1], a[0]), _p(x1, a[1], a[0]), _p(x1, b[1], b[0]), _p(x0, b[1], b[0])]
+			var n: Vector3 = (q[1] - q[0]).cross(q[3] - q[0]).normalized()
+			if n.y < 0.0:
+				n = -n
+				q = [q[0], q[3], q[2], q[1]]
+			for v in [q[0], q[1], q[2], q[0], q[2], q[3]]:
+				st.set_normal(n)
+				st.add_vertex(v - origin)
+	var mi := MeshInstance3D.new()
+	mi.mesh = st.commit()
+	mi.material_override = gravel
+	mi.position = origin
+	add_child(mi)
+	# Bahnhofsseite: Fläche in Dammhöhe von der Straße bis hinter das Bahnsteigende, quer vom Empfangsgebäude bis
+	# hinter den zweiten Bahnsteig
+	var sd := STATION_SIDE
+	var xa := road_edge + 0.5
+	var xb := road_edge + 2.0 + PLAT_LEN + 14.0
+	var za := -(TRACK_OFF + 3.6 + 2.0 + 5.2) - 6.0
+	var zb := TRACK_OFF + 3.6 + 2.0 + 1.0
+	var pave := Builder.mat(Color(0.34, 0.34, 0.35), 0.0, 0.9)
+	_add_box(Vector3(xb - xa, h, zb - za), pave, Transform3D(Basis.looking_at(fwd, Vector3.UP), _p(sd * (xa + xb) / 2.0, -h / 2.0 - 0.02, (za + zb) / 2.0)))
 
 
 ## Punkt in Bahn-Koordinaten: x entlang der Gleise (negativ = Bahnhofsseite), z quer (in Fahrtrichtung der Straße)
@@ -401,21 +448,24 @@ func _process(dt: float) -> void:
 	var p: float = player.progress
 	if p < d_cross - 460.0:
 		_triggered = false
-	# Zug so starten, dass er mit dem Spieler am Übergang ankommt
+	# Zug so starten, dass der Spieler bei gleichem Tempo LEAD Sekunden vor der Zugspitze drüber ist
+	# (_t_arrive: Zugmitte am Übergang)
 	if not _triggered and _t_arrive < 0.0 and p > d_cross - 420.0 and p < d_cross - 200.0:
 		_triggered = true
 		if randf() < 0.8:
 			var spd := maxf(absf(player.speed_fwd), 28.0)
-			_t_arrive = _clock + (d_cross - p) / spd
+			_t_arrive = _clock + (d_cross - p) / spd + LEAD + train_len / 2.0 / SPEED
 			_dir = 1.0 if randf() < 0.5 else -1.0
 
 	var was_blocked := blocked
 	blocked = false
+	var gates_down := false
 	if _t_arrive > 0.0:
 		var x := (_clock - _t_arrive) * SPEED * _dir  # Mitte des Zugs entlang der Gleise
 		var front := absf(x) - train_len / 2.0
 		var approaching := x * _dir < 0.0
 		blocked = (approaching and front < SPEED * WARN_TIME) or (not approaching and front < 12.0)
+		gates_down = (approaching and front < SPEED * GATE_TIME) or (not approaching and front < 12.0)
 		train.visible = absf(x) < RAIL_HALF + train_len
 		train.global_transform = Transform3D(Basis.looking_at(axis * _dir, Vector3.UP), origin + axis * x - fwd * TRACK_OFF * _dir)
 		train.velocity_vec = axis * _dir * SPEED
@@ -428,14 +478,14 @@ func _process(dt: float) -> void:
 			_rumble.stop()
 	if blocked and not was_blocked:
 		var dist := player.global_position.distance_to(origin)
-		Sfx.play("horn", linear_to_db(clampf(1.0 - dist / 600.0, 0.15, 1.0)))
+		Sfx.play("horn", linear_to_db(clampf(1.0 - dist / 600.0, 0.15, 1.0)) + 5.0)  # echte Aufnahme: leiser gemischt als die alte
 	for l in _lights:
 		l.material_override.set_shader_parameter("active", 1.0 if blocked else 0.0)
 	var cd := player.global_position.distance_to(origin)
 	_set_volume(_bell, clampf(1.0 - cd / 220.0, 0.0, 1.0) if blocked else 0.0, -4.0)
-	# Schranken: runter in ~2 s, rauf etwas langsamer
-	var target := 0.0 if blocked else deg_to_rad(-85.0)
-	_gate_angle = move_toward(_gate_angle, target, dt * (0.8 if blocked else 0.6))
+	# Schranken: erst Blinken und Läuten, dann runter in knapp 2 s, rauf etwas langsamer
+	var target := 0.0 if gates_down else deg_to_rad(-85.0)
+	_gate_angle = move_toward(_gate_angle, target, dt * (0.8 if gates_down else 0.6))
 	for g in _gates:
 		g.rotation.z = _gate_angle
 

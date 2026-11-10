@@ -49,7 +49,12 @@ const WALL_TURN_RATE := 4.0  # rad/s: so schnell dreht die Wand das Auto höchst
 const DRAG_LIMIT := 8000.0  # Begrenzer im Drag
 const PERFECT_SHIFT := Vector2(7100.0, 7650.0)  # grüner Bereich zum Hochschalten
 const GOOD_SHIFT := 6200.0
-const CAM_NAMES := ["Verfolger", "Stoßstange", "Motorhaube"]
+## Kameras (C schaltet weiter, die Wahl wird gespeichert): Verfolger nah und weit, Stoßstange, Motorhaube
+const CAM_NAMES := ["Verfolger", "Verfolger weit", "Stoßstange", "Motorhaube"]
+## Verfolger: Abstand, Höhe (je bei Stand, mit Tempo etwas weiter und flacher) und Blickpunkt vor dem Auto.
+## Seit 2.24 ein Stück höher (wie in NFSU, vorher 4,4 m / 1,6 m), dazu eine weite Stufe.
+const CHASE := [{"dist": 4.6, "height": 1.95, "look_y": 1.0, "look_z": -7.5},
+	{"dist": 6.4, "height": 2.55, "look_y": 1.0, "look_z": -8.5}]
 ## Sprungkamera wie in NFSU: bei hohen, langen Sprüngen schneidet das Bild auf eine feste Kamera knapp über dem
 ## Boden schräg vor der Landestelle. Sie schaut dem Auto nach und zoomt so, dass es etwa gleich groß bleibt; dazu
 ## Zeitlupe. Kurz nach dem Aufsetzen geht es zurück zur Fahrerkamera.
@@ -176,8 +181,8 @@ var _length := 4.0
 var _axle := 0.78  # Vorderachse so weit hinter dem Bug
 var _spec: Dictionary
 var _spin := 0.0
-## Trägheit (ab 2.23): die Drehrate folgt der Lenkung mit kurzer Verzögerung statt sofort, und die Karosserie federt
-## beim Wanken und Nicken nach (Feder mit leichter Dämpfung). Vorher fühlte sich das Auto zu direkt an, wie ohne Gewicht.
+## Karosserie federt beim Wanken und Nicken nach (Feder mit leichter Dämpfung, seit 2.23). Die Drehrate folgt der
+## Lenkung seit 2.24 wieder fast sofort wie in NFSU: die deutliche Trägheit aus 2.23 (Forza-Vergleich) war zu träge.
 var _yaw_v := 0.0
 var _roll_s := 0.0
 var _roll_sv := 0.0
@@ -217,7 +222,7 @@ func setup(car_id: String, cfg: Dictionary) -> void:
 	top_speed = st["top"]
 	grip_k = st["grip"] * 0.6
 	steer_rate = st["steer"]
-	lat_acc = 13.0 + st["grip"] * 0.39  # gut 2,1–2,5 g ab Werk (bis 2.22 7 % mehr): enge Ecken wollen angebremst werden
+	lat_acc = 14.0 + st["grip"] * 0.42  # 2,3–2,7 g ab Werk: griffig wie NFSU, aber enge Ecken wollen angebremst werden
 	drift_k = st["drift"]
 	drive_type = _spec.get("drive", "rwd")
 	nitro_power = nos["power"]
@@ -273,6 +278,7 @@ func setup(car_id: String, cfg: Dictionary) -> void:
 	cam.doppler_tracking = Camera3D.DOPPLER_TRACKING_PHYSICS_STEP  # Gegner und Verkehr ziehen mit Dopplereffekt vorbei
 	add_child(cam)
 	cam.make_current()
+	cam_mode = clampi(GameState.cam_mode, 0, CAM_NAMES.size() - 1)
 	_apply_cam()
 
 	audio = EngineAudio.new()
@@ -290,12 +296,12 @@ func setup(car_id: String, cfg: Dictionary) -> void:
 
 func _apply_cam() -> void:
 	_cam_init = false
-	if cam_mode == 0:
+	if _chase():
 		cam.top_level = true
 		return
 	cam.top_level = false
 	cam.transform = Transform3D.IDENTITY
-	if cam_mode == 1:
+	if cam_mode == 2:
 		cam.position = Vector3(0, 0.5, -_length / 2 - 0.05)
 		cam.rotation_degrees.x = -1.0
 	else:
@@ -305,7 +311,13 @@ func _apply_cam() -> void:
 
 func toggle_camera() -> void:
 	cam_mode = (cam_mode + 1) % CAM_NAMES.size()
+	GameState.cam_mode = cam_mode
+	GameState.save_game()
 	_apply_cam()
+
+
+func _chase() -> bool:
+	return cam_mode <= 1
 
 
 func _on_prop_hit(body: Node) -> void:
@@ -544,10 +556,9 @@ func _physics_process(dt: float) -> void:
 
 	# --- Lenkung (in der Luft wirkungslos). Bei Tempo schlägt das Lenkrad etwas langsamer ein (Tastatur).
 	var sf0 := clampf(spd / top_speed, 0.0, 1.0)
-	# 2.23: etwas ruhiger als bisher (6/3, zurück 8/5, gegen 9/6): das Auto soll Gewicht haben, nicht zucken
-	var steer_speed := lerpf(4.8, 2.3, sf0) if absf(steer_in) > 0.01 else lerpf(6.5, 4.0, sf0)
+	var steer_speed := lerpf(6.0, 3.0, sf0) if absf(steer_in) > 0.01 else lerpf(8.0, 5.0, sf0)
 	if steer_in * steer < 0.0:
-		steer_speed = lerpf(7.5, 5.0, sf0)  # Gegenlenken geht schneller als Einlenken
+		steer_speed = lerpf(9.0, 6.0, sf0)  # Gegenlenken geht schneller als Einlenken
 	steer = move_toward(steer, steer_in, dt * steer_speed)
 	var low_speed := clampf(spd / 2.0, 0.0, 1.0)
 	# Drehrate: langsam begrenzt durch den Wendekreis (Lenkgeometrie), bei Tempo durch die Querbeschleunigung
@@ -589,8 +600,8 @@ func _physics_process(dt: float) -> void:
 				# Drift-Modus: mit Gas und voll eingelenkt bricht das Heck aus
 				yaw *= 1.0 + 0.25 * smoothstep(0.5, 1.0, absf(steer)) * _thr_s * smoothstep(10.0, 16.0, spd)
 		_spin = move_toward(_spin, 0.0, dt * 2.0)
-		# Trägheit: die Drehrate baut sich auf (bei Tempo langsamer als beim Rangieren) und klingt nach
-		var yaw_k := 4.0 if airborne else lerpf(15.0, 6.5, sf0)
+		# kaum Trägheit (glättet nur Sprünge in der Drehrate); 2.23 hatte 15/6,5 und war zu träge
+		var yaw_k := 4.0 if airborne else lerpf(30.0, 20.0, sf0)
 		_yaw_v = lerpf(_yaw_v, yaw, 1.0 - exp(-dt * yaw_k))
 		_rotate_front((_yaw_v + _spin) * dt, 0.6 * _slip_hold)
 
@@ -935,7 +946,7 @@ func _slide_physics(dt: float, fwd: Vector3, right: Vector3, thr: float, hb: boo
 	if hb:
 		yaw *= 1.3
 	_spin = move_toward(_spin, 0.0, dt * 2.0)
-	_yaw_v = lerpf(_yaw_v, clampf(yaw, -3.2, 3.2), 1.0 - exp(-dt * 9.0))
+	_yaw_v = lerpf(_yaw_v, clampf(yaw, -3.2, 3.2), 1.0 - exp(-dt * 20.0))
 	_rotate_front((_yaw_v + _spin) * dt, 0.85)
 	var nf := -global_basis.z
 	nf.y = 0.0
@@ -1244,10 +1255,10 @@ func _update_camera(dt: float, sf: float) -> void:
 	if jump_cam:
 		_update_jump_cam(dt)
 		return
-	var base := 58.0 if cam_mode == 0 else 70.0
-	var zoom := (14.0 if cam_mode == 0 else 24.0) * sf + (8.0 if nitro_on else 0.0)
+	var base := 58.0 if _chase() else 70.0
+	var zoom := (14.0 if _chase() else 24.0) * sf + (8.0 if nitro_on else 0.0)
 	if not GameState.speed_fov:
-		zoom = (7.0 if cam_mode == 0 else 12.0)  # Tempo-Zoom aus: festes, mittleres Sichtfeld
+		zoom = (7.0 if _chase() else 12.0)  # Tempo-Zoom aus: festes, mittleres Sichtfeld
 	var target_fov := base + zoom
 	_fov = lerpf(_fov, target_fov, dt * (6.0 if nitro_on else 2.5))
 	cam.fov = _fov
@@ -1255,25 +1266,26 @@ func _update_camera(dt: float, sf: float) -> void:
 	var amp := _shake * (0.06 if GameState.cam_shake else 0.0)
 	var drift_look := clampf((drift_angle - 6.0) / 24.0, 0.0, 1.0) * 0.45 if velocity.length() > 5.0 else 0.0
 	_cam_drift = lerpf(_cam_drift, drift_look, 1.0 - exp(-dt * 3.0))
-	if cam_mode == 0:
+	if _chase():
 		# Verfolger: folgt mit leichter Verzögerung; im Drift schaut sie stufenlos ein Stück in Fahrtrichtung,
 		# so sieht man die Kurve und den Winkel
 		var yaw := global_rotation.y
 		if velocity.length() > 2.0:
 			yaw = lerp_angle(yaw, atan2(-velocity.x, -velocity.z), _cam_drift)
-		var dist := 4.4 + sf * 0.6 + (0.4 if nitro_on else 0.0)
-		var height := 1.6 - sf * 0.2
+		var cs: Dictionary = CHASE[cam_mode]
+		var dist: float = cs["dist"] + sf * 0.6 + (0.4 if nitro_on else 0.0)
+		var height: float = cs["height"] - sf * 0.2
 		if not _cam_init:
 			_cam_yaw = yaw
 			_cam_pos = global_position + Basis(Vector3.UP, yaw) * Vector3(0, height, dist)
 			_cam_init = true
 		# etwas Verzögerung: in Kurven sieht man das Auto einlenken (wie die NFSU-Verfolgerkamera)
-		_cam_yaw = lerp_angle(_cam_yaw, yaw, 1.0 - exp(-dt * (2.0 if airborne else 3.8)))
+		_cam_yaw = lerp_angle(_cam_yaw, yaw, 1.0 - exp(-dt * (2.0 if airborne else 4.5)))
 		var target := global_position + Basis(Vector3.UP, _cam_yaw) * Vector3(0, height, dist)
 		_cam_pos = _cam_pos.lerp(target, 1.0 - exp(-dt * 20.0))
 		_cam_pos.y = lerpf(_cam_pos.y, target.y, 1.0 - exp(-dt * (6.0 if airborne else 20.0)))
 		cam.global_position = _cam_pos
-		cam.look_at(global_position + Basis(Vector3.UP, _cam_yaw) * Vector3(0, 1.1, -7.0), Vector3.UP)
+		cam.look_at(global_position + Basis(Vector3.UP, _cam_yaw) * Vector3(0, cs["look_y"], cs["look_z"]), Vector3.UP)
 		if GameState.cam_shake:
 			cam.rotate_object_local(Vector3.FORWARD, -steer * sf * 0.02)
 	else:

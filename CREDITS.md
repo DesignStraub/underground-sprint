@@ -26,6 +26,13 @@ Die Autos im Spiel sind erfunden; welche Aufnahme ein Auto nutzt, steht in `scri
 von Joseph Sardin, BigSoundBank, [CC0](https://creativecommons.org/publicdomain/zero/1.0/) (gemeinfrei), als nahtlose
 Schleife geschnitten.
 
+## Bahnübergang (seit 2.24)
+| Datei | Aufnahme | Urheber | Lizenz |
+|---|---|---|---|
+| `assets/sfx/bell.wav` | [BÜ DE, Schrankensignal, 5](https://commons.wikimedia.org/wiki/File:B%C3%9C_DE,_Schrankensignal,_5.ogg) (Warnton beim Schließen der Schranken, zwei Töne als Schleife) | Renardo la vulpo | [CC0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| `assets/sfx/horn.wav` | [WWS Signalhorn (train horn)](https://commons.wikimedia.org/wiki/File:WWS_Signalhorntrainhorn.ogg) (erster Ton, gekürzt) | Work With Sounds / Konrad Gutkowski | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) |
+| `assets/sfx/rumble.wav` | [Freight train passes Phelan, startles Canadian geese](https://commons.wikimedia.org/wiki/File:Freight_train_passes_Phelan,_startles_Canadian_geese.flac) (4 s Rollen als Schleife, auch für die Hochbahn) | Extemporalist | [CC0](https://creativecommons.org/publicdomain/zero/1.0/) |
+
 ## Musik
 Tracks in `music/` und der Intro-Sound: Pixabay (Pixabay Content License).
 
