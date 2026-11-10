@@ -136,6 +136,12 @@ Titel: Street racing in your browser – no download
 Beschreibung: Need for Geschwindigkeit – night street racing through real German cities. Nitro, drift, tuning, 23 cars. Free, right in your browser: onehumanity.itch.io
 Hashtags: `#needforgeschwindigkeit #indiegame #browsergame #racinggame #streetracing #godot #gamedev`
 
+**Fassung mit Sprecher:** `release/need_for_geschwindigkeit_short_browser_en_voice.mp4` (38 s). Die Zeilen unten als
+Sprachaufnahme (ElevenLabs, Stimme „Roger – Laid-Back, Casual, Resonant“, Version 2), neu geschnitten: jede Szene beginnt
+mit ihrer Zeile (Würzburg und Kreuzberg je auf ihr Wort, Nitro auf „Hit the nitro“, Oberbaumbrücke mit Verkehr auf
+„Traffic in the mirror“, Zug auf „Beat the train“). Darunter Spielmusik „Drift Phonk“ von sub_clair (Pixabay) und Spielton,
+geduckt, solange gesprochen wird. Lautheit −14 LUFS.
+
 **Song (ElevenLabs Music), Länge 31 s:**
 
 Stil-Prompt:
