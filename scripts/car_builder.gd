@@ -488,7 +488,9 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 			hy = S["nose"] - 0.05
 		_:
 			pass
-	if headlights:
+	# Echte Scheinwerfer nur mit dem vollen Renderer: im Browser zeichnet jedes Licht jedes Objekt, das es trifft,
+	# noch einmal (das kostete bei vier Autos viel); dort macht der Lichtteppich (_light_pools) den Lichtschein
+	if headlights and RenderingServer.get_current_rendering_method() != "gl_compatibility":
 		var spot := SpotLight3D.new()
 		spot.position = Vector3(0, hy, zf - 0.1)
 		spot.spot_range = 45.0
@@ -945,7 +947,7 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 			gl.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			gl.position.y = 0.03
 			root.add_child(gl)
-		for z in [-1, 1]:
+		for z in ([] if RenderingServer.get_current_rendering_method() == "gl_compatibility" else [-1, 1]):
 			var ol := OmniLight3D.new()
 			ol.light_color = nc
 			ol.light_energy = 0.9
@@ -2615,7 +2617,8 @@ static func _light_pools(root: Node3D, W: float, L: float, light_c: Color) -> vo
 		var dc := Decal.new()
 		dc.size = size
 		dc.texture_emission = spec[0]
-		dc.emission_energy = spec[4]
+		# mit dem vollen Renderer leuchtet zusätzlich der echte Scheinwerfer: Teppich nur halb so hell (sonst im Tunnel grell)
+		dc.emission_energy = spec[4] * 0.45
 		dc.modulate = spec[3]
 		dc.albedo_mix = 0.0
 		dc.upper_fade = 0.3

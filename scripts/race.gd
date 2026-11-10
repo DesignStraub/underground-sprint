@@ -287,6 +287,16 @@ func _warmup() -> void:
 		vp.add_child(cam)
 		cover.add_child(vp)
 		cams.append(cam)
+	# Tempo-Effekt (Bildschirm-Shader) einmal mitzeichnen: sonst wird er erst übersetzt, wenn man zum ersten Mal schnell
+	# genug ist, und das Bild hakt (im Browser bis über 100 ms)
+	var fxw := ColorRect.new()
+	fxw.set_anchors_preset(Control.PRESET_FULL_RECT)
+	var fxm: ShaderMaterial = fx_mat.duplicate()
+	fxm.set_shader_parameter("blur", 0.05)
+	fxm.set_shader_parameter("nitro", 0.5)
+	fxm.set_shader_parameter("speed", 0.5)
+	fxw.material = fxm
+	cams[0].get_parent().add_child(fxw)
 	var i := 0
 	while i < views.size():
 		for cam in cams:
@@ -1359,9 +1369,11 @@ func _fmt(t: float) -> String:
 
 
 
-## Bewegungsunschärfe wie in NFS Underground (statt gezeichneter Tempolinien): ab gut 40 % Tempo verwischt der
-## Bildrand in Fahrtrichtung, mit Nitro stärker; beim Einlenken zusätzlich seitlich (Drehung der Kamera).
-## Stärke aus den Einstellungen (Aus/Dezent/Normal/Stark). Steht nichts an, ist das ganze Rechteck aus.
+## Bewegungsunschärfe wie in NFS Underground (statt gezeichneter Tempolinien): ab gut 90 km/h verwischt der Bildrand
+## in Fahrtrichtung, bis gut 230 km/h deutlich (seit 2.26 stärker und früher als vorher, ab 40 % der Höchstgeschwindigkeit
+## mit höchstens einem Drittel davon), Lichter ziehen Spuren, der Rand dunkelt leicht ab; mit Nitro stärker; beim
+## Einlenken zusätzlich seitlich (Drehung der Kamera). Stärke aus den Einstellungen (Aus/Dezent/Normal/Stark). Steht
+## nichts an, ist das ganze Rechteck aus.
 const BLUR_LEVEL := [0.0, 0.55, 1.0, 1.6]
 
 
@@ -1373,7 +1385,9 @@ func _update_speed_fx(sf: float) -> void:
 	var rate := wrapf(yaw - _cam_yaw_prev, -PI, PI) / maxf(dt, 0.001)
 	_cam_yaw_prev = yaw
 	_swing = lerpf(_swing, clampf(rate * 0.012, -0.03, 0.03), 1.0 - exp(-dt * 10.0))
-	var blur := lvl * (0.05 * smoothstep(0.4, 1.0, sf) + 0.06 * _nitro_fx)
+	var kmh: float = player.velocity.length() * 3.6
+	var sk := smoothstep(90.0, 235.0, kmh)
+	var blur := lvl * (0.115 * sk * sk + 0.075 * _nitro_fx)
 	var sw := lvl * _swing * smoothstep(0.2, 0.5, sf)
 	var nit := _nitro_fx if lvl > 0.0 else 0.0
 	if _bars_k > 0.0 or state != State.RACING:
@@ -1384,6 +1398,7 @@ func _update_speed_fx(sf: float) -> void:
 		fx_mat.set_shader_parameter("blur", blur)
 		fx_mat.set_shader_parameter("swing", sw)
 		fx_mat.set_shader_parameter("nitro", nit)
+		fx_mat.set_shader_parameter("speed", sk * minf(lvl, 1.0) if blur > 0.0 else 0.0)
 
 
 ## Sprungkamera: schwarze Balken oben und unten einfahren, Bewegungsunschärfe aus, Ton in der Zeitlupe dumpf

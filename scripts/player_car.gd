@@ -1262,8 +1262,11 @@ func _update_camera(dt: float, sf: float) -> void:
 	var target_fov := base + zoom
 	_fov = lerpf(_fov, target_fov, dt * (6.0 if nitro_on else 2.5))
 	cam.fov = _fov
-	# Kein Dauerwackeln bei Tempo: nur kurze, weiche Stöße bei Einschlägen und Landungen
+	# Kein Dauerwackeln bei Tempo: nur kurze, weiche Stöße bei Einschlägen und Landungen, dazu ab gut 80 % Tempo ein
+	# feines Zittern wie in NFS (wenige Millimeter, mit Nitro etwas mehr; mit "Kamerawackeln aus" nichts)
 	var amp := _shake * (0.06 if GameState.cam_shake else 0.0)
+	if GameState.cam_shake and not airborne:
+		amp += (0.006 + (0.006 if nitro_on else 0.0)) * smoothstep(0.78, 1.0, sf)
 	var drift_look := clampf((drift_angle - 6.0) / 24.0, 0.0, 1.0) * 0.45 if velocity.length() > 5.0 else 0.0
 	_cam_drift = lerpf(_cam_drift, drift_look, 1.0 - exp(-dt * 3.0))
 	if _chase():

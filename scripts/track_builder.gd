@@ -2529,12 +2529,16 @@ static func _pond(root: Node3D, n: Node3D, depth: float, rng: RandomNumberGenera
 		lan.radial_segments = 10
 		lan.rings = 5
 		Builder._add(n, lan, lamp_m, lp + Vector3(0, 3.55, 0))
-		var ol := OmniLight3D.new()
-		ol.light_color = Color(1.0, 0.78, 0.5)
-		ol.light_energy = 1.8
-		ol.omni_range = 11.0
-		ol.position = lp + Vector3(0, 3.3, 0)
-		n.add_child(ol)
+		if RenderingServer.get_current_rendering_method() != "gl_compatibility":  # Browser: nur Leuchte und Spiegelung
+			var ol := OmniLight3D.new()
+			ol.light_color = Color(1.0, 0.78, 0.5)
+			ol.light_energy = 1.8
+			ol.omni_range = 11.0
+			ol.position = lp + Vector3(0, 3.3, 0)
+			ol.distance_fade_enabled = true
+			ol.distance_fade_begin = 70.0
+			ol.distance_fade_length = 15.0
+			n.add_child(ol)
 		# Spiegelung der Laterne als schimmernder Streifen auf dem Wasser (zur Kamera hin)
 		var gm := ShaderMaterial.new()
 		gm.shader = GLINT_SHADER

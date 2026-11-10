@@ -502,9 +502,14 @@ dann steht „Benutzerdefiniert“ da. Werte in `GameState.GFX`.
   Stark), **Tempo-Zoom** (Sichtfeld wird mit Tempo und Nitro weiter), **Kamerawackeln** (Stöße bei Einschlägen und
   Landungen, Neigen beim Lenken), **Sprungkamera** (An / Ohne Zeitlupe / Aus).
 - **Bewegungsunschärfe wie in NFS Underground** (`shaders/speed_fx.gdshader`) statt gezeichneter Tempolinien: ab gut
-  40 % Tempo verwischt der Bildrand entlang der Fahrtrichtung (Zoom-Unschärfe vom Fluchtpunkt aus, zehn versetzte
-  Proben je Bildpunkt), die Mitte mit dem eigenen Auto bleibt scharf; beim Einlenken verwischt das Bild zusätzlich
-  seitlich, mit Nitro stärker, dazu ein blauer Schimmer und leichte Farbsäume. Steht nichts an, ist der Effekt ganz aus.
+  90 km/h verwischt der Bildrand entlang der Fahrtrichtung (Zoom-Unschärfe vom Fluchtpunkt aus, zehn versetzte
+  Proben je Bildpunkt), bis gut 230 km/h deutlich; die Mitte mit dem eigenen Auto bleibt scharf. Seit 2.26 näher am
+  Vorbild: gut doppelt so stark wie vorher und nach km/h statt nach Anteil der Höchstgeschwindigkeit (auch langsame
+  Autos fühlen sich bei 180 schnell an), helle Lichter ziehen Spuren wie bei langer Belichtung, der Bildrand dunkelt
+  mit dem Tempo leicht ab, und ab gut 80 % Tempo zittert die Kamera um wenige Millimeter (mit „Kamerawackeln aus“
+  nicht). Beim Einlenken verwischt das Bild zusätzlich seitlich, mit Nitro stärker, dazu ein blauer Schimmer und
+  leichte Farbsäume. Steht nichts an, ist der Effekt ganz aus; beim Laden wird er einmal unsichtbar gezeichnet,
+  damit der Browser den Shader nicht erst mitten im Rennen übersetzt.
 - **Nitro:** ein blauer Kegel aus jedem Endrohr, der in der Größe flackert; Fehlzündungen zeigen kurz einen kleinen
   orangefarbenen. Die Nitro-Grafik aus 2.20 (lodernde Flamme, Feuerball, Licht, Druckwelle, Kamerasprung beim Zünden)
   ist seit 2.22 wieder weg: sie wirkte wie eine Rakete.
@@ -512,6 +517,11 @@ dann steht „Benutzerdefiniert“ da. Werte in `GameState.GFX`.
   noch ein Viertel bis die Hälfte der Bildpunkte, ohne eigene Kopie des Fensterbilds. Spiegelungen auf „Niedrig“
   laufen in halber Auflösung.
 - Erststart: Handy/Tablet „Niedrig“, sonst „Mittel“ (beide mit dynamischer Auflösung).
+- **Browser schneller (seit 2.26):** Der Web-Renderer zeichnet jedes Objekt für jedes Echtzeit-Licht, das es trifft,
+  noch einmal, und neue Lichter erzwingen beim ersten Auftauchen neue Shader-Varianten (Ruckler). Im Browser haben
+  deshalb die Autos keine echten Scheinwerfer- und Neonlichter mehr (der Lichtteppich auf der Straße bleibt), die
+  Teiche keine Laternenlichter (Leuchte und Spiegelung bleiben) und der Zug kein Spitzenlicht. Gemessen mit dem
+  Web-Renderer am Rechner (Hafenrunde, Autopilot): 8,9 statt 10,6 ms je Bild, Ruckler über 30 ms von 14 auf 1.
 - **Leistung:** Unbewegliche Teile der Strecke werden je Material und Rasterzelle zu einem Mesh verschmolzen
   (`Track.batch_static`), Autos je Material und beweglichem Teil (Karosserie, Räder), dazu eine Fernansicht in
   Vertexfarben mit wenigen Flächen (`CarBuilder._build_lod`). Das halbiert etwa die Draw Calls. Im Browser fährt

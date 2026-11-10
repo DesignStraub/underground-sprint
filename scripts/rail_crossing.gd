@@ -420,12 +420,15 @@ func _build_train() -> void:
 			for s in [-0.9, 0.9]:
 				Builder._add(car, Builder.box(Vector3(0.4, 0.25, 0.05)), head, Vector3(s, 1.4, -l / 2.0 - 0.02))
 			Builder._add(car, Builder.box(Vector3(0.1, 1.2, 1.4)), dark, Vector3(0, 4.6, 0)).rotation_degrees.x = 30
-			var sp := SpotLight3D.new()
-			sp.position = Vector3(0, 1.6, -l / 2.0 - 0.3)
-			sp.spot_range = 60.0
-			sp.spot_angle = 30.0
-			sp.light_energy = 6.0
-			car.add_child(sp)
+			# Spitzenlicht nur mit dem vollen Renderer: im Browser erzwang das Licht beim ersten Auftauchen des Zugs neue
+			# Shader-Varianten an allem, was es traf (Ruckler bis 90 ms)
+			if RenderingServer.get_current_rendering_method() != "gl_compatibility":
+				var sp := SpotLight3D.new()
+				sp.position = Vector3(0, 1.6, -l / 2.0 - 0.3)
+				sp.spot_range = 60.0
+				sp.spot_angle = 30.0
+				sp.light_energy = 6.0
+				car.add_child(sp)
 		var cs := CollisionShape3D.new()
 		var bs := BoxShape3D.new()
 		bs.size = Vector3(3.2, 4.0, l)
