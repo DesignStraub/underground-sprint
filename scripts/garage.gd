@@ -1143,7 +1143,7 @@ func _install(cat: String, idx: int, group: String) -> void:
 	if GameState.get_config(preview_car).get(cat, 0) == idx:
 		Sfx.ui("select")
 		return
-	GameState.get_config(preview_car)[cat] = idx
+	GameState.set_part(preview_car, cat, idx)
 	GameState.save_game()
 	Sfx.ui("install")
 	_refresh_parts(cat)

@@ -400,8 +400,11 @@ Oben die alten Anzeigen, unten die neuen seit 2.10 (Minimap, Drehzahlmesser, Pla
   Kreis ab. Zeit und Tempo werden Zeichen für Zeichen ohne Textformung gezeichnet.
 
 ## Tuning wie in NFS
-**Ein Satz Teile für die ganze Garage** (wie in Underground): was eingebaut ist, passt auf alle eigenen Autos, beim
-Autowechsel bleibt alles dran. Rücktaste und Esc gehen eine Ebene zurück (Teileliste → Kategorie → Optik/Leistung →
+**Leistung für die ganze Garage, Optik je Auto (seit 2.25):** Motor, Turbo, Nitro, Fahrwerk und Reifen passen auf
+alle eigenen Autos, beim Autowechsel bleiben sie dran. Lack, Lackart, Felgen, Spoiler, Bodykit, Haube, Auspuff, Folie,
+Neon, Scheiben und Licht gestaltet man je Auto: ein Auto, das man zum ersten Mal wählt, ist blank (ab Werk, einfarbig).
+Bis 2.24 galt auch die Optik für alle Autos, eine einmal angebrachte Folie war so auf jedem Auto. Alte Spielstände
+behalten ihre Optik am zuletzt gefahrenen Auto (`GameState.looks`). Rücktaste und Esc gehen eine Ebene zurück (Teileliste → Kategorie → Optik/Leistung →
 Garage), der Fokus steht wieder auf dem Eintrag, aus dem man kam.
 
 **Seit 2.22 waagerecht wie in NFS Underground:** Tuning läuft in einer Leiste aus Kacheln unten im Bild statt in
@@ -636,6 +639,22 @@ ein, wie auf echten Aufnahmen. Kostet im Rennen etwa 4 % mehr Draw Calls und Dre
 - **Gehweg** (`shaders/pavement.gdshader`): Betonplatten 1,5 x 1,5 m mit Fugen, je Platte etwas anders getönt,
   Flecken und Kaugummi-Punkte, an beiden Rändern eine Reihe heller Bordsteine, Bordsteinkanten aus hellem Beton.
   Wo kein Haus die Streckenbegrenzung verdeckt, steht ein Zaun.
+
+## Autos und Licht (seit 2.25)
+- **Scheiben** (`shaders/car_glass.gdshader`): getönt und glatt, mit einer leichten, falschen Spiegelung der Stadt
+  (Horizontstreifen mit warmen Lichtern, oben etwas Himmel, im flachen Winkel stärker). Bis 2.24 fast schwarz.
+- **Leuchthöfe** (`Builder._lamp_glows`): weiche Lichtflecken auf Scheinwerfern und Rückleuchten, nur von vorn bzw.
+  hinten sichtbar; die Lage misst `_lamp_spots` an den Leuchtflächen jedes Autos (ohne dritte Bremsleuchte am Dach).
+- **Lichtteppiche** (`Builder._light_pools`): die Scheinwerfer legen einen 24 m langen, nach vorn breiter werdenden
+  Lichtkegel auf die Straße, die Rückleuchten einen kleinen roten Schein dahinter (Decal, im Browser additive Fläche).
+- **Kaido 2000GT** flacher und runder (Dach 1,30 statt 1,37 m, Gürtellinie tiefer, mehr Rundung, größere Räder).
+  Die aufgeschraubten Verbreiterungen sind bei allen Autos ein glatter, gerundeter Bogen statt elf Klötzchen.
+
+**Stadtparks mit Teich (seit 2.25):** auf jeder normalen Strecke ein, auf langen zwei Bauplätze am Straßenrand mit
+Rasen, unregelmäßig rundem Teich mit Steinkante, Kiesweg drumherum, Bänken, Bäumen, Parklaternen und einem niedrigen
+Zaun zur Straße (`Track._pond`). Das Wasser spiegelt stark (Reflexionssonde, einmal beim Laden), und jede Laterne wirft
+einen schimmernden Lichtstreifen über das Wasser zum Betrachter hin, der mit den Wellen flackert
+(`shaders/water_glint.gdshader`, geht auch im Browser).
 
 ## Entwicklung in Bildern
 Vergleichsbilder aus der Entwicklung liegen in `update_bilder/` (Godot ignoriert den Ordner, sie landen nicht im

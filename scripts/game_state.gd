@@ -1,6 +1,8 @@
 extends Node
 ## Spielstand: Siege, aktuelles Auto, Tuning. Kein Geld, nur Freischalten über Siege.
-## Tuning wie in NFS Underground: eingebaute Teile gelten für alle eigenen Autos (ein Satz für die ganze Garage).
+## Leistungsteile gelten für alle eigenen Autos (ein Satz für die ganze Garage). Die Optik (Lack, Felgen, Folie, Bodykit
+## usw.) hat seit 2.25 jedes Auto für sich: ein Auto, das man zum ersten Mal wählt, ist blank (ab Werk, einfarbig).
+## Bis 2.24 galt auch die Optik für alle Autos, eine einmal angebrachte Folie tauchte so auf jedem Auto auf.
 
 const Catalog := preload("res://scripts/catalog.gd")
 const I18n := preload("res://scripts/i18n.gd")
@@ -77,7 +79,9 @@ var current_car := "kaizen"
 var race_index := 0
 var best_times := {}  # Rennname -> Sekunden
 var won_events: Array = []  # gewonnene Events (Karriere: genug Siege in einer Stufe öffnen die nächste)
-var tuning := {}  # category -> option_index, für alle Autos gemeinsam
+var test_cfg := {}  # --cfg (nur Tests)
+var tuning := {}  # Leistungsteile: category -> option_index, für alle Autos gemeinsam
+var looks := {}  # Optik je Auto: car_id -> {category: option_index}; fehlt ein Wert, gilt 0 (ab Werk)
 var kept_cars: Array = []  # schon mit den alten Schwellen (bis 2.10) freigeschaltete Autos bleiben frei
 
 
@@ -114,13 +118,15 @@ func _ready() -> void:
 			pixel_look = a.substr(8) == "1"
 		elif a.begins_with("--car=") and Catalog.CARS.has(a.substr(6)):  # nur für Tests: mit diesem Auto fahren
 			current_car = a.substr(6)
-		elif a.begins_with("--cfg="):  # nur für Tests: Tuning setzen, z. B. --cfg=paint:5,finish:2
+		elif a.begins_with("--cfg="):  # nur für Tests: Tuning setzen, z. B. --cfg=paint:5,finish:2 (gilt für --car)
 			for kv in a.substr(6).split(","):
 				if ":" in kv and Catalog.PARTS.has(kv.get_slice(":", 0)):
-					tuning[kv.get_slice(":", 0)] = int(kv.get_slice(":", 1))
+					test_cfg[kv.get_slice(":", 0)] = int(kv.get_slice(":", 1))
 		elif a.begins_with("--lang="):  # nur für Tests und Bilder: Sprache (de/en)
 			language = a.substr(7)
 			I18n.setup(language)
+	for cat in test_cfg:
+		set_part(current_car, cat, test_cfg[cat])
 	apply_display()
 	_build_fps_overlay()
 	for a in OS.get_cmdline_user_args():
@@ -452,12 +458,24 @@ func is_part_unlocked(category: String, index: int) -> bool:
 	return total_wins() >= Catalog.PARTS[category]["options"][index]["wins"]
 
 
-## Eingebautes Tuning. Gilt für jedes Auto gleich (car_id bleibt für die Aufrufer, ändert aber nichts).
-func get_config(_car_id := "") -> Dictionary:
+## Eingebautes Tuning eines Autos (neues Dictionary): Leistung für alle gleich, Optik je Auto (fehlt: ab Werk)
+func get_config(car_id := "") -> Dictionary:
+	var id := car_id if car_id != "" else current_car
+	var lk: Dictionary = looks.get(id, {})
+	var cfg := {}
 	for cat in Catalog.PART_ORDER:
-		if not tuning.has(cat):
-			tuning[cat] = 0
-	return tuning
+		cfg[cat] = int((tuning if cat in Catalog.PART_GROUPS["leistung"] else lk).get(cat, 0))
+	return cfg
+
+
+## Teil einbauen: Leistung für alle Autos, Optik nur für dieses Auto
+func set_part(car_id: String, cat: String, idx: int) -> void:
+	if cat in Catalog.PART_GROUPS["leistung"]:
+		tuning[cat] = idx
+	else:
+		if not looks.has(car_id):
+			looks[car_id] = {}
+		looks[car_id][cat] = idx
 
 
 func part(car_id: String, category: String) -> Dictionary:
@@ -505,7 +523,7 @@ func _migrate_save() -> void:
 func save_game() -> void:
 	var text := JSON.stringify({
 		"wins": wins, "drift_wins": drift_wins, "current_car": current_car, "race_index": race_index,
-		"best_times": best_times, "tuning": tuning, "won_events": won_events, "kept_cars": kept_cars,
+		"best_times": best_times, "tuning": tuning, "looks": looks, "won_events": won_events, "kept_cars": kept_cars,
 		"gfx": {"preset": preset, "opts": gfx, "pixel": pixel_look, "vsync": vsync, "fps": fps_limit, "fullscreen": fullscreen,
 			"touch": touch_mode, "show_fps": show_fps, "jump_cam": jump_cam, "motion_blur": motion_blur,
 			"speed_fov": speed_fov, "cam_shake": cam_shake, "cam": cam_mode},
@@ -593,9 +611,26 @@ func load_game() -> void:
 	if src.is_empty():
 		src = data.get("car_configs", {}).get(current_car, {})
 	tuning = {}
-	for cat in Catalog.PART_ORDER:
+	for cat in Catalog.PART_GROUPS["leistung"]:
 		var n: int = Catalog.PARTS[cat]["options"].size()
 		tuning[cat] = clampi(int(src.get(cat, 0)), 0, n - 1)
+	# Optik je Auto (seit 2.25). Ältere Spielstände: die gemeinsame Optik bleibt am zuletzt gefahrenen Auto, alle
+	# anderen Autos sind blank
+	looks = {}
+	var lsrc: Dictionary = data.get("looks", {})
+	if not data.has("looks"):
+		lsrc = {current_car: src}
+	for id in lsrc:
+		if not Catalog.CARS.has(id):
+			continue
+		var one := {}
+		for cat in Catalog.PART_GROUPS["optik"]:
+			var n: int = Catalog.PARTS[cat]["options"].size()
+			var v := clampi(int(lsrc[id].get(cat, 0)), 0, n - 1)
+			if v != 0:
+				one[cat] = v
+		if not one.is_empty():
+			looks[id] = one
 
 
 func reset_progress() -> void:
@@ -605,6 +640,7 @@ func reset_progress() -> void:
 	race_index = 0
 	best_times = {}
 	tuning = {}
+	looks = {}
 	won_events = []
 	kept_cars = []
 	save_game()

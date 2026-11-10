@@ -17,7 +17,7 @@ const TIPS := [
 	"Spar dir Nitro für die letzte Gerade.",
 	"Bahnübergang: Blinkt es schon, kommst du mit Vollgas noch knapp vor dem Zug drüber.",
 	"Motor-Tuning steigert Beschleunigung und Höchstgeschwindigkeit.",
-	"Tuningteile passen auf alle deine Autos: einmal einbauen, überall dran.",
+	"Leistungsteile passen auf alle deine Autos, die Optik gestaltest du für jedes Auto einzeln.",
 	"Driften, knapp vorbei und Sprünge geben Punkte, die Nitro etwas nachfüllen.",
 	"Nitro brennt nach dem Zünden ein kurzes Stück und braucht danach einen Moment, bis es wieder zündet.",
 ]

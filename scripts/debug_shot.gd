@@ -183,6 +183,8 @@ func _process(dt: float) -> void:
 				return race.track["crossing_d"] + float(t.substr(1))
 			if t.begins_with("s"):
 				return race.track["stadium_d"] + float(t.substr(1))
+			if t.begins_with("p") and not race.track["ponds"].is_empty():
+				return race.track["ponds"][0][0] + float(t.substr(1))
 			return float(t)
 		var fa := Track.frame_at(vc, vd.call(view[1]))
 		var fb := Track.frame_at(vc, vd.call(view[4]))

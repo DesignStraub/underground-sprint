@@ -153,11 +153,13 @@ const SHAPES := {
 	# --- JDM-Klassiker: Chromstoßstangen (chrome_bumpers) ---
 	"kaido": {  # 70er-Hardtop (Hakosuka-Gefühl): kantige Kiste, hohe flache Front mit Gitter über die ganze Breite, runde
 		# Scheinwerfer, aufgeschraubte Kotflügelverbreiterungen (overfenders), vier runde Rückleuchten
-		"nose": 0.75, "hood": 0.87, "cowl": 0.36, "rf": 0.5, "rr": 0.69, "ge": 0.8, "cp": 0.74,
-		"roof": 1.37, "deck": 0.96, "tail": 0.94, "belt": 0.86, "fender": 0.0, "hips": 0.0,
-		"round_f": 0.04, "round_r": 0.035, "tumble": 0.1, "hl": {}, "tl": {},
+		# 2.25: flacher und runder (vorher Dach 1,37 m, Gürtel 0,86 m, kaum Rundung: wirkte wie eine Kiste aus Klötzchen),
+		# größere Räder
+		"nose": 0.72, "hood": 0.84, "cowl": 0.36, "rf": 0.5, "rr": 0.69, "ge": 0.8, "cp": 0.74,
+		"roof": 1.3, "deck": 0.93, "tail": 0.92, "belt": 0.82, "fender": 0.02, "hips": 0.025,
+		"round_f": 0.08, "round_r": 0.065, "tumble": 0.15, "hl": {}, "tl": {},
 		"doors": [0.375, 0.655], "intake": Vector2(0.3, 0.04), "pipes": [0.4], "pipe_r": 0.042,
-		"wheel_r": 0.3, "axle": 0.74, "tire_w": 0.22, "chrome_bumpers": true, "overfenders": true,
+		"wheel_r": 0.315, "axle": 0.74, "tire_w": 0.225, "chrome_bumpers": true, "overfenders": true,
 	},
 	"hakone": {  # 70er-Fließheck (S30-Gefühl): sehr lange Haube, Scheinwerfer in Mulden vorn in den Kotflügeln, kleines
 		# Maul, Dach fließt bis ans Heck, Leuchten in einem schwarzen Feld
@@ -229,7 +231,7 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 	var perf := int(cfg.get("engine", 0)) + int(cfg.get("turbo", 0)) + int(cfg.get("suspension", 0)) + int(cfg.get("tires", 0))
 	var mats := {
 		"paint": paint,
-		"glass": mat(tint["color"], 0.8 if int(cfg.get("tint", 0)) == 3 else 0.6, 0.06),
+		"glass": glass_mat(tint["color"], 1.0 if int(cfg.get("tint", 0)) == 3 else 0.0),
 		"under": mat(Color(0.025, 0.025, 0.03), 0.0, 0.85),
 		"seam": mat(Color(0.012, 0.012, 0.016), 0.2, 0.7),
 		"head": mat(Color(1, 1, 0.95).lerp(light_c, 0.5), 0, 0.3, light_c, 2.6),
@@ -1107,6 +1109,8 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 			if zi == -1:
 				fronts.append(pivot)
 
+	var head_spots := _lamp_spots(body, mats["head"])
+	var tail_spots := _lamp_spots(body, mats["tail"])
 	body.position.y -= Catalog.part_of(cfg, "suspension")["drop"] + S.get("drop", 0.0)
 	if not OS.get_cmdline_user_args().has("--nobatch"):
 		_merge_parts(root, body, fronts, spinners, flames)
@@ -1123,6 +1127,9 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 		if nd.has_meta("lod_only"):
 			nd.get_parent().remove_child(nd)
 			nd.free()
+	_lamp_glows(body, head_spots, tail_spots, light_c)
+	if headlights:
+		_light_pools(root, W, L, light_c)
 	_set_layer(root)
 	root.set_meta("body", body)
 	root.set_meta("front_pivots", fronts)
@@ -1167,6 +1174,7 @@ const FINISH := {
 	"chrome_matt": {"metal": 0.9, "rough": 0.42, "coat": 0.0, "coat_rough": 0.5, "rim": 0.5, "rim_tint": 0.7},
 }
 const PAINT_SHADER := preload("res://shaders/car_paint.gdshader")
+const GLASS_SHADER := preload("res://shaders/car_glass.gdshader")
 ## Lichtkarte der Strecke für den Lack: track_builder._bake_street_light setzt sie (tex, rect, gain), die Garage leert
 ## sie. Autos unter Laternen und im Tunnel bekommen so dasselbe Licht wie die Straße darunter.
 static var street := {}
@@ -2084,18 +2092,19 @@ static func _extras(body: Node3D, fb: Node3D, rbm: Node3D, car_id: String, S: Di
 				# Gummipuffer (Hörner) an der Stoßstange
 				_add(par, box(Vector3(0.05, 0.07, 0.03)), dark, Vector3(s * 0.38, yb, ze + (-0.025 if end == 0.0 else 0.025)))
 	if S.get("overfenders", false):
-		# Verbreiterungen: Bögen um die Radläufe in Wagenfarbe, außen auf die Flanke geschraubt
+		# Verbreiterungen: Bögen um die Radläufe in Wagenfarbe, außen auf die Flanke geschraubt. Seit 2.25 ein glatter,
+		# gerundeter Bogen (vorher elf aneinandergesetzte Klötzchen, das wirkte wie Lego).
 		var ra := wheel_r(S) + 0.07
-		var flare_m := paint
 		for wz in [-L / 2.0 + axle(S), L / 2.0 - axle(S)]:
 			for s in [-1, 1]:
-				for k in 11:
-					var a := deg_to_rad(-80.0 + k * 16.0)
+				var pts := []
+				for k in 25:
+					var a := deg_to_rad(-84.0 + k * 7.0)
 					var y := wheel_r(S) + cos(a) * ra
 					var z: float = wz + sin(a) * ra
-					var x := _side_x(S, (z - zf) / L, clampf(y, CLEARANCE + 0.1, S["belt"] - 0.05), W, L, flare) + 0.022
-					var seg := _add(body, box(Vector3(0.05, 0.035, ra * 0.29)), flare_m, Vector3(s * x, y, z))
-					seg.rotation.x = a
+					var x := _side_x(S, (z - zf) / L, clampf(y, CLEARANCE + 0.1, S["belt"] - 0.05), W, L, flare) + 0.008
+					pts.append([Vector3(s * x, y, z), Vector3(0, cos(a), sin(a))])
+				_add(body, _arc_strip(pts, s, 0.055, 0.042), paint, Vector3.ZERO)
 	match car_id:
 		"chibi":
 			if hood == 0:
@@ -2437,6 +2446,222 @@ static func _glow_texture() -> ImageTexture:
 			img.set_pixel(x, y, Color(k, k, k, k))
 	_glow_tex = ImageTexture.create_from_image(img)
 	return _glow_tex
+
+
+## Scheiben (seit 2.25): getönt, glatt, mit leichter falscher Spiegelung der Stadt (shaders/car_glass.gdshader)
+static func glass_mat(tint: Color, mirror: float) -> ShaderMaterial:
+	var key := "glass_%s_%.1f" % [tint.to_html(false), mirror]
+	if _mesh_cache.has(key):
+		return _mesh_cache[key]
+	var m := ShaderMaterial.new()
+	m.shader = GLASS_SHADER
+	m.set_shader_parameter("tint", tint)
+	m.set_shader_parameter("mirror", mirror)
+	m.set_meta("lod_color", tint)
+	_mesh_cache[key] = m
+	return m
+
+
+## Glatter Bogen (Verbreiterung) entlang pts [[Mittelpunkt an der Flanke, Richtung vom Radmittelpunkt weg]]: flaches,
+## gerundetes Profil, out m nach außen, depth m nach oben/außen über dem Radlauf
+static func _arc_strip(pts: Array, side: int, out: float, depth: float) -> ArrayMesh:
+	# Profil (seitlich, radial) mit runder Außenkante
+	var prof := [Vector2(0.0, -0.004), Vector2(out * 0.55, -0.002), Vector2(out * 0.9, 0.006), Vector2(out, depth * 0.45),
+		Vector2(out * 0.85, depth * 0.9), Vector2(out * 0.4, depth), Vector2(0.0, depth)]
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var rings := []
+	for p in pts:
+		var c: Vector3 = p[0]
+		var rad: Vector3 = p[1]
+		var ring := []
+		for q in prof:
+			ring.append(c + Vector3(side * q.x, 0, 0) + rad * q.y)
+		rings.append(ring)
+	for i in rings.size() - 1:
+		for j in prof.size() - 1:
+			var a: Vector3 = rings[i][j]
+			var b: Vector3 = rings[i + 1][j]
+			var c2: Vector3 = rings[i + 1][j + 1]
+			var d: Vector3 = rings[i][j + 1]
+			var n := (b - a).cross(d - a).normalized()
+			# nach außen zeigen lassen (weg von der Flanke bzw. nach oben)
+			var outward := Vector3(side, 0, 0) + (pts[i][1] as Vector3)
+			if n.dot(outward) < 0.0:
+				n = -n
+				var t := b
+				b = d
+				d = t
+			for v in [a, b, c2, a, c2, d]:
+				st.set_normal(n)
+				st.add_vertex(v)
+	st.generate_normals()
+	return st.commit()
+
+
+## Mittelpunkt und Größe der Leuchten mit diesem Material, je Seite (links/rechts), im Body-Raum. Liefert
+## [{"c": Mitte, "size": Ausdehnung, "z": vorderste bzw. hinterste Stelle}]
+static func _lamp_spots(body: Node3D, lamp: Material) -> Array:
+	var sides := {-1: [], 1: []}
+	var stack: Array = [body]
+	while not stack.is_empty():
+		var nd: Node = stack.pop_back()
+		stack.append_array(nd.get_children())
+		if not nd is MeshInstance3D:
+			continue
+		var mi := nd as MeshInstance3D
+		if mi.mesh == null:
+			continue
+		var xf := Transform3D.IDENTITY
+		var p: Node = mi
+		while p != null and p != body:
+			xf = (p as Node3D).transform * xf
+			p = p.get_parent()
+		for si in mi.mesh.get_surface_count():
+			var m: Material = mi.material_override if mi.material_override else mi.mesh.surface_get_material(si)
+			if m != lamp:
+				continue
+			var verts: PackedVector3Array = mi.mesh.surface_get_arrays(si)[Mesh.ARRAY_VERTEX]
+			for v in verts:
+				var w := xf * v
+				sides[1 if w.x > 0.0 else -1].append(w)
+	var out := []
+	for sd in sides:
+		var all_pts: Array = sides[sd]
+		if all_pts.is_empty():
+			continue
+		# nur die Leuchten unten am Bug bzw. Heck (eine dritte Bremsleuchte am Dach zählt nicht)
+		var ymin := INF
+		for q in all_pts:
+			ymin = minf(ymin, (q as Vector3).y)
+		var pts := all_pts.filter(func(q): return (q as Vector3).y < ymin + 0.3)
+		var lo: Vector3 = pts[0]
+		var hi: Vector3 = pts[0]
+		for q in pts:
+			lo = lo.min(q)
+			hi = hi.max(q)
+		out.append({"c": (lo + hi) / 2.0, "size": hi - lo, "zmin": lo.z, "zmax": hi.z})
+	return out
+
+
+## Leuchthöfe (seit 2.25): weiche, additive Lichtflecken auf den Scheinwerfern und Rückleuchten, damit man sie als
+## Lichter erkennt (bis 2.24 nur helle Flächen). Nur von vorn bzw. hinten sichtbar, wie echte Lampen.
+static func _lamp_glows(body: Node3D, heads: Array, tails: Array, light_c: Color) -> void:
+	for kind in [[heads, -1.0, Color(light_c.r, light_c.g, light_c.b) * 0.7], [tails, 1.0, Color(1.0, 0.08, 0.04) * 0.65]]:
+		var spots: Array = kind[0]
+		if spots.is_empty():
+			continue
+		var dir: float = kind[1]
+		var st := SurfaceTool.new()
+		st.begin(Mesh.PRIMITIVE_TRIANGLES)
+		for sp in spots:
+			var sz: Vector3 = sp["size"]
+			var w := clampf(sz.x * 1.5 + 0.18, 0.3, 1.6)
+			var h := clampf(sz.y * 1.8 + 0.16, 0.22, 0.6)
+			var c: Vector3 = sp["c"]
+			c.z = (sp["zmin"] if dir < 0.0 else sp["zmax"]) + dir * 0.04
+			var hx := w / 2.0
+			var hy := h / 2.0
+			# Viereck mit Vorderseite nach außen (vorn: -Z, hinten: +Z)
+			var q := [Vector3(-hx, -hy, 0), Vector3(hx, -hy, 0), Vector3(hx, hy, 0), Vector3(-hx, hy, 0)]
+			var uv := [Vector2(0, 1), Vector2(1, 1), Vector2(1, 0), Vector2(0, 0)]
+			# Godot: Vorderseite im Uhrzeigersinn, von außen gesehen
+			var order := [0, 1, 2, 0, 2, 3] if dir < 0.0 else [0, 2, 1, 0, 3, 2]
+			for i in order:
+				st.set_uv(uv[i])
+				st.set_normal(Vector3(0, 0, dir))
+				st.add_vertex(c + q[i])
+		var gm := StandardMaterial3D.new()
+		gm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		gm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		gm.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+		gm.albedo_texture = _halo_texture()
+		gm.albedo_color = kind[2]
+		gm.disable_receive_shadows = true
+		gm.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
+		var mi := MeshInstance3D.new()
+		mi.mesh = st.commit()
+		mi.material_override = gm
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		mi.set_meta("glow", dir)
+		body.add_child(mi)
+
+
+## Lichtteppiche (seit 2.25): die Scheinwerfer legen einen hellen Kegel vor das Auto auf die Straße, die Rückleuchten
+## einen roten Schein dahinter. Decal (liegt auf dem Asphalt, auch am Hang), im Browser additive Flächen.
+static func _light_pools(root: Node3D, W: float, L: float, light_c: Color) -> void:
+	var compat := RenderingServer.get_current_rendering_method() == "gl_compatibility"
+	for spec in [[_beam_texture(), Vector3(W + 5.0, 1.6, 24.0), -L / 2.0 - 12.3, light_c, 1.2],
+			[_halo_texture(), Vector3(W * 0.95, 1.4, 1.7), L / 2.0 + 0.45, Color(1.0, 0.06, 0.03), 0.22]]:
+		var size: Vector3 = spec[1]
+		if compat:
+			var gm := StandardMaterial3D.new()
+			gm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			gm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			gm.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+			gm.albedo_texture = spec[0]
+			var c: Color = spec[3]
+			gm.albedo_color = Color(c.r, c.g, c.b) * (0.35 * spec[4])
+			gm.disable_receive_shadows = true
+			var pm := PlaneMesh.new()
+			pm.size = Vector2(size.x, size.z)
+			var gl := MeshInstance3D.new()
+			gl.mesh = pm
+			gl.material_override = gm
+			gl.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			gl.position = Vector3(0, 0.035, spec[2])
+			root.add_child(gl)
+			continue
+		var dc := Decal.new()
+		dc.size = size
+		dc.texture_emission = spec[0]
+		dc.emission_energy = spec[4]
+		dc.modulate = spec[3]
+		dc.albedo_mix = 0.0
+		dc.upper_fade = 0.3
+		dc.lower_fade = 0.3
+		dc.cull_mask = 0xFFFFF & ~CAR_LAYER
+		dc.distance_fade_enabled = true
+		dc.distance_fade_begin = 80.0
+		dc.distance_fade_length = 20.0
+		dc.position = Vector3(0, 0.3, spec[2])
+		root.add_child(dc)
+
+
+static var _halo_tex: ImageTexture
+static var _beam_tex: ImageTexture
+
+
+## Leuchthof: heller Kern, weich auslaufend
+static func _halo_texture() -> ImageTexture:
+	if _halo_tex:
+		return _halo_tex
+	var img := Image.create(64, 64, false, Image.FORMAT_RGBA8)
+	for y in 64:
+		for x in 64:
+			var d := Vector2((x + 0.5) / 32.0 - 1.0, (y + 0.5) / 32.0 - 1.0).length()
+			var k := clampf(pow(maxf(1.0 - d, 0.0), 2.2) + 0.35 * pow(maxf(1.0 - d * 2.2, 0.0), 1.5), 0.0, 1.0)
+			img.set_pixel(x, y, Color(k, k, k, k))
+	_halo_tex = ImageTexture.create_from_image(img)
+	return _halo_tex
+
+
+## Scheinwerferkegel auf der Straße: v = 1 am Auto, 0 weit vorn; wird nach vorn breiter und blasser
+static func _beam_texture() -> ImageTexture:
+	if _beam_tex:
+		return _beam_tex
+	var img := Image.create(64, 128, false, Image.FORMAT_RGBA8)
+	for y in 128:
+		var a := 1.0 - (y + 0.5) / 128.0  # 0 am Auto, 1 weit vorn
+		var along := smoothstep(0.0, 0.06, a) * (1.0 - smoothstep(0.45, 1.0, a))
+		var hw := 0.14 + 0.32 * a
+		for x in 64:
+			var u := absf((x + 0.5) / 64.0 - 0.5)
+			var across := 1.0 - smoothstep(hw * 0.55, hw, u)
+			var k := along * across
+			img.set_pixel(x, y, Color(k, k, k, k))
+	_beam_tex = ImageTexture.create_from_image(img)
+	return _beam_tex
 
 
 ## Höhe der Ober-Mittellinie (Haube, Scheibe, Dach, Heckscheibe, Heckdeckel) an der Stelle t

@@ -8,6 +8,7 @@ const Builder := preload("res://scripts/car_builder.gd")
 var out := "/tmp/car"
 var cars: Array = Catalog.CAR_ORDER
 var stock := false
+var lights := false  # --lights: mit Scheinwerfern und Lichtteppichen auf dem Boden
 var cfgs: Array = []  # --cfgs: je Eintrag ein Bild je Ansicht, Dateiname mit laufender Nummer
 var views: Array = []
 var spin_v := 0.0  # --spin=m/s: Räder vor dem Bild so lange drehen lassen (Unschärfe testen)
@@ -21,6 +22,8 @@ func _ready() -> void:
 			cars = Array(a.substr(7).split(","))
 		elif a == "--stock":
 			stock = true
+		elif a == "--lights":
+			lights = true
 		elif a.begins_with("--cfgs="):
 			# mehrere Ausstattungen nacheinander: "rims:4,spoiler:5;rims:5" (fehlende Kategorien = Serie)
 			for one in a.substr(7).split(";"):
@@ -64,12 +67,12 @@ func _ready() -> void:
 			cfg[cat] = 0
 	var all_views := [["vorn", Vector3(4.2, 1.6, -5.2)], ["hinten", Vector3(-4.0, 1.5, 5.4)], ["seite", Vector3(8.5, 0.8, 0.0)],
 		["jagd", Vector3(0.0, 1.75, 6.2)], ["front", Vector3(0.0, 1.2, -6.0)], ["rad", Vector3(2.6, 0.5, -2.6)], ["felge", Vector3.ZERO], ["oben", Vector3(3.0, 4.2, -4.4)],
-		["heck", Vector3.ZERO], ["bug", Vector3.ZERO]]
+		["heck", Vector3.ZERO], ["bug", Vector3.ZERO], ["hoch", Vector3(0.5, 18.0, -2.0)]]
 	if cfgs.is_empty():
 		cfgs = [cfg]
 	for id in cars:
 		for ci in cfgs.size():
-			var car := Builder.build(id, cfgs[ci], false)
+			var car := Builder.build(id, cfgs[ci], lights)
 			add_child(car)
 			for view in all_views:
 				if (views.is_empty() and view[0] in ["rad", "felge", "oben", "heck", "bug"]) or (not views.is_empty() and not view[0] in views):

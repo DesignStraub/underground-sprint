@@ -20,6 +20,7 @@ const BUILDING_SHADER := preload("res://shaders/building.gdshader")
 const WATER_SHADER := preload("res://shaders/water.gdshader")
 const RAMP_SHADER := preload("res://shaders/ramp.gdshader")
 const SIGN_SHADER := preload("res://shaders/shop_sign.gdshader")
+const GLINT_SHADER := preload("res://shaders/water_glint.gdshader")
 const SIGN_FONTS := {"cond": preload("res://assets/fonts/D-DINCondensed-Bold.otf"), "wide": preload("res://assets/fonts/D-DINExp-Bold.otf")}
 const BLINK_SHADER := preload("res://shaders/blink.gdshader")
 const LIGHT_SHADER := preload("res://shaders/traffic_light.gdshader")
@@ -208,7 +209,7 @@ static func begin(race: Dictionary) -> Dictionary:
 		# Ziel als Gesamtfortschritt: Sprint am Ende der Straße, Rundkurs nach laps Runden an der Startlinie
 		"finish": laps * length + 37.0 if loop else length - 80.0,
 		"blocks": [], "ramps": [], "lakes": [], "zones": [], "crossing": null, "crossing_d": -1.0,
-		"districts": [], "parks": [], "tunnels": [], "el": [], "posts": [], "stadium_d": -1.0, "medians": [], "elev0": [],
+		"districts": [], "parks": [], "ponds": [], "tunnels": [], "el": [], "posts": [], "stadium_d": -1.0, "medians": [], "elev0": [],
 		"force_stadium": race.get("stadium", false), "city": city, "rivers": [], "bridges": [], "hills": [],
 		"spectators": [],  # Zuschauer hinter Zäunen und Absperrungen: [Transform, Wegstück d]
 		"pools": [],  # zusätzliche Lichtflächen für die Lichtkarte (Tunnel): [x, z, Radius, Farbe mal Stärke]
@@ -2395,6 +2396,10 @@ static func _build_landmarks(root: Node3D, track: Dictionary, rng: RandomNumberG
 		plan.resize(4)
 	if track["force_stadium"]:
 		plan = [[0.5, "stadium", 150.0], [0.15, "gas", 22.0]]
+	# Stadtpark mit Teich am Straßenrand (seit 2.25): statt Häusern Wasser, in dem sich Laternen und Häuser spiegeln
+	plan.append([0.3, "pond", 26.0])
+	if length > 2600.0:
+		plan.append([0.64, "pond", 26.0])
 	for entry in plan:
 		var depth: float = entry[2]
 		var placed := false
@@ -2424,6 +2429,9 @@ static func _build_landmarks(root: Node3D, track: Dictionary, rng: RandomNumberG
 					"stadium":
 						_stadium(n, dist - hw(track, d) - WALK - 0.3, rng)
 						track["stadium_d"] = d
+					"pond":
+						_pond(root, n, depth, rng)
+						track["ponds"].append([d, s])
 				occupied.append({"pos": n.position, "r": r + 6.0})
 				placed = true
 				side = -s
@@ -2431,6 +2439,155 @@ static func _build_landmarks(root: Node3D, track: Dictionary, rng: RandomNumberG
 			if placed:
 				break
 	return occupied
+
+
+## Stadtpark mit Teich (seit 2.25) auf einem Bauplatz am Straßenrand: Rasen, ein unregelmäßig runder Teich mit
+## Steinkante, Kiesweg drumherum und zur Straße, Bänke, Bäume, Parklaternen und ein niedriger Zaun mit Durchgang.
+## Eine Reflexionssonde (einmal beim Laden) lässt Laternen, Bäume und Häuser im Wasser spiegeln. n: -Z zur Straße.
+static func _pond(root: Node3D, n: Node3D, depth: float, rng: RandomNumberGenerator) -> void:
+	var half := depth / 2.0
+	var grass := Builder.mat(Color(0.03, 0.075, 0.035), 0.0, 0.95)
+	var gravel := Builder.mat(Color(0.3, 0.27, 0.22), 0.0, 0.95)
+	var stone := Builder.mat(Color(0.42, 0.41, 0.39), 0.0, 0.85)
+	var iron := Builder.mat(Color(0.05, 0.05, 0.06), 0.6, 0.5)
+	var wood := Builder.mat(Color(0.28, 0.17, 0.08), 0.0, 0.8)
+	Builder._add(n, Builder.box(Vector3(depth + 4.0, 0.04, depth)), grass, Vector3(0, 0.02, 0))
+	# Teich: Umriss aus Sinuswellen (kein Kreis), Mitte etwas von der Straße weg
+	var c := Vector3(rng.randf_range(-1.5, 1.5), 0, 1.5)
+	var rx := half * 0.62
+	var rz := half * 0.5
+	var ph := rng.randf() * TAU
+	var outline := []
+	var nseg := 48
+	for i in nseg:
+		var a := TAU * i / nseg
+		var k := 1.0 + 0.09 * sin(a * 3.0 + ph) + 0.05 * sin(a * 5.0 + ph * 1.7)
+		outline.append(c + Vector3(cos(a) * rx * k, 0, sin(a) * rz * k))
+	var water := SurfaceTool.new()
+	water.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var rim := SurfaceTool.new()
+	rim.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var path := SurfaceTool.new()
+	path.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for i in nseg:
+		var p0: Vector3 = outline[i]
+		var p1: Vector3 = outline[(i + 1) % nseg]
+		var d0 := (p0 - c).normalized()
+		var d1 := (p1 - c).normalized()
+		for v in [c, p1, p0]:
+			water.set_normal(Vector3.UP)
+			water.set_uv(Vector2(v.x, v.z))
+			water.add_vertex(v + Vector3(0, 0.07, 0))  # über dem Rasen (Platte bis 0,04 m)
+		# Steinkante: innen schräg ins Wasser, oben flach, außen schräg auf den Rasen
+		var prof := [[-0.05, 0.03], [0.1, 0.2], [0.55, 0.22], [0.7, 0.05]]
+		for j in prof.size() - 1:
+			var a0: Vector3 = p0 + d0 * prof[j][0] + Vector3(0, prof[j][1], 0)
+			var a1: Vector3 = p1 + d1 * prof[j][0] + Vector3(0, prof[j][1], 0)
+			var b0: Vector3 = p0 + d0 * prof[j + 1][0] + Vector3(0, prof[j + 1][1], 0)
+			var b1: Vector3 = p1 + d1 * prof[j + 1][0] + Vector3(0, prof[j + 1][1], 0)
+			var nn := (b0 - a0).cross(a1 - a0).normalized()
+			if nn.y < 0.0:
+				nn = -nn
+			for v in [a0, b0, b1, a0, b1, a1]:
+				rim.set_normal(nn)
+				rim.add_vertex(v)
+		# Kiesweg rund um den Teich
+		var g0a: Vector3 = p0 + d0 * 1.2
+		var g0b: Vector3 = p0 + d0 * 2.8
+		var g1a: Vector3 = p1 + d1 * 1.2
+		var g1b: Vector3 = p1 + d1 * 2.8
+		for v in [g0a, g0b, g1b, g0a, g1b, g1a]:
+			path.set_normal(Vector3.UP)
+			path.add_vertex(v + Vector3(0, 0.05, 0))
+	# Weg vom Gehweg zum Teich
+	var e0 := Vector3(-1.1, 0.05, -half)
+	var e1 := Vector3(1.1, 0.05, -half)
+	var e2 := Vector3(1.1, 0.05, c.z - rz - 1.6)
+	var e3 := Vector3(-1.1, 0.05, c.z - rz - 1.6)
+	for v in [e0, e3, e2, e0, e2, e1]:
+		path.set_normal(Vector3.UP)
+		path.add_vertex(v)
+	var wm := ShaderMaterial.new()
+	wm.shader = WATER_SHADER
+	wm.set_shader_parameter("mirror", 1.0)
+	wm.set_shader_parameter("deep", Color(0.02, 0.035, 0.05))
+	for it in [[water, wm], [rim, stone], [path, gravel]]:
+		var mi := MeshInstance3D.new()
+		mi.mesh = (it[0] as SurfaceTool).commit()
+		mi.material_override = it[1]
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		n.add_child(mi)
+	# Parklaternen am Weg (ihr Licht spiegelt sich im Wasser), Bänke zum Wasser hin
+	var lamp_m := Builder.mat(Color(1, 0.9, 0.7), 0.0, 0.3, Color(1.0, 0.78, 0.5), 3.5)
+	for i in 4:
+		var a := ph + TAU * (i + 0.5) / 4.0
+		var lp := c + Vector3(cos(a) * (rx + 3.3), 0, sin(a) * (rz + 3.3))
+		Builder._add(n, Builder.box(Vector3(0.12, 3.4, 0.12)), iron, lp + Vector3(0, 1.7, 0))
+		var lan := SphereMesh.new()
+		lan.radius = 0.24
+		lan.height = 0.5
+		lan.radial_segments = 10
+		lan.rings = 5
+		Builder._add(n, lan, lamp_m, lp + Vector3(0, 3.55, 0))
+		var ol := OmniLight3D.new()
+		ol.light_color = Color(1.0, 0.78, 0.5)
+		ol.light_energy = 1.8
+		ol.omni_range = 11.0
+		ol.position = lp + Vector3(0, 3.3, 0)
+		n.add_child(ol)
+		# Spiegelung der Laterne als schimmernder Streifen auf dem Wasser (zur Kamera hin)
+		var gm := ShaderMaterial.new()
+		gm.shader = GLINT_SHADER
+		gm.set_shader_parameter("lamp", n.transform * (c + Vector3(cos(a) * rx * 0.95, 0.09, sin(a) * rz * 0.95)))
+		gm.set_shader_parameter("pond_inv", Projection(n.transform.affine_inverse()))
+		gm.set_shader_parameter("pond_c", c)
+		gm.set_shader_parameter("pond_r", Vector2(rx, rz))
+		var gq := MeshInstance3D.new()
+		gq.mesh = QuadMesh.new()
+		gq.material_override = gm
+		gq.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		gq.custom_aabb = AABB(Vector3(-40, -2, -40), Vector3(80, 4, 80))
+		gq.top_level = true
+		gq.position = n.transform * c
+		n.add_child(gq)
+	for i in 3:
+		var a := ph + TAU * i / 3.0 + 0.4
+		var bp := c + Vector3(cos(a) * (rx + 3.2), 0, sin(a) * (rz + 3.2))
+		var bench := Node3D.new()
+		bench.transform = Transform3D(Basis.looking_at(Vector3(c.x - bp.x, 0, c.z - bp.z).normalized(), Vector3.UP), bp)
+		n.add_child(bench)
+		Builder._add(bench, Builder.box(Vector3(1.6, 0.06, 0.45)), wood, Vector3(0, 0.45, 0))
+		Builder._add(bench, Builder.box(Vector3(1.6, 0.4, 0.06)), wood, Vector3(0, 0.75, 0.22))
+		for s in [-0.7, 0.7]:
+			Builder._add(bench, Builder.box(Vector3(0.06, 0.45, 0.4)), iron, Vector3(s, 0.22, 0))
+	# Bäume hinten und an den Seiten (nicht zwischen Straße und Wasser, sonst sähe man den Teich nicht)
+	for i in 7:
+		var a := lerpf(0.15, PI - 0.15, float(i) / 6.0) + rng.randf_range(-0.12, 0.12)
+		var tp := c + Vector3(cos(a) * (rx + 6.0), 0, sin(a) * (rz + 5.5))
+		if absf(tp.x) > half + 1.0 or tp.z > half - 0.5:
+			continue
+		_tree(root, n.transform * tp, rng, false)
+	# niedriger Zaun zur Straße, in der Mitte offen
+	for sx in [-1.0, 1.0]:
+		var x0: float = sx * 1.6
+		var x1: float = sx * (half + 1.8)
+		var fz := -half + 0.4
+		Builder._add(n, Builder.box(Vector3(absf(x1 - x0), 0.05, 0.05)), iron, Vector3((x0 + x1) / 2.0, 0.9, fz))
+		Builder._add(n, Builder.box(Vector3(absf(x1 - x0), 0.05, 0.05)), iron, Vector3((x0 + x1) / 2.0, 0.45, fz))
+		var x: float = x0
+		while absf(x) < absf(x1):
+			Builder._add(n, Builder.box(Vector3(0.05, 1.0, 0.05)), iron, Vector3(x, 0.5, fz))
+			x += sx * 2.0
+	# Spiegelung: Sonde über dem Teich, einmal beim Laden aufgenommen
+	var rp := ReflectionProbe.new()
+	rp.size = Vector3(depth + 30.0, 18.0, depth + 30.0)
+	rp.position = c + Vector3(0, 2.5, 0)
+	rp.box_projection = false
+	rp.max_distance = 140.0
+	rp.update_mode = ReflectionProbe.UPDATE_ONCE
+	rp.intensity = 1.0
+	rp.ambient_mode = ReflectionProbe.AMBIENT_DISABLED
+	n.add_child(rp)
 
 
 static func _church(n: Node3D) -> void:

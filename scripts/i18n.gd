@@ -46,7 +46,7 @@ const EN := {
 	"Gib kurz vor LOS Gas: Drehzahl im grünen Bereich gibt einen perfekten Start.": "Hit the throttle just before GO: revs in the green zone give a perfect start.",
 	"Knapp am Verkehr vorbei gibt Punkte und füllt dein Nitro ein Stück.": "Near misses with traffic give points and top up your nitro a little.",
 	"Im Drag schaltest du von Hand: S hoch, X runter. A/D wechselt die Spur.": "In drag races you shift by hand: S up, X down. A/D changes lanes.",
-	"Tuningteile passen auf alle deine Autos: einmal einbauen, überall dran.": "Tuning parts fit all your cars: install once, they're on every car.",
+	"Leistungsteile passen auf alle deine Autos, die Optik gestaltest du für jedes Auto einzeln.": "Performance parts fit all your cars, the looks you design for each car on its own.",
 	"Driften, knapp vorbei und Sprünge geben Punkte, die Nitro etwas nachfüllen.": "Drifts, near misses and jumps give points that top up your nitro a little.",
 	"Im Drag im grünen Bereich schalten: perfekter Schaltvorgang, mehr Schub.": "In drag races, shift in the green zone for a perfect shift and extra push.",
 	"Abkürzungen sparen Zeit, aber dort kommt dir Verkehr entgegen.": "Shortcuts save time, but traffic comes the other way.",
