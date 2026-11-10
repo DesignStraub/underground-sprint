@@ -112,7 +112,7 @@ func setup(track_: Dictionary, car_id: String, cfg: Dictionary, start_progress: 
 		add_child(a)
 		a.play(randf() * w.get_length())
 		_eng.append(a)
-		_eng_ref[_eng.size() - 1] = EngineAudio.exact_rpm(EngineAudio.RPMS[spec[1]])
+		_eng_ref[_eng.size() - 1] = EngineAudio.exact_rpm(EngineAudio.RPMS[spec[1]]) / bank.get("k", 1.0)
 
 
 ## Tonbus für den Motor (race.gd: Hall-Bus, sobald es ihn gibt)

@@ -5,6 +5,13 @@ extends Node
 const Catalog := preload("res://scripts/catalog.gd")
 const I18n := preload("res://scripts/i18n.gd")
 const SAVE_PATH := "user://save.json"
+## Testläufe (Start mit Argumenten nach "--", z. B. --race=2 --drive) speichern in eine eigene Datei. Bis 2.22 schrieben
+## sie in den echten Spielstand, und die Testskripte kopierten danach eine alte Sicherung zurück: dabei ging der
+## Fortschritt verloren, und ein frischer Spielstand hatte Tuning aus den Tests (z. B. eine Folierung).
+const TEST_SAVE_PATH := "user://save_test.json"
+var save_path := SAVE_PATH
+## Im Browser: Schlüssel der Kopie im localStorage (falls der Browser das Dateisystem im Rahmen nicht dauerhaft hält)
+const WEB_KEY := "nfg_save"
 ## D-DIN (Datto, SIL Open Font License 1.1, siehe assets/fonts/COPYING.txt)
 const FONT := preload("res://assets/fonts/D-DIN-Bold.otf")
 const FONT_WIDE := preload("res://assets/fonts/D-DINExp-Bold.otf")
@@ -75,8 +82,15 @@ var kept_cars: Array = []  # schon mit den alten Schwellen (bis 2.10) freigescha
 func _ready() -> void:
 	# Schrift im Stil der deutschen Straßenschilder (DIN 1451) für alles: Menü, HUD, Schilder in der Welt
 	ThemeDB.fallback_font = FONT
+	# Hauptausgang mit hartem Limiter: Motor, Nitro, Reifen, Gegner, Verkehr und Musik zusammen übersteuerten bis 2.22
+	# in gut einem Drittel der Sekunden (Spitzen über 0 dB klingen kratzig); der Limiter fängt die Spitzen ab.
+	var lim := AudioEffectHardLimiter.new()
+	lim.ceiling_db = -0.8
+	AudioServer.add_bus_effect(0, lim)
 	_setup_input()
 	apply_preset(_default_preset())
+	if not OS.get_cmdline_user_args().is_empty():
+		save_path = TEST_SAVE_PATH
 	load_game()
 	I18n.setup(language if language != "" else "en")
 	_build_rotate_hint()
@@ -479,7 +493,7 @@ func register_win(event_type: String) -> Array:
 ## Das Spiel hieß früher "Underground Sprint": Godot legt user:// nach dem Spielnamen an. Gibt es im neuen Ordner
 ## noch keinen Spielstand, wird der alte einmal herüberkopiert (der alte bleibt liegen).
 func _migrate_save() -> void:
-	if FileAccess.file_exists(SAVE_PATH):
+	if save_path != SAVE_PATH or FileAccess.file_exists(SAVE_PATH):
 		return
 	var old := OS.get_user_data_dir().get_base_dir().path_join("Underground Sprint").path_join("save.json")
 	if FileAccess.file_exists(old):
@@ -487,24 +501,46 @@ func _migrate_save() -> void:
 
 
 func save_game() -> void:
-	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
-	if f == null:
-		return
-	f.store_string(JSON.stringify({
+	var text := JSON.stringify({
 		"wins": wins, "drift_wins": drift_wins, "current_car": current_car, "race_index": race_index,
 		"best_times": best_times, "tuning": tuning, "won_events": won_events, "kept_cars": kept_cars,
 		"gfx": {"preset": preset, "opts": gfx, "pixel": pixel_look, "vsync": vsync, "fps": fps_limit, "fullscreen": fullscreen,
 			"touch": touch_mode, "show_fps": show_fps, "jump_cam": jump_cam, "motion_blur": motion_blur,
 			"speed_fov": speed_fov, "cam_shake": cam_shake},
 		"language": language, "difficulty": difficulty,
-	}, "\t"))
+	}, "\t")
+	var f := FileAccess.open(save_path, FileAccess.WRITE)
+	if f:
+		f.store_string(text)
+		f.close()
+	# Browser: zusätzlich im localStorage ablegen (manche Browser halten das Dateisystem eines eingebetteten Spiels
+	# nicht dauerhaft, den localStorage aber schon)
+	if OS.has_feature("web") and save_path == SAVE_PATH:
+		JavaScriptBridge.eval("try { localStorage.setItem('%s', %s); } catch (e) {}" % [WEB_KEY, JSON.stringify(text)], true)
+
+
+## Im Browser: bleibt der Spielstand erhalten? (false: das Spiel läuft in einem Rahmen, dessen Speicher der Browser
+## blockiert oder beim Schließen löscht; dann hilft es, das Spiel in einem eigenen Tab zu öffnen)
+func save_persistent() -> bool:
+	if not OS.has_feature("web"):
+		return true
+	if OS.is_userfs_persistent():
+		return true
+	var ok = JavaScriptBridge.eval("(function () { try { localStorage.setItem('nfg_probe', '1'); localStorage.removeItem('nfg_probe'); return true; } catch (e) { return false; } })()", true)
+	return ok == true
 
 
 func load_game() -> void:
 	_migrate_save()
-	if not FileAccess.file_exists(SAVE_PATH):
+	var text := ""
+	if FileAccess.file_exists(save_path):
+		text = FileAccess.get_file_as_string(save_path)
+	elif OS.has_feature("web") and save_path == SAVE_PATH:
+		var v = JavaScriptBridge.eval("(function () { try { return localStorage.getItem('%s') || ''; } catch (e) { return ''; } })()" % WEB_KEY, true)
+		text = str(v) if v != null else ""
+	if text == "":
 		return
-	var data = JSON.parse_string(FileAccess.get_file_as_string(SAVE_PATH))
+	var data = JSON.parse_string(text)
 	if typeof(data) != TYPE_DICTIONARY:
 		return
 	wins = int(data.get("wins", 0))

@@ -49,7 +49,7 @@ Berlin-Kreuzberg, mit Dom, Residenz, Festung, Oberbaumbrücke und Hochbahn an ih
 - Kein Geld, kein Grind: Siege schalten Teile und Autos frei
 - Schwierigkeit Leicht / Normal / Schwer: Leicht zum entspannten Kennenlernen der Städte
 - Start- und Zielszene wie damals: Starterin, jubelnde Fans, Kamerafahrt; Zuschauer mit eigener Kleidung und Frisur
-- Motorklang aus vorgerechneten Drehzahl-Schleifen je Auto (Reihen-Drei- bis Sechszylinder, Boxer, Wankel, V6, V10, V12) – jedes Auto klingt anders, auch die Gegner (mit Dopplereffekt beim Überholen); Fehlzündungen beim Schalten, Blow-off-Ventil, Nitro faucht, Reifen schrubben und quietschen
+- Motorklang aus echten Motoraufnahmen (Vierzylinder mit und ohne Turbo, Boxer, Reihensechser, Sechszylinder-Boxer, Wankel, V10, V12) – jedes Auto klingt anders, auch die Gegner (mit Dopplereffekt beim Überholen); Fehlzündungen beim Schalten, Blow-off-Ventil, Nitro faucht, Reifen schrubben und quietschen
 - Musik als durchgehender Mix: sieben Tracks (Phonk, Trap, Drill), gleich laut, weich übergeblendet
 - Grafikmenü wie in großen PC-Spielen: Voreinstellungen Niedrig bis Ultra, dynamische Auflösung, Sichtweite, Details, Texturdetails, Kantenglättung, FPS-Anzeige
 - Englisch und Deutsch, Retro-Pixel-Look (einstellbar), läuft bis 4K und im Browser, auch auf Handy und Tablet
@@ -63,6 +63,7 @@ Gamepad wird unterstützt.
 Ein Spiel von **ONE HUMANITY**.
 
 Musik: Tracks von Pixabay (Pixabay Content License). Kartendaten der Städte © OpenStreetMap-Mitwirkende (ODbL).
+Motorklänge: echte Aufnahmen von Wikimedia Commons (CC BY 3.0/4.0) von prone, Y Racing, Tyler Riddle, Great Explorer, NEW CARS 2015 Official, Fabio Rojas Pichardo, Taz Ringer, asTUBE, Super Cars for you und Work With Sounds / Technisches Museum Slowenien, bearbeitet (geschnitten, geglättet, gefiltert). Reifenquietschen: Joseph Sardin, BigSoundBank (CC0).
 
 
 ## English description (to paste)
@@ -86,7 +87,7 @@ cathedral, palace, fortress, Oberbaum Bridge and elevated U-Bahn in their real p
 - No money, no grind: wins unlock parts and cars
 - Difficulty Easy / Normal / Hard: Easy for exploring the cities at your own pace
 - Start and finish scenes like back in the day: flag girl, cheering crowd, camera fly-in; spectators with their own clothes and hairstyles
-- Engine sound from pre-rendered rev loops per car (inline three to six, boxer, rotary, V6, V10, V12) – every car sounds different, rivals too (with Doppler as they pass); backfires on upshifts, blow-off valve, nitro hisses, tires scrub and squeal
+- Engine sound from real engine recordings (four-cylinders with and without turbo, boxer, inline six, flat six, rotary, V10, V12) – every car sounds different, rivals too (with Doppler as they pass); backfires on upshifts, blow-off valve, nitro hisses, tires scrub and squeal
 - Music as a continuous mix: seven tracks (phonk, trap, drill), levelled and crossfaded
 - Graphics menu like big PC games: Low to Ultra presets, dynamic resolution, view distance, detail, texture detail, anti-aliasing, FPS counter
 - English and German (choose at first start), retro pixel look, runs up to 4K and in the browser, also on phones and tablets
@@ -98,3 +99,4 @@ Gamepad supported.
 Tagline: Illegal street racing at night through real German towns. Tuning, nitro, drift, drag. Free.
 
 Music: tracks from Pixabay (Pixabay Content License). Map data of the cities © OpenStreetMap contributors (ODbL).
+Engine sounds: real recordings from Wikimedia Commons (CC BY 3.0/4.0) by prone, Y Racing, Tyler Riddle, Great Explorer, NEW CARS 2015 Official, Fabio Rojas Pichardo, Taz Ringer, asTUBE, Super Cars for you and Work With Sounds / Technical Museum of Slovenia, edited (cut, smoothed, filtered). Tyre squeal: Joseph Sardin, BigSoundBank (CC0).

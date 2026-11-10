@@ -232,7 +232,11 @@ const EN := {
 	"Weiche Schatten in Ecken und unter Autos. Teuer.": "Soft shadows in corners and under cars. Expensive.",
 	"Regen, Dampf aus Gullys und andere Partikel.": "Rain, steam from manholes and other particles.",
 	"Zeigt oben in der Mitte Bildrate und aktuelle 3D-Auflösung.": "Shows frame rate and current 3D resolution at the top.",
+	"Achtung: Dein Browser speichert hier keinen Spielstand. Öffne das Spiel über den Knopf oben rechts in einem eigenen Tab, dann bleibt dein Fortschritt erhalten.": "Note: your browser does not keep save data here. Open the game in its own tab with the button at the top right to keep your progress.",
 	"LÄDT": "LOADING", "Fertig": "Done", "Zurück": "Back",
+	"Quellen & Lizenzen": "Sources & licences",
+	"Motorklänge aus echten Aufnahmen (Wikimedia Commons, CC BY 3.0/4.0): prone, Y Racing, Tyler Riddle, Great Explorer, NEW CARS 2015 Official, Fabio Rojas Pichardo, Taz Ringer, asTUBE, Super Cars for you, Work With Sounds / Technisches Museum Slowenien. Reifenquietschen: Joseph Sardin, BigSoundBank (CC0). Musik: Pixabay. Schrift: D-DIN (Datto, OFL). Karten © OpenStreetMap-Mitwirkende.":
+		"Engine sounds from real recordings (Wikimedia Commons, CC BY 3.0/4.0): prone, Y Racing, Tyler Riddle, Great Explorer, NEW CARS 2015 Official, Fabio Rojas Pichardo, Taz Ringer, asTUBE, Super Cars for you, Work With Sounds / Technical Museum of Slovenia. Tyre squeal: Joseph Sardin, BigSoundBank (CC0). Music: Pixabay. Font: D-DIN (Datto, OFL). Maps © OpenStreetMap contributors.",
 	"Lack, Felgen, Spoiler …": "Paint, rims, spoiler …", "Motor, Turbo, Nitro …": "Engine, turbo, nitro …",
 	"←/→  Auswählen      ENTER  Einbauen/Öffnen      ESC  Zurück      F11  Vollbild": "←/→  Select      ENTER  Install/Open      ESC  Back      F11  Fullscreen", "DEIN AUTO": "YOUR CAR", "KLASSE %s": "CLASS %s",
 	"Nitro brennt nach dem Zünden ein kurzes Stück und braucht danach einen Moment, bis es wieder zündet.": "Once lit, nitro burns for a short moment and needs a second before it fires again.",

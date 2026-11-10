@@ -1,0 +1,39 @@
+# Quellen und Lizenzen
+
+## Motorklänge (seit 2.23)
+Die Schleifen in `assets/engine/` sind aus echten Aufnahmen geschnitten (`tools/engine_rec/build_banks.sh`):
+Drehzahl verfolgt, Abschnitte auf feste Drehzahlen geglättet, zu nahtlosen Schleifen zusammengesetzt, gefiltert und
+im Pegel angeglichen. Es sind also bearbeitete Fassungen der Originale. Alle Originale liegen auf Wikimedia Commons.
+
+| Ordner | Aufnahme | Urheber | Lizenz |
+|---|---|---|---|
+| `i4_turbo` | [Mitsubishi Lancer Evolution VI – engine and exhaust sound](https://commons.wikimedia.org/wiki/File:Mitsubishi_Lancer_Evolution_VI_-_engine_and_exhaust_sound_(YouTube_p2UANOqploM).opus) | prone (YouTube) | [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) |
+| `i4_hoch` | [Honda S2000 – engine and exhaust sound](https://commons.wikimedia.org/wiki/File:Honda_S2000_-_engine_and_exhaust_sound_(YouTube_aTd8viYxxnU).opus) | Y Racing (YouTube) | [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) |
+| `i4_sauger` | [2002 Honda F20C](https://commons.wikimedia.org/wiki/File:2002-Honda-F20C.ogg) | Tyler Riddle | [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) |
+| `boxer` | [Subaru Impreza STI with modified exhaust – engine and exhaust sound](https://commons.wikimedia.org/wiki/File:Subaru_Impreza_STI_with_modified_exhaust_-_engine_and_exhaust_sound_(YouTube_7c4BSSRq3bo).opus) | Great Explorer (YouTube) | [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) |
+| `f6` | [Porsche 911 GT3 RS – engine and exhaust sound](https://commons.wikimedia.org/wiki/File:Porsche_911_GT3_RS_-_engine_and_exhaust_sound_(YouTube_hpwTF8TXcaA).opus) | NEW CARS 2015 Official (YouTube) | [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) |
+| `i6` | [Toyota Supra (A80) – engine and exhaust sound](https://commons.wikimedia.org/wiki/File:Toyota_Supra_(A80)_-_engine_and_exhaust_sound_(YouTube_YlRjnMnHRO4).opus) | Fabio Rojas Pichardo (YouTube) | [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) |
+| `wankel` | [Mazda RX-7 – engine and exhaust sound](https://commons.wikimedia.org/wiki/File:Mazda_RX-7_-_engine_and_exhaust_sound_(YouTube_4z0y1H2REvE).opus) | Taz Ringer (YouTube) | [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) |
+| `v10` | [BMW M5 E60 – engine and exhaust sound](https://commons.wikimedia.org/wiki/File:BMW_M5_E60_-_engine_and_exhaust_sound_(YouTube_lFomO9-3vdM).opus) | asTUBE (YouTube) | [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) |
+| `v12` | [Lamborghini Aventador – engine and exhaust sound](https://commons.wikimedia.org/wiki/File:Lamborghini_Aventador_-_engine_and_exhaust_sound_(YouTube_oMKxhIcSmZs).opus) | Super Cars for you (YouTube) | [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) |
+| `traffic_bus_900.wav` | [City Bus MAN SG 220 – engine](https://commons.wikimedia.org/wiki/File:WWS_CityBusMANSG220engine.ogg) | Work With Sounds / Technical Museum of Slovenia | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) |
+| `traffic_car_2100.wav` | aus `i4_turbo` (siehe oben) | prone (YouTube) | [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) |
+
+Die Autos im Spiel sind erfunden; welche Aufnahme ein Auto nutzt, steht in `scripts/engine_audio.gd` (`CAR_BANK`).
+
+## Reifenquietschen (seit 2.23)
+`assets/sfx/skid.wav`: Ausschnitt aus [Screeching Tires #1](https://bigsoundbank.com/sound-2368-crissement-de-pneus-1.html)
+von Joseph Sardin, BigSoundBank, [CC0](https://creativecommons.org/publicdomain/zero/1.0/) (gemeinfrei), als nahtlose
+Schleife geschnitten.
+
+## Musik
+Tracks in `music/` und der Intro-Sound: Pixabay (Pixabay Content License).
+
+## Schrift
+D-DIN von Datto, SIL Open Font License 1.1 (`assets/fonts/COPYING.txt`).
+
+## Kartendaten
+Straßen und Gebäude der Städte-Strecken: © OpenStreetMap-Mitwirkende, ODbL (openstreetmap.org/copyright).
+
+## Alle anderen Klänge
+Synthetisch erzeugt (`tools/make_sfx.py`).

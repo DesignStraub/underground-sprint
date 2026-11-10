@@ -538,8 +538,12 @@ func _show_main() -> void:
 	if not OS.has_feature("web"):  # im Browser schließt man einfach den Tab
 		_button("Beenden", func(): get_tree().quit())
 	info.text = tr(Catalog.CARS[preview_car]["desc"]) + "\nF / F11: " + tr("Vollbild")
+	if not GameState.save_persistent():
+		info.text = tr("Achtung: Dein Browser speichert hier keinen Spielstand. Öffne das Spiel über den Knopf oben rechts in einem eigenen Tab, dann bleibt dein Fortschritt erhalten.") + "\n\n" + info.text
 	_focus_first()
 
+
+const CREDITS_TEXT := "Motorklänge aus echten Aufnahmen (Wikimedia Commons, CC BY 3.0/4.0): prone, Y Racing, Tyler Riddle, Great Explorer, NEW CARS 2015 Official, Fabio Rojas Pichardo, Taz Ringer, asTUBE, Super Cars for you, Work With Sounds / Technisches Museum Slowenien. Reifenquietschen: Joseph Sardin, BigSoundBank (CC0). Musik: Pixabay. Schrift: D-DIN (Datto, OFL). Karten © OpenStreetMap-Mitwirkende."
 
 ## Erklärung je Einstellung (unten im Infofeld)
 const SETTING_HINTS := {
@@ -586,6 +590,11 @@ func _show_settings(focus := "") -> void:
 	for key in ["language", "difficulty", "show_fps", "vsync", "fps", "fullscreen", "touch"]:
 		_setting_button(key).set_meta("key", key)
 	_button("Spielstand zurücksetzen", _confirm_reset).set_meta("key", "reset")
+	# Quellen: die Motorklänge sind echte Aufnahmen unter CC BY, die Urheber werden genannt (ausführlich in CREDITS.md)
+	var cr := _button("Quellen & Lizenzen", func(): info.text = tr(CREDITS_TEXT))
+	cr.focus_entered.connect(func(): info.text = tr(CREDITS_TEXT))
+	cr.set_meta("key", "credits")
+	cr.set_meta("quiet", true)
 	_button("< Zurück", _show_main)
 	info.text = tr(SETTING_HINTS["graphics"])
 	_focus_first()

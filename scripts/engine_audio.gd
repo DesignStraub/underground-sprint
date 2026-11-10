@@ -1,6 +1,7 @@
 extends Node
-## Motorklang wie in großen Rennspielen: vorgerechnete, nahtlose Schleifen je Auto bei festen Drehzahlen (RPMS),
-## einmal unter Last (Gas) und einmal im Schiebebetrieb (tools/make_engine_sounds.gd -> assets/engine/<auto>/).
+## Motorklang wie in großen Rennspielen: nahtlose Schleifen aus echten Motoraufnahmen bei festen Drehzahlen (RPMS),
+## einmal unter Last (Gas) und einmal im Schiebebetrieb (tools/engine_rec/build_banks.sh -> assets/engine/<aufnahme>/,
+## Quellen und Urheber in CREDITS.md). Mehrere Autos teilen sich eine Aufnahme (CAR_BANK), jedes in eigener Tonhöhe.
 ## Gespielt werden immer die beiden Drehzahlen um die echte herum, gleich laut überblendet, jede in der Tonhöhe auf
 ## die echte Drehzahl gezogen; Gas und Schub werden genauso überblendet. Beim Hochschalten nimmt der Motor kurz die
 ## Zündung weg (klingt kurz nach Schub), Fehlzündungen (backfire, von player_car ausgelöst) knallen im Auspuff.
@@ -9,8 +10,8 @@ extends Node
 ## scrub.wav (Schrubben, schon bei leichtem Rutschen), skid.wav (Quietschen erst im echten Drift), scrape.wav (Blech
 ## an der Wand), nitro_on.wav (Zünden), nitro.wav (Fauchen, solange Nitro läuft), nitro_off.wav (Abblasen),
 ## turbo.wav (Pfeifen).
-## Bis 2.21 rechnete das Skript den Klang Sample für Sample aus Sinustönen; das klang nach Orgel statt nach Motor
-## und kostete Rechenzeit. Gegner und Verkehr nutzen dieselben Schleifen (bank(), traffic_loop()).
+## Bis 2.21 rechnete das Skript den Klang Sample für Sample aus Sinustönen (klang nach Orgel), 2.22 aus einem
+## Rohr-Modell (klang blechern und heulend). Gegner und Verkehr nutzen dieselben Schleifen (bank(), traffic_loop()).
 ## Alle Player laufen im Stream-Modus: im Browser spielt Godot sonst fertige Samples ab, deren Lautstärke und
 ## Tonhöhe sich nicht zuverlässig in jedem Bild nachführen lassen.
 
@@ -18,7 +19,19 @@ const RATE := 22050.0
 ## Drehzahlen der Schleifen (Leerlauf zuerst; dort gibt es nur eine Schleife für Gas und Schub)
 const RPMS := [900.0, 1300.0, 1850.0, 2500.0, 3250.0, 4100.0, 5000.0, 6100.0, 7400.0]
 const DIR := "res://assets/engine/"
-const BASE_DB := -5.0
+const BASE_DB := -8.5  # 2.23: echte Aufnahmen sind dichter als die gerechneten Schleifen; so bleibt die Lautstärke wie in 2.22
+## Aufnahme je Auto und Drehzahl-Faktor: die Schleifen werden so gespielt, als drehte der Motor Faktor x so hoch.
+## Kleine Dreizylinder tiefer (drei statt vier Zündungen je zwei Umdrehungen), sonst kleine Unterschiede, damit
+## Autos mit derselben Aufnahme nicht gleich klingen.
+const CAR_BANK := {
+	"chibi": ["i4_turbo", 0.8], "hotaru": ["i4_sauger", 0.82], "tanuki": ["i4_turbo", 0.78],
+	"kaizen": ["i4_turbo", 1.0], "hachi": ["i4_hoch", 1.0], "sakura": ["i4_sauger", 1.04], "hayate": ["i4_turbo", 0.95],
+	"kitsune": ["i4_turbo", 1.07], "tsubame": ["i4_hoch", 1.06], "mirai": ["i4_sauger", 0.97], "tenshi": ["i4_hoch", 0.95],
+	"raijin": ["boxer", 1.0],
+	"kumo": ["i6", 1.0], "vortex": ["f6", 0.96], "kaze": ["f6", 1.04], "kaido": ["i6", 0.94], "hakone": ["i6", 1.05],
+	"ryujin": ["f6", 0.9], "shiden": ["f6", 0.86], "falke": ["f6", 1.0],
+	"ronin": ["wankel", 1.0], "kagura": ["v10", 1.0], "furia": ["v12", 1.0],
+}
 
 var bus := "Master":
 	set(v):
@@ -37,6 +50,7 @@ var turbo_amount := 0.0
 var bov_sound := "flutter"  # Gas weg mit Turbo: "bov" (Ventil, nachgerüstet) oder "flutter" (Serienlader)
 
 var _bank := {}
+var _k := 1.0  # Drehzahl-Faktor der Aufnahme (CAR_BANK)
 var _voices := {}  # "on3" -> AudioStreamPlayer (gerade hörbare Schleifen)
 var _pool: Array[AudioStreamPlayer] = []
 var _load := 0.0  # 0 = Schub, 1 = Gas (geglättet)
@@ -63,6 +77,7 @@ func configure(profile: Dictionary) -> void:
 	turbo_amount = profile.get("turbo", 0.0)
 	bov_sound = profile.get("bov", bov_sound)
 	_bank = bank(car)
+	_k = _bank.get("k", 1.0)
 
 
 func _ready() -> void:
@@ -127,7 +142,7 @@ func _process_sound(delta: float) -> void:
 func _update_engine() -> void:
 	if _bank.is_empty():
 		return
-	var r := clampf(rpm, RPMS[0] * 0.8, RPMS[RPMS.size() - 1] * 1.15)
+	var r := clampf(rpm * _k, RPMS[0] * 0.8, RPMS[RPMS.size() - 1] * 1.15)
 	var i := 0
 	while i < RPMS.size() - 2 and r > RPMS[i + 1]:
 		i += 1
@@ -279,19 +294,24 @@ static func exact_rpm(nominal: float) -> float:
 static var _banks := {}
 
 
-## Schleifen eines Autos: {"on": [je RPMS eine], "off": [...]}; im Leerlauf gilt dieselbe für beide. Einmal geladen.
+## Schleifen eines Autos: {"on": [je RPMS eine], "off": [...], "k": Drehzahl-Faktor}; im Leerlauf gilt dieselbe
+## für beide. Jede Aufnahme wird einmal geladen, auch wenn mehrere Autos sie nutzen.
 static func bank(id: String) -> Dictionary:
-	if _banks.has(id):
-		return _banks[id]
-	var b := {"on": [], "off": []}
-	for ld in ["on", "off"]:
-		for r in RPMS:
-			var name: String = "on" if r == RPMS[0] else ld
-			b[ld].append(_looped("%s%s/%s_%d.wav" % [DIR, id, name, int(r)]))
-	if b["on"][0] == null:
-		b = {}
-	_banks[id] = b
-	return b
+	var spec: Array = CAR_BANK.get(id, ["i4_turbo", 1.0])
+	var src: String = spec[0]
+	if not _banks.has(src):
+		var b := {"on": [], "off": []}
+		for ld in ["on", "off"]:
+			for r in RPMS:
+				var name: String = "on" if r == RPMS[0] else ld
+				b[ld].append(_looped("%s%s/%s_%d.wav" % [DIR, src, name, int(r)]))
+		if b["on"][0] == null:
+			b = {}
+		_banks[src] = b
+	var out: Dictionary = _banks[src].duplicate()
+	if not out.is_empty():
+		out["k"] = spec[1]
+	return out
 
 
 ## Verkehr: "car" oder "bus" (eine Schleife mit Abrollen), Drehzahl der Schleife in meta "rpm"
@@ -299,7 +319,7 @@ static func traffic_loop(kind: String) -> AudioStreamWAV:
 	var key := "traffic_" + kind
 	if _banks.has(key):
 		return _banks[key]
-	var r := 1300.0 if kind == "bus" else 2100.0
+	var r := 900.0 if kind == "bus" else 2100.0  # Bus: Stadtbus im Leerlauf, Tonhöhe folgt dem Tempo
 	var w := _looped("%straffic_%s_%d.wav" % [DIR, kind, int(r)])
 	if w:
 		w.set_meta("rpm", exact_rpm(r))

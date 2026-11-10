@@ -47,6 +47,13 @@ Nitro lädt sich langsam von selbst auf. Driften, knapp am Verkehr vorbei und Sp
 links), die Nitro ein Stück nachfüllen: eine schöne Drift-Kette etwa ein Zehntel, gedeckelt, damit Driften kein
 Nitro-Automat wird. In der Bildmitte steht nur noch Countdown und Ergebnis.
 
+**Fahrgefühl seit 2.23 mit Gewicht:** Die Drehrate folgt der Lenkung mit kurzer Verzögerung statt sofort (bei Tempo
+etwas träger als beim Rangieren), das Lenkrad schlägt mit der Tastatur ruhiger ein, die Karosserie wankt und nickt
+etwas stärker und federt einmal sanft nach (Feder mit knapp 1,6 Hz), die Kamera folgt der Drehung etwas weicher,
+und die Querhaftung liegt gut 7 % niedriger (2,1–2,5 g statt 2,3–2,7 g). Gemessen mit `tools/handling_lab.tscn`:
+nach einem Lenkimpuls bei 120 km/h ist die Drehrate nach 0,25 s auf 63 % (bis 2.22 nach 0,12 s). Vorher fühlte sich
+das Auto zu direkt an, wie ohne Gewicht.
+
 ## Events
 **Karriere:** Garage → Rennen fahren zeigt alle 21 Events als Liste neben einer Deutschlandkarte. Jedes Event liegt in
 einer deutschen Stadt (die ausgedachten Strecken in Frankfurt, München, Hamburg, Köln, Leipzig …, die echten in ihren
@@ -240,6 +247,14 @@ insgesamt schalten Autos und Tuningteile frei (Werte in `scripts/catalog.gd`). D
 Anfang an frei, Besonderes (Chrom, Perlweiß, Kreuzspeichen, Monster-Flügel, Breitbau …) kommt mit Siegen. Gesperrte Teile kann man in der Garage
 als Vorschau ansehen. Alte Spielstände übernehmen ihre bisherigen Siege in die Karriere.
 
+**Spielstand** (`user://save.json`): wird nach jedem Sieg, jedem Einbau und jeder Einstellung geschrieben. Seit 2.23
+schreiben Testläufe (Start mit Argumenten nach `--`) in `user://save_test.json`; bis 2.22 landeten sie im echten
+Spielstand und die Testskripte kopierten danach eine alte Sicherung zurück, dabei ging Fortschritt verloren und ein
+neuer Spielstand hatte Tuning aus den Tests (z. B. eine Folierung). Im Browser liegt zusätzlich eine Kopie im
+localStorage. Blockiert der Browser das Speichern im eingebetteten Spiel (Drittanbieter-Daten im Rahmen von itch.io),
+zeigt die Garage einen Hinweis, und oben rechts öffnet ein Knopf das Spiel in einem eigenen Tab, wo der Spielstand
+bleibt.
+
 ## Stimmungen
 Jedes Event hat sein eigenes Licht (`scripts/moods.gd`), damit sich die Städte unterscheiden: **Neon** (lila Himmel,
 satte Farben), **Mitternacht** (tiefblau, Sterne, Mond), **Natrium** (orange Straßenlampen, dunstig), **Regen**
@@ -259,24 +274,28 @@ neuer. Während des Ladens wartet die Titel-Blase. Die Tracks sind gleich laut g
 Tabelle `TRACKS`), Stille am Anfang und Ende wird übersprungen. M springt mit kurzer Überblendung weiter. Weitere
 mp3/ogg-Dateien in `music/` laufen automatisch mit (ohne Eintrag in der Tabelle ohne Angleich).
 
-**Motorklang seit 2.22 wie in großen Rennspielen** (`scripts/engine_audio.gd`): je Auto vorgerechnete, nahtlose
-Schleifen bei neun Drehzahlen (900 bis 7400 U/min), einmal unter Last und einmal im Schiebebetrieb
-(`assets/engine/<auto>/on_<U/min>.wav`, `off_…`). Im Spiel laufen immer die beiden Drehzahlen um die echte herum,
-gleich laut überblendet und in der Tonhöhe auf die echte Drehzahl gezogen; Gas und Schub werden genauso
-überblendet, beim Hochschalten klingt er kurz nach Schub (Zündung weg). Bis 2.21 rechnete das Skript den Klang Sample
-für Sample aus Sinustönen, das klang eher nach Orgel als nach Motor.
-- **Wie die Schleifen entstehen** (`tools/make_engine_sounds.gd`, Aufruf
-  `godot --headless --path . res://tools/make_engine_sounds.tscn`, gut 8 s für alle): ein einfaches physikalisches
-  Modell. Je Zylinder und Arbeitsspiel ein Druckstoß beim Öffnen des Auslassventils (steil an, über gut 100°
-  Kurbelwinkel abklingend), jeder etwas anders stark und minimal versetzt, jeder Zylinder ein wenig stärker oder
-  schwächer (das Bollern); Zündabstände je Bauart: Drei-, Vier- und Sechszylinder in Reihe, Boxer (Raijin, ungleich
-  lange Krümmer, Blubbern), V6 (Shiden, Ryujin), Sechszylinder-Boxer (Falke), Wankel (Ronin, kurze, scharfe Stöße),
-  V10 (Kagura), V12 (Furia), Diesel (Bus). Dazu Verbrennungsknacken, Strömungsrauschen im Takt der Stöße, ein
-  Auspuffrohr als Laufzeitleitung mit Reflexion (Rohrresonanzen, die beim Hochdrehen durchlaufen), Schalldämpfer mit
-  Brummresonanz, Abstrahlung am Endrohr, leichte Sättigung, bei Saugmotoren das Ansauggeräusch. Im Schub schwache,
-  unruhige Stöße, dumpfer, ab und zu ein Blubbern. Die Werte je Auto (Helligkeit, Bollern, Unruhe, Turbo) kommen aus
-  dem Katalog. Gut 3 MB im Export (QOA-komprimiert).
-- **Kostet kaum noch Rechenzeit:** statt eines Synthesizers im Skript nur noch vier abgespielte Schleifen.
+**Motorklang seit 2.23 aus echten Aufnahmen** (`scripts/engine_audio.gd`): nahtlose Schleifen bei neun Drehzahlen
+(900 bis 7400 U/min), einmal unter Last und einmal im Schiebebetrieb (`assets/engine/<aufnahme>/on_<U/min>.wav`,
+`off_…`), geschnitten aus Aufnahmen echter Motoren von Wikimedia Commons (Urheber und Lizenzen in `CREDITS.md` und im
+Spiel unter Einstellungen > Quellen & Lizenzen). Im Spiel laufen immer die beiden Drehzahlen um die echte herum, gleich
+laut überblendet und in der Tonhöhe auf die echte Drehzahl gezogen; Gas und Schub werden genauso überblendet, beim
+Hochschalten klingt er kurz nach Schub (Zündung weg). Bis 2.21 rechnete das Skript den Klang aus Sinustönen (klang
+nach Orgel), 2.22 aus einem Rohr-Modell (klang blechern, heulend und kratzig).
+- **Neun Aufnahmen für 23 Autos** (`CAR_BANK`): Turbo-Vierzylinder (Kaizen, Hayate, Kitsune und tiefer gestimmt die
+  kleinen Dreizylinder Chibi und Tanuki), hochdrehender Sauger-Vierzylinder (Hachi, Tsubame, Tenshi), Sauger aus dem
+  Motorraum aufgenommen (Sakura, Mirai, Hotaru), Boxer (Raijin), Sechszylinder in Reihe (Kumo, Kaido, Hakone),
+  Sechszylinder-Boxer (Falke, Vortex, Kaze und tiefer die V6 Ryujin und Shiden), Wankel (Ronin), V10 (Kagura), V12
+  (Furia). Autos mit derselben Aufnahme klingen durch einen eigenen Drehzahl-Faktor verschieden hoch.
+- **Wie die Schleifen entstehen** (`tools/engine_rec/build_banks.sh <arbeitsordner>`, Werkzeug `tools/engine_rec/eng.c`):
+  die Zündfrequenz wird über eine harmonische Summe im Spektrum und einen Viterbi-Pfad verfolgt (Oktavfehler werden
+  über die Stärke der ungeraden Obertöne erkannt), daraus die Drehzahl. Je Zieldrehzahl werden passende Abschnitte
+  gesucht (±12 %, Drehzahl steigt oder hält: Gas, fällt: Schub), ihre Tonhöhe auf genau diese Drehzahl geglättet (die
+  Zeitachse folgt der gemessenen Phase, die Wellenform bleibt echt), ausgerichtet aneinandergehängt und nach einer
+  ganzen Zahl von Arbeitsspielen geschlossen. Schleifen mit falsch erkannter Oktave werden verworfen, Lücken aus der
+  nächsten Schleife umgetastet. Zum Schluss Pegelglättung (kein Pumpen bei jedem Durchlauf), Hochpass 30 Hz,
+  Tiefpass 8 kHz (Wind und Kratzen der Aufnahme) und ein Pegel nach Drehzahl. `eng sweep` macht eine Probefahrt
+  zum Anhören. Gut 4 MB im Export (QOA-komprimiert).
+- **Kostet kaum Rechenzeit:** nur vier abgespielte Schleifen.
 - **Seit 2.20 hört man die anderen:** Jeder Gegner hat seinen eigenen Motorklang (seit 2.22 zwei Schleifen seines
   Autos: Schub unten, Volllast oben), mit Gängen, Gas und Bremse, nach der Drehzahl überblendet. An der Startlinie lassen die Gegner den Motor
   aufheulen, beim Überholen zieht der Klang mit Dopplereffekt vorbei. Vom Verkehr sind die vier nächsten Autos im
@@ -297,14 +316,13 @@ für Sample aus Sinustönen, das klang eher nach Orgel als nach Motor.
   die bis 2.21 im Menü liefen: Ticken beim Wandern (`ui_move`), Umschalten (`ui_change`), zwei aufsteigende Töne
   beim Bestätigen (`ui_select`), zwei absteigende beim Zurückgehen (`ui_back`), ein satter Schlag mit hellem
   Nachklang beim Einbauen (`ui_install`), zwei gedämpfte tiefe Töne bei Gesperrtem (`ui_locked`) und ein Luftzug mit
-  Schlag beim Rennstart (`ui_go`). Ohne Hall, auch im Pausemenü. Zug, Glocke, Landung, Platschen, Tunnel, Stadion,
-Reifenquietschen usw. sind synthetisch erzeugte WAVs in `assets/sfx/` (`python3 tools/make_sfx.py`, einzelne mit
-`python3 tools/make_sfx.py skid`).
+  Schlag beim Rennstart (`ui_go`). Ohne Hall, auch im Pausemenü. Zug, Glocke, Landung, Platschen, Tunnel, Stadion
+usw. sind synthetisch erzeugte WAVs in `assets/sfx/` (`python3 tools/make_sfx.py`, einzelne mit
+`python3 tools/make_sfx.py bell`).
 - **Reifen (seit 2.14):** zwei Schleifen. `scrub.wav` ist das Schrubben schon bei leichtem Rutschen (raues, eher tiefes
-  Rauschen mit Körnung vom Asphalt). `skid.wav` ist das Quietschen im echten Drift und bei durchdrehenden Rädern:
-  kein reiner Pfeifton mehr, sondern die Haft-Gleit-Schwingung der Reifen (rauer Sägezahn mit unruhiger Periode)
-  durch die Resonanzen von Reifen und Karosserie (um 1,2 / 2,3 / 3,6 kHz), zwei Reifen fast gleich hoch (Schwebung
-  statt Akkord, der nach Pfeife klang), dazu Rattern und Zischen. Beides setzt weich ein, wird mit dem Driftwinkel
+  Rauschen mit Körnung vom Asphalt). `skid.wav` ist das Quietschen im echten Drift und bei durchdrehenden Rädern,
+  seit 2.23 eine echte Aufnahme (BigSoundBank, CC0, als nahtlose 1,6-s-Schleife geschnitten mit
+  `eng xloop`); bis 2.22 synthetisch (Haft-Gleit-Schwingung durch Reifenresonanzen), das klang unnatürlich. Beides setzt weich ein, wird mit dem Driftwinkel
   lauter und mit Tempo etwas höher. Seit 2.16 hängt es nicht mehr am Querrutschen in m/s (das reichte im normalen
   Rennen nie: selbst mit Handbremse rutscht ein Auto bei Tempo nur 2–3 m/s quer, das Quietschen begann erst bei 6),
   sondern am Rutschwinkel, an der Kurvenfahrt am Grip-Limit (Schrubben, leises Quietschen), an Handbremse,
@@ -659,8 +677,9 @@ Texte, Cover und Screenshots für die itch.io-Seite: `release/`.
 ## Aufbau
 - `scripts/catalog.gd` – Autos, Teile, Rennen
 - `scripts/player_car.gd` – Fahrphysik, Kamera, Geschwindigkeitsgefühl
-- `scripts/engine_audio.gd` – Motorklang aus vorgerechneten Schleifen (`assets/engine/`, erzeugt von
-  `tools/make_engine_sounds.gd`), Turbo, Blow-off, Schalten, Fehlzündungen, Reifen, Wind, Abrollen, Schrammen
+- `scripts/engine_audio.gd` – Motorklang aus Schleifen echter Aufnahmen (`assets/engine/`, erzeugt von
+  `tools/engine_rec/build_banks.sh`, Quellen in `CREDITS.md`), Turbo, Blow-off, Schalten, Fehlzündungen, Reifen,
+  Wind, Abrollen, Schrammen
 - `scripts/loading_screen.gd` – Ladebildschirm vor dem Rennen
 - `scripts/track_builder.gd` – prozedurale Stadtstrecke
 - `scripts/ai_car.gd` – Gegner

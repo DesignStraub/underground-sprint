@@ -288,7 +288,8 @@ def _saw_blep(rng, m, f0, slow_amt, fast_amt, jit, seed_fc=(1.2, 11.0)):
 
 
 def skid_loop():
-    """Reifenquietschen (starkes Rutschen, Drift, durchdrehende Räder). Kein reiner Pfeifton: jeder Reifen schwingt
+    """Seit 2.23 nicht mehr in SOUNDS: skid.wav ist eine echte Aufnahme (CREDITS.md). Bleibt zum Vergleich.
+    Reifenquietschen (starkes Rutschen, Drift, durchdrehende Räder). Kein reiner Pfeifton: jeder Reifen schwingt
     im Haft-Gleit-Takt (rauer Sägezahn mit unruhiger Periode), der Klang kommt aus den Resonanzen von Reifen und
     Karosserie (Bandpässe um 1,2 / 2,3 / 3,6 kHz). Dazu Rattern (die Haftung reißt im Takt von 10–30 Hz ab),
     Zischen und etwas Sättigung. 2,4 s nahtlos."""
@@ -687,7 +688,7 @@ def ui_go():
 SOUNDS = {
     "horn": (horn, 0.89), "bell": (bell_loop, 0.7), "rumble": (rumble_loop, 0.89), "thud": (thud, 0.89),
     "whoosh": (whoosh, 0.7), "splash": (splash, 0.89), "clang": (clang, 0.75), "tunnel": (tunnel, 0.8),
-    "crowd": (crowd_loop, 0.6), "skid": (skid_loop, 0.8), "scrub": (scrub_loop, 0.8), "nitro": (nitro_loop, 0.8),
+    "crowd": (crowd_loop, 0.6), "scrub": (scrub_loop, 0.8), "nitro": (nitro_loop, 0.8),
     "nitro_on": (nitro_on, 0.89), "nitro_off": (nitro_off, 0.85),
     "backfire": (backfire, 0.89), "bov": (bov, 0.85), "flutter": (flutter, 0.85), "scrape": (scrape_loop, 0.8),
     "road": (road_loop, 0.8), "wind": (wind_loop, 0.8), "beep": (beep, 0.6), "beep_go": (beep_go, 0.7),

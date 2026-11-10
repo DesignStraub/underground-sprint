@@ -176,6 +176,13 @@ var _length := 4.0
 var _axle := 0.78  # Vorderachse so weit hinter dem Bug
 var _spec: Dictionary
 var _spin := 0.0
+## Trägheit (ab 2.23): die Drehrate folgt der Lenkung mit kurzer Verzögerung statt sofort, und die Karosserie federt
+## beim Wanken und Nicken nach (Feder mit leichter Dämpfung). Vorher fühlte sich das Auto zu direkt an, wie ohne Gewicht.
+var _yaw_v := 0.0
+var _roll_s := 0.0
+var _roll_sv := 0.0
+var _pitch_s := 0.0
+var _pitch_sv := 0.0
 var _on_walk := false
 var _crash_cooldown := 0.0
 var _ground_vy := 0.0
@@ -210,7 +217,7 @@ func setup(car_id: String, cfg: Dictionary) -> void:
 	top_speed = st["top"]
 	grip_k = st["grip"] * 0.6
 	steer_rate = st["steer"]
-	lat_acc = 14.0 + st["grip"] * 0.42  # 2,3–2,7 g ab Werk: griffig wie NFSU, aber enge Ecken wollen angebremst werden
+	lat_acc = 13.0 + st["grip"] * 0.39  # gut 2,1–2,5 g ab Werk (bis 2.22 7 % mehr): enge Ecken wollen angebremst werden
 	drift_k = st["drift"]
 	drive_type = _spec.get("drive", "rwd")
 	nitro_power = nos["power"]
@@ -537,9 +544,10 @@ func _physics_process(dt: float) -> void:
 
 	# --- Lenkung (in der Luft wirkungslos). Bei Tempo schlägt das Lenkrad etwas langsamer ein (Tastatur).
 	var sf0 := clampf(spd / top_speed, 0.0, 1.0)
-	var steer_speed := lerpf(6.0, 3.0, sf0) if absf(steer_in) > 0.01 else lerpf(8.0, 5.0, sf0)
+	# 2.23: etwas ruhiger als bisher (6/3, zurück 8/5, gegen 9/6): das Auto soll Gewicht haben, nicht zucken
+	var steer_speed := lerpf(4.8, 2.3, sf0) if absf(steer_in) > 0.01 else lerpf(6.5, 4.0, sf0)
 	if steer_in * steer < 0.0:
-		steer_speed = lerpf(9.0, 6.0, sf0)  # Gegenlenken geht schneller als Einlenken
+		steer_speed = lerpf(7.5, 5.0, sf0)  # Gegenlenken geht schneller als Einlenken
 	steer = move_toward(steer, steer_in, dt * steer_speed)
 	var low_speed := clampf(spd / 2.0, 0.0, 1.0)
 	# Drehrate: langsam begrenzt durch den Wendekreis (Lenkgeometrie), bei Tempo durch die Querbeschleunigung
@@ -581,7 +589,10 @@ func _physics_process(dt: float) -> void:
 				# Drift-Modus: mit Gas und voll eingelenkt bricht das Heck aus
 				yaw *= 1.0 + 0.25 * smoothstep(0.5, 1.0, absf(steer)) * _thr_s * smoothstep(10.0, 16.0, spd)
 		_spin = move_toward(_spin, 0.0, dt * 2.0)
-		_rotate_front((yaw + _spin) * dt, 0.6 * _slip_hold)
+		# Trägheit: die Drehrate baut sich auf (bei Tempo langsamer als beim Rangieren) und klingt nach
+		var yaw_k := 4.0 if airborne else lerpf(15.0, 6.5, sf0)
+		_yaw_v = lerpf(_yaw_v, yaw, 1.0 - exp(-dt * yaw_k))
+		_rotate_front((_yaw_v + _spin) * dt, 0.6 * _slip_hold)
 
 		# Neue Fahrzeugachse; Geschwindigkeit bleibt zunächst in Weltrichtung -> Querschlupf entsteht
 		var new_fwd := -global_basis.z
@@ -639,13 +650,21 @@ func _physics_process(dt: float) -> void:
 	var sf := clampf(spd / top_speed, 0.0, 1.0)
 	# Gewichtsverlagerung: Nase taucht beim Bremsen ein, hebt sich beim Beschleunigen; Wanken nach der echten
 	# Querbeschleunigung (Gierrate * Tempo) nach außen, im Rutschen zusätzlich zur Rutschseite
-	var pitch := clampf(a * 0.0028, -0.05, 0.035)
+	var pitch := clampf(a * 0.0034, -0.065, 0.045)
 	if airborne:
 		pitch = 0.0  # in der Luft dreht sich das ganze Auto (unten), nicht die Karosserie
 	var yaw_now := wrapf(global_rotation.y - _yaw_prev, -PI, PI) / maxf(dt, 0.0001)
 	_yaw_prev = global_rotation.y
-	var roll := clampf(-yaw_now * spd / 9.81 * 0.022, -0.065, 0.065) - clampf(l2 * 0.003, -0.035, 0.035)
-	Builder.animate(model, speed_fwd, steer, 0.0 if airborne else roll, pitch, nitro_on, dt, _wheel_speeds(thr, brk, hb, spd, dt), _backfire)
+	var roll := clampf(-yaw_now * spd / 9.81 * 0.03, -0.085, 0.085) - clampf(l2 * 0.003, -0.035, 0.035)
+	if airborne:
+		roll = 0.0
+	# Federung: knapp 1,6 Hz, leicht unterdämpft (wippt beim Einlenken und Bremsen einmal sanft nach)
+	var w0 := 10.0
+	_roll_sv += (w0 * w0 * (roll - _roll_s) - 2.0 * 0.45 * w0 * _roll_sv) * dt
+	_roll_s += _roll_sv * dt
+	_pitch_sv += (w0 * w0 * (pitch - _pitch_s) - 2.0 * 0.5 * w0 * _pitch_sv) * dt
+	_pitch_s += _pitch_sv * dt
+	Builder.animate(model, speed_fwd, steer, _roll_s, _pitch_s, nitro_on, dt, _wheel_speeds(thr, brk, hb, spd, dt), _backfire)
 	# Ganzes Auto in die Steigung neigen (Trog, Bergstraße)
 	if not airborne:
 		model.rotation.x = lerp_angle(model.rotation.x, _slope_pitch, 1.0 - exp(-dt * 12.0))
@@ -916,7 +935,8 @@ func _slide_physics(dt: float, fwd: Vector3, right: Vector3, thr: float, hb: boo
 	if hb:
 		yaw *= 1.3
 	_spin = move_toward(_spin, 0.0, dt * 2.0)
-	_rotate_front((clampf(yaw, -3.2, 3.2) + _spin) * dt, 0.85)
+	_yaw_v = lerpf(_yaw_v, clampf(yaw, -3.2, 3.2), 1.0 - exp(-dt * 9.0))
+	_rotate_front((_yaw_v + _spin) * dt, 0.85)
 	var nf := -global_basis.z
 	nf.y = 0.0
 	nf = nf.normalized()
@@ -1178,6 +1198,7 @@ func _tumble_bounce(impact: float) -> void:
 
 func _reset_pose() -> void:
 	tumbling = false
+	_yaw_v = 0.0
 	_air_roll = 0.0
 	_air_roll_v = 0.0
 	_air_pitch = 0.0
@@ -1247,7 +1268,7 @@ func _update_camera(dt: float, sf: float) -> void:
 			_cam_pos = global_position + Basis(Vector3.UP, yaw) * Vector3(0, height, dist)
 			_cam_init = true
 		# etwas Verzögerung: in Kurven sieht man das Auto einlenken (wie die NFSU-Verfolgerkamera)
-		_cam_yaw = lerp_angle(_cam_yaw, yaw, 1.0 - exp(-dt * (2.0 if airborne else 4.5)))
+		_cam_yaw = lerp_angle(_cam_yaw, yaw, 1.0 - exp(-dt * (2.0 if airborne else 3.8)))
 		var target := global_position + Basis(Vector3.UP, _cam_yaw) * Vector3(0, height, dist)
 		_cam_pos = _cam_pos.lerp(target, 1.0 - exp(-dt * 20.0))
 		_cam_pos.y = lerpf(_cam_pos.y, target.y, 1.0 - exp(-dt * (6.0 if airborne else 20.0)))
