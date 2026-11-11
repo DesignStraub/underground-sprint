@@ -222,7 +222,7 @@ static func begin(race: Dictionary) -> Dictionary:
 		"extra": 2.5 if type == "drift" else (AB_EXTRA if type == "autobahn" else 0.0),  # Drift breiter, Autobahn 3 Spuren je Richtung
 		"paths": [{"id": 0, "kind": "main", "curve": curve, "half_w": HALF_W, "length": length, "from": 0.0, "to": length}],
 		# Open World: Lage der Strecke in der Welt (die Strecke selbst bleibt in ihren eigenen Koordinaten)
-		"xf": race.get("xf", Transform3D.IDENTITY), "world_exit": {}, "world": race.get("world", false) or type == "autobahn",
+		"xf": race.get("xf", Transform3D.IDENTITY), "world_exit": {}, "keepout": race.get("keepout", []), "world": race.get("world", false) or type == "autobahn",
 	}
 	var weights: Dictionary = race.get("districts", {"downtown": 1.0})
 	var dd := 0.0
@@ -307,6 +307,9 @@ static func step(job: Dictionary) -> float:
 		2:
 			var occupied: Array = _build_city_landmarks(root, track) if not city.is_empty() else _build_landmarks(root, track, rng)
 			occupied.append_array(_build_structures(root, track, rng))
+			# Open World: fremde Fahrbahnen (Ring, Auffahrten, Nachbarstädte) freihalten, world_layout._add_keepout
+			for ko in job["race"].get("keepout", []):
+				occupied.append(ko.duplicate())
 			job["occupied"] = occupied
 		3:
 			_box_tag = "zeile"
@@ -3287,6 +3290,8 @@ static func _build_city_landmarks(root: Node3D, track: Dictionary) -> Array:
 				if _in_river(track, pos, hd * 0.7) and kind != "alter_kranen":
 					pos -= Vector3(away.x, 0, away.y) * 1.5
 		var y := hill_h(track, pos) if info.get("hill", false) else 0.0
+		if _keepout_hit(track, pos, basis, hl, hd):
+			continue  # Open World: läge auf dem Ring, einer Auffahrt oder der Straße einer Nachbarstadt
 		var n := Node3D.new()
 		n.name = kind
 		n.transform = Transform3D(basis, Vector3(pos.x, y, pos.z))
@@ -3691,6 +3696,16 @@ static func _foot_pen(a: Array, b: Array) -> float:
 ## Darf hier ein Haus stehen? Der ganze Rand des Grundrisses (Ecken, Kantenpunkte) muss hinter dem Gehweg der
 ## Hauptstraße (walk = Mindestabstand zur Fahrbahnkante) liegen, neben Nebenstraßen, außerhalb von Flüssen, Seen,
 ## Parks und Bahngelände; Wahrzeichen (Kreise) und andere Häuser (mehr als overlap Meter Überschneidung) sind tabu.
+## Open World: liegt ein Rechteck (Mitte, Achsen, halbe Länge hl entlang basis.x, halbe Tiefe hd) auf einer fremden
+## Fahrbahn (track["keepout"], world_layout._add_keepout)?
+static func _keepout_hit(track: Dictionary, pos: Vector3, basis: Basis, hl: float, hd: float) -> bool:
+	for ko in track["keepout"]:
+		var rel: Vector3 = ko["pos"] - pos
+		if absf(rel.dot(basis.x)) < hl + ko["r"] and absf(rel.dot(basis.z)) < hd + ko["r"]:
+			return true
+	return false
+
+
 static func _lot_free(track: Dictionary, foot: Array, grid: Dictionary, walk: float, overlap: float, soft := -1.0) -> bool:
 	var c2: Vector2 = foot[0]
 	var c := Vector3(c2.x, 0, c2.y)

@@ -140,10 +140,14 @@ func _draw() -> void:
 		var col: Color = UI.TYPE_COL.get(race.get("type", "sprint"), UI.CYAN)
 		if not open_:
 			col = Color(0.4, 0.42, 0.48)
-		draw_circle(sp, 7.0, Color(0, 0, 0, 0.9))
-		draw_circle(sp, 5.2, col)
 		if won:
-			draw_arc(sp, 8.5, 0.0, TAU, 20, Color(1.0, 0.8, 0.2), 2.0, true)
+			# erledigt: kleiner goldener Haken statt Punkt (in der Welt gibt es dort keinen Marker mehr)
+			draw_circle(sp, 5.0, Color(0, 0, 0, 0.85))
+			draw_polyline(PackedVector2Array([sp + Vector2(-3, 0), sp + Vector2(-1, 2.5), sp + Vector2(3.5, -3)]),
+				Color(1.0, 0.8, 0.2), 1.8, true)
+		else:
+			draw_circle(sp, 7.0, Color(0, 0, 0, 0.9))
+			draw_circle(sp, 5.2, col)
 		if p["race_index"] == target:
 			draw_arc(sp, 12.0, 0.0, TAU, 24, Color.WHITE, 1.5, true)
 		if i == sel:
@@ -201,9 +205,9 @@ func _draw_info() -> void:
 	y += 22
 	var km := (p["pos"] as Vector3).distance_to(player.global_position) / 1000.0 if player else 0.0
 	draw_string(_cond, Vector2(x + 12, y), tr("Luftlinie: %.1f km") % km, HORIZONTAL_ALIGNMENT_LEFT, w - 24, 13, Color(0.7, 0.75, 0.85))
-	var hint := tr("←/→ Rennen wählen\nEnter: als Ziel setzen (Flagge auf der Minikarte)\nTab / Esc: zurück")
+	var hint := tr("←/→ Rennen wählen\nEnter: als Ziel setzen (Flagge auf der Minikarte)\nM / Esc: zurück")
 	if target == p["race_index"]:
-		hint = tr("Ziel gesetzt. Enter: Ziel löschen\nTab / Esc: zurück")
+		hint = tr("Ziel gesetzt. Enter: Ziel löschen\nM / Esc: zurück")
 	var yy := size.y - 110
 	for line in hint.split("\n"):
 		draw_string(_cond, Vector2(x + 12, yy), line, HORIZONTAL_ALIGNMENT_LEFT, w - 24, 11, Color(0.75, 0.8, 0.9, 0.85))

@@ -186,6 +186,7 @@ static func build() -> Dictionary:
 		roads.append([PackedVector2Array([Vector2(r["from"].x, r["from"].z), Vector2(r["end"].x, r["end"].z)]), 1])
 	for c in cities:
 		roads.append_array(c["roads"])
+	_add_keepout(cities, ring, ramps)
 	_cache = {"cities": cities, "segments": segments, "ring_r": R, "ring": ring, "roads": roads}
 	if OS.get_cmdline_user_args().has("--worldlog"):
 		print("WELT Ring %.0f m (Umfang %.1f km), %d Städte, %d Stücke, Planung %d ms" % [R, TAU * R / 1000.0, cities.size(),
@@ -201,3 +202,42 @@ static func _near_ramp(ramp_k: Dictionary, k: int, m: int, w: int) -> bool:
 		if ramp_k.has((k + dk + m) % m):
 			return true
 	return false
+
+
+## Sperrflächen: jede Stadt bekommt die fremden Fahrbahnen in ihrer Nähe (Ring, alle Auffahrten, Straßen der
+## Nachbarstädte) als Kreise in ihren eigenen Koordinaten (race["keepout"]); der Streckenbau stellt dort keine Häuser
+## hin (track_builder Schritt 2: wie belegte Flächen). Sonst ragen Häuser aus echten Stadtplänen auf die Autobahn.
+static func _add_keepout(cities: Array, ring: Array, ramps: Array) -> void:
+	var ring_r: float = Track.HALF_W + Track.AB_EXTRA + Track.MED + Track.WALK + 3.0
+	var lines := []  # [Weltpunkte, Radius, Stadt (eigene Straßen auslassen) oder -1]
+	var rl := []
+	for q in ring:
+		rl.append(q)
+	rl.append(ring[0])
+	lines.append([rl, ring_r, -1])
+	for r in ramps:
+		lines.append([[r["from"], r["end"]], Track.HALF_W + Track.WALK + 2.0, -1])
+	for c in cities:
+		for road in c["roads"]:
+			var pl := []
+			for q in road[0]:
+				pl.append(Vector3(q.x, 0.0, q.y))
+			lines.append([pl, Track.HALF_W + Track.WALK + 2.0 if road[1] == 0 else 9.0, c["race_index"]])
+	for c in cities:
+		var inv: Transform3D = (c["xf"] as Transform3D).affine_inverse()
+		var ctr: Vector3 = c["center"]
+		var reach: float = c["radius"] + 700.0
+		var ko := []
+		for ln in lines:
+			if ln[2] == c["race_index"]:
+				continue
+			var pts: Array = ln[0]
+			for k in pts.size() - 1:
+				var a: Vector3 = pts[k]
+				var b: Vector3 = pts[k + 1]
+				var n := maxi(int(a.distance_to(b) / 8.0), 1)
+				for j in n:
+					var q := a.lerp(b, float(j) / n)
+					if Vector2(q.x - ctr.x, q.z - ctr.z).length() < reach:
+						ko.append({"pos": inv * q, "r": ln[1], "ko": true})
+		c["race"]["keepout"] = ko

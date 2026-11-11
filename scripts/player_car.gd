@@ -22,7 +22,10 @@ const GEARS := [0.0, 0.16, 0.31, 0.47, 0.63, 0.81, 1.3]
 const SHIFT_RPM := 7400.0
 const TOP_RPM := 6600.0  # Drehzahl bei Höchstgeschwindigkeit im 6. Gang
 const VMAX_K := 0.948  # so viel von top_speed erreicht das Auto ohne Nitro in der Ebene (wie bis 2.12)
-const GEAR_PULL := [0.0, 1.0, 0.86, 0.74, 0.63, 0.54, 0.46]
+## Zug je Gang. Die unteren Gänge seit der Open World schwächer (vorher 1,0 / 0,86 / 0,74): das Anfahren war zu
+## kräftig (Sakura 0–100 in 4,8 s, getunt 3,7 s; Einstiegsautos in Underground 7–8 s). Ab dem 4. Gang wie vorher,
+## das Endtempo bleibt.
+const GEAR_PULL := [0.0, 0.64, 0.6, 0.6, 0.59, 0.54, 0.46]
 const GRAVITY := 18.0  # knapp 2 g: Sprünge mit spürbarer Flugphase, ohne zu schweben
 const MAX_LAUNCH_VY := 14.0
 ## Überschlag nur wie in echt: quer rutschend mit der Flanke gegen ein Hindernis (die Räder haken, das Auto kippt
@@ -1353,12 +1356,23 @@ func _handle_collisions(pre: Vector3) -> void:
 		if other is Node and other.is_in_group("traffic"):
 			_hit_traffic(other, pre, n)
 		elif other is Node and other.is_in_group("racer"):
-			var impact := -pre.dot(n)
-			other.bump(pre, n)
-			velocity += n * clampf(impact, 0.0, 10.0) * 0.4
-			if impact > 3.0:
-				_shake = minf(_shake + impact * 0.02, 0.4)
-				audio.crash(clampf(impact / 25.0, 0.1, 0.5))
+			# Gegner: gleich schwer, Stoß nach Impuls auf beide (wer auffährt, verliert Tempo, der andere wird geschoben);
+			# hart von hinten oder frontal: kurz benommen
+			var ov: Vector3 = -other.global_basis.z * float(other.speed)
+			var rel := pre - ov
+			var impact := -rel.dot(n)
+			if impact > 0.5 and _crash_cooldown <= 0.0:
+				other.bump(pre, n)
+				velocity += n * impact * 0.65
+				velocity.y = 0.0
+				var ho := clampf(impact / maxf(rel.length(), 1.0), 0.0, 1.0)
+				_shake = minf(_shake + impact * 0.03, 0.6)
+				audio.crash(clampf(impact / 20.0, 0.1, 0.7))
+				if impact > 12.0 and ho > 0.6:
+					stun = 0.4
+					_spin += randf_range(-0.8, 0.8)
+					crashes += 1
+					_crash_cooldown = 0.4
 		elif not walled:
 			walled = true
 			if debug_hits:
@@ -1398,7 +1412,7 @@ func _hit_wall(pre: Vector3, n: Vector3, small := false, pole := false) -> void:
 	# kein Zurückfedern: nur bei harten Einschlägen ein Hauch, damit das Auto nicht im Hindernis klebt
 	var new_v := n * (0.6 if vn > 6.0 else 0.0)
 	if tang.length() > 0.1:
-		new_v += tang.normalized() * tang.length() * keep * (1.0 - pow(head_on, 2.5))
+		new_v += tang.normalized() * tang.length() * keep * (1.0 - pow(head_on, 1.8))
 	new_v = new_v.move_toward(Vector3.ZERO, 3.0 * get_physics_process_delta_time())  # Schleifen kostet etwas
 	velocity = Vector3(new_v.x, 0.0, new_v.z)
 	# Parallel zur Wand drehen: streifend ganz, schräg teilweise, frontal gar nicht (dort steht man)
@@ -1424,9 +1438,9 @@ func _hit_wall(pre: Vector3, n: Vector3, small := false, pole := false) -> void:
 		_crash_cooldown = 0.5
 
 
-## Verkehr: Stoß nach Impuls (die Masse zählt: einen Pkw schubst man weg, an einem Bus prallt man ab). Frontal oder
-## heftiges Auffahren ist zusätzlich ein Crash wie in NFS (Dreher, kurz keine Kontrolle, fast Stillstand); seitliches
-## Rempeln oder leichtes Auffahren kostet nur etwas Tempo, der andere Wagen wird aus dem Verkehr geworfen.
+## Verkehr wie in Underground: Rammen wird bestraft. Stoß nach Impuls gegen schwere Wagen (Pkw 2,5-, Bus 10-mal so
+## schwer wie das eigene Auto); ab gut 30 km/h Unterschied frontal oder von hinten ist es ein Crash (Dreher, kurz keine
+## Kontrolle, Tempo fast weg, man muss neu beschleunigen). Seitliches Streifen kostet etwas Tempo und schüttelt.
 func _hit_traffic(other: Node, pre: Vector3, n: Vector3) -> void:
 	var ov: Vector3 = other.velocity_vec
 	var rel: Vector3 = pre - ov
@@ -1445,9 +1459,9 @@ func _hit_traffic(other: Node, pre: Vector3, n: Vector3) -> void:
 		velocity = after * 0.5 + n * 3.0
 		_crash_cooldown = 0.7
 		start_tumble(n, absf(rel.dot(global_basis.x)))
-	elif hit > 14.0 and head_on > 0.55:
+	elif hit > 9.0 and head_on > 0.5:
 		other.push(-n * j / mt)
-		velocity = after * 0.55 + n * 2.0
+		velocity = after * 0.4 + n * 2.0
 		velocity.y = 0.0
 		_spin = randf_range(1.2, 2.4) * (1.0 if randf() < 0.5 else -1.0) * clampf(hit / 25.0, 0.5, 1.0)
 		stun = 0.8
@@ -1456,14 +1470,30 @@ func _hit_traffic(other: Node, pre: Vector3, n: Vector3) -> void:
 		crashes += 1
 	else:
 		other.push(-n * j / mt)
-		velocity = after * lerpf(0.98, 0.9, head_on)
+		velocity = after * lerpf(0.95, 0.8, head_on)
 		velocity.y = 0.0
-		_spin += signf(n.dot(global_basis.x)) * clampf(hit * 0.05, 0.1, 0.6) * clampf(mt, 1.0, 2.0)
+		_spin += signf(n.dot(global_basis.x)) * clampf(hit * 0.08, 0.15, 0.9)
 		_shake = minf(_shake + hit * 0.04, 0.7)
 		_crash_cooldown = 0.35
 		if hit > 8.0:
 			crashes += 1
 			stun = 0.2
+
+
+## Vom Zug erfasst (rail_crossing._sweep_player): mitgerissen und seitlich weggeschleudert, Dreher, kurz keine
+## Kontrolle. Die Lage hat der Bahnübergang schon neben den Zug gesetzt (auf Straßenhöhe, nie in den Boden).
+func hit_by_train(v_train: Vector3, away: Vector3) -> void:
+	if _crash_cooldown > 0.0:
+		velocity += away * 2.0
+		return
+	velocity = v_train * 0.5 + away * 10.0
+	velocity.y = 0.0
+	_spin = randf_range(2.0, 3.0) * (1.0 if randf() < 0.5 else -1.0)
+	stun = 1.2
+	_shake = 1.0
+	crashes += 1
+	_crash_cooldown = 0.8
+	audio.crash(1.0)
 
 
 ## Kleines Hindernis (Poller, Pfosten, Bank, Mülltonne): Kiste, die waagerecht nirgends über 2,5 m misst

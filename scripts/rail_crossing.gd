@@ -431,9 +431,10 @@ func _build_train() -> void:
 				car.add_child(sp)
 		var cs := CollisionShape3D.new()
 		var bs := BoxShape3D.new()
-		bs.size = Vector3(3.2, 4.0, l)
+		# reicht tief unter die Gleise: ein Auto im Weg wird zur Seite gedrückt, nie nach unten durch den Boden
+		bs.size = Vector3(3.2, 9.0, l)
 		cs.shape = bs
-		cs.position = Vector3(0, 0, cz) + Vector3(0, 2.0, 0)
+		cs.position = Vector3(0, 0, cz) + Vector3(0, -0.5, 0)
 		train.add_child(cs)
 		z += l + gap
 	train.visible = false
@@ -444,11 +445,16 @@ func is_blocked() -> bool:
 	return blocked
 
 
-func _process(dt: float) -> void:
+## Im Physiktakt: der Zug muss stehen, bevor das Auto sich bewegt (sonst schiebt die Physik es aus dem Zug heraus,
+## notfalls nach unten). Alles in den Koordinaten der Strecke (Open World: die Strecke liegt gedreht in der Welt).
+func _physics_process(dt: float) -> void:
 	_clock += dt
 	if player == null:
 		return
-	var p: float = player.progress
+	var lp := to_local(player.global_position)
+	# nur der Spieler auf dieser Strecke löst den Zug aus (Open World: mehrere Strecken sind geladen)
+	var mine: bool = (player.get("track") as Dictionary).get("node") == get_parent()
+	var p: float = player.progress if mine else -1e9
 	if p < d_cross - 460.0:
 		_triggered = false
 	# Zug so starten, dass der Spieler bei gleichem Tempo LEAD Sekunden vor der Zugspitze drüber ist
@@ -470,9 +476,11 @@ func _process(dt: float) -> void:
 		blocked = (approaching and front < SPEED * WARN_TIME) or (not approaching and front < 12.0)
 		gates_down = (approaching and front < SPEED * GATE_TIME) or (not approaching and front < 12.0)
 		train.visible = absf(x) < RAIL_HALF + train_len
-		train.global_transform = Transform3D(Basis.looking_at(axis * _dir, Vector3.UP), origin + axis * x - fwd * TRACK_OFF * _dir)
-		train.velocity_vec = axis * _dir * SPEED
-		var td := player.global_position.distance_to(train.global_position)
+		train.transform = Transform3D(Basis.looking_at(axis * _dir, Vector3.UP), origin + axis * x - fwd * TRACK_OFF * _dir)
+		train.velocity_vec = global_transform.basis * (axis * _dir * SPEED)
+		if train.visible:
+			_sweep_player(lp)
+		var td := lp.distance_to(train.position)
 		_set_volume(_rumble, clampf(1.0 - td / 380.0, 0.0, 1.0), 2.0)
 		if not approaching and front > RAIL_HALF:
 			_t_arrive = -1.0
@@ -480,17 +488,32 @@ func _process(dt: float) -> void:
 			train.position = origin + Vector3(0, -50, 0)
 			_rumble.stop()
 	if blocked and not was_blocked:
-		var dist := player.global_position.distance_to(origin)
+		var dist := lp.distance_to(origin)
 		Sfx.play("horn", linear_to_db(clampf(1.0 - dist / 600.0, 0.15, 1.0)) + 5.0)  # echte Aufnahme: leiser gemischt als die alte
 	for l in _lights:
 		l.material_override.set_shader_parameter("active", 1.0 if blocked else 0.0)
-	var cd := player.global_position.distance_to(origin)
+	var cd := lp.distance_to(origin)
 	_set_volume(_bell, clampf(1.0 - cd / 220.0, 0.0, 1.0) if blocked else 0.0, -4.0)
 	# Schranken: erst Blinken und Läuten, dann runter in knapp 2 s, rauf etwas langsamer
 	var target := 0.0 if gates_down else deg_to_rad(-85.0)
 	_gate_angle = move_toward(_gate_angle, target, dt * (0.8 if gates_down else 0.6))
 	for g in _gates:
 		g.rotation.z = _gate_angle
+
+
+## Erfasst der Zug das Auto, wird es seitlich aus dem Zug geschoben (auf Straßenhöhe) und weggeschleudert
+func _sweep_player(lp: Vector3) -> void:
+	var q: Vector3 = train.transform.affine_inverse() * lp
+	var hx := 1.6 + 1.2
+	if absf(q.x) >= hx or absf(q.z) >= train_len / 2.0 + 2.4 or q.y > 4.5:
+		return
+	var side := signf(q.x) if absf(q.x) > 0.05 else 1.0
+	var out: Vector3 = train.transform * Vector3(side * (hx + 0.1), q.y, q.z)
+	var g := to_global(out)
+	player.global_position = Vector3(g.x, player.global_position.y, g.z)
+	var away: Vector3 = (global_transform.basis * (train.transform.basis * Vector3(side, 0, 0))).normalized()
+	if player.has_method("hit_by_train"):
+		player.hit_by_train(train.velocity_vec, away)
 
 
 func _set_volume(a: AudioStreamPlayer, v: float, base_db: float) -> void:

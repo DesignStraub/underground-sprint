@@ -12,12 +12,12 @@ const EN := {
 	"Welt wird gebaut … %d / %d": "Building the world … %d / %d", "Enter: Rennen starten": "Enter: start race",
 	"Frei fahren: Marker anfahren startet ein Rennen\nC Kamera  R Zurücksetzen  Esc Menü": "Free roam: drive into a marker to start a race\nC camera  R reset  Esc menu",
 	"ZUR WELT": "BACK TO THE WORLD", "Zur Welt": "Back to the world",
-	"Frei fahren: Marker anfahren startet ein Rennen\nTab Karte  C Kamera  R Zurücksetzen  Esc Menü": "Free roam: drive into a marker to start a race\nTab map  C camera  R reset  Esc menu",
+	"Frei fahren: Marker anfahren startet ein Rennen\nM Karte  C Kamera  R Zurücksetzen  Esc Menü": "Free roam: drive into a marker to start a race\nM map  C camera  R reset  Esc menu",
 	"Karte": "Map", "KARTE": "MAP", "Gesperrt": "Locked", "OFFEN": "OPEN", "GEWONNEN": "WON",
 	"Gesperrt: erst %d Siege in Stufe „%s“": "Locked: win %d races in stage “%s” first",
 	"GESPERRT: %d Siege in Stufe „%s“": "LOCKED: %d wins in stage “%s”", "Luftlinie: %.1f km": "Distance: %.1f km",
-	"←/→ Rennen wählen\nEnter: als Ziel setzen (Flagge auf der Minikarte)\nTab / Esc: zurück": "←/→ choose race\nEnter: set as destination (flag on the minimap)\nTab / Esc: back",
-	"Ziel gesetzt. Enter: Ziel löschen\nTab / Esc: zurück": "Destination set. Enter: clear it\nTab / Esc: back", "Tuning": "Tuning", "Auto wechseln": "Change car", "Einstellungen": "Settings",
+	"←/→ Rennen wählen\nEnter: als Ziel setzen (Flagge auf der Minikarte)\nM / Esc: zurück": "←/→ choose race\nEnter: set as destination (flag on the minimap)\nM / Esc: back",
+	"Ziel gesetzt. Enter: Ziel löschen\nM / Esc: zurück": "Destination set. Enter: clear it\nM / Esc: back", "Tuning": "Tuning", "Auto wechseln": "Change car", "Einstellungen": "Settings",
 	"Beenden": "Quit", "Spielstand zurücksetzen": "Reset progress", "< Zurück": "< Back", "< Fertig": "< Done",
 	"Dieses Auto fahren": "Drive this car", "Ja, zurücksetzen": "Yes, reset", "Abbrechen": "Cancel",
 	"GARAGE": "GARAGE", "RENNEN": "RACES", "AUTOHAUS": "CAR LOT", "EINSTELLUNGEN": "SETTINGS", "ACHTUNG": "WARNING",
@@ -135,8 +135,8 @@ const EN := {
 	"%s   ·   %s   ·   Karte © OpenStreetMap-Mitwirkende   ·   Gas/Enter: los": "%s   ·   %s   ·   Map © OpenStreetMap contributors   ·   Throttle/Enter: go",
 	"SPRINT": "SPRINT", "RUNDKURS · %d RUNDEN": "CIRCUIT · %d LAPS", "DRIFT · %d RUNDEN": "DRIFT · %d LAPS",
 	"DRAG · A/D SPUR · S/X SCHALTEN": "DRAG · A/D LANE · S/X SHIFT", "ALLEIN": "SOLO", "4 FAHRER": "4 DRIVERS",
-	"W/S Gas/Bremse  A/D Lenken\nLeertaste Handbremse  Shift Nitro\nC Kamera  R Zurücksetzen  M Musik\nF Vollbild  Esc Pause":
-		"W/S Throttle/Brake  A/D Steer\nSpace Handbrake  Shift Nitro\nC Camera  R Reset  M Music\nF Fullscreen  Esc Pause",
+	"W/S Gas/Bremse  A/D Lenken\nLeertaste Handbremse  Shift Nitro\nC Kamera  R Zurücksetzen  . Musik\nF Vollbild  Esc Pause":
+		"W/S Throttle/Brake  A/D Steer\nSpace Handbrake  Shift Nitro\nC Camera  R Reset  . Music\nF Fullscreen  Esc Pause",
 	"W Gas  S hoch-, X runterschalten\nA/D Spur wechseln  Shift Nitro\nC Kamera  F Vollbild  Esc Pause":
 		"W Throttle  S shift up, X down\nA/D Change lane  Shift Nitro\nC Camera  F Fullscreen  Esc Pause",
 	"HOCHSCHALTEN  S   ·   RUNTER  X": "SHIFT UP  S   ·   DOWN  X", "MOTOR HEISS – SCHALTEN!": "ENGINE HOT – SHIFT!",

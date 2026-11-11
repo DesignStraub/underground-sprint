@@ -430,6 +430,13 @@ func _process(dt: float) -> void:
 		var rel: float = pl.progress - race.track["crossing_d"]
 		if rel > -30.0 and rel < 30.0:
 			print("rel=%.1f lat=%.1f y=%.2f vy=%.1f v=%.1f air=%s path=%d train=%s" % [rel, pl.lateral, pl.position.y, pl.vy, pl.speed_fwd, pl.airborne, pl.path_id, race.track["crossing"].train.global_position])
+	if _train_test:
+		Input.action_release("accelerate")
+		Input.action_release("nitro")
+	if _train_test and race and race.player and fmod(_t, 0.1) < get_process_delta_time():
+		var pl = race.player
+		print("TRAIN t=%.1f y=%.2f v=%.1f stun=%.2f d=%.1f lat=%.1f air=%s crashes=%d" % [_t, pl.global_position.y, pl.velocity.length(),
+			pl.stun, pl.progress - race.track["crossing_d"], pl.lateral, pl.airborne, pl.crashes])
 	if fulltest and race and "curve" in race and race.player:
 		_fulltest(race)
 	if race and "curve" in race and race.player and (OS.get_cmdline_user_args().has("--trace") or OS.get_cmdline_user_args().has("--handling") or not _crash.is_empty()):
@@ -773,6 +780,7 @@ func _fulltest(race) -> void:
 ## Spurwechsel aus, Nitro ab dem 3. Gang
 var _tap := ""
 var _shift_t := 0.0
+var _train_test := false
 var _crash_set := false
 
 
@@ -835,6 +843,18 @@ func _place_at(race) -> void:
 			rc._triggered = true
 			rc._t_arrive = rc._clock + 150.0 / 44.0 + rc.LEAD + rc.train_len / 2.0 / rc.SPEED
 			rc._dir = 1.0
+		"train":
+			# Test: Auto steht mitten auf den Gleisen, der Zug kommt in 2,5 s ("TRAIN ..." alle 0,1 s: Höhe, Tempo, Lage)
+			_train_test = true
+			drive = false
+			for act in ["accelerate", "nitro", "steer_left", "steer_right", "brake"]:
+				Input.action_release(act)
+			var dt0: float = tr["crossing_d"] - 2.25
+			pl.place(Track.xform_at(tr["curve"], dt0, Track.LANES[2]))
+			var rc = tr["crossing"]
+			rc._triggered = true
+			rc._dir = 1.0
+			rc._t_arrive = rc._clock + 2.5 + rc.train_len / 2.0 / rc.SPEED
 		"tunnel", "el", "stadium":
 			var d := 0.0
 			match at:

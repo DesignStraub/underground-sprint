@@ -8,6 +8,9 @@ extends RefCounted
 ## drei Exoten am Ende) haben die gleiche Grundleistung (Leistungsindex ~456) und unterscheiden sich nur im Charakter:
 ## Grip, Antritt, Endtempo, Lenkung, Drift. "class" steht in der Garage, rating() rechnet den Index aus.
 ## drive: fwd, rwd, mr (Mittelmotor), rr (Heckmotor), awd.
+## Schub der Gegner beim Anfahren (passend zu den entschärften unteren Gängen des Spielers, player_car.GEAR_PULL)
+const ACCEL_SCALE := 0.8
+
 const CARS := {
 	"kaizen": {
 		"drive": "fwd", "name": "Kaizen Rally S", "style": "hatch", "class": "D", "unlock": {}, "drift": 0.35, "paint": Color(0.92, 0.92, 0.89),
@@ -457,17 +460,17 @@ const PARTS := {
 		"label": "Motor",
 		"options": [
 			{"name": "Serie", "wins": 0, "accel": 1.0, "top": 1.0},
-			{"name": "Stufe 1", "wins": 0, "accel": 1.08, "top": 1.04},
-			{"name": "Stufe 2", "wins": 0, "accel": 1.16, "top": 1.08},
-			{"name": "Stufe 3", "wins": 0, "accel": 1.25, "top": 1.12},
+			{"name": "Stufe 1", "wins": 1, "accel": 1.08, "top": 1.04},
+			{"name": "Stufe 2", "wins": 3, "accel": 1.16, "top": 1.08},
+			{"name": "Stufe 3", "wins": 6, "accel": 1.25, "top": 1.12},
 		],
 	},
 	"nitro": {
 		"label": "Nitro",
 		"options": [
 			{"name": "Serie", "wins": 0, "power": 1.0, "capacity": 1.0},
-			{"name": "Stufe 1", "wins": 0, "power": 1.2, "capacity": 1.25},
-			{"name": "Stufe 2", "wins": 0, "power": 1.4, "capacity": 1.5},
+			{"name": "Stufe 1", "wins": 2, "power": 1.2, "capacity": 1.25},
+			{"name": "Stufe 2", "wins": 5, "power": 1.4, "capacity": 1.5},
 		],
 	},
 	# Turbo: mehr Schub und etwas mehr Endtempo, lauteres Ladedruck-Zischen
@@ -475,9 +478,9 @@ const PARTS := {
 		"label": "Turbo",
 		"options": [
 			{"name": "Serie", "wins": 0, "accel": 1.0, "top": 1.0},
-			{"name": "Stufe 1", "wins": 0, "accel": 1.06, "top": 1.03},
-			{"name": "Stufe 2", "wins": 0, "accel": 1.12, "top": 1.06},
-			{"name": "Stufe 3", "wins": 0, "accel": 1.18, "top": 1.09},
+			{"name": "Stufe 1", "wins": 2, "accel": 1.06, "top": 1.03},
+			{"name": "Stufe 2", "wins": 4, "accel": 1.12, "top": 1.06},
+			{"name": "Stufe 3", "wins": 7, "accel": 1.18, "top": 1.09},
 		],
 	},
 	# Fahrwerk: mehr Grip, direktere Lenkung, Karosserie tiefer (drop in Metern)
@@ -485,9 +488,9 @@ const PARTS := {
 		"label": "Fahrwerk",
 		"options": [
 			{"name": "Serie", "wins": 0, "grip": 0.0, "steer": 0.0, "drop": 0.0},
-			{"name": "Sport", "wins": 0, "grip": 1.5, "steer": 0.06, "drop": 0.025},
-			{"name": "Gewinde", "wins": 0, "grip": 3.0, "steer": 0.12, "drop": 0.045},
-			{"name": "Rennfahrwerk", "wins": 0, "grip": 4.5, "steer": 0.18, "drop": 0.06},
+			{"name": "Sport", "wins": 1, "grip": 1.5, "steer": 0.06, "drop": 0.025},
+			{"name": "Gewinde", "wins": 3, "grip": 3.0, "steer": 0.12, "drop": 0.045},
+			{"name": "Rennfahrwerk", "wins": 6, "grip": 4.5, "steer": 0.18, "drop": 0.06},
 		],
 	},
 	# Reifen: mehr Grip in Kurven, Rennreifen kleben, driften dafür etwas unwilliger
@@ -495,9 +498,9 @@ const PARTS := {
 		"label": "Reifen",
 		"options": [
 			{"name": "Serie", "wins": 0, "grip": 0.0, "drift": 0.0},
-			{"name": "Sport", "wins": 0, "grip": 1.0, "drift": 0.0},
-			{"name": "Semi-Slicks", "wins": 0, "grip": 2.5, "drift": -0.04},
-			{"name": "Rennreifen", "wins": 0, "grip": 4.0, "drift": -0.08},
+			{"name": "Sport", "wins": 1, "grip": 1.0, "drift": 0.0},
+			{"name": "Semi-Slicks", "wins": 4, "grip": 2.5, "drift": -0.04},
+			{"name": "Rennreifen", "wins": 6, "grip": 4.0, "drift": -0.08},
 		],
 	},
 }

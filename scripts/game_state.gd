@@ -150,10 +150,10 @@ func _setup_input() -> void:
 	_add_action("shift_down", [KEY_X, KEY_Q], [JOY_BUTTON_LEFT_SHOULDER], [])
 	_add_action("camera", [KEY_C], [JOY_BUTTON_Y], [])
 	_add_action("reset_car", [KEY_R], [JOY_BUTTON_BACK], [])
-	_add_action("map", [KEY_TAB], [JOY_BUTTON_LEFT_STICK], [])  # Open World: große Karte
-	# Pause auch mit Enter: im Browser beendet Esc im Vollbild nur das Vollbild und kommt nicht im Spiel an
-	_add_action("pause", [KEY_ESCAPE, KEY_P, KEY_ENTER, KEY_KP_ENTER], [JOY_BUTTON_START], [])
-	_add_action("next_track", [KEY_M], [], [])
+	_add_action("map", [KEY_M, KEY_TAB], [JOY_BUTTON_LEFT_STICK], [])  # Open World: große Karte
+	# Menü mit Esc (im Browser-Vollbild beendet Esc nur das Vollbild: dort P); Enter bestätigt nur
+	_add_action("pause", [KEY_ESCAPE, KEY_P], [JOY_BUTTON_START], [])
+	_add_action("next_track", [KEY_PERIOD], [], [])  # nächster Musiktitel (M ist seit der Open World die Karte)
 	_add_action("fullscreen", [KEY_F11, KEY_F], [], [])  # F: auf dem Mac ist F11 "Schreibtisch anzeigen"
 	var alt_enter := InputEventKey.new()
 	alt_enter.physical_keycode = KEY_ENTER
@@ -468,6 +468,10 @@ func get_config(car_id := "") -> Dictionary:
 	var cfg := {}
 	for cat in Catalog.PART_ORDER:
 		cfg[cat] = int((tuning if cat in Catalog.PART_GROUPS["leistung"] else lk).get(cat, 0))
+		# Leistungsteile kommen mit Siegen: ist ein eingebautes (noch) gesperrt, gilt die beste freie Stufe darunter
+		if cat in Catalog.PART_GROUPS["leistung"]:
+			while cfg[cat] > 0 and not is_part_unlocked(cat, cfg[cat]):
+				cfg[cat] -= 1
 	return cfg
 
 

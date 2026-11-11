@@ -88,15 +88,31 @@ Der Ring besteht aus Stücken von 2,6 km im Viertel „Schnellstraße“ (Lärms
   160 Autos, ein paar pro Bild eingesetzt, nie direkt vor der Nase). Autobahn: festes Tempo je Spur (innen 130, Mitte
   108, außen 86 km/h mit Bussen und Transportern), am Ende eines Stücks fahren die Autos aufs nächste weiter; in den
   Städten wie im Rennen, am Ende außer Sicht neu eingesetzt.
-- **Zusammenstöße mit Verkehr (auch im Rennen):** Stoß nach Impuls mit Masse (Pkw 1, Transporter 1,7, Bus 5): leichtes
-  Auffahren mit 40 km/h Unterschied kostet gut 25 % Tempo und schubst den Pkw weg, mit 250 in einen Bus ist ein Crash.
-  Verkehr bremst rechtzeitig für den Spieler, für Wracks und den Vordermann (Bremsweg mit 6 m/s², 6 m Abstand), wechselt
-  vor einem Wrack die Spur und steckt nie mehr im Auto des Spielers. Wände wie in NFSU: streifend 95 % Tempo,
-  30° gut 60 %, frontal Stillstand. Test: `world.tscn -- --wspawn=ring:10 --ctest=rear40` (auch rear120, side,
+- **Zusammenstöße wie in Underground (auch im Rennen):** Verkehr rammen wird bestraft. Stoß nach Impuls gegen schwere
+  Wagen (Pkw 2,5-, Transporter 4-, Bus 10-mal so schwer wie das eigene Auto); ab gut 30 km/h Unterschied frontal oder
+  von hinten ist es ein Crash (Auffahren 150 auf 108: man fällt auf knapp 40 km/h und dreht sich). Gegner sind gleich
+  schwer: wer auffährt, verliert Tempo, der andere wird geschoben. Verkehr bremst rechtzeitig für den Spieler, Wracks
+  und den Vordermann (Bremsweg mit 6 m/s², 6 m Abstand), wechselt vor einem Wrack die Spur und steckt nie mehr im Auto
+  des Spielers. Wände: streifend gut 90 % Tempo, 30° gut 50 %, ab 60° Stillstand (neu anfahren).
+- **Bahn:** der Zug erfasst ein Auto auf den Gleisen und schleudert es seitlich weg (mitgerissen, Dreher); er schob es
+  vorher nach unten durch den Boden, dann setzte das Spiel einen hinter dem Zug neu ein. Der Bahnübergang rechnet in
+  den Koordinaten seiner Strecke und fährt auch in der Welt. Test: `race.tscn -- --race=0 --at=train` („TRAIN …“).
+- **Nichts steht mehr auf fremden Straßen:** jede Stadt bekommt die Fahrbahnen in ihrer Nähe (Ring, Auffahrten,
+  Nachbarstädte) als Sperrflächen (`world_layout._add_keepout`); Häuser und Wahrzeichen kommen dort nicht hin. Vorher
+  ragten 223 Häuser vor allem aus den echten Stadtplänen auf Autobahn und Nachbarstraßen. Prüfen:
+  `world.tscn -- --worldcheck` baut die ganze Welt und listet jede Überschneidung („WC …“, jetzt 0).
+- **Gewonnene Rennen** verschwinden aus der Welt und von der Minikarte; die große Karte zeigt sie als goldenen Haken.
+- **Tasten:** Esc (oder P) öffnet das Menü, Enter bestätigt nur noch, M (oder Tab) öffnet die Karte, „.“ wechselt die
+  Musik. Test: `world.tscn -- --wspawn=ring:10 --ctest=rear40` (auch rear120, side,
   standing, wrongway, bus, wreck, wall10/30/60/90, median30), gibt alle 0,1 s „CT …“ aus.
 - Testen: `world.tscn -- --wspawn=ring:5 --wdrive --worldlog` (Autopilot auf dem Ring, Bauzeiten),
   `--wspawn=ramp:15` (vor der Auffahrt nach Aachen), `--nothreads` (wie im Browser); Draufsicht:
   `tools/world_map.tscn -- --worldlog --png=/pfad.png`.
+- **Anfahren ruhiger, Teile mit Siegen:** die unteren Gänge ziehen schwächer (`player_car.GEAR_PULL`), Gegner passend
+  (`Catalog.ACCEL_SCALE`); ab dem 4. Gang und das Endtempo wie vorher. 0–100: Kaizen 6,9 s (vorher 5,4), Sakura 6,2 s
+  (4,8), Sakura mit Motor 1 und Turbo 3 4,9 s (3,7). Leistungsteile kommen wieder mit Siegen (Motor 1/3/6, Turbo 2/4/7,
+  Nitro 2/5, Fahrwerk 1/3/6, Reifen 1/4/6); ein eingebautes, noch gesperrtes Teil gilt als die beste freie Stufe.
+  Messen: `world.tscn -- --wspawn=ring:10 --ctest=accel --car=sakura --cfg=engine:0,turbo:0`.
 - Noch offen: Stadion-Drift ohne Ausfahrt, abgeschnittene Schilder (Tunnelnamen), seltene Herausforderer-Autos,
   Motorklang bei Höchstgeschwindigkeit weniger gleichförmig (Vorbild: https://www.youtube.com/watch?v=qj5F_s3veiU&t=84s),
   Near-Miss-Nitro in der Welt, Test im Browser.

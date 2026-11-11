@@ -120,6 +120,9 @@ func _ready() -> void:
 	player.cam.make_current()
 	for n in get_tree().get_nodes_in_group("ambient"):
 		n.target = player
+	for e in entries:
+		if e["state"] == "ready" and e["track"]["crossing"]:
+			e["track"]["crossing"].player = player
 	_set_active(_entry_of(pc.track))
 	while not _tq.is_empty():
 		_spawn_queued(100)
@@ -129,6 +132,8 @@ func _ready() -> void:
 	await get_tree().process_frame
 	cover.queue_free()
 	_ready_done = true
+	if OS.get_cmdline_user_args().has("--worldcheck"):
+		_world_check()
 
 
 func _exit_tree() -> void:
@@ -144,6 +149,9 @@ func _spawn_xf() -> Transform3D:
 		# der Stadt von Rennen i, Blick zur Autobahn)
 		if a.begins_with("--wspawn="):
 			var parts := a.substr(9).split(":")
+			if parts[0] == "xy":  # --wspawn=xy:x:z:grad (Blickrichtung, 0 = Norden/-Z)
+				var yaw := deg_to_rad(float(parts[3]) if parts.size() > 3 else 0.0)
+				return Transform3D(Basis(Vector3.UP, -yaw), Vector3(float(parts[1]), 0.5, float(parts[2])))
 			if parts[0] == "ring":
 				var ring: Array = layout["ring"]
 				var k := int(parts[1]) % ring.size()
@@ -195,9 +203,12 @@ func _finish(e: Dictionary, job: Dictionary) -> void:
 	world.add_child(root)
 	e["track"] = tr
 	e["state"] = "ready"
+	e["feet"] = job.get("buildings", []) + job.get("occupied", [])  # Häuser und Bauwerke (für --worldcheck)
 	if e["kind"] == "city":
 		_add_marker(e)
 	_plan_traffic(e)
+	if player and tr["crossing"]:
+		tr["crossing"].player = player
 	if player:
 		for n in root.find_children("*", "", true, false):
 			if n.is_in_group("ambient"):
@@ -333,10 +344,10 @@ func _add_marker(e: Dictionary) -> void:
 	var i: int = e["race_index"]
 	var race: Dictionary = Catalog.RACES[i]
 	var col: Color = UI.TYPE_COL.get(race.get("type", "sprint"), UI.CYAN)
+	if race["name"] in GameState.won_events:
+		return  # gewonnen: kein Marker mehr in der Welt
 	if not GameState.career_open(race["name"]):
 		col = Color(0.45, 0.47, 0.52)  # gesperrt: grau
-	elif race["name"] in GameState.won_events:
-		col = col.lerp(Color(1.0, 0.8, 0.2), 0.5)  # gewonnen: golden angehaucht
 	var tr: Dictionary = e["track"]
 	var xf: Transform3D = e["xf"] * Track.xform_at(tr["curve"], tr["start"], 0.0)
 	var m := Node3D.new()
@@ -586,7 +597,7 @@ func _build_hud() -> void:
 	help.set_anchors_preset(Control.PRESET_TOP_RIGHT)
 	help.position = Vector2(-250, 6)
 	help.size = Vector2(240, 60)
-	help.text = tr("Frei fahren: Marker anfahren startet ein Rennen\nTab Karte  C Kamera  R Zurücksetzen  Esc Menü")
+	help.text = tr("Frei fahren: Marker anfahren startet ein Rennen\nM Karte  C Kamera  R Zurücksetzen  Esc Menü")
 	help.modulate.a = 0.7
 	hud["help"] = help
 	# Minikarte unten links: alle Straßen der Welt, Rennen in Sicht, gewähltes Ziel als Flagge
@@ -599,7 +610,12 @@ func _build_hud() -> void:
 		_pins[c["race_index"]] = pin
 	minimap = WorldMinimap.new()
 	root.add_child(minimap)
-	minimap.setup_world(layout["roads"], player, _pins.values())
+	# gewonnene Rennen verschwinden aus der Welt und von der Minikarte (wie in Underground); die große Karte zeigt sie golden
+	var open_pins := []
+	for i in _pins:
+		if not Catalog.RACES[i]["name"] in GameState.won_events:
+			open_pins.append(_pins[i])
+	minimap.setup_world(layout["roads"], player, open_pins)
 	minimap.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
 	minimap.offset_left = 8.0
 	minimap.offset_right = 8.0 + WorldMinimap.SIZE
@@ -988,6 +1004,7 @@ func _ctest_setup(case: String) -> void:
 		"wall60": [11.25, 42.0, 60.0, 0.0, 0.0, 0.0, ""],
 		"wall90": [11.25, 30.0, 90.0, 0.0, 0.0, 0.0, ""],
 		"median30": [2.25, 42.0, -30.0, 0.0, 0.0, 0.0, ""],
+		"accel": [6.75, 0.0, 0.0, 0.0, 0.0, 0.0, ""],
 	}
 	var k: Array = cases[case]
 	var xf := Track.xform_at(c, d0, Track.lane_lat(tr, d0, k[0]), true)
@@ -1010,7 +1027,8 @@ func _ctest_setup(case: String) -> void:
 		_spawn_queued(1)
 		_ready_done = rd2
 		traffic[1].push(Vector3.ZERO)
-	_ct = {"case": case, "t": 0.0, "next": 0.0, "hold": case.begins_with("wall") or case.begins_with("median")}
+	_ct = {"case": case, "t": 0.0, "next": 0.0, "hold": case.begins_with("wall") or case.begins_with("median") or case == "accel",
+		"marks": [60, 100, 150, 200, 250]}
 
 
 func _ctest_step(dt: float) -> void:
@@ -1019,6 +1037,16 @@ func _ctest_step(dt: float) -> void:
 		Input.action_release(a)
 	if _ct["hold"] or _ct["case"].begins_with("rear") or _ct["case"] == "bus":
 		Input.action_press("accelerate")
+	if _ct["case"] == "accel":
+		# Beschleunigung ohne Nitro: Zeit bis 60/100/150/200/250 km/h, danach Endtempo nach 40 s
+		var kmh: float = absf(player.speed_fwd) * 3.6
+		while not _ct["marks"].is_empty() and kmh >= _ct["marks"][0]:
+			print("ACC 0-%d km/h: %.2f s (Gang %d)" % [_ct["marks"][0], _ct["t"], player.gear])
+			_ct["marks"].pop_front()
+		if _ct["t"] > 40.0:
+			print("ACC nach 40 s: %d km/h" % int(kmh))
+			get_tree().quit()
+		return
 	if _ct["t"] < _ct["next"]:
 		return
 	_ct["next"] += 0.1
@@ -1037,3 +1065,73 @@ func _ctest_step(dt: float) -> void:
 	print(s)
 	if _ct["t"] > (8.0 if _ct["case"] in ["wreck", "bus", "standing"] else 3.0):
 		get_tree().quit()
+
+
+
+# --- Test: ganze Welt auf Überlappungen prüfen (--worldcheck) ------------------------------------
+## Baut alle Strecken und prüft jedes Haus und Bauwerk gegen die Fahrbahnen aller anderen Strecken (Ring, Auffahrten,
+## Straßen der Nachbarstädte). Gibt jede Überschneidung aus ("WC ...") und am Ende eine Zusammenfassung.
+func _world_check() -> void:
+	var t0 := Time.get_ticks_msec()
+	for e in entries:
+		if e["state"] == "none":
+			var job := Track.begin(e["race"])
+			job["nobatch"] = true
+			while Track.step(job) < 1.0:
+				pass
+			_finish(e, job)
+	print("WC alle %d Strecken gebaut in %d ms" % [entries.size(), Time.get_ticks_msec() - t0])
+	var total := 0
+	var pairs := {}
+	for a in entries:
+		var xa: Transform3D = a["xf"]
+		for o in a.get("feet", []):
+			if o.has("ko"):
+				continue  # Sperrfläche selbst
+			var p: Vector3 = xa * Vector3(o["pos"].x, 0.0, o["pos"].z)
+			var r: float = Vector2(o["foot"][3], o["foot"][4]).length() if o.has("foot") else float(o.get("r", 5.0))
+			for b in entries:
+				if b == a or _dist(b, p) > r:
+					continue
+				var loc := Track.locate(b["track"], (b["xf"] as Transform3D).affine_inverse() * p)
+				if loc.is_empty():
+					continue
+				if loc["score"] < r * 0.6 + Track.WALK:
+					total += 1
+					var key := "%s -> %s" % [_wc_name(a), _wc_name(b)]
+					pairs[key] = pairs.get(key, 0) + 1
+					if pairs[key] <= 3:
+						print("WC %s steht auf %s (%s) bei (%.0f, %.0f) r=%.0f abstand=%.1f" % [_wc_name(a), _wc_name(b),
+							loc["path"]["kind"], p.x, p.z, r, loc["score"]])
+	# Straßen gegen Straßen: kreuzt eine Stadtstraße den Ring oder eine Nachbarstadt (außer an der eigenen Ausfahrt)?
+	for a in entries:
+		if a["kind"] != "city":
+			continue
+		var xa: Transform3D = a["xf"]
+		for pth in a["track"]["paths"]:
+			var c: Curve3D = pth["curve"]
+			var d := 0.0
+			while d < c.get_baked_length():
+				var p: Vector3 = xa * c.sample_baked(d)
+				d += 15.0
+				if Vector2(p.x - a["exit"].x, p.z - a["exit"].z).length() < 80.0:
+					continue
+				for b in entries:
+					if b == a or _dist(b, p) > 30.0:
+						continue
+					var loc := Track.locate(b["track"], (b["xf"] as Transform3D).affine_inverse() * p)
+					if not loc.is_empty() and loc["score"] < 0.0:
+						total += 1
+						var key := "STRASSE %s -> %s" % [_wc_name(a), _wc_name(b)]
+						pairs[key] = pairs.get(key, 0) + 1
+						if pairs[key] <= 2:
+							print("WC Straße von %s (%s) auf %s (%s) bei (%.0f, %.0f)" % [_wc_name(a), pth["kind"], _wc_name(b),
+								loc["path"]["kind"], p.x, p.z])
+	print("WC SUMME %d Überschneidungen" % total)
+	for k in pairs:
+		print("WC   %4d  %s" % [pairs[k], k])
+	get_tree().quit()
+
+
+func _wc_name(e: Dictionary) -> String:
+	return "Autobahn %d" % e["seg_i"] if e["kind"] == "seg" else str(Catalog.RACES[e["race_index"]]["name"])

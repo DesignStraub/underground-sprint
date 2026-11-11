@@ -50,7 +50,8 @@ var _far_t := 0.0
 var parent_basis := Basis.IDENTITY
 var on_end := Callable()
 var _handing := false
-var mass := 1.0  # Pkw 1, Transporter 1,7, Bus 5: schwere Wagen geben beim Aufprall weniger nach
+var mass := 2.5  # im Verhältnis zum Spielerauto (1): Pkw 2,5, Transporter 4, Bus 10. Verkehr ist schwer wie in
+## Underground: wer ihn rammt, verliert viel Tempo; schwere Wagen geben kaum nach
 var leader: Node = null  # nächster Wagen vor mir auf meiner Spur (link_leaders)
 var player_speed := 0.0  # Spieler längs der Straße (+ in Wegrichtung)
 var _half_w := 0.9
@@ -85,7 +86,7 @@ func setup(kind_: String, rng: RandomNumberGenerator) -> void:
 			Builder._add(self, Builder.box(Vector3(2.3, 1.0, 0.05)), win, Vector3(0, 2.0, -5.51))
 	length = size.z
 	_half_w = size.x / 2.0
-	mass = {"van": 1.7, "bus": 5.0}.get(kind, 1.0)
+	mass = {"van": 4.0, "bus": 10.0}.get(kind, 2.5)
 	Builder.merge_static(self)
 	var cs := CollisionShape3D.new()
 	var bs := BoxShape3D.new()
@@ -322,7 +323,7 @@ func push(dv: Vector3) -> void:
 		_wreck_ground = position.y
 	_wreck_vel += Vector3(dv.x, 0, dv.z)
 	_wreck_spin += randf_range(-1.0, 1.0) * clampf(dv.length() / 6.0, 0.5, 3.0) / sqrt(mass)
-	if dv.length() > 12.0 and mass < 2.0 and _wreck_roll_v == 0.0 and position.y <= _wreck_ground + 0.01:
+	if dv.length() > 9.0 and mass < 3.0 and _wreck_roll_v == 0.0 and position.y <= _wreck_ground + 0.01:
 		_wreck_vy = clampf(dv.length() * 0.3, 3.5, 7.0)
 		_wreck_roll_v = randf_range(4.0, 7.0) * (1.0 if randf() < 0.5 else -1.0)
 

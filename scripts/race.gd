@@ -188,7 +188,7 @@ func _ready() -> void:
 		# Abkürzungen sparen bis zu einem Fünftel der Zeit: in den ersten Rennen (1 Stern) kennen die Gegner
 		# sie noch nicht, danach nehmen sie sie auf Leicht selten
 		ai.shortcut_k = 0.0 if tier <= 1 else [0.3, 0.8, 1.0][diff]
-		ai.accel *= 0.8 + 0.2 * GameState.pace()
+		ai.accel *= (0.8 + 0.2 * GameState.pace()) * Catalog.ACCEL_SCALE
 		ai.set_meta("hud_col", _hud_col(Builder.paint_color(id, cfg)))
 		ais.append(ai)
 		_loading.progress = 0.77 + 0.05 * (i + 1)
@@ -674,7 +674,7 @@ func _build_hud() -> void:
 	hud["help"].set_anchors_preset(Control.PRESET_TOP_RIGHT)
 	hud["help"].position = Vector2(-250, 6)
 	hud["help"].size = Vector2(240, 60)
-	hud["help"].text = tr("W/S Gas/Bremse  A/D Lenken\nLeertaste Handbremse  Shift Nitro\nC Kamera  R Zurücksetzen  M Musik\nF Vollbild  Esc Pause")
+	hud["help"].text = tr("W/S Gas/Bremse  A/D Lenken\nLeertaste Handbremse  Shift Nitro\nC Kamera  R Zurücksetzen  . Musik\nF Vollbild  Esc Pause")
 	hud["help"].modulate.a = 0.7
 	if event_type == "drag":
 		hud["help"].text = tr("W Gas  S hoch-, X runterschalten\nA/D Spur wechseln  Shift Nitro\nC Kamera  F Vollbild  Esc Pause")
