@@ -184,3 +184,28 @@ Twenty-three cars, pick one, let's go!
 Play it free, right in your browser!
 Need for Geschwindigkeit!
 ```
+
+## 14. Überholen und Abkürzung (Englisch, Stand 2.27.2)
+
+Datei: `release/need_for_geschwindigkeit_short2_overtake_en.mp4` (23 s, 1080×1920, liegt nicht im Repo). Gleicher Stil
+wie Nr. 13 (keine Stimme, „Drift Phonk“, Drop auf dem Start, jede Szene 2–4 Schläge), dafür eine kurze Zeile je Szene.
+Ziel: zeigen, dass da echte Rennen stattfinden, und keine Stellen, an denen das Auto stumpf gegen die Wand fährt.
+
+| Schläge | Bild | Text |
+|---|---|---|
+| 4 | Schwarzbild | street racing. in your browser. |
+| 4 | Start in Frankfurt, „GO!“ auf dem Drop | four cars. one finish line. |
+| 4 | Köln: an einem Gegner links vorbei | pass them. |
+| 3 | Würzburg: am roten Gegner vorbei | Ortsschild WÜRZBURG |
+| 3 | Frankfurt: drei Gegner ziehen vorbei | they pass back. |
+| 4 | Frankfurt: Abkürzung durch die Gasse (Platz 4 → 1) | so take the shortcut. |
+| 3 | Hamburg: in den Tunnel | through the tunnel. |
+| 3 | Kreuzberg unter der U1 | Ortsschild BERLIN-KREUZBERG |
+| 2 | Frankfurt: am Stadion vorbei | – |
+| 7 | Endtafel | need for geschwindigkeit · free · no download · onehumanity.itch.io |
+
+Gebaut so: Szenen mit `--write-movie` im Hochformat (`--nopool --lang=en --nomusic`, FPS-Anzeige im Test-Spielstand aus),
+gefunden mit `--placelog` (Platzwechsel, Treffer, Abstand zum nächsten Gegner). Sichtbare Überholmanöver gibt es mit
+`--hold=3`: das Auto bleibt nach dem Start 3 s stehen und holt die Gegner danach ein. Texte mit
+`tools/promo_overlays.tscn -- --sketch2`, Schnitt mit `tools/short2/cut4.py` (erwartet `clips/` und `ov/` daneben).
+Titel, Beschreibung und Hashtags: `release/SHORT_TEXTE_EN.txt`, Abschnitt „Zweites Short“.

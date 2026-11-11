@@ -21,7 +21,10 @@ extends Node
 ##   -- --fulltest         Autopilot fährt das ganze Rennen; meldet Hänger, Stürze, Fahrten neben der Strecke, Ruckler,
 ##                         hängende Gegner und das Ergebnis ("FT ..."), beendet sich 3 s nach dem Ziel
 ##   -- --branches         Autopilot nimmt jede Abkürzung (See, Gasse, Gabelung)
-##   -- --audiolog         alle 0,25 s Gang/Drehzahl (gehört und für den Vortrieb), Driftwinkel, Reifenquietschen
+##   -- --hold=2.5         Spieler bleibt nach dem Start 2,5 s stehen (Gegner ziehen davon, dann sichtbar überholen)
+##   -- --placelog        gibt Platzwechsel ("PL"), Treffer an Wand/Bande ("HIT") und alle 0,5 s den Abstand zum
+##                         nächsten Gegner aus ("NB"): Szenen fürs Short finden (Überholen ohne Patzer)
+##   -- --audiolog        alle 0,25 s Gang/Drehzahl (gehört und für den Vortrieb), Driftwinkel, Reifenquietschen
 ##   -- --sndtest          Gas, ab 3 s Nitro, ab 7 s Handbremsen-Drift; loggt Pegel von Nitro und Reifen ("snd ...").
 ##                         Mit --write-movie aufnehmen, --nomusic für die Effekte allein, --sndtrace für jedes Bild
 ##   -- --lightlog         Größe und Aufbauzeit der Lichtkarte (Laternenlicht auf der Straße)
@@ -73,6 +76,9 @@ var _crash_yaw := 0.0
 var _crash_t0 := 0.0
 var _block: PackedStringArray = []
 var _block_done := false
+var _pl_place := 0  # --placelog
+var _pl_hits := 0
+var _pl_crash := 0
 var _added := {}  # in diesem Bild neu hinzugefügte Knoten nach Art (Ruckler-Suche)
 var fulltest := false
 var branches := false
@@ -477,6 +483,28 @@ func _process(dt: float) -> void:
 		if ep.gear != _ev_gear:
 			print("EV %.2fs gang %d" % [_t, ep.gear])
 			_ev_gear = ep.gear
+	# --hold=2.5: Spieler bleibt nach dem Start so lange stehen (Gegner ziehen davon, danach sichtbar einholen und überholen)
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--hold=") and race and "curve" in race and race.player and race.state == 1 and race.race_time < float(a.substr(7)):
+			Input.action_release("accelerate")
+			Input.action_release("nitro")
+	# --placelog: Platzwechsel, Treffer an Wand/Bande und nächster Gegner (Szenen fürs Short finden: Überholen ohne Patzer)
+	if OS.get_cmdline_user_args().has("--placelog") and race and "curve" in race and race.player and race.state == 1:
+		var lp = race.player
+		var plc: int = race._place()
+		if plc != _pl_place:
+			print("PL %.2fs platz %d -> %d d=%.0f v=%d" % [_t, _pl_place, plc, lp.progress, int(lp.speed_fwd * 3.6)])
+			_pl_place = plc
+		if lp.wall_hits != _pl_hits or lp.crashes != _pl_crash:
+			print("HIT %.2fs wand=%d crash=%d d=%.0f" % [_t, lp.wall_hits, lp.crashes, lp.progress])
+			_pl_hits = lp.wall_hits
+			_pl_crash = lp.crashes
+		if fmod(_t, 0.5) < dt:
+			var near := 9999.0
+			for ai in race.ais:
+				if ai.finish_time < 0.0 and absf(ai.total - race.player_progress) < absf(near):
+					near = ai.total - race.player_progress
+			print("NB %.1fs gegner %+.0f m pfad=%d nos=%s" % [_t, near, lp.path_id, "AN" if lp.nitro_on else "-"])
 	if OS.get_cmdline_user_args().has("--airlog") and race and "curve" in race and race.player and race.state == 1 and fmod(_t, 0.1) < dt:
 		var p2 = race.player
 		print("air t=%.1f v=%.1f y=%.2f vy=%.1f luft=%s nick=%.2f roll=%.2f d=%.0f pfad=%d wasser=%.1f" % [_t, p2.velocity.length(), p2.position.y, p2.vy,

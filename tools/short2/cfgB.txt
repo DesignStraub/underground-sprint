@@ -1,0 +1,1 @@
+paint:0,finish:4,rims:9,rimcol:2,rimsize:3,spoiler:2,bodykit:5,hood:5,neon:2,tint:2,lights:1

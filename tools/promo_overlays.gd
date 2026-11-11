@@ -5,6 +5,7 @@ extends Node
 ##   [--cover=bild.png]  zusätzlich itch-Cover 1260x1000 und 630x500 aus einem Spielbild (Querformat, Auto in der Mitte)
 ##   [--scover=bild.png] zusätzlich Titelbild fürs Short 1080x1920 aus einem Spielbild im Hochformat
 ##   [--sketch]          schlichte Einblendungen für den Skizzen-Trailer (Kleinschrift, kein Neon, nur Ortsschilder)
+##   [--sketch2]         dasselbe fürs zweite Short (Überholen, Abkürzung, Tunnel, U1), Dateien t_*.png
 ## Das Fenster lässt den Inhalt frei (transparent): darunter legt ffmpeg das Querformat-Video (1000x563 bei x 40, y 700).
 
 const UiStyle := preload("res://scripts/ui_style.gd")
@@ -45,6 +46,26 @@ func _ready() -> void:
 		await _render(_sign_only("WÜRZBURG"), "s_sign_wue")
 		await _render(_sign_only("BERLIN-KREUZBERG"), "s_sign_xberg")
 		await _render(_sketch_end(), "s_end")
+		get_tree().quit()
+		return
+	if OS.get_cmdline_user_args().has("--sketch2"):
+		# zweites Short: gleicher Stil, etwas mehr Text (eine Zeile je Szene, im Himmel über der Straße)
+		await _render(_sketch_text("street racing. in your browser.", 900.0), "t_intro")
+		for c in [["four cars. one finish line.", "t_four"], ["pass them.", "t_pass"], ["they pass back.", "t_back"],
+				["so take the shortcut.", "t_short"], ["through the tunnel.", "t_tunnel"], ["under the u1.", "t_u1"]]:
+			await _render(_sketch_text(c[0], 560.0), c[1])
+		await _render(_sign_only("WÜRZBURG"), "t_sign_wue")
+		await _render(_sign_only("BERLIN-KREUZBERG"), "t_sign_xberg")
+		var e2 := Control.new()
+		e2.size = SIZE
+		var dim := ColorRect.new()
+		dim.color = Color(0, 0, 0.01, 0.72)
+		dim.size = SIZE
+		e2.add_child(dim)
+		_sketch_line(e2, "need for geschwindigkeit", 800.0, 92)
+		_sketch_line(e2, "free · no download", 935.0, 56, Color(0.78, 0.82, 0.9))
+		_sketch_line(e2, "onehumanity.itch.io", 1015.0, 56, Color(0.78, 0.82, 0.9))
+		await _render(e2, "t_end")
 		get_tree().quit()
 		return
 	if cover_src != "" or scover_src != "":
