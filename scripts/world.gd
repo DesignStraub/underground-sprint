@@ -15,6 +15,8 @@ const UI := preload("res://scripts/ui_style.gd")
 const TACHO := preload("res://scripts/tacho.gd")
 const SPEED_FX := preload("res://shaders/speed_fx.gdshader")
 const SKY_SHADER := preload("res://shaders/night_sky.gdshader")
+const WorldMinimap := preload("res://scripts/world_minimap.gd")
+const MapView := preload("res://scripts/world_map_view.gd")
 
 const LOAD_PAD := 700.0  # Strecke bauen, wenn man so nah am Rand ihres Umkreises ist
 const DROP_PAD := 1300.0  # ... und wieder entfernen, wenn man so weit weg ist
@@ -24,6 +26,7 @@ const BLUR_LEVEL := [0.0, 0.55, 1.0, 1.6]
 ## Rückkehr nach einem Rennen: dort wieder einsetzen (gilt für diese Sitzung)
 static var return_xf := Transform3D.IDENTITY
 static var has_return := false
+static var target := -1  # auf der Karte gewähltes Ziel (Rennen), gilt für diese Sitzung
 
 var world: SubViewport
 var player: CharacterBody3D
@@ -40,6 +43,9 @@ var _threads := false
 var _markers := {}  # race_index -> Node3D
 var _near_marker := -1
 var hud := {}
+var minimap: Control
+var map_view: Control
+var _pins := {}  # race_index -> Node3D am Start (für die Minikarte, immer da)
 var pause_panel: Control
 var fx_mat: ShaderMaterial
 var _fx_rect: ColorRect
@@ -306,6 +312,10 @@ func _add_marker(e: Dictionary) -> void:
 	var i: int = e["race_index"]
 	var race: Dictionary = Catalog.RACES[i]
 	var col: Color = UI.TYPE_COL.get(race.get("type", "sprint"), UI.CYAN)
+	if not GameState.career_open(race["name"]):
+		col = Color(0.45, 0.47, 0.52)  # gesperrt: grau
+	elif race["name"] in GameState.won_events:
+		col = col.lerp(Color(1.0, 0.8, 0.2), 0.5)  # gewonnen: golden angehaucht
 	var tr: Dictionary = e["track"]
 	var xf: Transform3D = e["xf"] * Track.xform_at(tr["curve"], tr["start"], 0.0)
 	var m := Node3D.new()
@@ -381,7 +391,12 @@ func _update_markers() -> void:
 		_near_marker = near
 		if near >= 0:
 			var race: Dictionary = Catalog.RACES[near]
-			hud["prompt"].text = "%s\n%s" % [tr(race["name"]).to_upper(), tr("Enter: Rennen starten")]
+			var line := tr("Enter: Rennen starten")
+			if not GameState.career_open(race["name"]):
+				var st := Catalog.stage_of(race["name"])
+				line = tr("Gesperrt: erst %d Siege in Stufe „%s“") % [Catalog.stage_need(st - 1), tr(Catalog.STAGES[st - 1]["name"])] \
+					if st > 0 else tr("Gesperrt")
+			hud["prompt"].text = "%s\n%s" % [tr(race["name"]).to_upper(), line]
 		hud["prompt"].visible = near >= 0
 
 
@@ -550,10 +565,37 @@ func _build_hud() -> void:
 	help.set_anchors_preset(Control.PRESET_TOP_RIGHT)
 	help.position = Vector2(-250, 6)
 	help.size = Vector2(240, 60)
-	help.text = tr("Frei fahren: Marker anfahren startet ein Rennen\nC Kamera  R Zurücksetzen  Esc Menü")
+	help.text = tr("Frei fahren: Marker anfahren startet ein Rennen\nTab Karte  C Kamera  R Zurücksetzen  Esc Menü")
 	help.modulate.a = 0.7
 	hud["help"] = help
+	# Minikarte unten links: alle Straßen der Welt, Rennen in Sicht, gewähltes Ziel als Flagge
+	for c in layout["cities"]:
+		var pin := Node3D.new()
+		pin.position = c["start_world"]
+		var race: Dictionary = Catalog.RACES[c["race_index"]]
+		pin.set_meta("hud_col", UI.TYPE_COL.get(race.get("type", "sprint"), UI.CYAN) if GameState.career_open(race["name"]) else Color(0.5, 0.52, 0.58))
+		world.add_child(pin)
+		_pins[c["race_index"]] = pin
+	minimap = WorldMinimap.new()
+	root.add_child(minimap)
+	minimap.setup_world(layout["roads"], player, _pins.values())
+	minimap.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+	minimap.offset_left = 8.0
+	minimap.offset_right = 8.0 + WorldMinimap.SIZE
+	minimap.offset_top = -WorldMinimap.SIZE - 8.0
+	minimap.offset_bottom = -8.0
+	_set_target(target)
 	_build_pause(root)
+	var map_layer := CanvasLayer.new()
+	map_layer.layer = 5
+	add_child(map_layer)
+	map_view = MapView.new()
+	map_view.visible = false
+	map_layer.add_child(map_view)
+	map_view.setup(layout["roads"], layout["cities"], player)
+	map_view.target = target
+	map_view.target_chosen.connect(_set_target)
+	map_view.closed.connect(_close_map)
 
 
 func _build_pause(root: Control) -> void:
@@ -567,12 +609,45 @@ func _build_pause(root: Control) -> void:
 	root.add_child(pause_panel)
 	var title := _label(pause_panel, 28, HORIZONTAL_ALIGNMENT_CENTER)
 	title.text = tr("PAUSE")
-	for entry in [["Weiter", _toggle_pause], ["Vollbild", GameState.toggle_fullscreen],
+	for entry in [["Weiter", _toggle_pause], ["Karte", func(): _toggle_pause(); _open_map()],
+			["Tuning", _to_garage.bind("tuning")], ["Auto wechseln", _to_garage.bind("cars")],
+			["Vollbild", GameState.toggle_fullscreen],
 			["Garage", func(): _unpause(); GameState.in_world = false; get_tree().change_scene_to_file("res://scenes/garage.tscn")]]:
 		var b := Button.new()
 		b.text = tr(entry[0])
 		b.pressed.connect(entry[1])
 		pause_panel.add_child(b)
+
+
+## Esc > Tuning / Auto wechseln: Garage öffnet direkt dort, "Fertig" bringt einen an dieselbe Stelle zurück
+func _to_garage(menu: String) -> void:
+	_unpause()
+	return_xf = player.global_transform
+	has_return = true
+	GameState.world_menu = menu
+	get_tree().change_scene_to_file("res://scenes/garage.tscn")
+
+
+func _open_map() -> void:
+	get_tree().paused = true
+	Music.set_paused(true)
+	hud["prompt"].visible = false
+	map_view.open(target)
+
+
+func _close_map() -> void:
+	_unpause()
+	_near_marker = -2  # Hinweis am Marker neu zeigen
+
+
+func _set_target(i: int) -> void:
+	target = i
+	if minimap == null:
+		return
+	if i >= 0 and _pins.has(i):
+		minimap.set_target(_pins[i].position, true)
+	else:
+		minimap.set_target(Vector3.ZERO, false)
 
 
 func _toggle_pause() -> void:
@@ -592,9 +667,16 @@ func _unpause() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if not _ready_done:
 		return
-	if _near_marker >= 0 and not get_tree().paused and event.is_action_pressed("ui_accept"):
+	if map_view and map_view.visible:
+		map_view._handle(event)
+		return
+	if _near_marker >= 0 and not get_tree().paused and event.is_action_pressed("ui_accept") \
+			and GameState.career_open(Catalog.RACES[_near_marker]["name"]):
 		get_viewport().set_input_as_handled()
 		_start_race(_near_marker)
+		return
+	if event.is_action_pressed("map") and not get_tree().paused:
+		_open_map()
 		return
 	if event.is_action_pressed("camera") and not get_tree().paused:
 		player.toggle_camera()

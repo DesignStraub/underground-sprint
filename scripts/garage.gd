@@ -49,6 +49,12 @@ func _ready() -> void:
 	_build_ui()
 	if GameState.language == "":
 		_show_language(true)  # erster Start: Sprache wählen (Englisch vorausgewählt)
+	elif GameState.world_menu == "tuning":
+		preview_car = GameState.current_car
+		_show_tuning()  # aus der Open World (Esc > Tuning): "Fertig" führt zurück in die Welt
+	elif GameState.world_menu == "cars":
+		preview_car = GameState.current_car
+		_show_cars()
 	else:
 		_show_main()
 
@@ -532,6 +538,12 @@ func _focus_first() -> void:
 
 
 func _show_main() -> void:
+	if GameState.world_menu != "":
+		# aus der Open World gekommen (Tuning, Autohaus): zurück dorthin statt ins Hauptmenü
+		GameState.world_menu = ""
+		_starting = true
+		get_tree().change_scene_to_file("res://scenes/world.tscn")
+		return
 	_clear_menu()
 	_back = Callable()
 	_cam_view = ""
@@ -540,7 +552,7 @@ func _show_main() -> void:
 	_show_car(preview_car, preview_cfg)
 	_set_section("GARAGE", true)
 	# Seit 2.28: Open World statt Rennen-Liste. Die Rennen findet man als Marker in den Städten.
-	_button("Losfahren", _enter_world)
+	_button("Losfahren", _drive_world)
 	_button("Tuning", _show_tuning)
 	_button("Auto wechseln", _show_cars)
 	_button("Einstellungen", _show_settings)
@@ -824,7 +836,7 @@ func _show_events(type: String) -> void:
 var _starting := false
 
 
-func _enter_world() -> void:
+func _drive_world() -> void:
 	if _starting:
 		return
 	_starting = true

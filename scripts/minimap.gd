@@ -26,6 +26,9 @@ var track: Dictionary
 var player: Node3D
 var cars: Array = []  # Gegner (Node3D), Farbe in meta "hud_col"
 var view_m := 150.0  # Sichtweite (Radius) in Metern
+var edge_dots := true  # Punkte außer Sicht am Rand zeigen (Open World: nur in Sicht, sonst wären es zu viele)
+var show_flag := true  # Zielflagge (Open World: nur, wenn ein Ziel auf der Karte gewählt ist)
+var view_range := Vector2(130.0, 230.0)  # Sichtweite langsam / schnell
 
 var _xf := Transform2D.IDENTITY  # Welt (x, z) -> Kartenpixel
 var _roads := [[], [], []]  # je Art (Haupt, Abkürzung, Sackgasse): Linienzüge in Welt (x, z)
@@ -79,7 +82,11 @@ func setup(track_: Dictionary, player_: Node3D, cars_: Array) -> void:
 	var fd: float = fposmod(track["finish"], track["length"]) if track["loop"] else track["finish"]
 	var fp := curve.sample_baked(fd)
 	_finish = Vector2(fp.x, fp.z)
+	_build_layers()
 
+
+## Ebenen anlegen (nachdem _roads, _rivers, _lakes, _finish und cars gesetzt sind)
+func _build_layers() -> void:
 	_layer(_draw_bg)
 	_world = Node2D.new()
 	_mat = ShaderMaterial.new()
@@ -124,7 +131,7 @@ func _process(delta: float) -> void:
 		f = Vector2(f3.x, f3.z)
 	f = f.normalized()
 	var v: float = player.velocity.length() if "velocity" in player else 0.0
-	view_m = lerpf(view_m, lerpf(130.0, 230.0, clampf(v / 60.0, 0.0, 1.0)), minf(delta * 1.5, 1.0))
+	view_m = lerpf(view_m, lerpf(view_range.x, view_range.y, clampf(v / 60.0, 0.0, 1.0)), minf(delta * 1.5, 1.0))
 	var k := R / view_m
 	var right := Vector2(-f.y, f.x)
 	# Bildschirm-x = Anteil nach rechts, Bildschirm-y = minus Anteil nach vorn
@@ -143,6 +150,7 @@ func _process(delta: float) -> void:
 	var fin_out := (fpos - C).length() > R - 6.0
 	_flag.position = C + (fpos - C).normalized() * (R - 6.0) if fin_out else fpos
 	_flag.modulate.a = 0.75 if fin_out else 1.0
+	_flag.visible = show_flag
 	for i in cars.size():
 		var car: Node3D = cars[i]
 		var dot: Control = _dots[i]
@@ -152,6 +160,9 @@ func _process(delta: float) -> void:
 		var gp := car.global_position
 		var off := _xf * Vector2(gp.x, gp.z) - C
 		var out := off.length() > R - 4.0
+		if out and not edge_dots:
+			dot.visible = false
+			continue
 		dot.position = C + (off.normalized() * (R - 4.0) if out else off)
 		dot.scale = Vector2(0.75, 0.75) if out else Vector2.ONE
 	# Du: Pfeil in Fahrtrichtung (beim Driften schräg zur Blickrichtung), Schein pulsiert

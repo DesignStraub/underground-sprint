@@ -55,10 +55,18 @@ static func build() -> Dictionary:
 		var yaw := atan2(dir.x, dir.z) - PI  # Drehung, die dir auf (0, 0, -1) bringt
 		var b0 := Basis(Vector3.UP, -yaw)
 		var pts := []
+		var polys := []  # für die Karten: [Punkte alle 8 m (Streckenkoordinaten), Art 0 Haupt / 1 Abzweig / 2 Sackgasse]
 		for p in tr["paths"]:
 			var bp: PackedVector3Array = (p["curve"] as Curve3D).get_baked_points()
 			for k in range(0, bp.size(), 15):
 				pts.append(b0 * (bp[k] - ex["end"]))
+			var pl := PackedVector3Array()
+			for k in range(0, bp.size(), 8):
+				pl.append(bp[k])
+			pl.append(bp[bp.size() - 1])
+			if p["kind"] == "main" and tr["loop"]:
+				pl.append(bp[0])
+			polys.append([pl, 0 if p["kind"] == "main" else (2 if p["kind"] == "spur" else 1)])
 		var lat0 := 1e9
 		var lat1 := -1e9
 		var rad0 := 0.0
@@ -74,7 +82,7 @@ static func build() -> Dictionary:
 		var gz := -(geo.x - GEO_CENTER.y)
 		cities.append({"race_index": i, "b0": b0, "end_local": ex["end"], "lat0": lat0 - SIDE_MARGIN / 2.0,
 			"lat1": lat1 + SIDE_MARGIN / 2.0, "gap": maxf(GAP_MIN, -rad0 + 160.0), "far": far,
-			"phi": atan2(gz, gx) + i * 1e-4, "start_local": Track.frame_at(tr["curve"], tr["start"])["pos"]})
+			"phi": atan2(gz, gx) + i * 1e-4, "start_local": Track.frame_at(tr["curve"], tr["start"])["pos"], "polys_local": polys})
 	cities.sort_custom(func(a, b): return a["phi"] < b["phi"])
 	# Platz am Ring: zwischen zwei Nachbarn rechte Kante des einen + linke Kante des anderen (am Ring gemessen)
 	var n := cities.size()
@@ -86,12 +94,25 @@ static func build() -> Dictionary:
 		var s: float = a["lat1"] - b["lat0"]
 		need.append(s)
 		total += s
-	var R := maxf(total / TAU, 2500.0)
-	# Winkel: Reihenfolge wie auf der Karte, Abstände nach Platzbedarf (Ring genau ausgefüllt)
-	var phi: float = cities[0]["phi"]
+	# Ring etwas größer als nötig: der Spielraum rückt jede Stadt möglichst nah an ihre echte Himmelsrichtung
+	var R := maxf(total / TAU * 1.18, 2500.0)
+	var x := []
 	for k in n:
-		cities[k]["phi_w"] = phi
-		phi += need[k] / R
+		x.append(float(cities[k]["phi"]))
+	for it in 400:
+		if it < 250:
+			for k in n:
+				x[k] += (float(cities[k]["phi"]) - x[k]) * 0.04
+		for k in n:
+			var k2 := (k + 1) % n
+			var gap: float = (x[k2] + (TAU if k2 == 0 else 0.0)) - x[k]
+			var mn: float = need[k] / R
+			if gap < mn:
+				var push := (mn - gap) / 2.0
+				x[k] -= push
+				x[k2] += push
+	for k in n:
+		cities[k]["phi_w"] = x[k]
 	# Ring: Kreis mit sanften Wellen (sieht nicht wie mit dem Zirkel gezogen aus)
 	var ring := []
 	var m := int(TAU * R / RING_STEP)
@@ -120,6 +141,13 @@ static func build() -> Dictionary:
 		c["center"] = rp + N * (c["gap"] + c["far"] / 2.0)
 		c["radius"] = maxf(c["far"] / 2.0, (c["lat1"] - c["lat0"]) / 2.0) + 200.0
 		c["race"] = world_race(c["race_index"], xf)
+		c["roads"] = []
+		for pl in c["polys_local"]:
+			var w2 := PackedVector2Array()
+			for q in pl[0]:
+				var wq: Vector3 = xf * q
+				w2.append(Vector2(wq.x, wq.z))
+			c["roads"].append([w2, pl[1]])
 		ramps.append({"k": k, "from": rp, "end": exit_w, "name": Catalog.RACES[c["race_index"]].get("town", "")})
 	# Ring in Stücke teilen; Grenzen nicht in der Nähe einer Auffahrt
 	var ramp_k := {}
@@ -147,7 +175,18 @@ static func build() -> Dictionary:
 			"districts": {"highway": 1.0}, "mood": MOOD, "ramps": rs, "world": true},
 			"center": mid, "radius": (k1 - k0) * RING_STEP / 2.0 + 150.0})
 		k0 = k1
-	_cache = {"cities": cities, "segments": segments, "ring_r": R, "ring": ring}
+	# Straßen für die Karten (Weltkoordinaten x, z): Ring, Auffahrten, alle Wege der Städte
+	var roads := []
+	var rl := PackedVector2Array()
+	for q in ring:
+		rl.append(Vector2(q.x, q.z))
+	rl.append(rl[0])
+	roads.append([rl, 0])
+	for r in ramps:
+		roads.append([PackedVector2Array([Vector2(r["from"].x, r["from"].z), Vector2(r["end"].x, r["end"].z)]), 1])
+	for c in cities:
+		roads.append_array(c["roads"])
+	_cache = {"cities": cities, "segments": segments, "ring_r": R, "ring": ring, "roads": roads}
 	if OS.get_cmdline_user_args().has("--worldlog"):
 		print("WELT Ring %.0f m (Umfang %.1f km), %d Städte, %d Stücke, Planung %d ms" % [R, TAU * R / 1000.0, cities.size(),
 			segments.size(), Time.get_ticks_msec() - t0])

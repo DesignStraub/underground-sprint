@@ -77,6 +77,7 @@ var wins := 0  # Rennsiege (Sprint + Rundkurs)
 var drift_wins := 0
 var current_car := "kaizen"
 var race_index := 0
+var world_menu := ""  # Open World > Esc > Tuning/Autohaus: Garage öffnet dort, "Fertig" führt zurück in die Welt
 var in_world := false  # Rennen aus der Open World gestartet: danach zurück in die Welt (nicht gespeichert)
 var best_times := {}  # Rennname -> Sekunden
 var won_events: Array = []  # gewonnene Events (Karriere: genug Siege in einer Stufe öffnen die nächste)
@@ -149,6 +150,7 @@ func _setup_input() -> void:
 	_add_action("shift_down", [KEY_X, KEY_Q], [JOY_BUTTON_LEFT_SHOULDER], [])
 	_add_action("camera", [KEY_C], [JOY_BUTTON_Y], [])
 	_add_action("reset_car", [KEY_R], [JOY_BUTTON_BACK], [])
+	_add_action("map", [KEY_TAB], [JOY_BUTTON_LEFT_STICK], [])  # Open World: große Karte
 	# Pause auch mit Enter: im Browser beendet Esc im Vollbild nur das Vollbild und kommt nicht im Spiel an
 	_add_action("pause", [KEY_ESCAPE, KEY_P, KEY_ENTER, KEY_KP_ENTER], [JOY_BUTTON_START], [])
 	_add_action("next_track", [KEY_M], [], [])

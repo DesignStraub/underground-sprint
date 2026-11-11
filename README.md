@@ -59,8 +59,8 @@ steht im Spielstand.
 
 ## Open World „Mini-Deutschland“ (im Aufbau, Zweig `open-world`)
 Garage → **Losfahren** führt in eine offene Welt statt in die Rennen-Liste. Alle Strecken außer Drag liegen außen an
-einem **Autobahnring** (gut 22 km), ungefähr in der Himmelsrichtung ihrer Stadt vom Mittelpunkt Deutschlands aus
-(`scripts/world_layout.gd`). Jede Stadt hat eine **Ausfahrt** zur Autobahn: Sprints gehen hinter dem Start einfach
+einem **Autobahnring** (knapp 26 km), möglichst nah an der Himmelsrichtung ihrer Stadt vom Mittelpunkt Deutschlands
+aus (der Ring ist 18 % größer als nötig, der Spielraum zieht jede Stadt zu ihrer echten Richtung; `scripts/world_layout.gd`). Jede Stadt hat eine **Ausfahrt** zur Autobahn: Sprints gehen hinter dem Start einfach
 weiter, Rundkurse bekommen eine Seitenstraße an ihrer äußersten geraden Stelle (`track_builder._plan_world_exit`);
 eine gerade **Auffahrt** führt von der Mittellinie der Autobahn dorthin (Mittelstreifen dort offen).
 Der Ring besteht aus Stücken von 2,6 km im Viertel „Schnellstraße“ (Lärmschutzwand, Schilderbrücken).
@@ -73,10 +73,20 @@ Der Ring besteht aus Stücken von 2,6 km im Viertel „Schnellstraße“ (Lärms
   am nächsten ist. Die Lichtkarte der Laternen gilt für die Strecke, auf der man gerade ist.
 - **Rennen:** an jedem Start eine Lichtsäule in der Farbe der Art. Hineinfahren, Enter: das Rennen startet wie
   bisher mit Ladebildschirm, danach „ZUR WELT“ zurück an den Marker.
+- **Gesperrt wie in der Karriere:** die Stufen gelten weiter (3 Siege öffnen die nächste). Gesperrte Marker sind grau
+  und sagen, wie viele Siege in welcher Stufe fehlen; gewonnene leuchten golden angehaucht.
+- **Minikarte** unten links wie im Rennen (dreht mit der Kamera, zoomt mit dem Tempo weiter raus), mit allen Straßen
+  der Welt und den Rennen in Sicht (`world_minimap.gd`, erbt von `minimap.gd`).
+- **Große Karte** mit Tab (Gamepad: linker Stick drücken) oder Esc > Karte: Ring, Städte, Rennen in der Farbe ihrer
+  Art, du als Pfeil; rechts Art, Name, Stadt, Stand, Bestzeit, Luftlinie. ←/→ wählt ein Rennen, Enter setzt es als
+  **Ziel**: dann zeigt die Zielflagge auf der Minikarte die Richtung (`world_map_view.gd`).
+- **Esc-Menü:** Weiter, Karte, Tuning, Auto wechseln, Vollbild, Garage. Tuning und Auto wechseln öffnen die Garage
+  direkt dort; „Fertig“ bzw. Zurück bringt einen an dieselbe Stelle in der Welt zurück (`GameState.world_menu`).
+  Achtung beim Benennen: eine Funktion `_enter_world` in einem Node3D ruft die Engine selbst beim Laden auf.
 - Testen: `world.tscn -- --wspawn=ring:5 --wdrive --worldlog` (Autopilot auf dem Ring, Bauzeiten),
   `--wspawn=ramp:15` (vor der Auffahrt nach Aachen), `--nothreads` (wie im Browser); Draufsicht:
   `tools/world_map.tscn -- --worldlog --png=/pfad.png`.
-- Noch offen: Karte und Minikarte, Tuning im Esc-Menü, Verkehr in der Welt, Stadion-Drift ohne Ausfahrt,
+- Noch offen: Verkehr in der Welt, breitere Autobahn, Stadion-Drift ohne Ausfahrt,
   abgeschnittene Schilder (Tunnelnamen), seltene Herausforderer-Autos.
 
 ## Events
