@@ -78,6 +78,7 @@ var _tunnel_k := 0.0
 var _in_tunnel := false
 var _beep_n := 4  # zuletzt gepiepte Countdown-Zahl
 var _traffic_snd_t := 0.0
+var _leader_t := 0.0
 const TRAFFIC_VOICES := 4  # so viele Verkehrsautos sind gleichzeitig zu hören (die nächsten)
 var _district_i := -1
 var _area_t := 0.0
@@ -840,11 +841,19 @@ func _process(dt: float) -> void:
 		if ai.total >= track["finish"] and ai.finish_time < 0.0:
 			ai.finish_time = race_time
 			finish_order.append(ai)
+	var p_v: float = 0.0
+	if not player.loc.is_empty():
+		p_v = player.velocity.dot(Track.frame_at(player.loc["path"]["curve"], p_d)["fwd"])
+	_leader_t -= dt
+	if _leader_t <= 0.0:
+		_leader_t = 0.2
+		Traffic.link_leaders(traffic)
 	for t in traffic:
 		t.player_progress = p_d
 		t.player_lateral = p_lat
 		t.player_path = player.path_id
 		t.player_pos = player.global_position
+		t.player_speed = p_v
 	if event_type == "drift":
 		_update_drift(dt)
 	elif state == State.RACING:

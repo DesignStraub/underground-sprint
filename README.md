@@ -63,7 +63,8 @@ einem **Autobahnring** (knapp 26 km), möglichst nah an der Himmelsrichtung ihre
 aus (der Ring ist 18 % größer als nötig, der Spielraum zieht jede Stadt zu ihrer echten Richtung; `scripts/world_layout.gd`). Jede Stadt hat eine **Ausfahrt** zur Autobahn: Sprints gehen hinter dem Start einfach
 weiter, Rundkurse bekommen eine Seitenstraße an ihrer äußersten geraden Stelle (`track_builder._plan_world_exit`);
 eine gerade **Auffahrt** führt von der Mittellinie der Autobahn dorthin (Mittelstreifen dort offen).
-Der Ring besteht aus Stücken von 2,6 km im Viertel „Schnellstraße“ (Lärmschutzwand, Schilderbrücken).
+Der Ring besteht aus Stücken von 2,6 km im Viertel „Schnellstraße“ (Lärmschutzwand, Schilderbrücken), mit
+**drei Spuren je Richtung** (`track["extra"] = AB_EXTRA`, Fahrbahn-Shader mit `lanes` 3 bzw. 6).
 
 - **Nachladen:** Strecken im Umkreis von 700 m werden nebenher gebaut (am Rechner in einem eigenen Thread, im Browser
   Schritt für Schritt), ab 1,3 km wieder entfernt. In der Welt ohne Verschmelzen der Häuser: im Thread liest das jedes
@@ -83,11 +84,22 @@ Der Ring besteht aus Stücken von 2,6 km im Viertel „Schnellstraße“ (Lärms
 - **Esc-Menü:** Weiter, Karte, Tuning, Auto wechseln, Vollbild, Garage. Tuning und Auto wechseln öffnen die Garage
   direkt dort; „Fertig“ bzw. Zurück bringt einen an dieselbe Stelle in der Welt zurück (`GameState.world_menu`).
   Achtung beim Benennen: eine Funktion `_enter_world` in einem Node3D ruft die Engine selbst beim Laden auf.
+- **Verkehr:** jede geladene Strecke bekommt Verkehr, der an ihrem Knoten hängt und mit ihr verschwindet (höchstens
+  160 Autos, ein paar pro Bild eingesetzt, nie direkt vor der Nase). Autobahn: festes Tempo je Spur (innen 130, Mitte
+  108, außen 86 km/h mit Bussen und Transportern), am Ende eines Stücks fahren die Autos aufs nächste weiter; in den
+  Städten wie im Rennen, am Ende außer Sicht neu eingesetzt.
+- **Zusammenstöße mit Verkehr (auch im Rennen):** Stoß nach Impuls mit Masse (Pkw 1, Transporter 1,7, Bus 5): leichtes
+  Auffahren mit 40 km/h Unterschied kostet gut 25 % Tempo und schubst den Pkw weg, mit 250 in einen Bus ist ein Crash.
+  Verkehr bremst rechtzeitig für den Spieler, für Wracks und den Vordermann (Bremsweg mit 6 m/s², 6 m Abstand), wechselt
+  vor einem Wrack die Spur und steckt nie mehr im Auto des Spielers. Wände wie in NFSU: streifend 95 % Tempo,
+  30° gut 60 %, frontal Stillstand. Test: `world.tscn -- --wspawn=ring:10 --ctest=rear40` (auch rear120, side,
+  standing, wrongway, bus, wreck, wall10/30/60/90, median30), gibt alle 0,1 s „CT …“ aus.
 - Testen: `world.tscn -- --wspawn=ring:5 --wdrive --worldlog` (Autopilot auf dem Ring, Bauzeiten),
   `--wspawn=ramp:15` (vor der Auffahrt nach Aachen), `--nothreads` (wie im Browser); Draufsicht:
   `tools/world_map.tscn -- --worldlog --png=/pfad.png`.
-- Noch offen: Verkehr in der Welt, breitere Autobahn, Stadion-Drift ohne Ausfahrt,
-  abgeschnittene Schilder (Tunnelnamen), seltene Herausforderer-Autos.
+- Noch offen: Stadion-Drift ohne Ausfahrt, abgeschnittene Schilder (Tunnelnamen), seltene Herausforderer-Autos,
+  Motorklang bei Höchstgeschwindigkeit weniger gleichförmig (Vorbild: https://www.youtube.com/watch?v=qj5F_s3veiU&t=84s),
+  Near-Miss-Nitro in der Welt, Test im Browser.
 
 ## Events
 **Karriere:** Garage → Rennen fahren zeigt alle 21 Events als Liste neben einer Deutschlandkarte. Jedes Event liegt in

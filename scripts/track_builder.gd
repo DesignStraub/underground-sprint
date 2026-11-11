@@ -35,6 +35,8 @@ const People := preload("res://scripts/people.gd")
 const City := preload("res://scripts/city_builder.gd")
 
 const HALF_W := 9.0  # 4 Spuren à 4,5 m
+const AB_EXTRA := 4.5  # Open-World-Autobahn: eine Spur mehr je Richtung (3 + 3)
+const AB_LANES := [-11.25, -6.75, -2.25, 2.25, 6.75, 11.25]
 const LANES := [-6.75, -2.25, 2.25, 6.75]
 const WALK := 5.0  # Gehwegbreite
 const CURB_H := 0.2
@@ -217,7 +219,7 @@ static func begin(race: Dictionary) -> Dictionary:
 		"force_stadium": race.get("stadium", false), "city": city, "rivers": [], "bridges": [], "hills": [],
 		"spectators": [],  # Zuschauer hinter Zäunen und Absperrungen: [Transform, Wegstück d]
 		"pools": [],  # zusätzliche Lichtflächen für die Lichtkarte (Tunnel): [x, z, Radius, Farbe mal Stärke]
-		"extra": 2.5 if type == "drift" else 0.0,  # Drift-Kurse: breitere Fahrbahn
+		"extra": 2.5 if type == "drift" else (AB_EXTRA if type == "autobahn" else 0.0),  # Drift breiter, Autobahn 3 Spuren je Richtung
 		"paths": [{"id": 0, "kind": "main", "curve": curve, "half_w": HALF_W, "length": length, "from": 0.0, "to": length}],
 		# Open World: Lage der Strecke in der Welt (die Strecke selbst bleibt in ihren eigenen Koordinaten)
 		"xf": race.get("xf", Transform3D.IDENTITY), "world_exit": {}, "world": race.get("world", false) or type == "autobahn",
@@ -1381,9 +1383,10 @@ static func _build_road(root: Node3D, track: Dictionary) -> void:
 				# (nicht in Tunnel und Trog: die sind asphaltiert)
 				var cob := 1.0 if _district_at(track, piece_d0 + 30.0)["name"] == "ALTSTADT" \
 					and _trough_at(track, piece_d0) == 0 and _trough_at(track, minf(d, length)) == 0 else 0.0
-				_road_mesh(root, road, 4.0, HALF_W * 2.0, cob)
+				_road_mesh(root, road, 6.0 if track["extra"] >= AB_EXTRA else 4.0, (HALF_W + track["extra"]) * 2.0 if track["extra"] >= AB_EXTRA else HALF_W * 2.0, cob)
 			if n_carr > 0:
-				_road_mesh(root, carr, 2.0, HALF_W, 0.0)
+				var ab: bool = track["extra"] >= AB_EXTRA
+				_road_mesh(root, carr, 3.0 if ab else 2.0, HALF_W + track["extra"] if ab else HALF_W, 0.0)
 				_flush(root, grass, grass_m)
 			if n_trough > 0:
 				_flush(root, trough, trough_m)

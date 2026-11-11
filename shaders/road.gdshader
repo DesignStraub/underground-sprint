@@ -65,7 +65,7 @@ void fragment() {
 	float tar = dt.b * (1.0 - cobble);
 
 	// Fahrspuren: zwei glattgefahrene Radspuren je Spur, in der Mitte Öltropfen
-	float nl = lanes > 3.0 ? 4.0 : (lanes > 1.0 ? 2.0 : 1.0);
+	float nl = max(round(lanes), 1.0);
 	float lw = road_w / nl;
 	float lc = mod(xm, lw) - lw * 0.5;
 	float wheel = (1.0 - smoothstep(0.18, 0.5, abs(abs(lc) - 0.85))) * (0.75 + 0.25 * noise(vec2(xm * 0.7, y * 0.05)));
@@ -77,10 +77,20 @@ void fragment() {
 	// Markierungen
 	float white = 0.0;
 	float yellow = 0.0;
-	if (lanes > 3.0) {
+	if (lanes > 5.0) {
+		// Autobahn ohne Mittelstreifen (an den Auffahrten): 3 + 3 Spuren
+		white = band(xm, 0.025 * road_w, 0.15) + band(xm, 0.975 * road_w, 0.15);
+		white += (band(xm, road_w / 6.0, 0.12) + band(xm, road_w / 3.0, 0.12) + band(xm, road_w * 2.0 / 3.0, 0.12)
+			+ band(xm, road_w * 5.0 / 6.0, 0.12)) * dash(y, 12.0, 6.0);
+		white += band(xm, 0.5 * road_w, 0.15);
+	} else if (lanes > 3.0) {
 		white = band(xm, 0.03 * road_w, 0.12) + band(xm, 0.97 * road_w, 0.12);
 		white += (band(xm, 0.25 * road_w, 0.12) + band(xm, 0.75 * road_w, 0.12)) * dash(y, 9.0, 4.0);
 		yellow = band(xm, 0.488 * road_w, 0.085) + band(xm, 0.512 * road_w, 0.085);
+	} else if (lanes > 2.5) {
+		// Richtungsfahrbahn der Autobahn: 3 Spuren, durchgezogene Ränder, lange Striche
+		white = band(xm, 0.035 * road_w, 0.15) + band(xm, 0.965 * road_w, 0.15);
+		white += (band(xm, road_w / 3.0, 0.12) + band(xm, road_w * 2.0 / 3.0, 0.12)) * dash(y, 12.0, 6.0);
 	} else if (lanes > 1.0) {
 		white = band(xm, 0.05 * road_w, 0.12) + band(xm, 0.95 * road_w, 0.12);
 		white += band(xm, 0.5 * road_w, 0.12) * dash(y, 6.0, 3.0);

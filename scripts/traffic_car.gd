@@ -3,6 +3,8 @@ extends CharacterBody3D
 ## weicht gesperrten Spuren aus, bremst für den Spieler und hält am Bahnübergang. Bei einem Crash wird er weggeschleudert,
 ## bei einem harten Treffer hebt er ab, überschlägt sich und bleibt auf Seite oder Dach liegen.
 ## Fährt auf der Hauptstraße (mit Mittelstreifen-Versatz) oder in einer Gabelung (path_id).
+## Bremst rechtzeitig für Spieler, Wracks und den Vordermann (leader, link_leaders), wechselt vor Wracks die Spur.
+## Masse je Art: der Spieler stößt nach Impuls (player_car._hit_traffic), schwere Wagen geben weniger nach.
 ## Ton: race.gd schaltet bei den nächsten paar Autos Motor und Abrollen ein (sound()), mit Dopplereffekt im Vorbeifahren.
 
 const Builder := preload("res://scripts/car_builder.gd")
@@ -43,6 +45,16 @@ var _far_d2 := 0.0
 var kind := ""
 var _snd: AudioStreamPlayer3D
 var _far_t := 0.0
+## Open World: Lage der Strecke in der Welt (der Wagen hängt an ihrem Knoten) und Rückruf am Ende des Wegs
+## (world.gd reicht ihn ans nächste Autobahnstück weiter oder setzt ihn außer Sicht neu ein)
+var parent_basis := Basis.IDENTITY
+var on_end := Callable()
+var _handing := false
+var mass := 1.0  # Pkw 1, Transporter 1,7, Bus 5: schwere Wagen geben beim Aufprall weniger nach
+var leader: Node = null  # nächster Wagen vor mir auf meiner Spur (link_leaders)
+var player_speed := 0.0  # Spieler längs der Straße (+ in Wegrichtung)
+var _half_w := 0.9
+var _stuck_t := 0.0
 
 
 func setup(kind_: String, rng: RandomNumberGenerator) -> void:
@@ -72,6 +84,8 @@ func setup(kind_: String, rng: RandomNumberGenerator) -> void:
 				Builder._add(self, Builder.box(Vector3(0.05, 0.9, 9.0)), win, Vector3(s * 1.26, 2.1, 0.5))
 			Builder._add(self, Builder.box(Vector3(2.3, 1.0, 0.05)), win, Vector3(0, 2.0, -5.51))
 	length = size.z
+	_half_w = size.x / 2.0
+	mass = {"van": 1.7, "bus": 5.0}.get(kind, 1.0)
 	Builder.merge_static(self)
 	var cs := CollisionShape3D.new()
 	var bs := BoxShape3D.new()
@@ -159,7 +173,8 @@ func _physics_process(dt: float) -> void:
 		_wreck_vel = _wreck_vel.move_toward(Vector3.ZERO, 9.0 * dt)
 		rotate_y(_wreck_spin * dt)
 		_wreck_spin = move_toward(_wreck_spin, 0.0, 2.5 * dt)
-		velocity_vec = _wreck_vel
+		velocity_vec = parent_basis * _wreck_vel
+		_clear_player()
 		if _wreck_vel.length_squared() > 0.01:
 			# Lage für KI und Verkehr nachführen, damit sie um das Wrack herumfahren, wo es wirklich liegt
 			progress = curve.get_closest_offset(position)
@@ -192,11 +207,25 @@ func _physics_process(dt: float) -> void:
 			target_lane = lane - signf(lane) * 4.5
 	_lane_cur = move_toward(_lane_cur, target_lane, dt * 2.0)
 
-	# Spieler direkt vor mir? Bremsen.
+	# Spieler oder Wagen vor mir auf der Spur: rechtzeitig bremsen (der Bremsweg wächst mit dem Tempo) und
+	# hinterherfahren; vor einem Wrack nach kurzem Warten die Spur wechseln
 	var target := base_speed
 	var ahead := (player_progress - progress) * dir
-	if player_path == path_id and absf(player_lateral - _lane_cur) < 2.6 and ahead > 0.0 and ahead < length / 2.0 + 12.0:
-		target = 0.0
+	if player_path == path_id and absf(player_lateral - _lane_cur) < 2.6 and ahead > 0.0:
+		target = minf(target, _follow(ahead - length / 2.0 - 2.3, maxf(player_speed * dir, 0.0)))
+	if is_instance_valid(leader) and leader.path_id == path_id:
+		var lg: float = (leader.progress - progress) * dir
+		if track.get("loop", false) and path_id == 0:
+			lg = fposmod(lg, track_length)
+		lg -= (length + leader.length) / 2.0
+		if absf(leader.lateral() - _lane_cur) < 2.6:
+			var lv: float = 0.0 if leader.wrecked else maxf(leader.speed * leader.dir * dir, 0.0)
+			target = minf(target, _follow(lg, lv))
+			if leader.wrecked and speed < 1.5 and lg < 15.0:
+				_stuck_t += dt
+				if _stuck_t > 1.2:
+					_stuck_t = 0.0
+					lane = lane - signf(lane) * 4.5 if absf(lane) > 4.0 else lane + signf(lane) * 4.5
 	# Schranken unten? Vor der Haltelinie stehen bleiben.
 	if crossing and path_id == 0 and crossing.is_blocked():
 		var stop: float = (crossing.d_cross - 12.0 - progress) if dir > 0.0 else (progress - crossing.d_cross - 12.0)
@@ -206,6 +235,12 @@ func _physics_process(dt: float) -> void:
 	progress += speed * dt * dir
 	if path_id == 0 and track.get("loop", false):
 		progress = fposmod(progress, track_length)  # Rundkurs: einfach weiterfahren
+	elif on_end.is_valid():
+		if progress > track_length - 1.0 or progress < 1.0:
+			progress = clampf(progress, 1.0, track_length - 1.0)
+			if not _handing:
+				_handing = true
+				on_end.call_deferred(self)
 	elif path_id != 0:
 		# Gabelung: am Ende wieder am Anfang einsetzen
 		if progress > track_length - 4.0:
@@ -217,6 +252,7 @@ func _physics_process(dt: float) -> void:
 		progress = 40.0
 	elif progress < 40.0:
 		progress = track_length - 10.0
+	_clear_player()
 	# Außer Sichtweite: unsichtbar und Lage nur zweimal pro Sekunde neu (spart im Browser viel Rechenzeit)
 	var far := position.distance_squared_to(player_pos) > _far_d2
 	visible = not far
@@ -235,23 +271,104 @@ func place() -> void:
 	if dir < 0.0:
 		xf.basis = xf.basis * Basis(Vector3.UP, PI)  # um die eigene Hochachse: bergab bleibt bergab
 	var fwd := -xf.basis.z
-	velocity_vec = fwd * speed
+	velocity_vec = parent_basis * fwd * speed
 	transform = xf  # Eltern: Welt (Rennen) oder Strecke (Open World), beides ohne Verschiebung im Rennen
 
 
-## Unfall: wird mit (einem Teil) der Aufprallgeschwindigkeit weggeschoben und dreht sich.
+## Wunschtempo hinter etwas, das gap Meter vor mir mit lv fährt: so schnell, dass ich mit 6 m/s² noch 6 m davor
+## zum Stehen (oder auf sein Tempo) komme
+func _follow(gap: float, lv: float) -> float:
+	return clampf(lv + sqrt(12.0 * maxf(gap - 6.0, 0.0)), 0.0, base_speed)
+
+
+## Steckt der Spieler in mir (Wrack rutscht in ihn, oder ich fahre auf)? Dann bleibe ich an seiner Kante stehen,
+## statt durch ihn hindurchzufahren.
+func _clear_player() -> void:
+	var rel := player_pos - position
+	if rel.x * rel.x + rel.z * rel.z > 100.0:
+		return
+	var q: Vector3 = transform.basis.inverse() * rel
+	var hx := _half_w + 1.0
+	var hz := length / 2.0 + 2.2
+	if absf(q.x) >= hx or absf(q.z) >= hz:
+		return
+	var px := hx - absf(q.x)
+	var pz := hz - absf(q.z)
+	var away := transform.basis * (Vector3(-signf(q.x), 0, 0) if px < pz else Vector3(0, 0, -signf(q.z)))
+	away.y = 0.0
+	away = away.normalized()
+	if wrecked:
+		position += away * minf(px, pz)
+		var into := -_wreck_vel.dot(away)
+		if into > 0.0:
+			_wreck_vel += away * into
+	elif q.z < 0.0 and pz <= px:
+		# der Spieler steht vor mir: zurück an seine Kante, stehen bleiben
+		progress -= dir * pz
+		speed = 0.0
+
+
+## Unfall: wird mit (einem Teil) der Aufprallgeschwindigkeit weggeschoben und dreht sich (schwere Wagen weniger).
 func knock(v: Vector3) -> void:
+	push(v * 0.6 / mass)
+
+
+## Stoß als Tempoänderung (Weltkoordinaten): aus dem Verkehr geworfen, rutscht, dreht sich, kleine Wagen kippen
+func push(dv: Vector3) -> void:
+	dv = parent_basis.inverse() * dv  # Stoß kommt in Weltkoordinaten
 	if not wrecked:
 		wrecked = true
-		_wreck_vel = velocity_vec
+		_wreck_vel = parent_basis.inverse() * velocity_vec
 		_wreck_ground = position.y
-	_wreck_vel += Vector3(v.x, 0, v.z) * 0.6
-	_wreck_spin += randf_range(-1.0, 1.0) * clampf(v.length() / 10.0, 0.5, 3.0)
-	if v.length() > 20.0 and _wreck_roll_v == 0.0 and position.y <= _wreck_ground + 0.01:
-		_wreck_vy = clampf(v.length() * 0.18, 3.5, 7.0)
+	_wreck_vel += Vector3(dv.x, 0, dv.z)
+	_wreck_spin += randf_range(-1.0, 1.0) * clampf(dv.length() / 6.0, 0.5, 3.0) / sqrt(mass)
+	if dv.length() > 12.0 and mass < 2.0 and _wreck_roll_v == 0.0 and position.y <= _wreck_ground + 0.01:
+		_wreck_vy = clampf(dv.length() * 0.3, 3.5, 7.0)
 		_wreck_roll_v = randf_range(4.0, 7.0) * (1.0 if randf() < 0.5 else -1.0)
+
+
+## Open World: auf einen anderen Weg (nächstes Autobahnstück) oder an eine andere Stelle desselben Wegs setzen
+func move_to(new_track: Dictionary, d: float) -> void:
+	track = new_track
+	curve = track["curve"]
+	track_length = track["length"]
+	blocks = track["blocks"]
+	progress = d
+	_handing = false
+	place()
 
 
 ## Für KI/Verkehrslogik: aktuelle Querposition auf der Strecke
 func lateral() -> float:
 	return _lane_cur
+
+
+## Für jeden Wagen den nächsten vor ihm auf seiner Spur suchen (auch Wracks): race.gd und world.gd rufen das ein
+## paarmal pro Sekunde auf, den Abstand rechnet jeder Wagen dann selbst in jedem Takt.
+static func link_leaders(cars: Array) -> void:
+	var groups := {}
+	for t in cars:
+		if not is_instance_valid(t) or not t.is_inside_tree():
+			continue
+		t.leader = null
+		var key := "%d|%d|%d" % [t.get_parent().get_instance_id(), t.path_id, int(floor(t.lateral() / 4.5))]
+		if not groups.has(key):
+			groups[key] = []
+		groups[key].append(t)
+	for g in groups.values():
+		if g.size() < 2:
+			continue
+		g.sort_custom(func(a, b): return a.progress < b.progress)
+		var n: int = g.size()
+		var loop: bool = g[0].track.get("loop", false) and g[0].path_id == 0
+		for i in n:
+			var t = g[i]
+			if t.wrecked:
+				continue
+			var j: int = i + (1 if t.dir > 0.0 else -1)
+			if j >= n or j < 0:
+				if not loop:
+					continue
+				j = posmod(j, n)
+			if g[j] != t:
+				t.leader = g[j]

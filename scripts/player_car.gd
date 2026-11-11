@@ -67,6 +67,8 @@ const JC_FRAME := 2.4  # halbe Bildhöhe am Auto (m): kleiner = näher heran
 const SLOW_REAL := 2.4  # Zeitlupe so stark, dass ein Sprung etwa so lange dauert (s, Echtzeit) ...
 const SLOW_RANGE := Vector2(0.45, 0.7)  # ... aber nur leicht: Zeitfaktor in diesem Bereich
 
+const TRAFFIC_BOUNCE := 0.25  # Stoßzahl gegen Verkehr: 0 klebt zusammen, 1 prallt voll ab
+
 var controls_enabled := false
 var finished := false
 var cam_mode := 0
@@ -1422,8 +1424,9 @@ func _hit_wall(pre: Vector3, n: Vector3, small := false, pole := false) -> void:
 		_crash_cooldown = 0.5
 
 
-## Verkehr: frontal oder deutliches Auffahren ist ein Crash wie in NFS (fast Stillstand, Dreher, kurz keine
-## Kontrolle). Seitliches Rempeln oder langsames Auffahren: abprallen und Tempo verlieren, das andere Auto schleudert.
+## Verkehr: Stoß nach Impuls (die Masse zählt: einen Pkw schubst man weg, an einem Bus prallt man ab). Frontal oder
+## heftiges Auffahren ist zusätzlich ein Crash wie in NFS (Dreher, kurz keine Kontrolle, fast Stillstand); seitliches
+## Rempeln oder leichtes Auffahren kostet nur etwas Tempo, der andere Wagen wird aus dem Verkehr geworfen.
 func _hit_traffic(other: Node, pre: Vector3, n: Vector3) -> void:
 	var ov: Vector3 = other.velocity_vec
 	var rel: Vector3 = pre - ov
@@ -1431,28 +1434,31 @@ func _hit_traffic(other: Node, pre: Vector3, n: Vector3) -> void:
 	if hit < 1.5 or _crash_cooldown > 0.0:
 		return
 	var head_on := clampf(hit / maxf(rel.length(), 1.0), 0.0, 1.0)
+	var mt: float = other.mass if "mass" in other else 1.0
+	var j := (1.0 + TRAFFIC_BOUNCE) * hit / (1.0 + 1.0 / mt)  # Stoß bei gleicher Masse des eigenen Autos
+	var after := pre + n * j  # eigenes Tempo nach dem Stoß
 	audio.crash(clampf(hit / 22.0, 0.25, 1.0))
 	if drag_mode and hit > 9.0 and head_on > 0.5:
 		totaled = true  # Drag: wer frontal oder ins Heck kracht, ist raus
 	if _trips(pre, n, rel) and not drag_mode:
-		other.knock(pre * 0.7)
-		velocity = ov * 0.5 + n * 4.0 + pre * 0.15
+		other.push(-n * j / mt)
+		velocity = after * 0.5 + n * 3.0
 		_crash_cooldown = 0.7
 		start_tumble(n, absf(rel.dot(global_basis.x)))
 	elif hit > 14.0 and head_on > 0.55:
-		other.knock(pre * 0.7)
-		velocity = ov * 0.4 + n * 3.0
+		other.push(-n * j / mt)
+		velocity = after * 0.55 + n * 2.0
+		velocity.y = 0.0
 		_spin = randf_range(1.2, 2.4) * (1.0 if randf() < 0.5 else -1.0) * clampf(hit / 25.0, 0.5, 1.0)
 		stun = 0.8
 		_shake = 1.0
 		_crash_cooldown = 0.7
 		crashes += 1
 	else:
-		other.knock(-n * hit * 1.2)
-		var v := pre + n * hit * 1.15
-		velocity = v * lerpf(0.95, 0.72, head_on)
+		other.push(-n * j / mt)
+		velocity = after * lerpf(0.98, 0.9, head_on)
 		velocity.y = 0.0
-		_spin += signf(n.dot(global_basis.x)) * clampf(hit * 0.05, 0.1, 0.6)
+		_spin += signf(n.dot(global_basis.x)) * clampf(hit * 0.05, 0.1, 0.6) * clampf(mt, 1.0, 2.0)
 		_shake = minf(_shake + hit * 0.04, 0.7)
 		_crash_cooldown = 0.35
 		if hit > 8.0:

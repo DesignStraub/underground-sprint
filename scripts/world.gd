@@ -17,11 +17,16 @@ const SPEED_FX := preload("res://shaders/speed_fx.gdshader")
 const SKY_SHADER := preload("res://shaders/night_sky.gdshader")
 const WorldMinimap := preload("res://scripts/world_minimap.gd")
 const MapView := preload("res://scripts/world_map_view.gd")
+const Traffic := preload("res://scripts/traffic_car.gd")
 
 const LOAD_PAD := 700.0  # Strecke bauen, wenn man so nah am Rand ihres Umkreises ist
 const DROP_PAD := 1300.0  # ... und wieder entfernen, wenn man so weit weg ist
 const MARKER_R := 9.0
 const BLUR_LEVEL := [0.0, 0.55, 1.0, 1.6]
+const TRAFFIC_MAX := 160
+const TRAFFIC_VOICES := 4
+## Autobahn: Tempo je Spur (innen schnell, außen Lkw und Busse) in m/s
+const AB_SPEED := {2.25: 36.0, 6.75: 30.0, 11.25: 24.0}
 
 ## Rückkehr nach einem Rennen: dort wieder einsetzen (gilt für diese Sitzung)
 static var return_xf := Transform3D.IDENTITY
@@ -55,6 +60,12 @@ var _swing := 0.0
 var _area_t := 0.0
 var _area_name := ""
 var _ready_done := false
+var traffic: Array = []
+var _tq: Array = []  # [Eintrag, Plan] wartet aufs Einsetzen (ein paar pro Bild, sonst ruckelt es beim Nachladen)
+var _trng := RandomNumberGenerator.new()
+var _traffic_snd_t := 0.0
+var _leader_t := 0.0
+var _segs: Array = []
 
 
 func _ready() -> void:
@@ -77,7 +88,10 @@ func _ready() -> void:
 			"state": "none", "track": {}, "race_index": c["race_index"], "start": c["start_world"], "exit": c["exit_world"]})
 	for s in layout["segments"]:
 		entries.append({"kind": "seg", "race": s["race"], "xf": Transform3D.IDENTITY, "center": s["center"], "radius": s["radius"],
-			"state": "none", "track": {}, "race_index": -1})
+			"state": "none", "track": {}, "race_index": -1, "seg_i": _segs.size()})
+		_segs.append(entries[-1])
+	_trng.seed = 4711
+	Traffic.prepare_sound()
 	_setup_environment()
 
 	var spawn := _spawn_xf()
@@ -107,6 +121,8 @@ func _ready() -> void:
 	for n in get_tree().get_nodes_in_group("ambient"):
 		n.target = player
 	_set_active(_entry_of(pc.track))
+	while not _tq.is_empty():
+		_spawn_queued(100)
 	_build_hud()
 	world.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 	Music.race_go()
@@ -181,6 +197,7 @@ func _finish(e: Dictionary, job: Dictionary) -> void:
 	e["state"] = "ready"
 	if e["kind"] == "city":
 		_add_marker(e)
+	_plan_traffic(e)
 	if player:
 		for n in root.find_children("*", "", true, false):
 			if n.is_in_group("ambient"):
@@ -190,7 +207,10 @@ func _finish(e: Dictionary, job: Dictionary) -> void:
 func _drop(e: Dictionary) -> void:
 	if e["state"] != "ready" or e == active:
 		return
-	(e["track"]["node"] as Node).queue_free()
+	var root: Node = e["track"]["node"]
+	traffic = traffic.filter(func(t): return is_instance_valid(t) and not root.is_ancestor_of(t))
+	_tq = _tq.filter(func(q): return not is_same(q[0], e))
+	root.queue_free()
 	e["track"] = {}
 	e["state"] = "none"
 	if _markers.has(e["race_index"]):
@@ -304,6 +324,7 @@ func _physics_process(_dt: float) -> void:
 			best = e
 	if not best.is_empty():
 		_set_active(best)
+	_feed_traffic()
 
 
 # --- Rennen-Marker -------------------------------------------------------------------
@@ -697,7 +718,14 @@ func _process(dt: float) -> void:
 		return
 	if OS.get_cmdline_user_args().has("--wdrive"):
 		_autopilot()
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--ctest="):
+			if _ct.is_empty():
+				_ctest_setup(a.substr(8))
+			_ctest_step(dt)
 	_update_streaming()
+	_spawn_queued(3)
+	_update_traffic_sound(dt)
 	_update_markers()
 	var tacho = hud["tacho"]
 	tacho.rpm = player.rpm
@@ -750,9 +778,9 @@ func _autopilot() -> void:
 	if _wd_t > 2.0:
 		_wd_t = 0.0
 		var built := entries.filter(func(e): return e["state"] == "ready").size()
-		print("WD pos=(%.0f,%.0f) v=%d strecke=%s weg=%s d=%.0f geladen=%d baut=%s fps=%d" % [player.global_position.x, player.global_position.z,
+		print("WD pos=(%.0f,%.0f) v=%d strecke=%s weg=%s d=%.0f geladen=%d baut=%s fps=%d verkehr=%d schlange=%d" % [player.global_position.x, player.global_position.z,
 			int(player.speed_fwd * 3.6), active.get("race", {}).get("name", "-"), player.loc["path"]["kind"], d, built, str(_task >= 0 or not _job.is_empty()),
-			Engine.get_frames_per_second()])
+			Engine.get_frames_per_second(), traffic.size(), _tq.size()])
 
 
 func _update_speed_fx(dt: float) -> void:
@@ -773,3 +801,239 @@ func _update_speed_fx(dt: float) -> void:
 		fx_mat.set_shader_parameter("swing", sw)
 		fx_mat.set_shader_parameter("nitro", nit)
 		fx_mat.set_shader_parameter("speed", sk * minf(lvl, 1.0) if blur > 0.0 else 0.0)
+
+
+# --- Verkehr ----------------------------------------------------------------------
+## Jede geladene Strecke bekommt Verkehr: auf der Autobahn sechs Spuren mit festem Tempo je Spur (so holen sich
+## Autos auf derselben Spur nie ein), in den Städten wie im Rennen. Die Autos hängen am Knoten ihrer Strecke und
+## verschwinden mit ihr. Am Ende eines Autobahnstücks fahren sie aufs nächste weiter, sonst werden sie außer Sicht
+## neu eingesetzt.
+
+func _plan_traffic(e: Dictionary) -> void:
+	if not _ct.is_empty():
+		return
+	var tr: Dictionary = e["track"]
+	var L: float = tr["length"]
+	if e["kind"] == "seg":
+		var d := _trng.randf_range(10.0, 80.0)
+		while d < L - 10.0:
+			var lane: float = Track.AB_LANES[_trng.randi() % Track.AB_LANES.size()]
+			var outer := absf(lane) > 10.0
+			var kind: String = ["bus", "van", "van", "sedan"][_trng.randi() % 4] if outer else ["sedan", "sedan", "taxi", "van"][_trng.randi() % 4]
+			_tq.append([e, {"d": d, "lane": lane, "speed": AB_SPEED[absf(lane)], "kind": kind}])
+			d += _trng.randf_range(60.0, 120.0)
+		return
+	var d2: float = 30.0
+	while d2 < L - 30.0:
+		var lane2: float = Track.LANES[_trng.randi() % 4]
+		var blocked: bool = tr["crossing_d"] > 0.0 and absf(d2 - tr["crossing_d"]) < 40.0
+		for b in tr["blocks"]:
+			if absf(b["lane"] - lane2) < 1.0 and d2 > b["from"] - 20.0 and d2 < b["to"] + 20.0:
+				blocked = true
+		if not blocked:
+			_tq.append([e, {"d": d2, "lane": lane2, "speed": _trng.randf_range(10.0, 16.0),
+				"kind": Traffic.KINDS[_trng.randi() % Traffic.KINDS.size()]}])
+		d2 += _trng.randf_range(70.0, 140.0)
+
+
+func _spawn_queued(n: int) -> void:
+	var lp_cache := {}
+	while n > 0 and not _tq.is_empty() and traffic.size() < TRAFFIC_MAX:
+		var q: Array = _tq.pop_front()
+		var e: Dictionary = q[0]
+		var plan: Dictionary = q[1]
+		if e["state"] != "ready":
+			continue
+		var tr: Dictionary = e["track"]
+		# nicht direkt vor der Nase auftauchen (ab der ersten Fahrt; beim Bauen hinter dem Ladebild egal)
+		if _ready_done:
+			var lp: Vector3 = (e["xf"] as Transform3D).affine_inverse() * player.global_position
+			if (tr["curve"] as Curve3D).sample_baked(plan["d"]).distance_to(lp) < 160.0:
+				continue
+		var t := Traffic.new()
+		t.process_mode = Node.PROCESS_MODE_PAUSABLE
+		t.curve = tr["curve"]
+		t.track = tr
+		t.blocks = tr["blocks"]
+		t.progress = plan["d"]
+		t.lane = plan["lane"]
+		t.dir = 1.0 if plan["lane"] > 0.0 else -1.0
+		t.base_speed = plan["speed"]
+		t.speed = plan["speed"]
+		t.track_length = tr["length"]
+		t.crossing = tr["crossing"]
+		t.parent_basis = (e["xf"] as Transform3D).basis
+		t.player_path = -1
+		if e["kind"] == "seg" or not tr["loop"]:
+			t.on_end = _traffic_end
+		t.set_meta("e", e)
+		(tr["node"] as Node).add_child(t)
+		t.setup(plan["kind"], _trng)
+		t.place()
+		traffic.append(t)
+		n -= 1
+
+
+## Wagen am Ende seines Wegs: aufs nächste (oder vorige) Autobahnstück, sonst außer Sicht neu einsetzen
+func _traffic_end(t: Node) -> void:
+	if not is_instance_valid(t) or not t.is_inside_tree():
+		return
+	var e: Dictionary = t.get_meta("e")
+	if e["state"] != "ready":
+		return
+	if e["kind"] == "seg":
+		var fwd: bool = t.progress > t.track_length / 2.0
+		var n2: Dictionary = _segs[(int(e["seg_i"]) + (1 if fwd else -1) + _segs.size()) % _segs.size()]
+		if n2["state"] == "ready":
+			var nt: Dictionary = n2["track"]
+			t.get_parent().remove_child(t)
+			(nt["node"] as Node).add_child(t)
+			t.set_meta("e", n2)
+			t.move_to(nt, 1.5 if fwd else float(nt["length"]) - 1.5)
+			return
+	var tr: Dictionary = e["track"]
+	var L: float = tr["length"]
+	var lp: Vector3 = (e["xf"] as Transform3D).affine_inverse() * player.global_position
+	var far := maxf(GameState.view_distance() + 60.0, 300.0)
+	for i in 12:
+		var d := _trng.randf_range(40.0, L - 40.0)
+		if (tr["curve"] as Curve3D).sample_baked(d).distance_to(lp) > far:
+			t.move_to(tr, d)
+			return
+	t.move_to(tr, 40.0 if t.dir > 0.0 else L - 40.0)
+
+
+## Was der Verkehr vom Spieler wissen muss (in den Koordinaten seiner Strecke): wo er ist, und auf derselben
+## Strecke auch Weg, Meter und Spur, damit die Autos vor ihm bremsen
+func _feed_traffic() -> void:
+	if traffic.is_empty():
+		return
+	var proot: Node = player.track.get("node") if not player.track.is_empty() else null
+	var on_main: bool = player.path_id == 0
+	var p_lat: float = 0.0
+	var p_d: float = 0.0
+	var p_v: float = 0.0
+	if proot and not player.loc.is_empty():
+		p_lat = Track.logical_lat(player.track, player.progress, player.lateral) if on_main else player.lateral
+		p_d = player.progress if on_main else player.loc["d"]
+		var pf: Vector3 = Track.frame_at(player.loc["path"]["curve"], p_d)["fwd"]
+		p_v = ((proot as Node3D).transform.basis.inverse() * player.velocity).dot(pf)
+	_leader_t -= get_physics_process_delta_time()
+	if _leader_t <= 0.0:
+		_leader_t = 0.2
+		Traffic.link_leaders(traffic)
+	var local := {}
+	for t in traffic:
+		var par: Node = t.get_parent()
+		if par == null:
+			continue
+		if not local.has(par):
+			local[par] = (par as Node3D).transform.affine_inverse() * player.global_position
+		t.player_pos = local[par]
+		if par == proot:
+			t.player_progress = p_d
+			t.player_lateral = p_lat
+			t.player_path = player.path_id
+			t.player_speed = p_v
+		else:
+			t.player_path = -1
+
+
+## Wie im Rennen: nur die nächsten paar Autos im Umkreis von 80 m sind zu hören
+func _update_traffic_sound(dt: float) -> void:
+	_traffic_snd_t -= dt
+	if _traffic_snd_t > 0.0 or traffic.is_empty():
+		return
+	_traffic_snd_t = 0.25
+	var near := []
+	var pp: Vector3 = player.global_position
+	for t in traffic:
+		var d2: float = (t.global_position - pp).length_squared()
+		if d2 < 6400.0 and not t.wrecked:
+			near.append([d2, t])
+	near.sort_custom(func(a, b): return a[0] < b[0])
+	var on := {}
+	for i in mini(near.size(), TRAFFIC_VOICES):
+		on[near[i][1]] = true
+	var bus: String = player.audio.bus if player.audio else "Master"
+	for t in traffic:
+		t.sound(on.has(t), bus)
+
+
+# --- Test: Zusammenstöße (--ctest=fall) -----------------------------------------------------
+## Feste Szenen auf der Autobahn, misst alle 0,1 s Tempo, Drehung, Benommenheit, Überschlag und ob der Spieler
+## im anderen Auto steckt ("CT ..."). Fälle: rear40, rear120, side, standing, wrongway, wall10/30/60/90
+var _ct := {}
+
+
+func _ctest_setup(case: String) -> void:
+	for t in traffic:
+		t.queue_free()
+	traffic.clear()
+	_tq.clear()
+	var tr: Dictionary = player.track
+	var c: Curve3D = tr["curve"]
+	var d0: float = player.progress
+	var cases := {
+		# Spieler-Spur, Tempo, Drehung (Grad, + nach rechts), Verkehr: Spur, Abstand, Tempo, Art
+		"rear40": [6.75, 42.0, 0.0, 6.75, 30.0, 30.0, "sedan"],
+		"rear120": [11.25, 70.0, 0.0, 11.25, 60.0, 24.0, "bus"],
+		"side": [2.25, 32.0, 12.0, 6.75, 0.0, 30.0, "sedan"],
+		"wreck": [11.25, 0.0, 0.0, 11.25, 40.0, 24.0, "sedan"],
+		"standing": [2.25, 0.0, 0.0, 2.25, -70.0, 36.0, "sedan"],
+		"wrongway": [6.75, -35.0, 180.0, 6.75, -80.0, 30.0, "van"],
+		"bus": [6.75, 42.0, 0.0, 6.75, 30.0, 30.0, "bus"],
+		"wall10": [11.25, 42.0, 10.0, 0.0, 0.0, 0.0, ""],
+		"wall30": [11.25, 42.0, 30.0, 0.0, 0.0, 0.0, ""],
+		"wall60": [11.25, 42.0, 60.0, 0.0, 0.0, 0.0, ""],
+		"wall90": [11.25, 30.0, 90.0, 0.0, 0.0, 0.0, ""],
+		"median30": [2.25, 42.0, -30.0, 0.0, 0.0, 0.0, ""],
+	}
+	var k: Array = cases[case]
+	var xf := Track.xform_at(c, d0, Track.lane_lat(tr, d0, k[0]), true)
+	xf.basis = xf.basis * Basis(Vector3.UP, deg_to_rad(-k[2]))
+	player.place(xf)
+	player.velocity = -xf.basis.z * absf(k[1])
+	player.speed_fwd = absf(k[1])
+	if k[6] != "":
+		_tq.append([active, {"d": d0 + k[4], "lane": k[3], "speed": k[5], "kind": k[6]}])
+		var rd := _ready_done
+		_ready_done = false
+		_spawn_queued(1)
+		_ready_done = rd
+		traffic[0].player_path = -1
+	if case == "wreck":
+		# Wrack 140 m vor dem Spieler auf derselben Spur: der Wagen dahinter muss bremsen und die Spur wechseln
+		_tq.append([active, {"d": d0 + 140.0, "lane": 11.25, "speed": 0.0, "kind": "van"}])
+		var rd2 := _ready_done
+		_ready_done = false
+		_spawn_queued(1)
+		_ready_done = rd2
+		traffic[1].push(Vector3.ZERO)
+	_ct = {"case": case, "t": 0.0, "next": 0.0, "hold": case.begins_with("wall") or case.begins_with("median")}
+
+
+func _ctest_step(dt: float) -> void:
+	_ct["t"] += dt
+	for a in ["steer_left", "steer_right", "accelerate", "nitro", "brake", "handbrake"]:
+		Input.action_release(a)
+	if _ct["hold"] or _ct["case"].begins_with("rear") or _ct["case"] == "bus":
+		Input.action_press("accelerate")
+	if _ct["t"] < _ct["next"]:
+		return
+	_ct["next"] += 0.1
+	var pl = player
+	var s := "CT %s t=%.1f v=%3d fwd=%3d gier=%4d stun=%.2f spin=%.1f roll=%s crashes=%d wand=%d" % [_ct["case"], _ct["t"],
+		int(pl.velocity.length() * 3.6), int(pl.speed_fwd * 3.6), int(rad_to_deg(pl.global_basis.z.signed_angle_to(Track.frame_at(pl.track["curve"], pl.progress)["fwd"] * -1.0, Vector3.UP))),
+		pl.stun, pl._spin, str(pl.tumbling), pl.crashes, pl.wall_hits]
+	if not traffic.is_empty():
+		var t = traffic[0]
+		var q: Vector3 = t.global_transform.affine_inverse() * pl.global_position
+		var inside: bool = absf(q.x) < 1.9 and absf(q.z) < t.length / 2.0 + 2.0
+		if traffic.size() > 1:
+			s += " | B v=%d spur=%.1f luecke=%.0f" % [int(t.speed * 3.6), t.lateral(), traffic[1].progress - t.progress]
+		s += " | ver v=%3d wrack=%s abst=%.1f quer=%.1f laengs=%.1f%s" % [int(t.velocity_vec.length() * 3.6), str(t.wrecked),
+			t.global_position.distance_to(pl.global_position), q.x, q.z, " DRIN" if inside else ""]
+	print(s)
+	if _ct["t"] > (8.0 if _ct["case"] in ["wreck", "bus", "standing"] else 3.0):
+		get_tree().quit()
