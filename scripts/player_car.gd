@@ -74,7 +74,14 @@ var cam_mode := 0
 var model: Node3D
 var cam: Camera3D
 var audio: Node  # engine_audio.gd
-var track: Dictionary
+var track: Dictionary:
+	set(v):
+		track = v
+		_txf = v.get("xf", Transform3D.IDENTITY)
+		_txi = _txf.affine_inverse()
+## Open World: Lage der Strecke in der Welt. Alle Abfragen an die Strecke rechnen in ihren eigenen Koordinaten.
+var _txf := Transform3D.IDENTITY
+var _txi := Transform3D.IDENTITY
 
 var accel := 11.0
 var top_speed := 58.0
@@ -978,7 +985,7 @@ func _update_vertical(dt: float) -> void:
 	if track.is_empty():
 		position.y = 0.0
 		return
-	loc = Track.locate(track, global_position)
+	loc = Track.locate(track, _txi * global_position)
 	path_id = loc["path"]["id"]
 	progress = Track.race_progress(loc)
 	lateral = loc["lat"]
@@ -990,13 +997,13 @@ func _update_vertical(dt: float) -> void:
 			lap -= 1
 		_last_prog = progress
 	total = lap * track["length"] + progress
-	var g := Track.ground(track, loc, global_position)
+	var g := Track.ground(track, loc, _txi * global_position)
 	var gh: float = g["h"]
 	var base: float = g["base"]
 	# Fahrbahnneigung in Fahrtrichtung des Autos
 	var pc: Curve3D = loc["path"]["curve"]
 	var sl := Track.slope_at(pc, loc["d"])
-	var tf: Vector3 = Track.frame_at(pc, loc["d"])["fwd"]
+	var tf: Vector3 = _txf.basis * Track.frame_at(pc, loc["d"])["fwd"]
 	_slope_pitch = atan(sl * (-global_basis.z).dot(tf))
 	_slope_roll = atan(sl * global_basis.x.dot(tf))
 	var bvy := (base - _base_y) / maxf(dt, 0.0001)
@@ -1177,7 +1184,7 @@ func _update_tumble(dt: float) -> void:
 				if _tumble_rest > 1.3:
 					var p: Dictionary = loc["path"]
 					var half: float = p["half_w"] - 2.0
-					place(Track.xform_at(p["curve"], loc["d"], clampf(loc["lat"], -half, half)))
+					place(_txf * Track.xform_at(p["curve"], loc["d"], clampf(loc["lat"], -half, half)))
 					stun = 0.3
 					return
 	var b := Basis(Vector3.BACK, _air_roll) * Basis(Vector3.RIGHT, _air_pitch)
@@ -1232,7 +1239,7 @@ func _splash() -> void:
 	for r in track["ramps"]:
 		if r["path"] == p["id"] and loc["d"] > r["d0"] and loc["d"] - r["d0"] < 80.0:
 			d = maxf(r["d0"] - 45.0, 2.0)
-	_respawn_xf = Track.xform_at(p["curve"], d, 0.0)
+	_respawn_xf = _txf * Track.xform_at(p["curve"], d, 0.0)
 
 
 func _update_sinking(dt: float) -> void:
@@ -1562,8 +1569,8 @@ func _predict_flight() -> Dictionary:
 		v -= GRAVITY * step
 		p += hv * step
 		p.y += v * step
-		var l := Track.locate(track, p)
-		var g := Track.ground(track, l, p)
+		var l := Track.locate(track, _txi * p)
+		var g := Track.ground(track, l, _txi * p)
 		var floor_y: float = g["base"] - 0.5 if g["water"] else g["h"]
 		if p.y <= floor_y and v < 0.0:
 			return {"time": t, "peak": peak, "apex": apex, "land": Vector3(p.x, floor_y, p.z), "loc": l}
@@ -1580,7 +1587,7 @@ func _jump_cam_spot(f: Dictionary) -> Variant:
 	var p: Dictionary = l["path"]
 	var c: Curve3D = p["curve"]
 	var fr := Track.frame_at(c, l["d"])
-	var d: float = l["d"] + JC_AHEAD * (1.0 if velocity.dot(fr["fwd"]) >= 0.0 else -1.0)
+	var d: float = l["d"] + JC_AHEAD * (1.0 if velocity.dot(_txf.basis * fr["fwd"]) >= 0.0 else -1.0)
 	var fc := Track.frame_at(c, d)
 	var main: bool = p["id"] == 0
 	# Hauptstraße: bis auf den Gehweg; Nebenwege: innerhalb ihrer (unsichtbaren) Randmauern
@@ -1596,6 +1603,7 @@ func _jump_cam_spot(f: Dictionary) -> Variant:
 		var g := Track.ground_path(track, p["id"], d, cl, absf(cl) - Track.hw(track, d) if main else -1.0)
 		var pos: Vector3 = fc["pos"] + fc["right"] * cl
 		pos.y = g["h"] + c2[1]
+		pos = _txf * pos
 		var ok := _sight(space, pos, global_position + Vector3(0, 1.0, 0)) and _sight(space, pos, f["apex"] + Vector3(0, 0.6, 0)) \
 				and _sight(space, pos, f["land"] + Vector3(0, 1.0, 0)) and _free(space, pos)
 		if OS.get_cmdline_user_args().has("--jumplog"):

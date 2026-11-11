@@ -1320,10 +1320,15 @@ func _show_result(place: int, new_best: bool, unlocked: Array, dnf := "") -> voi
 	again.pressed.connect(func(): get_tree().reload_current_scene())
 	hb.add_child(again)
 	var back := Button.new()
-	back.text = "GARAGE"
-	back.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/garage.tscn"))
+	back.text = tr("ZUR WELT") if GameState.in_world else "GARAGE"
+	back.pressed.connect(func(): get_tree().change_scene_to_file(_back_scene()))
 	hb.add_child(back)
 	back.grab_focus.call_deferred()
+
+
+## Nach dem Rennen: zurück in die Open World, wenn man von dort kam, sonst in die Garage
+func _back_scene() -> String:
+	return "res://scenes/world.tscn" if GameState.in_world else "res://scenes/garage.tscn"
 
 
 func _build_pause(root: Control) -> void:
@@ -1341,7 +1346,7 @@ func _build_pause(root: Control) -> void:
 	title.text = "PAUSE"
 	for entry in [["Weiter", _toggle_pause], ["Vollbild", GameState.toggle_fullscreen],
 			["Neustart", func(): _unpause(); get_tree().reload_current_scene()],
-			["Garage", func(): _unpause(); get_tree().change_scene_to_file("res://scenes/garage.tscn")]]:
+			["Zur Welt" if GameState.in_world else "Garage", func(): _unpause(); get_tree().change_scene_to_file(_back_scene())]]:
 		var b := Button.new()
 		b.text = tr(entry[0]).to_upper()
 		b.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED

@@ -183,7 +183,11 @@ static func begin(race: Dictionary) -> Dictionary:
 	# Orts-Strecken: Mittellinie aus echten Straßen (OpenStreetMap), siehe tools/osm_city.py
 	var city: Dictionary = CityData.CITIES.get(race.get("city", ""), {})
 	_city_names = race.get("shops", [])
-	var gen := _city_centerline(city) if not city.is_empty() else (_loop_centerline(race, rng) if loop else _centerline(race, rng))
+	var gen: Dictionary
+	if race.has("pts"):
+		gen = {"pts": race["pts"], "bulges": []}  # Open World: Autobahn-Stück mit vorgegebener Mittellinie
+	else:
+		gen = _city_centerline(city) if not city.is_empty() else (_loop_centerline(race, rng) if loop else _centerline(race, rng))
 	var pts: Array = gen["pts"]
 	var curve := Curve3D.new()
 	curve.bake_interval = 1.0
@@ -199,7 +203,7 @@ static func begin(race: Dictionary) -> Dictionary:
 		curve.add_point(pts[i], -t, t)
 	if loop:
 		curve.set_meta("loop", true)
-	if city.is_empty():
+	if city.is_empty() and not race.has("pts"):
 		_round_corners(curve, HALF_W + (6.5 if type == "drift" else 3.0), loop)
 	var length := curve.get_baked_length()
 	var laps: int = race.get("laps", 1) if loop else 1
@@ -215,6 +219,8 @@ static func begin(race: Dictionary) -> Dictionary:
 		"pools": [],  # zusätzliche Lichtflächen für die Lichtkarte (Tunnel): [x, z, Radius, Farbe mal Stärke]
 		"extra": 2.5 if type == "drift" else 0.0,  # Drift-Kurse: breitere Fahrbahn
 		"paths": [{"id": 0, "kind": "main", "curve": curve, "half_w": HALF_W, "length": length, "from": 0.0, "to": length}],
+		# Open World: Lage der Strecke in der Welt (die Strecke selbst bleibt in ihren eigenen Koordinaten)
+		"xf": race.get("xf", Transform3D.IDENTITY), "world_exit": {}, "world": race.get("world", false) or type == "autobahn",
 	}
 	var weights: Dictionary = race.get("districts", {"downtown": 1.0})
 	var dd := 0.0
@@ -239,6 +245,8 @@ static func begin(race: Dictionary) -> Dictionary:
 			_plan_kreuzberg_el(track)
 		_plan_spurs(track, rng)
 		_plan_medians(track, rng)
+	elif type == "autobahn":
+		_plan_autobahn(track, race)
 	elif type == "drag":
 		# Drag: vier freie Spuren geradeaus (kein Bahnübergang, keine Hochbahnstützen, kein Mittelstreifen)
 		_plan_tunnels(track, rng)
@@ -252,6 +260,8 @@ static func begin(race: Dictionary) -> Dictionary:
 		_plan_medians(track, rng)
 	if not track["elev0"].is_empty():
 		curve.set_meta("elev", track["elev0"])
+	if race.get("world", false):
+		_plan_world_exit(track)
 	return {"race": race, "rng": rng, "root": root, "track": track, "city": city, "type": type, "loop": loop,
 		"occupied": [], "buildings": [], "i": 0, "us": []}
 
@@ -314,14 +324,17 @@ static func step(job: Dictionary) -> float:
 			else:
 				_build_props(root, track, rng)
 			_build_steam(root, track, rng)
-			_build_spectators(root, track, rng)
+			if type != "autobahn":
+				_build_spectators(root, track, rng)
 			if type == "drag":
 				_drag_boards(root, track)
 			if not city.is_empty() or race.has("town"):
 				_build_city_signs(root, track, race)
 			if race.get("city", "") == "kreuzberg":
 				_east_side_gallery(root, track)
-			if job["loop"]:
+			if type == "autobahn":
+				pass
+			elif job["loop"]:
 				_gate(root, track, track["start"] + 12.0, "START · ZIEL", Color(0.2, 1.0, 0.4))
 			else:
 				_gate(root, track, track["start"] + 12.0, "START", Color(0.2, 1.0, 0.4))
@@ -344,7 +357,9 @@ static func step(job: Dictionary) -> float:
 			_auto_collide(root, track)
 		9:
 			# Verschmelzen dauert am längsten: in Stücken von gut 0,1 s, damit der Ladebalken weiterläuft
-			if not OS.get_cmdline_user_args().has("--nobatch"):
+			# Open World: ohne Verschmelzen (im Bau-Thread liest es jedes Mesh einzeln vom Grafikserver zurück, das
+			# dauert dort dreimal so lange; die Bildrate ist am Rechner ohne Verschmelzen kaum anders)
+			if not OS.get_cmdline_user_args().has("--nobatch") and not job.get("nobatch", false):
 				if not job.has("batch"):
 					job["batch"] = batch_begin(root)
 				if not batch_step(root, job["batch"], 110):
@@ -514,8 +529,10 @@ static func _build_ground(root: Node3D, track: Dictionary) -> void:
 		for q in (p["curve"] as Curve3D).get_baked_points():
 			lo = Vector2(minf(lo.x, q.x), minf(lo.y, q.z))
 			hi = Vector2(maxf(hi.x, q.x), maxf(hi.y, q.z))
-	lo -= Vector2(1500.0, 1500.0)
-	hi += Vector2(1500.0, 1500.0)
+	# Open World: nur ein Rand um die Strecke (sonst deckte der Boden die Flussbetten und Tröge der Nachbarn zu)
+	var margin := 260.0 if track["world"] else 1500.0
+	lo -= Vector2(margin, margin)
+	hi += Vector2(margin, margin)
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	st.set_normal(Vector3.UP)
@@ -949,6 +966,105 @@ static func _plan_shortcut(track: Dictionary, b: Dictionary, rng: RandomNumberGe
 		track["lakes"].append({"path": path["id"], "center": p0 + du * (0.52 * a) + dv * vb * 6.0,
 			"au": du, "av": dv * vb, "hu": 0.22 * a, "hv": 29.0, "gap0": 1e9, "gap1": -1e9})
 		track["parks"].append([p0, b["p1"], b["p2"]])
+
+
+## Open World: Autobahn-Stück. Durchgehender Mittelstreifen (über die Stückenden hinaus, sonst liefe er an jeder
+## Naht spitz zu), an den Ausfahrten offen, damit man von beiden Fahrbahnen abbiegen kann. Ausfahrten ("ramp") gehen
+## als gerade Straße von der Mittellinie zur Ausfahrt der Stadt (race["ramps"]: from = Punkt auf der Mittellinie,
+## end = Ende der Ausfahrt der Stadt, beides in Autobahn- = Weltkoordinaten).
+const RAMP_HALF := HALF_W
+const EXIT_LEN := 45.0  # so weit führt die Ausfahrt einer Stadt von ihrem Gehweg nach draußen
+
+
+static func _plan_autobahn(track: Dictionary, race: Dictionary) -> void:
+	var curve: Curve3D = track["curve"]
+	var L: float = track["length"]
+	var gaps := []
+	for r in race.get("ramps", []):
+		var d := curve.get_closest_offset(r["from"])
+		var f := frame_at(curve, d)
+		var end: Vector3 = r["end"]
+		var sc := Curve3D.new()
+		sc.bake_interval = 1.0
+		sc.add_point(f["pos"])
+		sc.add_point(Vector3(end.x, 0.0, end.z))
+		track["paths"].append({"id": track["paths"].size(), "kind": "ramp", "curve": sc, "half_w": RAMP_HALF,
+			"length": sc.get_baked_length(), "from": d, "to": d, "closed": false,
+			"side": signf((end - f["pos"]).dot(f["right"])), "name": r.get("name", "")})
+		track["zones"].append({"from": d - 40.0, "to": d + 40.0})
+		gaps.append([d - 45.0, d + 45.0])
+	var pieces := [[-300.0, L + 300.0]]
+	for g in gaps:
+		var next := []
+		for pc in pieces:
+			if g[1] <= pc[0] or g[0] >= pc[1]:
+				next.append(pc)
+				continue
+			if g[0] > pc[0]:
+				next.append([pc[0], g[0]])
+			if g[1] < pc[1]:
+				next.append([g[1], pc[1]])
+		pieces = next
+	for pc in pieces:
+		if pc[1] - pc[0] > 2.0 * MED_TAPER:
+			track["medians"].append({"from": pc[0], "to": pc[1]})
+
+
+## Open World: Ausfahrt der Stadt zur Autobahn. Sprint: die Straße geht hinter dem Start einfach weiter ("tail").
+## Rundkurs: eine Seitenstraße auf einem geraden Stück, das möglichst weit außen liegt, nach außen.
+## track["world_exit"]: end = Ende der Ausfahrt, dir = Richtung von der Stadt weg (beides in Streckenkoordinaten).
+static func _plan_world_exit(track: Dictionary) -> void:
+	var curve: Curve3D = track["curve"]
+	var L: float = track["length"]
+	if not track["loop"]:
+		var f0 := frame_at(curve, 0.0)
+		var dir: Vector3 = -f0["fwd"]
+		var sc := Curve3D.new()
+		sc.bake_interval = 1.0
+		sc.add_point(f0["pos"])
+		sc.add_point(f0["pos"] + dir * EXIT_LEN)
+		track["paths"].append({"id": track["paths"].size(), "kind": "ramp", "curve": sc, "half_w": HALF_W,
+			"length": EXIT_LEN, "from": 0.0, "to": 0.0, "closed": false, "tail": true, "side": 0.0})
+		track["world_exit"] = {"end": f0["pos"] + dir * EXIT_LEN, "dir": dir, "d": 0.0}
+		return
+	var centroid := Vector3.ZERO
+	var pts := curve.get_baked_points()
+	for q in pts:
+		centroid += q
+	centroid /= maxf(pts.size(), 1)
+	var best := -1e9
+	var pick := {}
+	var d := 40.0
+	while d < L - 40.0:
+		if not _in_zone(track, d, 60.0) and not _near_median(track, d - 50.0, d + 50.0) and tunnel_at(track, d, 40.0).is_empty() \
+				and (track["crossing_d"] < 0.0 or absf(d - track["crossing_d"]) > 80.0):
+			var fa := frame_at(curve, d - 25.0)
+			var fb := frame_at(curve, d + 25.0)
+			if (fa["fwd"] as Vector3).angle_to(fb["fwd"]) < 0.15:
+				var f := frame_at(curve, d)
+				for side in [-1.0, 1.0]:
+					var out: Vector3 = f["right"] * side
+					var tip: Vector3 = f["pos"] + out * (hw(track, d) + WALK + EXIT_LEN)
+					if _in_river(track, tip, 10.0) or _in_river(track, (f["pos"] + tip) / 2.0, 10.0):
+						continue
+					var score: float = out.dot((f["pos"] - centroid).normalized()) * 100.0 + (f["pos"] - centroid).length() * 0.02
+					# nicht wieder auf die eigene Strecke zu (enge Rundkurse)
+					if curve.get_closest_point(tip).distance_to(tip) < hw(track, d) + WALK + EXIT_LEN - 5.0:
+						continue
+					if score > best:
+						best = score
+						pick = {"d": d, "f": f, "out": out, "tip": tip}
+		d += 10.0
+	if pick.is_empty():
+		return
+	var sc2 := Curve3D.new()
+	sc2.bake_interval = 1.0
+	sc2.add_point(pick["f"]["pos"])
+	sc2.add_point(pick["tip"])
+	track["paths"].append({"id": track["paths"].size(), "kind": "ramp", "curve": sc2, "half_w": RAMP_HALF,
+		"length": sc2.get_baked_length(), "from": pick["d"], "to": pick["d"], "closed": false, "side": 0.0})
+	track["zones"].append({"from": pick["d"] - 30.0, "to": pick["d"] + 30.0})
+	track["world_exit"] = {"end": pick["tip"], "dir": pick["out"], "d": pick["d"]}
 
 
 ## Bahnübergang auf einem geraden Stück, auf einem flachen Bahndamm
@@ -1472,13 +1588,14 @@ static func _build_branch(root: Node3D, track: Dictionary, p: Dictionary, rng: R
 		if lk["path"] == p["id"]:
 			gap0 = lk["gap0"]
 			gap1 = lk["gap1"]
+	var tail: bool = p.get("tail", false)  # Open World: Fortsetzung der Hauptstraße hinter dem Start
 	var road := SurfaceTool.new()
 	road.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var walls := StaticBody3D.new()
 	root.add_child(walls)
 	var hedge := Builder.mat(Color(0.04, 0.16, 0.06), 0.0, 0.9)
 	var concrete := Builder.mat(Color(0.3, 0.3, 0.31), 0.0, 0.85)
-	var walk_w := 3.0 if kind == "fork" else 0.0  # Gabelung: richtige Straße mit Gehwegen
+	var walk_w := 3.0 if kind == "fork" else (WALK if tail else 0.0)  # Gabelung: richtige Straße mit Gehwegen
 	var walk := SurfaceTool.new()
 	walk.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var n_walk := 0
@@ -1505,20 +1622,20 @@ static func _build_branch(root: Node3D, track: Dictionary, p: Dictionary, rng: R
 				n_ret += 1
 			var mid: Vector3 = (prev["l"] + cur["r"]) / 2
 			var in_gap: bool = d > gap0 and prev["d"] < gap1
-			if _main_clearance(track, mid) > -0.3 and not in_gap:
+			if (tail or _main_clearance(track, mid) > -0.3) and not in_gap:
 				_strip(road, prev["l"], prev["r"], cur["l"], cur["r"], prev["d"], d)
 			if walk_w > 0.0:
 				var up := Vector3(0, CURB_H, 0)
 				for sd in [["lo", "l", true], ["r", "ro", false]]:
 					var outer: Vector3 = (prev[sd[0]] + cur[sd[0]]) / 2.0 if sd[2] else (prev[sd[1]] + cur[sd[1]]) / 2.0
-					if _main_clearance(track, outer) > 0.5:
+					if tail or _main_clearance(track, outer) > 0.5:
 						_strip(walk, prev[sd[0]] + up, prev[sd[1]] + up, cur[sd[0]] + up, cur[sd[1]] + up, prev["d"], d)
 						_strip_v(walk, prev["l" if sd[2] else "r"], cur["l" if sd[2] else "r"], CURB_H, sd[2])
 						n_walk += 1
 			for side in ["lw", "rw"]:
 				var wm: Vector3 = (prev[side] + cur[side]) / 2
 				# Sackgassen: Wände erst hinter der durchlaufenden Randmauer der Hauptstraße (keine Kante in deren Linie)
-				if _main_clearance(track, wm) < WALK + (1.6 if kind == "spur" else 0.4):
+				if not tail and _main_clearance(track, wm) < WALK + (1.6 if kind == "spur" else 0.4):
 					continue
 				_wall_shape(walls, prev[side], cur[side])
 				# Über der Sprunglücke nur unsichtbar: wer in der Luft seitlich abtreibt, schrammt daran entlang, statt
@@ -1539,7 +1656,7 @@ static func _build_branch(root: Node3D, track: Dictionary, p: Dictionary, rng: R
 					root.add_child(hm)
 		prev = cur
 		d += step
-	var lanes := 2.0 if kind == "spur" or kind == "fork" else 0.0
+	var lanes := 2.0 if kind == "spur" or kind == "fork" or kind == "ramp" else 0.0
 	_road_mesh(root, road, lanes, half * 2.0, 1.0 if kind == "alley" else 0.0, 0.012)
 	if n_walk > 0:
 		_flush(root, walk, _walk_mat(walk_w))
@@ -4007,6 +4124,21 @@ const STREET_GAIN := 5.0  # Helligkeit der Lichtkreise bei voller Sättigung
 const STREET_FLOOR := Vector3(0.1, 0.085, 0.07)  # Grundhelligkeit zwischen den Laternen: nirgends pechschwarz
 
 
+## Open World: Lichtkarte einer Strecke auf alle Straßen und Lacke legen (eine Karte zur Zeit)
+static func apply_street_light(track: Dictionary) -> void:
+	if not track.has("street_light"):
+		for m in _road_mats.values():
+			m.set_shader_parameter("street_gain", 0.0)
+		Builder.street = {}
+		return
+	for m in _road_mats.values():
+		m.set_shader_parameter("street_light", track["street_light"])
+		m.set_shader_parameter("street_rect", track["street_rect"])
+		m.set_shader_parameter("street_gain", STREET_GAIN)
+		m.set_shader_parameter("street_floor", STREET_FLOOR)
+	Builder.street = {"tex": track["street_light"], "rect": track["street_rect"], "gain": STREET_GAIN}
+
+
 static func _bake_street_light(root: Node3D, track: Dictionary) -> void:
 	var t0 := Time.get_ticks_usec()
 	var pools: Array = track["pools"].duplicate()
@@ -4029,11 +4161,20 @@ static func _bake_street_light(root: Node3D, track: Dictionary) -> void:
 				# Kreis so weit, wie das Licht den Boden erreicht; hohe Lampen streuen breiter und schwächer
 				var r := clampf(sqrt(maxf(l.omni_range * l.omni_range - h * h, 16.0)) * 1.05, 6.0, 28.0)
 				var k := l.light_energy * 0.55 * clampf(1.4 - h / 14.0, 0.5, 1.2)
-				pools.append([p.x, p.z, r, l.light_color * k])
+				var wp: Vector3 = track["xf"] * p  # Open World: Lichtkarte in Weltkoordinaten
+				pools.append([wp.x, wp.z, r, l.light_color * k])
 			if c.get_child_count() > 0:
 				stack.append([c, xf])
-	Builder.street = {}
+	if track["world"]:
+		for i in pools.size():
+			if i < track["pools"].size():  # Tunnel-Lichtflächen stehen in Streckenkoordinaten
+				var wq: Vector3 = track["xf"] * Vector3(pools[i][0], 0.0, pools[i][1])
+				pools[i] = [wq.x, wq.z, pools[i][2], pools[i][3]]
+	else:
+		Builder.street = {}
 	if pools.is_empty():
+		if track["world"]:
+			return
 		for m in _road_mats.values():
 			m.set_shader_parameter("street_gain", 0.0)  # sonst blieben die Lichtkreise der vorigen Strecke
 		return
@@ -4073,6 +4214,10 @@ static func _bake_street_light(root: Node3D, track: Dictionary) -> void:
 		img.set_pixel(idx % w, idx / w, Color(1.0 - exp(-v.r * 0.9), 1.0 - exp(-v.g * 0.9), 1.0 - exp(-v.b * 0.9)))
 	var tex := ImageTexture.create_from_image(img)
 	var rect := Vector4(lo.x, lo.y, 1.0 / (w * cell), 1.0 / (h * cell))
+	track["street_light"] = tex
+	track["street_rect"] = rect
+	if track["world"]:
+		return  # die Welt schaltet die Lichtkarte der Strecke ein, auf der man gerade fährt (apply_street_light)
 	for m in _road_mats.values():
 		m.set_shader_parameter("street_light", tex)
 		m.set_shader_parameter("street_rect", rect)

@@ -8,7 +8,10 @@ const NAMES := {"en": "English", "de": "Deutsch"}
 
 const EN := {
 	# --- Menü ---
-	"Rennen fahren": "Race", "Tuning": "Tuning", "Auto wechseln": "Change car", "Einstellungen": "Settings",
+	"Rennen fahren": "Race", "Losfahren": "Drive", "Welt wird gebaut …": "Building the world …",
+	"Welt wird gebaut … %d / %d": "Building the world … %d / %d", "Enter: Rennen starten": "Enter: start race",
+	"Frei fahren: Marker anfahren startet ein Rennen\nC Kamera  R Zurücksetzen  Esc Menü": "Free roam: drive into a marker to start a race\nC camera  R reset  Esc menu",
+	"ZUR WELT": "BACK TO THE WORLD", "Zur Welt": "Back to the world", "Tuning": "Tuning", "Auto wechseln": "Change car", "Einstellungen": "Settings",
 	"Beenden": "Quit", "Spielstand zurücksetzen": "Reset progress", "< Zurück": "< Back", "< Fertig": "< Done",
 	"Dieses Auto fahren": "Drive this car", "Ja, zurücksetzen": "Yes, reset", "Abbrechen": "Cancel",
 	"GARAGE": "GARAGE", "RENNEN": "RACES", "AUTOHAUS": "CAR LOT", "EINSTELLUNGEN": "SETTINGS", "ACHTUNG": "WARNING",

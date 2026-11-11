@@ -155,24 +155,24 @@ func _physics_process(dt: float) -> void:
 	if _snd and _snd.playing:
 		_snd.pitch_scale = clampf(0.8 + 0.4 * speed / maxf(base_speed, 1.0), 0.6, 1.4)
 	if wrecked:
-		global_position += _wreck_vel * dt
+		position += _wreck_vel * dt
 		_wreck_vel = _wreck_vel.move_toward(Vector3.ZERO, 9.0 * dt)
 		rotate_y(_wreck_spin * dt)
 		_wreck_spin = move_toward(_wreck_spin, 0.0, 2.5 * dt)
 		velocity_vec = _wreck_vel
 		if _wreck_vel.length_squared() > 0.01:
 			# Lage für KI und Verkehr nachführen, damit sie um das Wrack herumfahren, wo es wirklich liegt
-			progress = curve.get_closest_offset(global_position)
+			progress = curve.get_closest_offset(position)
 			var f := Track.frame_at(curve, progress)
-			var lat: float = (global_position - f["pos"]).dot(f["right"])
+			var lat: float = (position - f["pos"]).dot(f["right"])
 			_lane_cur = Track.logical_lat(track, progress, lat) if path_id == 0 else lat
-		if _wreck_roll_v != 0.0 or global_position.y > _wreck_ground + 0.01:
+		if _wreck_roll_v != 0.0 or position.y > _wreck_ground + 0.01:
 			_wreck_vy -= 18.0 * dt
-			global_position.y += _wreck_vy * dt
+			position.y += _wreck_vy * dt
 			rotate_object_local(Vector3.BACK, _wreck_roll_v * dt)
 			_wreck_roll += _wreck_roll_v * dt
-			if global_position.y <= _wreck_ground and _wreck_vy < 0.0:
-				global_position.y = _wreck_ground
+			if position.y <= _wreck_ground and _wreck_vy < 0.0:
+				position.y = _wreck_ground
 				if _wreck_vy < -3.0:
 					_wreck_vy *= -0.3  # schlägt auf und springt noch einmal
 					_wreck_roll_v *= 0.5
@@ -218,7 +218,7 @@ func _physics_process(dt: float) -> void:
 	elif progress < 40.0:
 		progress = track_length - 10.0
 	# Außer Sichtweite: unsichtbar und Lage nur zweimal pro Sekunde neu (spart im Browser viel Rechenzeit)
-	var far := global_position.distance_squared_to(player_pos) > _far_d2
+	var far := position.distance_squared_to(player_pos) > _far_d2
 	visible = not far
 	if far:
 		_far_t -= dt
@@ -236,7 +236,7 @@ func place() -> void:
 		xf.basis = xf.basis * Basis(Vector3.UP, PI)  # um die eigene Hochachse: bergab bleibt bergab
 	var fwd := -xf.basis.z
 	velocity_vec = fwd * speed
-	global_transform = xf
+	transform = xf  # Eltern: Welt (Rennen) oder Strecke (Open World), beides ohne Verschiebung im Rennen
 
 
 ## Unfall: wird mit (einem Teil) der Aufprallgeschwindigkeit weggeschoben und dreht sich.
@@ -244,10 +244,10 @@ func knock(v: Vector3) -> void:
 	if not wrecked:
 		wrecked = true
 		_wreck_vel = velocity_vec
-		_wreck_ground = global_position.y
+		_wreck_ground = position.y
 	_wreck_vel += Vector3(v.x, 0, v.z) * 0.6
 	_wreck_spin += randf_range(-1.0, 1.0) * clampf(v.length() / 10.0, 0.5, 3.0)
-	if v.length() > 20.0 and _wreck_roll_v == 0.0 and global_position.y <= _wreck_ground + 0.01:
+	if v.length() > 20.0 and _wreck_roll_v == 0.0 and position.y <= _wreck_ground + 0.01:
 		_wreck_vy = clampf(v.length() * 0.18, 3.5, 7.0)
 		_wreck_roll_v = randf_range(4.0, 7.0) * (1.0 if randf() < 0.5 else -1.0)
 

@@ -57,6 +57,28 @@ Einlenken und Bremsen etwas wankt und einmal sanft nachfedert (Feder mit knapp 1
 wie in NFSU, dazu gibt es „Verfolger weit“ (2,55 m hoch, 6,4 m dahinter). C schaltet durch alle vier Kameras, die Wahl
 steht im Spielstand.
 
+## Open World „Mini-Deutschland“ (im Aufbau, Zweig `open-world`)
+Garage → **Losfahren** führt in eine offene Welt statt in die Rennen-Liste. Alle Strecken außer Drag liegen außen an
+einem **Autobahnring** (gut 22 km), ungefähr in der Himmelsrichtung ihrer Stadt vom Mittelpunkt Deutschlands aus
+(`scripts/world_layout.gd`). Jede Stadt hat eine **Ausfahrt** zur Autobahn: Sprints gehen hinter dem Start einfach
+weiter, Rundkurse bekommen eine Seitenstraße an ihrer äußersten geraden Stelle (`track_builder._plan_world_exit`);
+eine gerade **Auffahrt** führt von der Mittellinie der Autobahn dorthin (Mittelstreifen dort offen).
+Der Ring besteht aus Stücken von 2,6 km im Viertel „Schnellstraße“ (Lärmschutzwand, Schilderbrücken).
+
+- **Nachladen:** Strecken im Umkreis von 700 m werden nebenher gebaut (am Rechner in einem eigenen Thread, im Browser
+  Schritt für Schritt), ab 1,3 km wieder entfernt. In der Welt ohne Verschmelzen der Häuser: im Thread liest das jedes
+  Mesh einzeln vom Grafikserver zurück und dauerte dreimal so lange (21 statt 7 s), die Bildrate ist ohne kaum anders.
+- **Strecken liegen gedreht und verschoben** (`track["xf"]`), bleiben aber in ihren eigenen Koordinaten; das Auto
+  rechnet seine Lage für Boden, Rampen und Zurücksetzen dorthin um und fährt immer auf der Strecke, deren Fahrbahn
+  am nächsten ist. Die Lichtkarte der Laternen gilt für die Strecke, auf der man gerade ist.
+- **Rennen:** an jedem Start eine Lichtsäule in der Farbe der Art. Hineinfahren, Enter: das Rennen startet wie
+  bisher mit Ladebildschirm, danach „ZUR WELT“ zurück an den Marker.
+- Testen: `world.tscn -- --wspawn=ring:5 --wdrive --worldlog` (Autopilot auf dem Ring, Bauzeiten),
+  `--wspawn=ramp:15` (vor der Auffahrt nach Aachen), `--nothreads` (wie im Browser); Draufsicht:
+  `tools/world_map.tscn -- --worldlog --png=/pfad.png`.
+- Noch offen: Karte und Minikarte, Tuning im Esc-Menü, Verkehr in der Welt, Stadion-Drift ohne Ausfahrt,
+  abgeschnittene Schilder (Tunnelnamen), seltene Herausforderer-Autos.
+
 ## Events
 **Karriere:** Garage → Rennen fahren zeigt alle 21 Events als Liste neben einer Deutschlandkarte. Jedes Event liegt in
 einer deutschen Stadt (die ausgedachten Strecken in Frankfurt, München, Hamburg, Köln, Leipzig …, die echten in ihren

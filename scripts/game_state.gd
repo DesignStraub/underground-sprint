@@ -77,6 +77,7 @@ var wins := 0  # Rennsiege (Sprint + Rundkurs)
 var drift_wins := 0
 var current_car := "kaizen"
 var race_index := 0
+var in_world := false  # Rennen aus der Open World gestartet: danach zurück in die Welt (nicht gespeichert)
 var best_times := {}  # Rennname -> Sekunden
 var won_events: Array = []  # gewonnene Events (Karriere: genug Siege in einer Stufe öffnen die nächste)
 var test_cfg := {}  # --cfg (nur Tests)

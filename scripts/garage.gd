@@ -539,7 +539,8 @@ func _show_main() -> void:
 	preview_cfg = GameState.get_config(preview_car).duplicate()
 	_show_car(preview_car, preview_cfg)
 	_set_section("GARAGE", true)
-	_button("Rennen fahren", _show_races)
+	# Seit 2.28: Open World statt Rennen-Liste. Die Rennen findet man als Marker in den Städten.
+	_button("Losfahren", _enter_world)
 	_button("Tuning", _show_tuning)
 	_button("Auto wechseln", _show_cars)
 	_button("Einstellungen", _show_settings)
@@ -821,6 +822,17 @@ func _show_events(type: String) -> void:
 ## Rennen starten: sofort den Ladebildschirm zeigen (das Rennen übernimmt ihn), Musik leiser, dann Szene wechseln.
 ## Ohne das stand das Menü einige Sekunden still, während die Strecke gebaut wurde.
 var _starting := false
+
+
+func _enter_world() -> void:
+	if _starting:
+		return
+	_starting = true
+	GameState.save_game()
+	Sfx.ui("go")
+	Music.race_loading()
+	await get_tree().process_frame
+	get_tree().change_scene_to_file("res://scenes/world.tscn")
 
 
 func _start_race(i: int) -> void:
