@@ -670,7 +670,9 @@ ein, wie auf echten Aufnahmen. Kostet im Rennen etwa 4 % mehr Draw Calls und Dre
   Lage misst `_lamp_spots` an den Leuchtflächen jedes Autos (ohne dritte Bremsleuchte am Dach).
 - **Lichtteppiche** (`Builder._light_pools`): die Scheinwerfer legen einen 22 m langen Lichtkegel vor das Auto, seit
   2.27 schmal wie echtes Abblendlicht (fast autobreit, nach vorn nur wenig breiter statt zur Seite hinaus) und
-  schwächer; die Rückleuchten einen kleinen roten Schein dahinter (Decal, im Browser additive Fläche).
+  schwächer; die Rückleuchten einen kleinen roten Schein dahinter (Decal, im Browser additive Fläche). Seit 2.27.1 liegt
+  der Kegel vorn nur noch im Browser: am Rechner leuchtet der echte Scheinwerfer auf die Straße, der zusätzliche Teppich
+  sah dort wie ein heller, scharf begrenzter Kasten vor dem Auto aus. Der rote Schein hinten bleibt überall.
 - **Kaido 2000GT** flacher und runder (Dach 1,30 statt 1,37 m, Gürtellinie tiefer, mehr Rundung, größere Räder).
   Die aufgeschraubten Verbreiterungen sind bei allen Autos ein glatter, gerundeter Bogen statt elf Klötzchen.
 

@@ -2594,12 +2594,16 @@ static func _lamp_glows(body: Node3D, heads: Array, tails: Array, light_c: Color
 
 ## Lichtteppiche (seit 2.25): die Scheinwerfer legen einen hellen Kegel vor das Auto auf die Straße, die Rückleuchten
 ## einen roten Schein dahinter. Decal (liegt auf dem Asphalt, auch am Hang), im Browser additive Flächen.
+## Seit 2.27.1 vorn nur noch im Browser: mit dem vollen Renderer leuchtet der echte Scheinwerfer (SpotLight) schon auf die
+## Straße, der Teppich lag dort zusätzlich als heller, scharf begrenzter Kasten vor dem Auto (in Aufnahmen sehr störend).
 static func _light_pools(root: Node3D, W: float, L: float, light_c: Color) -> void:
 	var compat := RenderingServer.get_current_rendering_method() == "gl_compatibility"
 	if OS.get_cmdline_user_args().has("--nopool"):
-		return  # nur Aufnahmen: ohne Lichtteppich (der Scheinwerfer leuchtet trotzdem)
-	for spec in [[_beam_texture(), Vector3(W + 1.6, 1.6, 22.0), -L / 2.0 - 11.2, light_c, 0.7],
-			[_halo_texture(), Vector3(W * 0.95, 1.4, 1.7), L / 2.0 + 0.45, Color(1.0, 0.06, 0.03), 0.22]]:
+		return  # nur Aufnahmen: ganz ohne Lichtteppich
+	var specs := [[_halo_texture(), Vector3(W * 0.95, 1.4, 1.7), L / 2.0 + 0.45, Color(1.0, 0.06, 0.03), 0.22]]
+	if compat:
+		specs.push_front([_beam_texture(), Vector3(W + 1.6, 1.6, 22.0), -L / 2.0 - 11.2, light_c, 0.7])
+	for spec in specs:
 		var size: Vector3 = spec[1]
 		if compat:
 			var gm := StandardMaterial3D.new()
@@ -2622,7 +2626,6 @@ static func _light_pools(root: Node3D, W: float, L: float, light_c: Color) -> vo
 		var dc := Decal.new()
 		dc.size = size
 		dc.texture_emission = spec[0]
-		# mit dem vollen Renderer leuchtet zusätzlich der echte Scheinwerfer: Teppich nur halb so hell (sonst im Tunnel grell)
 		dc.emission_energy = spec[4] * 0.4
 		dc.modulate = spec[3]
 		dc.albedo_mix = 0.0
