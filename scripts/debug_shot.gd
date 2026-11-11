@@ -27,6 +27,7 @@ extends Node
 ##   -- --lightlog         Größe und Aufbauzeit der Lichtkarte (Laternenlicht auf der Straße)
 ##   -- --lightpng=/pfad.png  speichert die Lichtkarte als Bild
 ##   -- --carcam=d:w:h:bh[:fov]  Kamera fest am Spielerauto (Abstand, Winkel um das Auto, Höhe, Blickhöhe), HUD aus
+##   -- --lightoff=spot,omni,shadow  Lichter einer Art abschalten (Fehlersuche)
 ##   -- --nomusic         Musik aus (Aufnahmen, unter die später eigene Musik kommt)
 ##   -- --wheelcam         Kamera fährt neben dem rechten Vorderrad des Spielers mit (Felgen, Unschärfe, Blockieren);
 ##                         mit --revtest: Gas, Vollbremsung, Gas; loggt die Raddrehung ("WHEEL ...")
@@ -139,6 +140,19 @@ func _process(dt: float) -> void:
 			Input.parse_input_event(ev)
 		_step += 1
 	var race = get_tree().current_scene
+	for a in OS.get_cmdline_user_args():
+		# --lightoff=spot,omni,shadow  Lichter einer Art abschalten (Fehlersuche: welches Licht macht den Fleck?)
+		if a.begins_with("--lightoff=") and race and "world" in race and race.world and fmod(_t, 0.5) < dt:
+			var kinds := a.substr(11).split(",")
+			var st: Array = [race.world]
+			while not st.is_empty():
+				var nd: Node = st.pop_back()
+				if nd is Light3D:
+					if ("spot" in kinds and nd is SpotLight3D) or ("omni" in kinds and nd is OmniLight3D):
+						nd.visible = false
+					if "shadow" in kinds:
+						nd.shadow_enabled = false
+				st.append_array(nd.get_children())
 	if OS.get_cmdline_user_args().has("--nomusic"):
 		for mp in Music._players:
 			mp.volume_db = -80.0  # Musik aus (Aufnahmen mit eigener Musik, Effekte allein)

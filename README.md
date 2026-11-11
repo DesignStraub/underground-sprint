@@ -521,7 +521,8 @@ dann steht „Benutzerdefiniert“ da. Werte in `GameState.GFX`.
   mit dem Tempo leicht ab, und ab gut 80 % Tempo zittert die Kamera um wenige Millimeter (mit „Kamerawackeln aus“
   nicht). Beim Einlenken verwischt das Bild zusätzlich seitlich, mit Nitro stärker, dazu ein blauer Schimmer und
   leichte Farbsäume. Steht nichts an, ist der Effekt ganz aus; beim Laden wird er einmal unsichtbar gezeichnet,
-  damit der Browser den Shader nicht erst mitten im Rennen übersetzt.
+  damit der Browser den Shader nicht erst mitten im Rennen übersetzt. Seit 2.27.2 ohne Oval ums Auto: der verwischte
+  Bereich war vorher heller bzw. dunkler gerechnet als die scharfe Mitte, die Grenze stand als Fleck auf dem Heck.
 - **Nitro:** ein blauer Kegel aus jedem Endrohr, der in der Größe flackert; Fehlzündungen zeigen kurz einen kleinen
   orangefarbenen. Die Nitro-Grafik aus 2.20 (lodernde Flamme, Feuerball, Licht, Druckwelle, Kamerasprung beim Zünden)
   ist seit 2.22 wieder weg: sie wirkte wie eine Rakete.

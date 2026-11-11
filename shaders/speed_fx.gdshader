@@ -28,7 +28,10 @@ void fragment() {
 		col = texture(screen_tex, uv).rgb;
 	} else {
 		// versetzte Proben je Bildpunkt (Rauschen statt sichtbarer Doppelbilder), Schweif läuft weich aus; helle
-		// Proben zählen mehr: Lichter ziehen Spuren wie auf einem Foto mit langer Belichtung
+		// Proben zählen mehr: Lichter ziehen Spuren wie auf einem Foto mit langer Belichtung.
+		// Seit 2.27.2 echter gewichteter Mittelwert (geteilt durch dieselben Gewichte): bei kaum Unschärfe kommt genau
+		// das Bild heraus. Vorher wurde anders geteilt, dadurch war der Bereich mit Unschärfe heller (helle Flächen) bzw.
+		// dunkler (der Rest) als die scharfe Mitte, und um das Auto stand ein scharf begrenztes Oval.
 		float j = fract(52.9829189 * fract(dot(FRAGCOORD.xy, vec2(0.06711056, 0.00583715))));
 		vec3 acc = vec3(0.0);
 		float wsum = 0.0;
@@ -39,9 +42,9 @@ void fragment() {
 			float lum = dot(c, vec3(0.3, 0.55, 0.15));
 			float w = (1.0 - 0.6 * t) * (1.0 + 2.2 * speed * smoothstep(0.55, 1.0, lum));
 			acc += c * w;
-			wsum += 1.0 - 0.6 * t;
+			wsum += w;
 		}
-		col = acc / (wsum * (1.0 + 0.55 * speed * 0.6));
+		col = acc / wsum;
 	}
 	// Tunnelblick: Rand leicht dunkler, je schneller
 	col *= 1.0 - 0.22 * speed * smoothstep(0.45, 1.15, r);
