@@ -1524,9 +1524,10 @@ func _describe(c: KinematicCollision3D) -> String:
 		var f: PackedVector3Array = cs.shape.get_faces()
 		var best := 1e9
 		var bi := 0
+		var pl := cs.global_transform.affine_inverse() * p  # Flächen liegen in Streckenkoordinaten
 		for i in range(0, f.size(), 3):
 			var m := (f[i] + f[i + 1] + f[i + 2]) / 3.0
-			var dd := Vector2(m.x - p.x, m.z - p.z).length()
+			var dd := Vector2(m.x - pl.x, m.z - pl.z).length()
 			if dd < best:
 				best = dd
 				bi = i
