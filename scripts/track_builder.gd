@@ -222,7 +222,7 @@ static func begin(race: Dictionary) -> Dictionary:
 		"extra": 2.5 if type == "drift" else (AB_EXTRA if type == "autobahn" else 0.0),  # Drift breiter, Autobahn 3 Spuren je Richtung
 		"paths": [{"id": 0, "kind": "main", "curve": curve, "half_w": HALF_W, "length": length, "from": 0.0, "to": length}],
 		# Open World: Lage der Strecke in der Welt (die Strecke selbst bleibt in ihren eigenen Koordinaten)
-		"xf": race.get("xf", Transform3D.IDENTITY), "world_exit": {}, "keepout": race.get("keepout", []), "world": race.get("world", false) or type == "autobahn",
+		"xf": race.get("xf", Transform3D.IDENTITY), "world_exit": {}, "world_exit2": {}, "tail_join": race.get("tail_join", false), "keepout": race.get("keepout", []), "world": race.get("world", false) or type == "autobahn",
 	}
 	var weights: Dictionary = race.get("districts", {"downtown": 1.0})
 	var dd := 0.0
@@ -991,11 +991,16 @@ static func _plan_autobahn(track: Dictionary, race: Dictionary) -> void:
 		var end: Vector3 = r["end"]
 		var sc := Curve3D.new()
 		sc.bake_interval = 1.0
-		sc.add_point(f["pos"])
-		sc.add_point(Vector3(end.x, 0.0, end.z))
+		if r.has("c1"):
+			# Verbindung zur Ziel-Ausfahrt eines Sprints: Bogen (senkrecht vom Ring, in Richtung der Ausfahrt ankommend)
+			sc.add_point(f["pos"], Vector3.ZERO, (r["c1"] as Vector3) - (r["from"] as Vector3))
+			sc.add_point(Vector3(end.x, 0.0, end.z), (r["c2"] as Vector3) - end, Vector3.ZERO)
+		else:
+			sc.add_point(f["pos"])
+			sc.add_point(Vector3(end.x, 0.0, end.z))
 		track["paths"].append({"id": track["paths"].size(), "kind": "ramp", "curve": sc, "half_w": RAMP_HALF,
 			"length": sc.get_baked_length(), "from": d, "to": d, "closed": false,
-			"side": signf((end - f["pos"]).dot(f["right"])), "name": r.get("name", "")})
+			"side": signf((end - f["pos"]).dot(f["right"])), "name": r.get("name", ""), "conn": r.has("c1")})
 		track["zones"].append({"from": d - 40.0, "to": d + 40.0})
 		gaps.append([d - 45.0, d + 45.0])
 	var pieces := [[-300.0, L + 300.0]]
@@ -1031,6 +1036,18 @@ static func _plan_world_exit(track: Dictionary) -> void:
 		track["paths"].append({"id": track["paths"].size(), "kind": "ramp", "curve": sc, "half_w": HALF_W,
 			"length": EXIT_LEN, "from": 0.0, "to": 0.0, "closed": false, "tail": true, "side": 0.0})
 		track["world_exit"] = {"end": f0["pos"] + dir * EXIT_LEN, "dir": dir, "d": 0.0}
+		# zweite Ausfahrt hinter dem Ziel (seit der Außenring kam): die Straße geht auch dort weiter, world_layout
+		# verbindet ihr Ende mit dem inneren oder äußeren Ring, so gibt es in der Welt keine Sackgasse mehr
+		var f1 := frame_at(curve, L)
+		if track["tail_join"] and _plan_tail_join(track, f1):
+			return
+		var sc1 := Curve3D.new()
+		sc1.bake_interval = 1.0
+		sc1.add_point(f1["pos"])
+		sc1.add_point(f1["pos"] + f1["fwd"] * EXIT_LEN)
+		track["paths"].append({"id": track["paths"].size(), "kind": "ramp", "curve": sc1, "half_w": HALF_W,
+			"length": EXIT_LEN, "from": L, "to": L, "closed": false, "tail": true, "side": 0.0})
+		track["world_exit2"] = {"end": f1["pos"] + f1["fwd"] * EXIT_LEN, "dir": f1["fwd"], "d": L}
 		return
 	var centroid := Vector3.ZERO
 	var pts := curve.get_baked_points()
@@ -1072,6 +1089,79 @@ static func _plan_world_exit(track: Dictionary) -> void:
 		"length": sc2.get_baked_length(), "from": pick["d"], "to": pick["d"], "closed": false, "side": 0.0})
 	track["zones"].append({"from": pick["d"] - 30.0, "to": pick["d"] + 30.0})
 	track["world_exit"] = {"end": pick["tip"], "dir": pick["out"], "d": pick["d"]}
+
+
+## Ziel liegt eingeschlossen von der eigenen Strecke (Würzburg: U-förmig, das Ende zeigt ins Innere), keine Verbindung
+## zum Ring ohne Kreuzung (world_layout._connect_ends setzt dann race["tail_join"]): die Straße hinter dem Ziel biegt
+## im Bogen zurück und mündet als T-Einmündung in die eigene Hauptstraße. So gibt es auch dort keine Sackgasse,
+## man fährt über die Strecke zurück zur Ausfahrt. Gesucht wird die kürzeste Einmündung, deren Bogen der Strecke und
+## ihren Abzweigen nicht nahe kommt.
+static func _plan_tail_join(track: Dictionary, f1: Dictionary) -> bool:
+	var curve: Curve3D = track["curve"]
+	var L: float = track["length"]
+	var p0: Vector3 = f1["pos"]
+	var best := {}
+	var best_len := 1e9
+	var d := 150.0
+	while d < L - 300.0:
+		if _in_zone(track, d, 70.0) or not tunnel_at(track, d, 60.0).is_empty() or _near_median(track, d - 40.0, d + 40.0):
+			d += 20.0
+			continue
+		var f := frame_at(curve, d)
+		var side := signf((p0 - f["pos"]).dot(f["right"]))
+		var edge: Vector3 = f["pos"] + f["right"] * side * hw(track, d)
+		var air := p0.distance_to(edge)
+		if air > 900.0 or air < 60.0:
+			d += 20.0
+			continue
+		for hk in [0.35, 0.5, 0.7]:
+			var c1: Vector3 = p0 + f1["fwd"] * air * hk
+			var c2: Vector3 = edge + f["right"] * side * air * hk
+			var pts := []
+			var ok := true
+			var n := maxi(20, int(air * 1.6 / 4.0))
+			var prev_dir := Vector3.ZERO
+			var length := 0.0
+			for j in n + 1:
+				var t := float(j) / n
+				var u := 1.0 - t
+				var q: Vector3 = p0 * u * u * u + c1 * 3.0 * u * u * t + c2 * 3.0 * u * t * t + edge * t * t * t
+				q.y = 0.0
+				if j > 0:
+					var sg: Vector3 = q - pts[-1]
+					length += sg.length()
+					if prev_dir != Vector3.ZERO and prev_dir.angle_to(sg) > sg.length() / 45.0:
+						ok = false  # enger als gut 45 m Radius
+						break
+					prev_dir = sg
+				pts.append(q)
+			if not ok or length >= best_len:
+				continue
+			var acc := 0.0
+			for j in range(1, pts.size()):
+				acc += (pts[j] as Vector3).distance_to(pts[j - 1])
+				if acc < 30.0 or length - acc < 30.0:
+					continue
+				# gleich hinter dem Ende zählt das Ende der Hauptstraße selbst nicht (da kommt man ja her)
+				var from_end: bool = acc < 120.0 and curve.get_closest_offset(pts[j]) > L - 60.0
+				if (not from_end and _main_clearance(track, pts[j]) < HALF_W + WALK + 14.0) or _branch_clearance(track, pts[j]) < HALF_W + WALK + 14.0 \
+						or _in_river(track, pts[j], 12.0):
+					ok = false
+					break
+			if ok:
+				best_len = length
+				best = {"d": d, "c1": c1, "c2": c2, "end": edge}
+		d += 20.0
+	if best.is_empty():
+		return false
+	var sc := Curve3D.new()
+	sc.bake_interval = 1.0
+	sc.add_point(p0, Vector3.ZERO, best["c1"] - p0)
+	sc.add_point(best["end"], best["c2"] - best["end"], Vector3.ZERO)
+	track["paths"].append({"id": track["paths"].size(), "kind": "ramp", "curve": sc, "half_w": HALF_W,
+		"length": sc.get_baked_length(), "from": L, "to": L, "closed": false, "tail": true, "join": best["d"], "side": 0.0})
+	track["zones"].append({"from": best["d"] - 40.0, "to": best["d"] + 40.0})
+	return true
 
 
 ## Ausweich-Ausfahrt für verwinkelte Kurse (Stadion-Drift: Zickzack-Stern, keine Gerade hat seitlich Platz): an der
@@ -1299,6 +1389,7 @@ static func _build_road(root: Node3D, track: Dictionary) -> void:
 	var grass := SurfaceTool.new()
 	grass.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var walls := StaticBody3D.new()
+	walls.name = "WallsRoad"
 	root.add_child(walls)
 	var walk_m := _walk_mat(WALK)
 	var grass_m := Builder.mat(Color(0.05, 0.11, 0.05), 0.0, 0.95)
@@ -1467,6 +1558,7 @@ static func _build_barriers(root: Node3D, track: Dictionary, rng: RandomNumberGe
 	var curve: Curve3D = track["curve"]
 	var length: float = track["length"]
 	var walls := StaticBody3D.new()
+	walls.name = "WallsBarrier"
 	root.add_child(walls)
 	var concrete := Builder.mat(Color(0.55, 0.55, 0.56), 0.0, 0.8)
 	var red := Builder.mat(Color(0.75, 0.06, 0.05), 0.0, 0.6)
@@ -1651,9 +1743,11 @@ static func _build_branch(root: Node3D, track: Dictionary, p: Dictionary, rng: R
 			gap0 = lk["gap0"]
 			gap1 = lk["gap1"]
 	var tail: bool = p.get("tail", false)  # Open World: Fortsetzung der Hauptstraße hinter dem Start
+	var join: bool = p.has("join")  # führt zurück auf die Hauptstraße (_plan_tail_join): am Ende wie ein Abzweig
 	var road := SurfaceTool.new()
 	road.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var walls := StaticBody3D.new()
+	walls.name = "WallsBranch%d" % p["id"]
 	root.add_child(walls)
 	var hedge := Builder.mat(Color(0.04, 0.16, 0.06), 0.0, 0.9)
 	var concrete := Builder.mat(Color(0.3, 0.3, 0.31), 0.0, 0.85)
@@ -1684,20 +1778,21 @@ static func _build_branch(root: Node3D, track: Dictionary, p: Dictionary, rng: R
 				n_ret += 1
 			var mid: Vector3 = (prev["l"] + cur["r"]) / 2
 			var in_gap: bool = d > gap0 and prev["d"] < gap1
-			if (tail or _main_clearance(track, mid) > -0.3) and not in_gap:
+			var free_end := tail and not (join and d > len - 40.0)  # Ende einer Rückführung: wie ein Abzweig
+			if (free_end or _main_clearance(track, mid) > -0.3) and not in_gap:
 				_strip(road, prev["l"], prev["r"], cur["l"], cur["r"], prev["d"], d)
 			if walk_w > 0.0:
 				var up := Vector3(0, CURB_H, 0)
 				for sd in [["lo", "l", true], ["r", "ro", false]]:
 					var outer: Vector3 = (prev[sd[0]] + cur[sd[0]]) / 2.0 if sd[2] else (prev[sd[1]] + cur[sd[1]]) / 2.0
-					if tail or _main_clearance(track, outer) > 0.5:
+					if free_end or _main_clearance(track, outer) > 0.5:
 						_strip(walk, prev[sd[0]] + up, prev[sd[1]] + up, cur[sd[0]] + up, cur[sd[1]] + up, prev["d"], d)
 						_strip_v(walk, prev["l" if sd[2] else "r"], cur["l" if sd[2] else "r"], CURB_H, sd[2])
 						n_walk += 1
 			for side in ["lw", "rw"]:
 				var wm: Vector3 = (prev[side] + cur[side]) / 2
 				# Sackgassen: Wände erst hinter der durchlaufenden Randmauer der Hauptstraße (keine Kante in deren Linie)
-				if not tail and _main_clearance(track, wm) < WALK + (1.6 if kind == "spur" else 0.4):
+				if not free_end and _main_clearance(track, wm) < WALK + (1.6 if kind == "spur" else 0.4):
 					continue
 				_wall_shape(walls, prev[side], cur[side])
 				# Über der Sprunglücke nur unsichtbar: wer in der Luft seitlich abtreibt, schrammt daran entlang, statt
@@ -4974,6 +5069,7 @@ static func _build_tunnels(root: Node3D, track: Dictionary, rng: RandomNumberGen
 	var warn := Builder.mat(Color(0.9, 0.62, 0.05), 0.0, 0.5)
 	var exit_m := Builder.mat(Color(0.1, 0.9, 0.3), 0.0, 0.4, Color(0.1, 1.0, 0.35), 3.0)
 	var walls := StaticBody3D.new()
+	walls.name = "WallsTunnel"
 	root.add_child(walls)
 	for t in track["tunnels"]:
 		var col: Color = Color(1.0, 0.6, 0.25) if t["sodium"] else Color(0.75, 0.9, 1.0)

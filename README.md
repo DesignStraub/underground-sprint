@@ -66,6 +66,18 @@ eine gerade **Auffahrt** führt von der Mittellinie der Autobahn dorthin (Mittel
 Der Ring besteht aus Stücken von 2,6 km im Viertel „Schnellstraße“ (Lärmschutzwand, Schilderbrücken), mit
 **drei Spuren je Richtung** (`track["extra"] = AB_EXTRA`, Fahrbahn-Shader mit `lanes` 3 bzw. 6).
 
+**Rund, ohne Sackgassen:** ein zweiter Ring, der **Außenring** (gut 44 km), läuft in sanften Bögen außen um alle
+Städte (`world_layout._outer_ring`: jeder Straßenpunkt hebt ihn auf mindestens 260 m Abstand an, Kuppen mit 900 m
+Radius, Täler geglättet; engster Bogen gut 850 m). Sprints gehen jetzt auch **hinter dem Ziel** weiter
+(`track["world_exit2"]`), eine Verbindung im Bogen führt von dort zum nächsten freien Ring (`_connect_ends`: bis 3,2 km
+zur Seite gesucht, alle 10 m geprüft, nie näher als 32 m an einer anderen Straße, nicht enger als gut 130 m). Acht
+Sprints enden am Außenring. Würzburgs Ziel liegt im Inneren der eigenen U-förmigen Strecke, ohne Kreuzung kommt man
+dort nicht heraus (die erste Verbindung lief quer durch die eigene Hauptstraße, die Prüfung tastete nur alle 70 m ab):
+dort biegt die Straße hinter dem Ziel im Bogen zurück und mündet in die eigene Hauptstraße (`_plan_tail_join`,
+`race["tail_join"]`), man fährt über die Strecke zurück zur Ausfahrt. So fährt man durch: Autobahn → Stadt →
+Außenring → nächste Stadt → Autobahn. Rundkurse und Drift-Kurse sind Schleifen mit ihrer einen Ausfahrt. Draufsicht:
+`tools/world_map.tscn -- --png=/pfad.png --worldlog`.
+
 - **Nachladen:** Strecken im Umkreis von 700 m werden nebenher gebaut (am Rechner in einem eigenen Thread, im Browser
   Schritt für Schritt), ab 1,3 km wieder entfernt. In der Welt ohne Verschmelzen der Häuser: im Thread liest das jedes
   Mesh einzeln vom Grafikserver zurück und dauerte dreimal so lange (21 statt 7 s), die Bildrate ist ohne kaum anders.
@@ -101,6 +113,17 @@ Der Ring besteht aus Stücken von 2,6 km im Viertel „Schnellstraße“ (Lärms
   Nachbarstädte) als Sperrflächen (`world_layout._add_keepout`); Häuser und Wahrzeichen kommen dort nicht hin. Vorher
   ragten 223 Häuser vor allem aus den echten Stadtplänen auf Autobahn und Nachbarstraßen. Prüfen:
   `world.tscn -- --worldcheck` baut die ganze Welt und listet jede Überschneidung („WC …“, jetzt 0).
+- **Rundfahrt-Test** (`scripts/world_tour.gd`): ein Autopilot fährt jede Straße der Welt ab, beide Ringe Stück für
+  Stück, in jeder Stadt Auffahrt, Ausfahrt, Hauptstraße bzw. Runde, Ziel-Ausfahrt, Verbindung zum Ring und alle
+  Abzweige, und meldet „TB WAND/FEST/FALL/NEBEN/KIPPT/ZEIT/BAU/FEHLT“ mit Ort und dem Ding, woran er stieß (Wände
+  heißen nach ihrer Straße: `WallsRoad`, `WallsBranch<n>`, …), am Ende „TOUR SUMME“.
+  `world.tscn --headless --fixed-fps 60 --log-file /tmp/tour.log -- --wtour=ring|outer|cities|<Rennname>` (dazu
+  `--wpaths`: alle Wege jeder Strecke mit Anfang und Ende). Headless baut die Welt ohne Thread (der Ersatz-Renderer
+  ist nicht threadsicher, Meshes aus dem Bau-Thread zerschossen dort die RIDs und das Log lief in die Gigabytes);
+  `--log-file` hält Godots eigenes Log aus dem Benutzerordner. Ergebnis: innerer Ring 26,6 km und Außenring 43,9 km
+  ohne Befund, alle Städte (66 km) ohne Hängenbleiben; übrig sind 4 Berührungen: zwei streifend am Fahrbahnrand
+  (2 m/s quer), eine gewollte Kiste in einer Gasse, und am Altstadtring trägt es den Autopiloten in einer Kurve an die
+  Randmauer. `--worldcheck`: 0 Überschneidungen.
 - **Gewonnene Rennen** verschwinden aus der Welt und von der Minikarte; die große Karte zeigt sie als goldenen Haken.
 - **Tasten:** Esc (oder P) öffnet das Menü, Enter bestätigt nur noch, M (oder Tab) öffnet die Karte, „.“ wechselt die
   Musik. Test: `world.tscn -- --wspawn=ring:10 --ctest=rear40` (auch rear120, side,

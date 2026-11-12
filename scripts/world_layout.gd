@@ -82,7 +82,8 @@ static func build() -> Dictionary:
 		var gz := -(geo.x - GEO_CENTER.y)
 		cities.append({"race_index": i, "b0": b0, "end_local": ex["end"], "lat0": lat0 - SIDE_MARGIN / 2.0,
 			"lat1": lat1 + SIDE_MARGIN / 2.0, "gap": maxf(GAP_MIN, -rad0 + 160.0), "far": far,
-			"phi": atan2(gz, gx) + i * 1e-4, "start_local": Track.frame_at(tr["curve"], tr["start"])["pos"], "polys_local": polys})
+			"phi": atan2(gz, gx) + i * 1e-4, "start_local": Track.frame_at(tr["curve"], tr["start"])["pos"], "polys_local": polys,
+			"exit2_local": tr["world_exit2"]})
 	cities.sort_custom(func(a, b): return a["phi"] < b["phi"])
 	# Platz am Ring: zwischen zwei Nachbarn rechte Kante des einen + linke Kante des anderen (am Ring gemessen)
 	var n := cities.size()
@@ -149,7 +150,56 @@ static func build() -> Dictionary:
 				w2.append(Vector2(wq.x, wq.z))
 			c["roads"].append([w2, pl[1]])
 		ramps.append({"k": k, "from": rp, "end": exit_w, "name": Catalog.RACES[c["race_index"]].get("town", "")})
-	# Ring in Stücke teilen; Grenzen nicht in der Nähe einer Auffahrt
+	# Außenring um alle Städte und zweite Ausfahrten der Sprints (hinter dem Ziel) an einen der beiden Ringe
+	var oring := _outer_ring(cities, R)
+	var oramps := []
+	_connect_ends(cities, ring, oring, ramps, oramps)
+	for c in cities:
+		if not (c["exit2_local"] as Dictionary).is_empty() and not c.has("exit2_ring"):
+			c["race"]["tail_join"] = true  # Ziel eingeschlossen: die Straße dahinter führt zurück auf die Strecke
+	var segments := _split(ring, ramps, 9000, 0)
+	var osegs := _split(oring, oramps, 9500, 1)
+	segments.append_array(osegs)
+	# Straßen für die Karten (Weltkoordinaten x, z): Ring, Auffahrten, alle Wege der Städte
+	var roads := []
+	var rl := PackedVector2Array()
+	for q in ring:
+		rl.append(Vector2(q.x, q.z))
+	rl.append(rl[0])
+	roads.append([rl, 0])
+	var orl := PackedVector2Array()
+	for q in oring:
+		orl.append(Vector2(q.x, q.z))
+	orl.append(orl[0])
+	roads.append([orl, 0])
+	for r in ramps + oramps:
+		var rp2 := PackedVector2Array()
+		for q in _ramp_pts(r):
+			rp2.append(Vector2(q.x, q.z))
+		roads.append([rp2, 1])
+	for c in cities:
+		roads.append_array(c["roads"])
+	_add_keepout(cities, ring, ramps + oramps, oring, osegs)
+	_cache = {"cities": cities, "segments": segments, "ring_r": R, "ring": ring, "oring": oring, "roads": roads}
+	if OS.get_cmdline_user_args().has("--worldlog"):
+		var olen := 0.0
+		for k in oring.size():
+			olen += (oring[k] as Vector3).distance_to(oring[(k + 1) % oring.size()])
+		print("WELT Ring %.0f m (Umfang %.1f km), Außenring %.1f km, %d Städte, %d Stücke, Planung %d ms" % [R, TAU * R / 1000.0,
+			olen / 1000.0, cities.size(), segments.size(), Time.get_ticks_msec() - t0])
+		for c in cities:
+			if not c["exit2_local"].is_empty():
+				print("  Ziel-Ausfahrt %-26s -> %s" % [Catalog.RACES[c["race_index"]]["name"],
+					["innerer Ring", "Außenring"][c["exit2_ring"]] if c.has("exit2_ring") else "zurück auf die eigene Strecke"])
+		for c in cities:
+			print("  %-28s phi=%.2f gap=%.0f breite=%.0f tiefe=%.0f" % [Catalog.RACES[c["race_index"]]["name"], c["phi_w"], c["gap"],
+				c["lat1"] - c["lat0"], c["far"]])
+	return _cache
+
+
+## Ring in Stücke teilen (Grenzen nicht in der Nähe einer Auffahrt). ring_i: 0 innen, 1 außen
+static func _split(ring: Array, ramps: Array, seed0: int, ring_i: int) -> Array:
+	var m := ring.size()
 	var ramp_k := {}
 	for r in ramps:
 		ramp_k[r["k"]] = r
@@ -171,30 +221,220 @@ static func build() -> Dictionary:
 			if ramp_k.has(k % m):
 				rs.append(ramp_k[k % m])
 		var mid: Vector3 = pts[pts.size() / 2]
-		segments.append({"race": {"name": "Autobahn", "type": "autobahn", "seed": 9000 + segments.size(), "pts": pts,
-			"districts": {"highway": 1.0}, "mood": MOOD, "ramps": rs, "world": true},
-			"center": mid, "radius": (k1 - k0) * RING_STEP / 2.0 + 150.0})
+		segments.append({"race": {"name": "Autobahn" if ring_i == 0 else "Außenring", "type": "autobahn", "seed": seed0 + segments.size(),
+			"pts": pts, "districts": {"highway": 1.0}, "mood": MOOD, "ramps": rs, "world": true},
+			"center": mid, "radius": (k1 - k0) * RING_STEP / 2.0 + 150.0, "ring": ring_i})
 		k0 = k1
-	# Straßen für die Karten (Weltkoordinaten x, z): Ring, Auffahrten, alle Wege der Städte
-	var roads := []
-	var rl := PackedVector2Array()
-	for q in ring:
-		rl.append(Vector2(q.x, q.z))
-	rl.append(rl[0])
-	roads.append([rl, 0])
-	for r in ramps:
-		roads.append([PackedVector2Array([Vector2(r["from"].x, r["from"].z), Vector2(r["end"].x, r["end"].z)]), 1])
+	return segments
+
+
+## Außenring: läuft in sanften Bögen außen um alle Städte. Jeder Straßenpunkt einer Stadt hebt den Ring an seiner
+## Stelle auf mindestens 260 m Abstand an, mit einer Kuppe vom Radius 900 m (Parabel über die Bogenlänge), damit es
+## keine Knicke gibt; dazwischen mindestens 700 m außerhalb des inneren Rings. Zum Schluss leicht geglättet.
+static func _outer_ring(cities: Array, R: float) -> Array:
+	var pts2 := []
+	var rmax := R
 	for c in cities:
-		roads.append_array(c["roads"])
-	_add_keepout(cities, ring, ramps)
-	_cache = {"cities": cities, "segments": segments, "ring_r": R, "ring": ring, "roads": roads}
+		for road in c["roads"]:
+			for q in road[0]:
+				pts2.append(q)
+				rmax = maxf(rmax, (q as Vector2).length())
+	var m := int(TAU * (rmax + 400.0) / RING_STEP)
+	var need := PackedFloat32Array()
+	need.resize(m)
+	need.fill(R + 700.0)
+	const RC := 900.0
+	for q in pts2:
+		var rq: float = (q as Vector2).length()
+		var a := atan2(q.y, q.x)
+		var top := rq + 260.0
+		var span := sqrt(2.0 * RC * maxf(top - (R + 700.0), 0.0))  # so weit (Bogen) reicht die Kuppe
+		var w := int(ceil(span / rq / (TAU / m)))
+		var k0 := int(round(a / TAU * m))
+		for dk in range(-w, w + 1):
+			var sdist := absf(dk) * (TAU / m) * rq
+			var k := posmod(k0 + dk, m)
+			need[k] = maxf(need[k], top - sdist * sdist / (2.0 * RC))
+	# glätten, aber nie unter den nötigen Abstand: so füllen sich die spitzen Täler zwischen zwei Kuppen zu Bögen
+	var r := need
+	for it in 400:
+		var nr := PackedFloat32Array()
+		nr.resize(m)
+		for k in m:
+			nr[k] = maxf(need[k], 0.25 * r[posmod(k - 1, m)] + 0.5 * r[k] + 0.25 * r[(k + 1) % m])
+		r = nr
+	for it in 3:
+		var nr2 := PackedFloat32Array()
+		nr2.resize(m)
+		for k in m:
+			nr2[k] = 0.25 * r[posmod(k - 1, m)] + 0.5 * r[k] + 0.25 * r[(k + 1) % m]
+		r = nr2
 	if OS.get_cmdline_user_args().has("--worldlog"):
-		print("WELT Ring %.0f m (Umfang %.1f km), %d Städte, %d Stücke, Planung %d ms" % [R, TAU * R / 1000.0, cities.size(),
-			segments.size(), Time.get_ticks_msec() - t0])
-		for c in cities:
-			print("  %-28s phi=%.2f gap=%.0f breite=%.0f tiefe=%.0f" % [Catalog.RACES[c["race_index"]]["name"], c["phi_w"], c["gap"],
-				c["lat1"] - c["lat0"], c["far"]])
-	return _cache
+		# engster Bogen des Außenrings (Umkreis von drei Punkten im Abstand von je 2 Schritten)
+		var rmin := 1e9
+		for k in m:
+			var pa := Vector2(cos(TAU * (k - 2) / m), sin(TAU * (k - 2) / m)) * r[posmod(k - 2, m)]
+			var pb := Vector2(cos(TAU * k / m), sin(TAU * k / m)) * r[k]
+			var pc := Vector2(cos(TAU * (k + 2) / m), sin(TAU * (k + 2) / m)) * r[(k + 2) % m]
+			var area := absf((pb - pa).cross(pc - pa))
+			if area > 1e-3:
+				rmin = minf(rmin, pa.distance_to(pb) * pb.distance_to(pc) * pc.distance_to(pa) / (2.0 * area))
+		print("WELT Außenring: engster Bogen %.0f m" % rmin)
+	var out := []
+	for k in m:
+		var a := TAU * k / m
+		out.append(Vector3(cos(a) * r[k], 0.0, sin(a) * r[k]))
+	return out
+
+
+## Punkte einer Auffahrt (gerade oder Bogen mit Anfassern c1/c2)
+static func _ramp_pts(r: Dictionary) -> Array:
+	if r.has("pts"):
+		return r["pts"]
+	return [r["from"], r["end"]]
+
+
+static func _bez(p0: Vector3, p1: Vector3, p2: Vector3, p3: Vector3, t: float) -> Vector3:
+	var u := 1.0 - t
+	return p0 * (u * u * u) + p1 * (3.0 * u * u * t) + p2 * (3.0 * u * t * t) + p3 * (t * t * t)
+
+
+## Zweite Ausfahrt der Sprints (hinter dem Ziel) mit dem nächsten freien Ring verbinden: eine Straße im Bogen vom Ring
+## (senkrecht abgehend) bis zum Ende der Ausfahrt (in ihrer Richtung ankommend). Gesucht wird auf beiden Ringen bis
+## 1,2 km zur Seite; die Straße darf keiner anderen Straße näher als 32 m kommen und nicht zu eng kurven. Die kürzeste
+## gültige gewinnt. Ohne gültige führt die Straße hinter dem Ziel zurück auf die eigene Strecke (race["tail_join"]).
+static func _connect_ends(cities: Array, ring: Array, oring: Array, ramps_in: Array, ramps_out: Array) -> void:
+	const CELL := 50.0
+	var grid := {}  # Zelle -> [Punkt 2D, Stadt]
+	var add := func(q: Vector2, owner: int) -> void:
+		var key := Vector2i(floori(q.x / CELL), floori(q.y / CELL))
+		if not grid.has(key):
+			grid[key] = []
+		grid[key].append([q, owner])
+	for c in cities:
+		for road in c["roads"]:
+			for q in road[0]:
+				add.call(q, c["race_index"])
+	for rg in [ring, oring]:
+		for k in rg.size():
+			var a3: Vector3 = rg[k]
+			var b3: Vector3 = rg[(k + 1) % rg.size()]
+			for j in 10:
+				var q3 := a3.lerp(b3, j / 10.0)
+				add.call(Vector2(q3.x, q3.z), -1 if rg == ring else -2)
+	for r in ramps_in:
+		for j in 40:
+			var q4: Vector3 = (r["from"] as Vector3).lerp(r["end"], j / 40.0)
+			add.call(Vector2(q4.x, q4.z), -3)
+	var near := func(q: Vector2, rad: float, skip: int) -> bool:
+		var c0 := Vector2i(floori(q.x / CELL), floori(q.y / CELL))
+		var n := int(ceil(rad / CELL))
+		for dx in range(-n, n + 1):
+			for dz in range(-n, n + 1):
+				for e in grid.get(c0 + Vector2i(dx, dz), []):
+					if e[1] != skip and (e[0] as Vector2).distance_to(q) < rad:
+						return true
+		return false
+	for c in cities:
+		var ex2: Dictionary = c["exit2_local"]
+		if ex2.is_empty():
+			continue
+		var xf: Transform3D = c["xf"]
+		var e2: Vector3 = xf * (ex2["end"] as Vector3)
+		e2.y = 0.0
+		var d2: Vector3 = xf.basis * (ex2["dir"] as Vector3)
+		d2.y = 0.0
+		d2 = d2.normalized()
+		var best := {}
+		var best_len := 1e9
+		for which in 2:
+			var rg: Array = ring if which == 0 else oring
+			var m := rg.size()
+			var k0 := int(round(atan2(e2.z, e2.x) / TAU * m))
+			for cand in 81 * 3:
+				var dk := cand / 3 - 40
+				var hk: float = [0.3, 0.45, 0.6][cand % 3]  # Länge der Anfasser (Anteil der Luftlinie)
+				var k := posmod(k0 + dk, m)
+				var rp: Vector3 = rg[k]
+				var nrm := Vector3(rp.x, 0.0, rp.z).normalized()
+				var sd := signf((e2 - rp).dot(nrm))
+				var L := rp.distance_to(e2)
+				if L < 120.0:
+					continue
+				var c1 := rp + nrm * sd * L * hk
+				var c2 := e2 + d2 * L * hk
+				var pts := []
+				var ok := true
+				var prev_dir := Vector3.ZERO
+				var length := 0.0
+				for j in 41:
+					var q := _bez(rp, c1, c2, e2, j / 40.0)
+					if j > 0:
+						var sg: Vector3 = q - pts[-1]
+						length += sg.length()
+						if prev_dir != Vector3.ZERO and prev_dir.angle_to(sg) > deg_to_rad(9.0):
+							ok = false  # zu enge Kurve (gut 9° je Vierzigstel)
+							break
+						prev_dir = sg
+					pts.append(q)
+				if not ok or length >= best_len:
+					continue  # zu eng, oder es gibt schon eine kürzere
+				# für den Abstand dicht abtasten (gut 10 m): mit nur 41 Punkten liegen sie bei langen Verbindungen fast
+				# 70 m auseinander, und eine Straße quer dazwischen fiel durch den 32-m-Radius (Würzburg: Rampe quer
+				# durch die eigene Hauptstraße)
+				var nd := maxi(40, int(ceil(length / 10.0)))
+				pts = []
+				for j in nd + 1:
+					pts.append(_bez(rp, c1, c2, e2, float(j) / nd))
+				var acc := 0.0
+				for j in range(1, pts.size()):
+					acc += (pts[j] as Vector3).distance_to(pts[j - 1])
+					if acc < 50.0 or length - acc < 50.0:
+						continue
+					var q2 := Vector2(pts[j].x, pts[j].z)
+					# andere Straßen (auch die eigene Stadt), der andere Ring, die geraden Auffahrten
+					if near.call(q2, 32.0, -1 if which == 0 else -2):
+						ok = false
+						break
+					# den eigenen Ring nur am Anfang berühren
+					if acc > 90.0 and near.call(q2, 36.0, -99) and _near_only(grid, q2, 36.0, -1 if which == 0 else -2, CELL):
+						ok = false
+						break
+				if not ok:
+					continue
+				for o in ramps_in + ramps_out:
+					if not o.has("pts"):
+						continue
+					var op: Array = o["pts"]
+					for i5 in range(0, op.size(), 2):
+						for i6 in range(0, pts.size(), 2):
+							if (op[i5] as Vector3).distance_to(pts[i6]) < 40.0:
+								ok = false
+								break
+						if not ok:
+							break
+					if not ok:
+						break
+				if ok and length < best_len:
+					best_len = length
+					best = {"k": k, "from": rp, "end": e2, "c1": c1, "c2": c2, "pts": pts, "ring": which,
+						"name": Catalog.RACES[c["race_index"]].get("town", "")}
+		if not best.is_empty():
+			(ramps_in if best["ring"] == 0 else ramps_out).append(best)
+			c["exit2_ring"] = best["ring"]
+			c["exit2_world"] = e2
+
+
+## Liegt in der Nähe nur der Ring "owner"? (für: die Straße läuft am eigenen Ring entlang oder kreuzt ihn)
+static func _near_only(grid: Dictionary, q: Vector2, rad: float, owner: int, cell: float) -> bool:
+	var c0 := Vector2i(floori(q.x / cell), floori(q.y / cell))
+	var n := int(ceil(rad / cell))
+	for dx in range(-n, n + 1):
+		for dz in range(-n, n + 1):
+			for e in grid.get(c0 + Vector2i(dx, dz), []):
+				if e[1] == owner and (e[0] as Vector2).distance_to(q) < rad:
+					return true
+	return false
 
 
 static func _near_ramp(ramp_k: Dictionary, k: int, m: int, w: int) -> bool:
@@ -207,7 +447,7 @@ static func _near_ramp(ramp_k: Dictionary, k: int, m: int, w: int) -> bool:
 ## Sperrflächen: jede Stadt bekommt die fremden Fahrbahnen in ihrer Nähe (Ring, alle Auffahrten, Straßen der
 ## Nachbarstädte) als Kreise in ihren eigenen Koordinaten (race["keepout"]); der Streckenbau stellt dort keine Häuser
 ## hin (track_builder Schritt 2: wie belegte Flächen). Sonst ragen Häuser aus echten Stadtplänen auf die Autobahn.
-static func _add_keepout(cities: Array, ring: Array, ramps: Array) -> void:
+static func _add_keepout(cities: Array, ring: Array, ramps: Array, oring: Array, osegs: Array) -> void:
 	var ring_r: float = Track.HALF_W + Track.AB_EXTRA + Track.MED + Track.WALK + 3.0
 	var lines := []  # [Weltpunkte, Radius, Stadt (eigene Straßen auslassen) oder -1]
 	var rl := []
@@ -215,8 +455,12 @@ static func _add_keepout(cities: Array, ring: Array, ramps: Array) -> void:
 		rl.append(q)
 	rl.append(ring[0])
 	lines.append([rl, ring_r, -1])
+	var orl := oring.duplicate()
+	orl.append(oring[0])
+	lines.append([orl, ring_r, -2])
 	for r in ramps:
-		lines.append([[r["from"], r["end"]], Track.HALF_W + Track.WALK + 2.0, -1])
+		# Bögen zu den Ziel-Ausfahrten: etwas mehr Platz (die Kreise sitzen auf den Sehnen des Bogens)
+		lines.append([_ramp_pts(r), Track.HALF_W + Track.WALK + (8.0 if r.has("c1") else 2.0), -1])
 	for c in cities:
 		for road in c["roads"]:
 			var pl := []
@@ -241,3 +485,21 @@ static func _add_keepout(cities: Array, ring: Array, ramps: Array) -> void:
 					if Vector2(q.x - ctr.x, q.z - ctr.z).length() < reach:
 						ko.append({"pos": inv * q, "r": ln[1], "ko": true})
 		c["race"]["keepout"] = ko
+	# Außenring: seine Häuser dürfen nicht auf die Straßen der Städte (der innere Ring liegt weit genug weg)
+	for sg in osegs:
+		var ctr2: Vector3 = sg["center"]
+		var reach2: float = sg["radius"] + 300.0
+		var ko2 := []
+		for ln in lines:
+			if ln[2] == -2:
+				continue
+			var pts2: Array = ln[0]
+			for k in pts2.size() - 1:
+				var a2: Vector3 = pts2[k]
+				var b2: Vector3 = pts2[k + 1]
+				var n2 := maxi(int(a2.distance_to(b2) / 8.0), 1)
+				for j in n2:
+					var q2 := a2.lerp(b2, float(j) / n2)
+					if Vector2(q2.x - ctr2.x, q2.z - ctr2.z).length() < reach2:
+						ko2.append({"pos": q2, "r": ln[1], "ko": true})
+		sg["race"]["keepout"] = ko2

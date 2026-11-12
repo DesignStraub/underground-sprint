@@ -1530,7 +1530,9 @@ func _describe(c: KinematicCollision3D) -> String:
 			if dd < best:
 				best = dd
 				bi = i
-		return "Wand %s-%s bei %s" % [f[bi].snapped(Vector3.ONE * 0.1), f[bi + 1].snapped(Vector3.ONE * 0.1), p.snapped(Vector3.ONE * 0.1)]
+		var gt := cs.global_transform
+		return "Wand %s-%s bei %s (%s)" % [(gt * f[bi]).snapped(Vector3.ONE * 0.1), (gt * f[bi + 1]).snapped(Vector3.ONE * 0.1), p.snapped(Vector3.ONE * 0.1),
+			str(cs.get_parent().get_path()).right(60)]
 	return str(cs.shape)
 
 

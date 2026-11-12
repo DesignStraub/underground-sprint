@@ -19,6 +19,7 @@ const WorldMinimap := preload("res://scripts/world_minimap.gd")
 const MapView := preload("res://scripts/world_map_view.gd")
 const Traffic := preload("res://scripts/traffic_car.gd")
 const Challenger := preload("res://scripts/challenger_car.gd")
+const WorldTour := preload("res://scripts/world_tour.gd")
 const DUEL_GAP := 300.0  # so viel Vorsprung entscheidet ein Duell
 
 const LOAD_PAD := 700.0  # Strecke bauen, wenn man so nah am Rand ihres Umkreises ist
@@ -70,6 +71,7 @@ var _trng := RandomNumberGenerator.new()
 var _traffic_snd_t := 0.0
 var _leader_t := 0.0
 var _segs: Array = []
+var _rings: Array = []  # je Ring (0 innen, 1 außen) seine Stücke der Reihe nach
 ## Herausforderer (selten, nur auf der Autobahn): überholt dich, fährt vor dir her; dicht dran startet Enter ein Duell
 var challenger: Node = null
 var _ch_pin: Node3D  # Stellvertreter für die Minikarte (roter Punkt, solange es einen Herausforderer gibt)
@@ -78,12 +80,16 @@ var _duel := 0  # 0 keins (er fährt vor dir her), 1 Duell läuft, 2 entschieden
 var _ch_prompt := false
 var _off_ring_t := 0.0
 var _ch_log := 0.0
+var quiet := false  # Tests (--wtour): kein Verkehr, keine Herausforderer
 
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	GameState.in_world = true
-	_threads = not OS.has_feature("web") and OS.get_processor_count() > 1 and not OS.get_cmdline_user_args().has("--nothreads")
+	quiet = Array(OS.get_cmdline_user_args()).any(func(a): return a.begins_with("--wtour"))
+	# headless (Tests): der Ersatz-Renderer ist nicht threadsicher, Meshes aus dem Bau-Thread zerschießen dort die RIDs
+	_threads = not OS.has_feature("web") and OS.get_processor_count() > 1 and not OS.get_cmdline_user_args().has("--nothreads") \
+		and DisplayServer.get_name() != "headless"
 	var view_layer := CanvasLayer.new()
 	view_layer.layer = -1
 	add_child(view_layer)
@@ -97,10 +103,15 @@ func _ready() -> void:
 	layout = Layout.build()
 	for c in layout["cities"]:
 		entries.append({"kind": "city", "race": c["race"], "xf": c["xf"], "center": c["center"], "radius": c["radius"],
-			"state": "none", "track": {}, "race_index": c["race_index"], "start": c["start_world"], "exit": c["exit_world"]})
+			"state": "none", "track": {}, "race_index": c["race_index"], "start": c["start_world"], "exit": c["exit_world"],
+			"exit2": c.get("exit2_world", Vector3(1e9, 0, 1e9))})
 	for s in layout["segments"]:
+		var ri: int = s.get("ring", 0)
+		while _rings.size() <= ri:
+			_rings.append([])
 		entries.append({"kind": "seg", "race": s["race"], "xf": Transform3D.IDENTITY, "center": s["center"], "radius": s["radius"],
-			"state": "none", "track": {}, "race_index": -1, "seg_i": _segs.size()})
+			"state": "none", "track": {}, "race_index": -1, "seg_i": _rings[ri].size(), "ring": ri, "n": _segs.size()})
+		_rings[ri].append(entries[-1])
 		_segs.append(entries[-1])
 	_trng.seed = 4711
 	Traffic.prepare_sound()
@@ -146,6 +157,12 @@ func _ready() -> void:
 	_ready_done = true
 	if OS.get_cmdline_user_args().has("--worldcheck"):
 		_world_check()
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--wtour"):
+			var tour := WorldTour.new()
+			tour.w = self
+			tour.only = a.substr(8) if a.length() > 8 else ""
+			add_child(tour)
 
 
 func _exit_tree() -> void:
@@ -890,7 +907,7 @@ func _update_feed(dt: float) -> void:
 ## Im Duell fährt er so schnell wie dein Auto (Schwierigkeit: 92/97/100 %) und schlängelt sich durch den Verkehr.
 ## 300 m Vorsprung gewinnt, 300 m Rückstand verliert; wer die Autobahn verlässt, gibt auf.
 func _update_challenger(dt: float) -> void:
-	if not _ct.is_empty() or not _ready_done:
+	if not _ct.is_empty() or not _ready_done or quiet:
 		return
 	if challenger != null and not is_instance_valid(challenger):
 		_remove_challenger()  # mit seinem Autobahnstück entfernt
@@ -960,9 +977,8 @@ func _spawn_challenger() -> void:
 	var d := c.get_closest_offset(xf.affine_inverse() * player.global_position)
 	var sgn := 1.0 if (xf.basis * Track.frame_at(c, d)["fwd"]).dot(player.velocity) >= 0.0 else -1.0
 	var dd := d - sgn * 170.0
-	var n := _segs.size()
 	if dd < 5.0 or dd > float(tr["length"]) - 5.0:
-		var e2: Dictionary = _segs[(int(e["seg_i"]) + (1 if dd > 5.0 else -1) + n) % n]
+		var e2: Dictionary = _seg_next(e, dd > 5.0)
 		if e2["state"] != "ready":
 			_ch_t = 5.0
 			return
@@ -1125,7 +1141,7 @@ func _update_speed_fx(dt: float) -> void:
 ## neu eingesetzt.
 
 func _plan_traffic(e: Dictionary) -> void:
-	if not _ct.is_empty():
+	if not _ct.is_empty() or quiet:
 		return
 	var tr: Dictionary = e["track"]
 	var L: float = tr["length"]
@@ -1189,6 +1205,12 @@ func _spawn_queued(n: int) -> void:
 		n -= 1
 
 
+## Nächstes (fwd) oder voriges Stück desselben Rings
+func _seg_next(e: Dictionary, fwd: bool) -> Dictionary:
+	var rg: Array = _rings[e["ring"]]
+	return rg[(int(e["seg_i"]) + (1 if fwd else -1) + rg.size()) % rg.size()]
+
+
 ## Wagen am Ende seines Wegs: aufs nächste (oder vorige) Autobahnstück, sonst außer Sicht neu einsetzen
 func _traffic_end(t: Node) -> void:
 	if not is_instance_valid(t) or not t.is_inside_tree():
@@ -1198,7 +1220,7 @@ func _traffic_end(t: Node) -> void:
 		return
 	if e["kind"] == "seg":
 		var fwd: bool = t.progress > t.track_length / 2.0
-		var n2: Dictionary = _segs[(int(e["seg_i"]) + (1 if fwd else -1) + _segs.size()) % _segs.size()]
+		var n2: Dictionary = _seg_next(e, fwd)
 		if n2["state"] == "ready":
 			var nt: Dictionary = n2["track"]
 			t.get_parent().remove_child(t)
@@ -1443,8 +1465,9 @@ func _world_check() -> void:
 			while d < c.get_baked_length():
 				var p: Vector3 = xa * c.sample_baked(d)
 				d += 15.0
-				if Vector2(p.x - a["exit"].x, p.z - a["exit"].z).length() < 80.0:
-					continue
+				if Vector2(p.x - a["exit"].x, p.z - a["exit"].z).length() < 80.0 \
+						or Vector2(p.x - a["exit2"].x, p.z - a["exit2"].z).length() < 80.0:
+					continue  # an den eigenen Ausfahrten treffen sich die Straßen absichtlich
 				for b in entries:
 					if b == a or _dist(b, p) > 30.0:
 						continue
@@ -1463,4 +1486,4 @@ func _world_check() -> void:
 
 
 func _wc_name(e: Dictionary) -> String:
-	return "Autobahn %d" % e["seg_i"] if e["kind"] == "seg" else str(Catalog.RACES[e["race_index"]]["name"])
+	return ("%s %d" % [["Autobahn", "Außenring"][e["ring"]], e["seg_i"]]) if e["kind"] == "seg" else str(Catalog.RACES[e["race_index"]]["name"])

@@ -15,14 +15,27 @@ func _ready() -> void:
 			png = a.substr(6)
 	if png != "":
 		var R: float = w["ring_r"]
-		var ext := R + 6000.0
+		var ext := R + 4600.0
 		var S := 2000
 		var img := Image.create(S, S, false, Image.FORMAT_RGB8)
 		img.fill(Color(0.05, 0.05, 0.07))
 		var px := func(p: Vector3) -> Vector2i:
 			return Vector2i(int((p.x + ext) / (2.0 * ext) * S), int((p.z + ext) / (2.0 * ext) * S))
-		for q in w["ring"]:
-			_dot(img, px.call(q), Color(1, 0.8, 0.2), 2)
+		for rk in ["ring", "oring"]:
+			var rg: Array = w.get(rk, [])
+			for k in rg.size():
+				var a: Vector3 = rg[k]
+				var b: Vector3 = rg[(k + 1) % rg.size()]
+				for j in 8:
+					_dot(img, px.call(a.lerp(b, j / 8.0)), Color(1, 0.8, 0.2), 2)
+		# Auffahrten (gerade und Bögen zu den Ziel-Ausfahrten)
+		for rd in w["roads"]:
+			if rd[1] == 1:
+				var pl: PackedVector2Array = rd[0]
+				for k in pl.size() - 1:
+					for j in 10:
+						var q2 := pl[k].lerp(pl[k + 1], j / 10.0)
+						_dot(img, px.call(Vector3(q2.x, 0, q2.y)), Color(1, 1, 1), 1)
 		var cols := [Color(0.3, 0.9, 1), Color(0.4, 1, 0.5), Color(1, 0.5, 0.2), Color(1, 0.4, 0.8)]
 		var ci := 0
 		for c in w["cities"]:
