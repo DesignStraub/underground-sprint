@@ -69,6 +69,17 @@ var _scr: AudioStreamPlayer
 var _road: AudioStreamPlayer
 var _wind: AudioStreamPlayer
 var _whistle: AudioStreamPlayer
+var _whine: AudioStreamPlayer
+## Leben im Dauerton (seit Open World): bei konstant hoher Drehzahl liefen sonst immer dieselben zwei Schleifen in
+## fester Tonhöhe, das klang nach Endlosschleife. Echte Motoren klingen von Arbeitsspiel zu Arbeitsspiel etwas anders
+## (Vorbild: AngeTheGreat, "Adding Mechanical Sound Simulation to My Audio Engine"). Darum wandern Drehzahl,
+## Mischung der Schleifen und Pegel langsam, eine dritte Schleife kommt ab und zu dazu, und ein Getriebesingen läuft mit.
+var _wand := PackedFloat32Array([0.0, 0.0, 0.0, 0.0])  # langsame Schwankungen -1..1: Tonhöhe, Mischung, Pegel, dritte Schleife
+var _wand_to := PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
+var _wand_t := PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
+var _steady := 0.0  # 0..1: wie gleichmäßig die Drehzahl gerade ist
+var _rpm_prev := 900.0
+var live := 1.0  # Stärke der Schwankungen (1 = normal; 0 = aus, für Vergleichsaufnahmen)
 
 
 ## profile: Klangdaten aus dem Katalog, dazu "car" (Auto-Kennung für die Schleifen)
@@ -89,6 +100,7 @@ func _ready() -> void:
 	_road = _loop("road")
 	_wind = _loop("wind")
 	_whistle = _loop("turbo")
+	_whine = _loop("whine")
 
 
 func _loop(sound: String) -> AudioStreamPlayer:
@@ -131,6 +143,7 @@ func _process_sound(delta: float) -> void:
 	var want := 0.0 if _cut > 0.0 else clampf(throttle, 0.0, 1.0)
 	_load = move_toward(_load, want, delta * (9.0 if want > _load else 6.0))
 	_cut_k = move_toward(_cut_k, 1.0 if _cut > 0.0 else 0.0, delta * 25.0)
+	_update_life(delta)
 	_update_engine()
 	# Turbo pfeift unter Last, Tonhöhe mit der Drehzahl
 	var wl := _turbo * turbo_amount
@@ -138,25 +151,52 @@ func _process_sound(delta: float) -> void:
 	_whistle.pitch_scale = clampf((700.0 + rpm / 10.0) / 1100.0, 0.5, 1.6)
 
 
+## Langsame Zufallskurven (je eine neue Zielmarke alle 0,3–1,1 s, weich angefahren) und wie gleichmäßig die Drehzahl
+## ist: beim Beschleunigen und Schalten ändert sich der Klang ohnehin, dort bleibt alles wie gehabt.
+func _update_life(delta: float) -> void:
+	for k in 4:
+		_wand_t[k] -= delta
+		if _wand_t[k] <= 0.0:
+			_wand_t[k] = randf_range(0.3, 1.1)
+			_wand_to[k] = randf_range(-1.0, 1.0)
+		_wand[k] = lerpf(_wand[k], _wand_to[k], 1.0 - exp(-delta * 2.2))
+	var drpm := absf(rpm - _rpm_prev) / maxf(delta, 0.001)
+	_rpm_prev = rpm
+	_steady = move_toward(_steady, 1.0 if drpm < 600.0 else 0.0, delta * (0.8 if drpm < 600.0 else 4.0))
+	# Getriebesingen: Tonhöhe folgt dem Tempo, hörbar erst schnell und unter Last
+	var v := clampf(speed / 75.0, 0.0, 1.0)
+	var wl := v * v * (0.45 + 0.55 * _load) * live
+	_whine.bus = bus
+	_whine.volume_db = -80.0 if wl < 0.01 else linear_to_db(wl) - 25.0
+	_whine.pitch_scale = clampf(0.35 + 1.0 * v + 0.01 * _wand[0], 0.3, 1.5)
+
+
 ## Die zwei Schleifen um die Drehzahl herum (Gas und Schub je zwei) hörbar machen, alle anderen stoppen
 func _update_engine() -> void:
 	if _bank.is_empty():
 		return
-	var r := clampf(rpm * _k, RPMS[0] * 0.8, RPMS[RPMS.size() - 1] * 1.15)
+	# Leben im Dauerton: nur bei gleichmäßiger, hoher Drehzahl (dort fällt die Wiederholung auf)
+	var life := _steady * smoothstep(3500.0, 6000.0, rpm * _k) * live
+	var r0 := rpm * _k * (1.0 + life * (0.011 * _wand[0] + randf_range(-0.003, 0.003)))
+	var r := clampf(r0, RPMS[0] * 0.8, RPMS[RPMS.size() - 1] * 1.15)
 	var i := 0
 	while i < RPMS.size() - 2 and r > RPMS[i + 1]:
 		i += 1
-	var t := clampf(log(r / RPMS[i]) / log(RPMS[i + 1] / RPMS[i]), 0.0, 1.0)
+	var t := clampf(log(r / RPMS[i]) / log(RPMS[i + 1] / RPMS[i]) + life * 0.22 * _wand[1], 0.0, 1.0)
 	var lo := cos(t * PI * 0.5)
 	var hi := sin(t * PI * 0.5)
 	var g_on := sin(_load * PI * 0.5)
 	var g_off := cos(_load * PI * 0.5)
-	var lvl := 1.0 - 0.45 * _cut_k  # Zündung weg: leiser
+	var lvl := (1.0 - 0.45 * _cut_k) * (1.0 + life * 0.09 * _wand[2])  # Zündung weg: leiser
 	var want := {}
 	for ld in ["on", "off"]:
 		var g := g_on if ld == "on" else g_off
 		want[ld + str(i)] = lo * g
 		want[ld + str(i + 1)] = hi * g
+	# dritte Schleife (eine Stufe darunter) zeitweise leise dazu: ihre andere Länge bricht das Muster
+	var x3 := life * maxf(_wand[3], 0.0) * 0.35
+	if i > 0 and x3 > 0.01:
+		want["on" + str(i - 1)] = x3 * g_on
 	for key in _voices.keys():
 		if want.get(key, 0.0) < 0.002:
 			var a: AudioStreamPlayer = _voices[key]

@@ -80,6 +80,7 @@ var race_index := 0
 var world_menu := ""  # Open World > Esc > Tuning/Autohaus: Garage öffnet dort, "Fertig" führt zurück in die Welt
 var in_world := false  # Rennen aus der Open World gestartet: danach zurück in die Welt (nicht gespeichert)
 var best_times := {}  # Rennname -> Sekunden
+var outruns := 0  # Open World: abgehängte Herausforderer (Duelle auf der Autobahn)
 var won_events: Array = []  # gewonnene Events (Karriere: genug Siege in einer Stufe öffnen die nächste)
 var test_cfg := {}  # --cfg (nur Tests)
 var tuning := {}  # Leistungsteile: category -> option_index, für alle Autos gemeinsam
@@ -530,7 +531,7 @@ func _migrate_save() -> void:
 func save_game() -> void:
 	var text := JSON.stringify({
 		"wins": wins, "drift_wins": drift_wins, "current_car": current_car, "race_index": race_index,
-		"best_times": best_times, "tuning": tuning, "looks": looks, "won_events": won_events, "kept_cars": kept_cars,
+		"best_times": best_times, "tuning": tuning, "looks": looks, "won_events": won_events, "kept_cars": kept_cars, "outruns": outruns,
 		"gfx": {"preset": preset, "opts": gfx, "pixel": pixel_look, "vsync": vsync, "fps": fps_limit, "fullscreen": fullscreen,
 			"touch": touch_mode, "show_fps": show_fps, "jump_cam": jump_cam, "motion_blur": motion_blur,
 			"speed_fov": speed_fov, "cam_shake": cam_shake, "cam": cam_mode},
@@ -596,6 +597,7 @@ func load_game() -> void:
 	# alter Spielstand: Pixel-Stufe Stark/Mittel = Pixel-Look an
 	pixel_look = bool(g.get("pixel", int(data.get("pixel_mode_v2", 2)) <= 1))
 	language = str(data.get("language", ""))
+	outruns = int(data.get("outruns", 0))
 	if data.has("won_events"):
 		won_events = Array(data["won_events"])
 	else:

@@ -3,7 +3,7 @@ extends Node
 ## Sfx.play("thud") für einmalige Effekte, Sfx.looping("rumble") für Dauer-Sounds.
 
 const NAMES := ["horn", "bell", "rumble", "thud", "whoosh", "splash", "clang", "tunnel", "crowd", "skid", "scrub", "nitro",
-	"nitro_on", "nitro_off", "backfire", "bov", "flutter", "scrape", "road", "wind", "beep", "beep_go", "turbo",
+	"nitro_on", "nitro_off", "backfire", "bov", "flutter", "scrape", "road", "wind", "beep", "beep_go", "turbo", "whine",
 	"ui_move", "ui_change", "ui_select", "ui_back", "ui_install", "ui_locked", "ui_go"]
 ## Menü-Töne: Lautstärke je Art (dB). Ganz leise und kurz, damit Durchscrollen nicht nervt.
 const UI_DB := {"move": -17.0, "change": -15.0, "select": -12.0, "back": -14.0, "install": -9.0, "locked": -12.0, "go": -8.0}

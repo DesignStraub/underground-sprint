@@ -56,6 +56,8 @@ var leader: Node = null  # nächster Wagen vor mir auf meiner Spur (link_leaders
 var player_speed := 0.0  # Spieler längs der Straße (+ in Wegrichtung)
 var _half_w := 0.9
 var _stuck_t := 0.0
+var lane_rate := 2.0  # Spurwechsel m/s quer (Herausforderer: schneller)
+var accel_up := 4.0  # Beschleunigen m/s² (Herausforderer: wie ein Sportwagen)
 
 
 func setup(kind_: String, rng: RandomNumberGenerator) -> void:
@@ -206,7 +208,7 @@ func _physics_process(dt: float) -> void:
 	for b in blocks:
 		if absf(b["lane"] - lane) < 1.0 and progress > b["from"] - 25.0 and progress < b["to"] + 10.0:
 			target_lane = lane - signf(lane) * 4.5
-	_lane_cur = move_toward(_lane_cur, target_lane, dt * 2.0)
+	_lane_cur = move_toward(_lane_cur, target_lane, dt * lane_rate)
 
 	# Spieler oder Wagen vor mir auf der Spur: rechtzeitig bremsen (der Bremsweg wächst mit dem Tempo) und
 	# hinterherfahren; vor einem Wrack nach kurzem Warten die Spur wechseln
@@ -232,7 +234,7 @@ func _physics_process(dt: float) -> void:
 		var stop: float = (crossing.d_cross - 12.0 - progress) if dir > 0.0 else (progress - crossing.d_cross - 12.0)
 		if stop > -2.0 and stop < 140.0:
 			target = minf(target, sqrt(2.0 * 7.0 * maxf(stop, 0.0)))
-	speed = move_toward(speed, target, dt * (4.0 if target > speed else 10.0))
+	speed = move_toward(speed, target, dt * (accel_up if target > speed else 10.0))
 	progress += speed * dt * dir
 	if path_id == 0 and track.get("loop", false):
 		progress = fposmod(progress, track_length)  # Rundkurs: einfach weiterfahren

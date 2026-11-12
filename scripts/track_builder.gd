@@ -1061,6 +1061,8 @@ static func _plan_world_exit(track: Dictionary) -> void:
 						pick = {"d": d, "f": f, "out": out, "tip": tip}
 		d += 10.0
 	if pick.is_empty():
+		pick = _apex_exit(track, centroid)
+	if pick.is_empty():
 		return
 	var sc2 := Curve3D.new()
 	sc2.bake_interval = 1.0
@@ -1070,6 +1072,45 @@ static func _plan_world_exit(track: Dictionary) -> void:
 		"length": sc2.get_baked_length(), "from": pick["d"], "to": pick["d"], "closed": false, "side": 0.0})
 	track["zones"].append({"from": pick["d"] - 30.0, "to": pick["d"] + 30.0})
 	track["world_exit"] = {"end": pick["tip"], "dir": pick["out"], "d": pick["d"]}
+
+
+## Ausweich-Ausfahrt für verwinkelte Kurse (Stadion-Drift: Zickzack-Stern, keine Gerade hat seitlich Platz): an der
+## äußersten Kurve gerade nach außen, weg von der Mitte. Der Strahl der Ausfahrt (samt Auffahrt dahinter) darf der
+## übrigen Strecke nicht nahe kommen.
+static func _apex_exit(track: Dictionary, centroid: Vector3) -> Dictionary:
+	var curve: Curve3D = track["curve"]
+	var L: float = track["length"]
+	var cands := []
+	var d := 0.0
+	while d < L:
+		if not _in_zone(track, d, 40.0) and tunnel_at(track, d, 40.0).is_empty():
+			var p: Vector3 = frame_at(curve, d)["pos"]
+			cands.append([Vector2(p.x - centroid.x, p.z - centroid.z).length(), d])
+		d += 5.0
+	cands.sort_custom(func(a, b): return a[0] > b[0])
+	for c in cands.slice(0, 40):
+		var dd: float = c[1]
+		var f := frame_at(curve, dd)
+		var out: Vector3 = f["pos"] - centroid
+		out.y = 0.0
+		out = out.normalized()
+		var h := hw(track, dd)
+		var tip: Vector3 = f["pos"] + out * (h + WALK + EXIT_LEN)
+		if _in_river(track, tip, 10.0):
+			continue
+		var clear := true
+		var s := h + WALK
+		while s < h + WALK + EXIT_LEN + 200.0 and clear:
+			var q: Vector3 = f["pos"] + out * s
+			var off := curve.get_closest_offset(q)
+			var dl := absf(off - dd)
+			dl = minf(dl, L - dl)
+			if dl > h + 40.0 and curve.sample_baked(off).distance_to(q) < h + RAMP_HALF + WALK + 4.0:
+				clear = false
+			s += 5.0
+		if clear:
+			return {"d": dd, "f": f, "out": out, "tip": tip}
+	return {}
 
 
 ## Bahnübergang auf einem geraden Stück, auf einem flachen Bahndamm
@@ -1415,6 +1456,13 @@ static func _build_road(root: Node3D, track: Dictionary) -> void:
 
 ## Drift-Kurs: durchgehende Bande an beiden Rändern (rot-weiß, mit Sponsorentafeln), Reifenstapel außen in
 ## den Kurven und Flutlicht. Man kann sich nicht verfahren, nur anecken. (Publikum gibt es nur an Start und Ziel.)
+## Abstand zweier Weg-Meter auf der Strecke (Rundkurs: über den Start hinweg)
+static func _loop_dist(track: Dictionary, a: float, b: float) -> float:
+	var L: float = track["length"]
+	var x := absf(a - b)
+	return minf(x, L - x) if track["loop"] else x
+
+
 static func _build_barriers(root: Node3D, track: Dictionary, rng: RandomNumberGenerator) -> void:
 	var curve: Curve3D = track["curve"]
 	var length: float = track["length"]
@@ -1429,6 +1477,12 @@ static func _build_barriers(root: Node3D, track: Dictionary, rng: RandomNumberGe
 	var caps := {"r": [], "w": []}
 	var tires := []
 	var bh := 1.1
+	var gap_side := ""
+	var gap_d := -1e9
+	var ex: Dictionary = track["world_exit"]
+	if not ex.is_empty():
+		gap_d = ex["d"]
+		gap_side = "r" if (frame_at(curve, gap_d)["right"] as Vector3).dot(ex["dir"]) > 0.0 else "l"
 	var d := 0.0
 	var prev := {}
 	var k := 0
@@ -1438,6 +1492,8 @@ static func _build_barriers(root: Node3D, track: Dictionary, rng: RandomNumberGe
 		var cur := {"l": f["pos"] - f["right"] * b, "r": f["pos"] + f["right"] * b, "d": d}
 		if not prev.is_empty():
 			for sd in ["l", "r"]:
+				if sd == gap_side and _loop_dist(track, d - 1.5, gap_d) < RAMP_HALF + WALK + 2.0:
+					continue  # Lücke für die Ausfahrt in die Welt
 				_wall_uv(st, prev[sd], cur[sd], bh, 0.0, 0.0, sd == "l")
 				_wall_shape(walls, prev[sd], cur[sd])
 				var mid: Vector3 = (prev[sd] + cur[sd]) / 2.0
@@ -1446,7 +1502,7 @@ static func _build_barriers(root: Node3D, track: Dictionary, rng: RandomNumberGe
 		# Kurvenaußenseite: Reifenstapel
 		var f2 := frame_at(curve, d + 12.0)
 		var bend := (f["fwd"] as Vector3).signed_angle_to(f2["fwd"], Vector3.UP)
-		if absf(bend) > 0.12:
+		if absf(bend) > 0.12 and _loop_dist(track, d, gap_d) > RAMP_HALF + WALK + 4.0:
 			var out := -1.0 if bend > 0.0 else 1.0  # Linkskurve: außen ist rechts
 			for j in 3:
 				tires.append(Transform3D(Basis(), f["pos"] + f["right"] * out * (b - 0.6) + Vector3(0, 0.2 + j * 0.38, 0)))
@@ -3428,6 +3484,11 @@ static func _east_side_gallery(root: Node3D, track: Dictionary) -> void:
 
 
 ## Gelbes Ortsschild hinter dem Start, Straßenschilder an jedem Straßenwechsel
+## Breite eines Label3D-Texts in Metern (Standardschrift)
+static func _text_w(text: String, size: int, px: float) -> float:
+	return ThemeDB.fallback_font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x * px
+
+
 static func _build_city_signs(root: Node3D, track: Dictionary, race: Dictionary) -> void:
 	var curve: Curve3D = track["curve"]
 	var city: Dictionary = track["city"]
@@ -3442,7 +3503,8 @@ static func _build_city_signs(root: Node3D, track: Dictionary, race: Dictionary)
 	var f := frame_at(curve, d0)
 	var bf := Basis.looking_at(f["fwd"], Vector3.UP)
 	var base: Vector3 = f["pos"] + f["right"] * (hw(track, d0) + WALK - 1.2)
-	var pw := maxf(2.2, town.length() * 0.24 + 0.6)
+	# Tafel so breit wie die Schrift (gemessen, nicht nach Buchstabenzahl geschätzt: sonst ragen lange Namen hinaus)
+	var pw := maxf(2.2, maxf(_text_w(town, 96, 0.0042), _text_w(region, 34, 0.0042)) + 0.5)
 	for s in [-1.0, 1.0]:
 		_part(groups, post, Builder.box(Vector3(0.08, 2.9, 0.08)), Transform3D(bf, base + bf.x * s * (pw * 0.35) + Vector3(0, CURB_H + 1.45, 0)))
 	_part(groups, black, Builder.box(Vector3(pw + 0.12, 1.32, 0.05)), Transform3D(bf, base + Vector3(0, CURB_H + 2.35, 0.04)))
@@ -3479,7 +3541,7 @@ static func _build_city_signs(root: Node3D, track: Dictionary, race: Dictionary)
 		last = d
 		var name: String = stt[2]
 		var sb := Basis.looking_at(sf["fwd"], Vector3.UP)
-		var w := name.length() * 0.16 + 0.4
+		var w := _text_w(name, 64, 0.0045) + 0.3
 		_part(groups, post, Builder.box(Vector3(0.07, 3.0, 0.07)), Transform3D(sb, sp + Vector3(0, CURB_H + 1.5, 0)))
 		_part(groups, black, Builder.box(Vector3(w + 0.06, 0.5, 0.04)), Transform3D(sb, sp + Vector3(0, CURB_H + 2.75, 0) - sb.x * w * 0.45))
 		_part(groups, white, Builder.box(Vector3(w, 0.44, 0.06)), Transform3D(sb, sp + Vector3(0, CURB_H + 2.75, 0) - sb.x * w * 0.45))
@@ -3947,15 +4009,19 @@ static func _building(root: Node3D, center: Vector3, basis: Basis, w: float, dep
 	if shop:
 		# Ladenschild über der Markise, im Stil der Ladenart (Apotheke, Friseur, Imbiss ...)
 		_shop_sign(root, names[rng.randi() % names.size()], Transform3D(face_basis, face_pos + Vector3(0, 4.75, 0)), w * 0.8, rng)
+	# über einem Laden erst ab dem 2. Stock (im 1. hängt das Ladenschild, Balkone/Treppen würden es verdecken)
+	var lift := 1 if shop else 0
 	if style == 4.0 and h > 10.0 and rng.randf() < dist.get("fire_escape", 0.0):
-		_fire_escape(root, face_pos + basis.z * rng.randf_range(-w * 0.25, w * 0.25), Basis.looking_at(-face_dir, Vector3.UP),
-			mini(int((h - 4.2) / 3.2), 6))
+		var fx := rng.randf_range(-w * 0.25, w * 0.25)  # Zufallszahl immer ziehen: Stadt bleibt wie bisher
+		if mini(int((h - 4.2) / 3.2), 6) - lift > 0:
+			_fire_escape(root, face_pos + basis.z * fx + Vector3(0, lift * 3.2, 0),
+				Basis.looking_at(-face_dir, Vector3.UP), mini(int((h - 4.2) / 3.2), 6) - lift)
 	elif style == 4.0 and rng.randf() < 0.5:
 		# Balkone übereinander
 		var bc := Builder.mat(Color(0.2, 0.2, 0.22), 0.5, 0.5)
 		var floors := int((h - 4.2) / 3.2)
 		var off := basis.z * rng.randf_range(-w * 0.3, w * 0.3)
-		for k in mini(floors, 6):
+		for k in range(lift, mini(floors, 6)):
 			Builder._add(root, Builder.box(Vector3(2.4, 0.12, 1.0)), bc, face_pos + off + face_dir * 0.5 + Vector3(0, 4.2 + k * 3.2, 0)).basis = face_basis
 			Builder._add(root, Builder.box(Vector3(2.4, 0.9, 0.05)), bc, face_pos + off + face_dir * 1.0 + Vector3(0, 4.65 + k * 3.2, 0)).basis = face_basis
 
@@ -5082,10 +5148,13 @@ static func _build_tunnels(root: Node3D, track: Dictionary, rng: RandomNumberGen
 		var dist := _district_at(track, d0 + len / 2.0)
 		var styles: Array = dist["styles"]
 		var tints: Array = dist["tints"]
-		var segs := int(ceil(len / 24.0))
+		# hinter den Portalen (Portalwand reicht 2,3 m nach innen), sonst verdeckt die Fassade den Tunnelnamen
+		var h0 := d0 + 3.2
+		var hl := len - 6.4
+		var segs := int(ceil(len / 24.0))  # Anzahl wie früher: gleiche Zufallszahlen, die Stadt danach bleibt gleich
 		for i in segs:
-			var a: float = d0 + len * i / segs
-			var b: float = d0 + len * (i + 1) / segs
+			var a: float = h0 + hl * i / segs
+			var b: float = h0 + hl * (i + 1) / segs
 			var f := frame_at(curve, (a + b) / 2.0)
 			var tint: Color = tints[rng.randi() % tints.size()]
 			var h := rng.randf_range(20.0, 48.0) if i % 3 == 1 else rng.randf_range(5.0, 22.0)

@@ -611,6 +611,26 @@ def turbo_loop():
     return _loop_xfade(x, n, xf)
 
 
+def whine_loop():
+    """Getriebe- und Antriebssingen (seit Open World): Zahneingriff als Ton bei 520 Hz mit leiser Oktave und
+    Quinte, leicht schwebend, dazu ein schmales Rauschband. Klingt erst bei hohem Tempo mit (Tonhöhe folgt im Spiel dem
+    Tempo, nicht der Drehzahl) und bricht das gleichförmige Dröhnen bei Höchstgeschwindigkeit auf. 2 s nahtlos."""
+    rng = random.Random(91)
+    n = secs(2.0)
+    xf = secs(0.25)
+    m = n + xf
+    drift = _wander(rng, m, 0.8)
+    amp = _wander(rng, m, 1.7)
+    air = _norm(_bp_noise(rng, m, 1050.0, 6.0))
+    out = []
+    ph = 0.0
+    for j in range(m):
+        ph += 2.0 * math.pi * 520.0 * (1.0 + 0.004 * drift[j]) / SR
+        tone = math.sin(ph) + 0.35 * math.sin(2.0 * ph + 0.6) + 0.12 * math.sin(1.5 * ph)
+        out.append(tone * (0.8 + 0.2 * amp[j]) + air[j] * 0.25)
+    return _loop_xfade(out, n, xf)
+
+
 # --- Menü: kurze, saubere Klicks und Töne (bis 2.21 liefen hier Sprung-, Lande- und Laternen-Geräusche)
 
 def _click(dur, f, decay, bright=0.4):
@@ -693,7 +713,7 @@ SOUNDS = {
     "nitro_on": (nitro_on, 0.89), "nitro_off": (nitro_off, 0.85),
     "backfire": (backfire, 0.89), "bov": (bov, 0.85), "flutter": (flutter, 0.85), "scrape": (scrape_loop, 0.8),
     "road": (road_loop, 0.8), "wind": (wind_loop, 0.8), "beep": (beep, 0.6), "beep_go": (beep_go, 0.7),
-    "turbo": (turbo_loop, 0.8), "ui_move": (ui_move, 0.5), "ui_change": (ui_change, 0.5), "ui_select": (ui_select, 0.55),
+    "turbo": (turbo_loop, 0.8), "whine": (whine_loop, 0.7), "ui_move": (ui_move, 0.5), "ui_change": (ui_change, 0.5), "ui_select": (ui_select, 0.55),
     "ui_back": (ui_back, 0.5), "ui_install": (ui_install, 0.7), "ui_locked": (ui_locked, 0.55), "ui_go": (ui_go, 0.7),
 }
 

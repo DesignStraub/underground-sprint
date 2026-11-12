@@ -104,7 +104,7 @@ Der Ring besteht aus Stücken von 2,6 km im Viertel „Schnellstraße“ (Lärms
 - **Gewonnene Rennen** verschwinden aus der Welt und von der Minikarte; die große Karte zeigt sie als goldenen Haken.
 - **Tasten:** Esc (oder P) öffnet das Menü, Enter bestätigt nur noch, M (oder Tab) öffnet die Karte, „.“ wechselt die
   Musik. Test: `world.tscn -- --wspawn=ring:10 --ctest=rear40` (auch rear120, side,
-  standing, wrongway, bus, wreck, wall10/30/60/90, median30), gibt alle 0,1 s „CT …“ aus.
+  standing, wrongway, bus, wreck, wall10/30/60/90, median30, near, chal), gibt alle 0,1 s „CT …“ aus.
 - Testen: `world.tscn -- --wspawn=ring:5 --wdrive --worldlog` (Autopilot auf dem Ring, Bauzeiten),
   `--wspawn=ramp:15` (vor der Auffahrt nach Aachen), `--nothreads` (wie im Browser); Draufsicht:
   `tools/world_map.tscn -- --worldlog --png=/pfad.png`.
@@ -113,9 +113,30 @@ Der Ring besteht aus Stücken von 2,6 km im Viertel „Schnellstraße“ (Lärms
   (4,8), Sakura mit Motor 1 und Turbo 3 4,9 s (3,7). Leistungsteile kommen wieder mit Siegen (Motor 1/3/6, Turbo 2/4/7,
   Nitro 2/5, Fahrwerk 1/3/6, Reifen 1/4/6); ein eingebautes, noch gesperrtes Teil gilt als die beste freie Stufe.
   Messen: `world.tscn -- --wspawn=ring:10 --ctest=accel --car=sakura --cfg=engine:0,turbo:0`.
-- Noch offen: Stadion-Drift ohne Ausfahrt, abgeschnittene Schilder (Tunnelnamen), seltene Herausforderer-Autos,
-  Motorklang bei Höchstgeschwindigkeit weniger gleichförmig (Vorbild: https://www.youtube.com/watch?v=qj5F_s3veiU&t=84s),
-  Near-Miss-Nitro in der Welt, Test im Browser.
+- **Herausforderer (wie die Outrun-Gegner in Underground 2):** alle 1,5–3 Minuten freier Fahrt auf der Autobahn
+  kommt von hinten ein getuntes Auto ungefähr so schnell wie deins (`challenger_car.gd`, roter Punkt auf der
+  Minikarte), überholt und fährt dann gut 100 km/h vor dir her. Dicht dran (35 m) startet Enter das Duell: er fährt
+  so schnell wie dein Auto (Leicht/Normal/Schwer 92/97/100 %), wechselt vor langsameren Autos zügig die Spur und wird
+  beim Rempeln nur geschoben. 300 m Vorsprung gewinnt (zählt in `GameState.outruns`, füllt Nitro), 300 m Rückstand
+  verliert, wer die Autobahn verlässt, gibt auf. Test: `world.tscn -- --wspawn=ring:10 --wdrive --challenger`
+  (kommt nach 3 s, Duell startet von selbst, „CH …“), Spurwechsel: `--ctest=chal`.
+- **Knapp vorbei** gibt jetzt auch in der freien Fahrt Nitro (wie im Rennen: ab 90 km/h seitlich 1,7–3,4 m an einem
+  fahrenden Auto vorbei); Einblendung über der Minikarte. Test: `--ctest=near`.
+- **Motorklang bei Höchsttempo:** bei gleichbleibender hoher Drehzahl liefen dieselben zwei kurzen Schleifen
+  (0,4–0,5 s) in fester Tonhöhe und klangen nach Endlosschleife. Jetzt wandern Drehzahl (±1 %), Mischung der beiden
+  Schleifen und Pegel langsam, eine dritte Schleife kommt zeitweise dazu, und ein leises Getriebesingen
+  (`whine.wav`, Tonhöhe nach Tempo) läuft mit (Vorbild: AngeTheGreat, https://www.youtube.com/watch?v=qj5F_s3veiU&t=84s).
+  Wiederholung der Wellenform nach einer Schleifenlänge: Sakura 0,76 → 0,14, Kagura 0,42 → 0,08, Boxer 0,51 → 0,40.
+  Messen: `tools/engine_snd.tscn -- --car=sakura --live=1 --out=/pfad.wav` (8 s Vollgas bei Höchsttempo; `--live=0`
+  wie vorher). Zufällige Sprünge in der Schleife waren schlechter (Einbrüche bis 6 dB beim Neuansetzen).
+- **Stadion-Drift hat eine Ausfahrt:** der Zickzack-Kurs hat keine Gerade mit Platz zur Seite; die Ausfahrt geht jetzt
+  an der äußersten Kurve gerade nach außen (`Track._apex_exit`), mit Lücke in den Betonwänden. Damit liegen alle
+  18 Rennen (alle außer Drag) in der Welt.
+- **Schilder:** Tunnelnamen waren vom Häuserblock über dem Tunnel verdeckt (stand 0,75 m vor dem Portal, nur „HA“ zu
+  sehen); Ortsschilder und Straßennamen sind so breit wie ihr gemessener Text; Balkone und Feuertreppen über einem Laden
+  beginnen erst im 2. Stock (verdeckten das Ladenschild).
+- Browser: der Web-Export startet, die Welt baut sich ohne Skriptfehler auf (gut 25 s). Noch offen: eine Testfahrt mit
+  Bildrate im sichtbaren Browserfenster (Herausforderer, Nachladen, Verkehr).
 
 ## Events
 **Karriere:** Garage → Rennen fahren zeigt alle 21 Events als Liste neben einer Deutschlandkarte. Jedes Event liegt in

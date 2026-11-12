@@ -154,7 +154,7 @@ func _process(delta: float) -> void:
 	for i in cars.size():
 		var car: Node3D = cars[i]
 		var dot: Control = _dots[i]
-		dot.visible = is_instance_valid(car)
+		dot.visible = is_instance_valid(car) and not car.get_meta("off", false)  # meta "off": gerade nicht zeigen
 		if not dot.visible:
 			continue
 		var gp := car.global_position

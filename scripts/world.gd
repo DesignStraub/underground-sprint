@@ -18,6 +18,8 @@ const SKY_SHADER := preload("res://shaders/night_sky.gdshader")
 const WorldMinimap := preload("res://scripts/world_minimap.gd")
 const MapView := preload("res://scripts/world_map_view.gd")
 const Traffic := preload("res://scripts/traffic_car.gd")
+const Challenger := preload("res://scripts/challenger_car.gd")
+const DUEL_GAP := 300.0  # so viel Vorsprung entscheidet ein Duell
 
 const LOAD_PAD := 700.0  # Strecke bauen, wenn man so nah am Rand ihres Umkreises ist
 const DROP_PAD := 1300.0  # ... und wieder entfernen, wenn man so weit weg ist
@@ -61,11 +63,21 @@ var _area_t := 0.0
 var _area_name := ""
 var _ready_done := false
 var traffic: Array = []
+var _near := {}  # Verkehrsautos, für die es schon „knapp vorbei“ gab
+var _feed: VBoxContainer  # Einblendungen über der Minikarte (knapp vorbei)
 var _tq: Array = []  # [Eintrag, Plan] wartet aufs Einsetzen (ein paar pro Bild, sonst ruckelt es beim Nachladen)
 var _trng := RandomNumberGenerator.new()
 var _traffic_snd_t := 0.0
 var _leader_t := 0.0
 var _segs: Array = []
+## Herausforderer (selten, nur auf der Autobahn): überholt dich, fährt vor dir her; dicht dran startet Enter ein Duell
+var challenger: Node = null
+var _ch_pin: Node3D  # Stellvertreter für die Minikarte (roter Punkt, solange es einen Herausforderer gibt)
+var _ch_t := 0.0  # Sekunden freie Fahrt auf der Autobahn bis zum nächsten
+var _duel := 0  # 0 keins (er fährt vor dir her), 1 Duell läuft, 2 entschieden (er fährt weg oder fällt zurück)
+var _ch_prompt := false
+var _off_ring_t := 0.0
+var _ch_log := 0.0
 
 
 func _ready() -> void:
@@ -165,7 +177,8 @@ func _spawn_xf() -> Transform3D:
 					var n := Vector3(ex.x, 0, ex.z).normalized()
 					if parts[0] == "ramp":  # auf dem Ring vor der Auffahrt, Blick zur Stadt
 						return Transform3D(Basis.looking_at(n, Vector3.UP), ex - n * (c["gap"] - 6.0))
-					return Transform3D(Basis.looking_at(-n, Vector3.UP), ex + n * 30.0)
+					# --wspawn=exit:i:m  m Meter von der Ausfahrt in die Stadt hinein (Standard 30)
+					return Transform3D(Basis.looking_at(-n, Vector3.UP), ex + n * (float(parts[2]) if parts.size() > 2 else 30.0))
 	if has_return:
 		has_return = false
 		return return_xf
@@ -615,12 +628,67 @@ func _build_hud() -> void:
 	for i in _pins:
 		if not Catalog.RACES[i]["name"] in GameState.won_events:
 			open_pins.append(_pins[i])
+	_ch_pin = Node3D.new()
+	_ch_pin.set_meta("hud_col", Color(1.0, 0.2, 0.15))
+	_ch_pin.set_meta("off", true)
+	world.add_child(_ch_pin)
+	open_pins.append(_ch_pin)
+	_ch_t = 3.0 if OS.get_cmdline_user_args().has("--challenger") else randf_range(70.0, 160.0)
 	minimap.setup_world(layout["roads"], player, open_pins)
 	minimap.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
 	minimap.offset_left = 8.0
 	minimap.offset_right = 8.0 + WorldMinimap.SIZE
 	minimap.offset_top = -WorldMinimap.SIZE - 8.0
 	minimap.offset_bottom = -8.0
+	_feed = VBoxContainer.new()
+	_feed.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_feed.add_theme_constant_override("separation", -2)
+	_feed.alignment = BoxContainer.ALIGNMENT_END
+	_feed.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+	_feed.offset_left = 14.0
+	_feed.offset_right = 14.0 + 300.0
+	_feed.offset_top = -WorldMinimap.SIZE - 8.0 - 96.0
+	_feed.offset_bottom = -WorldMinimap.SIZE - 12.0
+	root.add_child(_feed)
+	var dp := _label(root, 20, HORIZONTAL_ALIGNMENT_CENTER)
+	dp.anchor_left = 0.5
+	dp.anchor_right = 0.5
+	dp.anchor_top = 0.3
+	dp.anchor_bottom = 0.3
+	dp.offset_left = -300.0
+	dp.offset_right = 300.0
+	dp.add_theme_color_override("font_color", Color(1.0, 0.35, 0.3))
+	dp.visible = false
+	hud["duel_prompt"] = dp
+	var duel := Control.new()
+	duel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	duel.anchor_left = 0.5
+	duel.anchor_right = 0.5
+	duel.offset_left = -170.0
+	duel.offset_right = 170.0
+	duel.offset_top = 84.0
+	duel.offset_bottom = 130.0
+	duel.visible = false
+	root.add_child(duel)
+	var dl := _label(duel, 16, HORIZONTAL_ALIGNMENT_CENTER)
+	dl.size = Vector2(340, 24)
+	var bg := ColorRect.new()
+	bg.color = Color(0, 0, 0, 0.55)
+	bg.position = Vector2(10, 28)
+	bg.size = Vector2(320, 9)
+	duel.add_child(bg)
+	var fill := ColorRect.new()
+	fill.position = Vector2(170, 28)
+	fill.size = Vector2(0, 9)
+	duel.add_child(fill)
+	var mid := ColorRect.new()
+	mid.color = Color(1, 1, 1, 0.8)
+	mid.position = Vector2(169, 25)
+	mid.size = Vector2(2, 15)
+	duel.add_child(mid)
+	hud["duel"] = duel
+	hud["duel_label"] = dl
+	hud["duel_fill"] = fill
 	_set_target(target)
 	_build_pause(root)
 	var map_layer := CanvasLayer.new()
@@ -707,6 +775,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	if map_view and map_view.visible:
 		map_view._handle(event)
 		return
+	if _ch_prompt and _duel == 0 and not get_tree().paused and event.is_action_pressed("ui_accept"):
+		get_viewport().set_input_as_handled()
+		_start_duel()
+		return
 	if _near_marker >= 0 and not get_tree().paused and event.is_action_pressed("ui_accept") \
 			and GameState.career_open(Catalog.RACES[_near_marker]["name"]):
 		get_viewport().set_input_as_handled()
@@ -743,6 +815,9 @@ func _process(dt: float) -> void:
 	_spawn_queued(3)
 	_update_traffic_sound(dt)
 	_update_markers()
+	_check_near_miss()
+	_update_challenger(dt)
+	_update_feed(dt)
 	var tacho = hud["tacho"]
 	tacho.rpm = player.rpm
 	tacho.speed_kmh = int(absf(player.speed_fwd) * 3.6)
@@ -756,6 +831,230 @@ func _process(dt: float) -> void:
 	else:
 		hud["area"].modulate.a = 0.0
 	_update_speed_fx(dt)
+
+
+## Knapp vorbei (wie im Rennen und in Underground): seitlich 1,7–3,4 m an einem fahrenden Verkehrsauto vorbei, ab
+## 90 km/h, füllt Nitro etwas auf. Wer es rammt, bekommt nichts (das Auto ist dann ein Wrack).
+func _check_near_miss() -> void:
+	if not player.controls_enabled:
+		return
+	var fwd: Vector3 = -player.global_basis.z
+	var right := Vector3(-fwd.z, 0, fwd.x).normalized()
+	var fast := player.velocity.length() > 25.0
+	for t in traffic:
+		if not is_instance_valid(t) or t.wrecked or not t.is_inside_tree() or t == challenger:
+			continue
+		var rel: Vector3 = t.global_position - player.global_position
+		var id: int = t.get_instance_id()
+		if rel.length() > 30.0:
+			_near.erase(id)
+			continue
+		var along := rel.dot(fwd)
+		var side := absf(rel.dot(right))
+		if fast and absf(rel.y) < 3.0 and absf(along) < 2.5 and side > 1.7 and side < 3.4 and not _near.has(id):
+			_near[id] = true
+			_flash(tr("KNAPP VORBEI"), Color(1.0, 0.85, 0.2), 300)
+			Sfx.play("whoosh", -12.0, randf_range(1.1, 1.3))
+
+
+## Einblendung über der Minikarte; Punkte füllen Nitro (wie im Rennen: 300 Punkte = 7,5 % einer Serienflasche)
+func _flash(text: String, col: Color, pts := 0) -> void:
+	if _feed == null:
+		return
+	var l := _label(_feed, 15)
+	l.add_theme_color_override("font_color", col)
+	l.text = text + ("   +%d" % pts if pts > 0 else "")
+	l.set_meta("t", 3.2)
+	while _feed.get_child_count() > 4:
+		var old := _feed.get_child(0)
+		_feed.remove_child(old)
+		old.queue_free()
+	if pts > 0:
+		player.nitro = minf(player.nitro + minf(pts / 4000.0, 0.12) / player.nitro_cap, 1.0)
+
+
+func _update_feed(dt: float) -> void:
+	for l in _feed.get_children():
+		var t: float = l.get_meta("t") - dt
+		l.set_meta("t", t)
+		l.modulate.a = clampf(t / 0.5, 0.0, 1.0)
+		if t <= 0.0:
+			_feed.remove_child(l)
+			l.queue_free()
+
+
+# --- Herausforderer ------------------------------------------------------------------------------------------
+
+## Alle paar Minuten freier Fahrt auf der Autobahn taucht einer auf (-- --challenger: nach 3 s, zum Testen).
+## Vor dem Duell überholt er dich und fährt dann etwas langsamer vor dir her; dicht dran (35 m) fordert Enter ihn heraus.
+## Im Duell fährt er so schnell wie dein Auto (Schwierigkeit: 92/97/100 %) und schlängelt sich durch den Verkehr.
+## 300 m Vorsprung gewinnt, 300 m Rückstand verliert; wer die Autobahn verlässt, gibt auf.
+func _update_challenger(dt: float) -> void:
+	if not _ct.is_empty() or not _ready_done:
+		return
+	if challenger != null and not is_instance_valid(challenger):
+		_remove_challenger()  # mit seinem Autobahnstück entfernt
+	var on_ring: bool = not player.track.is_empty() and _entry_of(player.track).get("kind", "") == "seg"
+	if challenger == null:
+		if on_ring and absf(player.speed_fwd) > 12.0:
+			_ch_t -= dt
+			if _ch_t <= 0.0:
+				_spawn_challenger()
+		return
+	var ch = challenger
+	var fwd: Vector3 = -ch.global_basis.z
+	var rel: Vector3 = player.global_position - ch.global_position
+	var gap := rel.dot(fwd)  # + du liegst vorn
+	var dist := rel.length()
+	var top: float = ch.get_meta("top")
+	ch.others = traffic  # die Liste wird beim Entladen neu angelegt
+	_ch_pin.global_position = ch.global_position
+	var prompt := false
+	match _duel:
+		0:
+			var pv := player.velocity.dot(fwd)
+			# noch nicht vorbei: überholen; danach gemütlich (gut 100 km/h), damit du aufschließen kannst
+			ch.base_speed = clampf(pv + 9.0, 32.0, top) if gap > -30.0 else 29.0
+			prompt = dist < 35.0 and gap < 6.0
+			if dist > 700.0:
+				_remove_challenger()
+				return
+		1:
+			# Gummiband, aber schwach: liegst du weit vorn, gibt er alles (etwas mehr), weit hinten nimmt er etwas raus
+			ch.base_speed = top * (1.03 if gap > 120.0 else (0.96 if gap < -150.0 else 1.0))
+			_off_ring_t = 0.0 if on_ring else _off_ring_t + dt
+			_update_duel_hud(gap)
+			if gap >= DUEL_GAP:
+				_end_duel(true)
+			elif gap <= -DUEL_GAP or _off_ring_t > 4.0:
+				_end_duel(false)
+		2:
+			if dist > 450.0:
+				_remove_challenger()
+				return
+	if OS.get_cmdline_user_args().has("--challenger"):
+		# Test: Verlauf jede Sekunde ("CH ..."), Duell startet von selbst, sobald man dicht dran ist
+		_ch_log -= dt
+		if _ch_log <= 0.0:
+			_ch_log = 0.5
+			var lead := "-"
+			if is_instance_valid(ch.leader):
+				lead = "%.0fm/%dkmh/spur%.1f" % [(ch.leader.progress - ch.progress) * ch.dir, int(ch.leader.speed * 3.6), ch.leader.lateral()]
+			print("CH duell=%d abst=%.0f vorsprung=%.0f er=%d du=%d spur=%.1f/%.1f vordermann=%s wagen=%s" % [_duel, dist, gap, int(ch.speed * 3.6),
+				int(absf(player.speed_fwd) * 3.6), ch.lane, ch.lateral(), lead, ch.car_id])
+		if prompt and _duel == 0:
+			_start_duel()
+			return
+	if prompt != _ch_prompt:
+		_ch_prompt = prompt
+		hud["duel_prompt"].text = "%s: %s\n%s" % [tr("HERAUSFORDERER"), Catalog.CARS[ch.car_id]["name"].to_upper(), tr("Enter: Duell starten")]
+	hud["duel_prompt"].visible = _ch_prompt and _duel == 0 and _near_marker < 0
+
+
+## Hinter dir auf deiner Fahrbahn einsetzen (170 m zurück, notfalls auf dem Stück davor), ein Auto passend zu deinem
+func _spawn_challenger() -> void:
+	var e := _entry_of(player.track)
+	var tr: Dictionary = e["track"]
+	var xf: Transform3D = e["xf"]
+	var c: Curve3D = tr["curve"]
+	var d := c.get_closest_offset(xf.affine_inverse() * player.global_position)
+	var sgn := 1.0 if (xf.basis * Track.frame_at(c, d)["fwd"]).dot(player.velocity) >= 0.0 else -1.0
+	var dd := d - sgn * 170.0
+	var n := _segs.size()
+	if dd < 5.0 or dd > float(tr["length"]) - 5.0:
+		var e2: Dictionary = _segs[(int(e["seg_i"]) + (1 if dd > 5.0 else -1) + n) % n]
+		if e2["state"] != "ready":
+			_ch_t = 5.0
+			return
+		dd = dd - float(tr["length"]) if dd > 5.0 else float(e2["track"]["length"]) + dd
+		e = e2
+		tr = e["track"]
+		if dd < 5.0 or dd > float(tr["length"]) - 5.0:
+			_ch_t = 5.0
+			return
+	# Auto: ungefähr so schnell wie deins, nicht dasselbe
+	var mine: float = Catalog.CARS[GameState.current_car]["top_speed"]
+	var pool: Array = Catalog.CAR_ORDER.filter(func(id): return id != GameState.current_car \
+		and absf(float(Catalog.CARS[id]["top_speed"]) / mine - 1.0) < 0.1)
+	if pool.is_empty():
+		pool = Catalog.CAR_ORDER.filter(func(id): return id != GameState.current_car)
+	var id: String = pool[_trng.randi() % pool.size()]
+	var cfg := {}
+	for cat in Catalog.PART_ORDER:
+		cfg[cat] = _trng.randi() % Catalog.PARTS[cat]["options"].size()
+	var ch := Challenger.new()
+	ch.process_mode = Node.PROCESS_MODE_PAUSABLE
+	ch.curve = tr["curve"]
+	ch.track = tr
+	ch.blocks = tr["blocks"]
+	ch.progress = dd
+	ch.lane = sgn * 6.75
+	ch.dir = sgn
+	ch.speed = maxf(absf(player.speed_fwd) + 6.0, 28.0)
+	ch.base_speed = ch.speed
+	ch.track_length = tr["length"]
+	ch.parent_basis = (e["xf"] as Transform3D).basis
+	ch.player_path = -1
+	ch.on_end = _traffic_end
+	ch.others = traffic
+	ch.set_meta("e", e)
+	ch.set_meta("top", player.top_speed * PlayerCar.VMAX_K * [0.92, 0.97, 1.0][GameState.difficulty])
+	(tr["node"] as Node).add_child(ch)
+	ch.setup_racer(id, cfg)
+	ch.place()
+	traffic.append(ch)
+	challenger = ch
+	_duel = 0
+	_ch_pin.set_meta("off", false)
+	_flash(tr("HERAUSFORDERER IM ANMARSCH"), Color(1.0, 0.35, 0.3))
+
+
+func _start_duel() -> void:
+	_duel = 1
+	_off_ring_t = 0.0
+	_ch_prompt = false
+	hud["duel_prompt"].visible = false
+	hud["duel"].visible = true
+	Sfx.ui("go")
+	_flash(tr("DUELL: 300 M VORSPRUNG GEWINNT"), Color(1.0, 0.35, 0.3))
+
+
+func _update_duel_hud(gap: float) -> void:
+	var k := clampf(gap / DUEL_GAP, -1.0, 1.0)
+	var fill: ColorRect = hud["duel_fill"]
+	fill.color = Color(0.3, 1.0, 0.45) if k >= 0.0 else Color(1.0, 0.3, 0.25)
+	fill.size.x = absf(k) * 160.0
+	fill.position.x = 170.0 if k >= 0.0 else 170.0 - fill.size.x
+	hud["duel_label"].text = "%s  %s%d m" % [tr("DUELL"), "+" if gap >= 0.0 else "−", int(absf(gap))]
+
+
+func _end_duel(won: bool) -> void:
+	_duel = 2
+	hud["duel"].visible = false
+	if won:
+		GameState.outruns += 1
+		GameState.save_game()
+		challenger.base_speed = 22.0  # gibt auf und fällt zurück
+		_flash(tr("HERAUSFORDERER ABGEHÄNGT (%d)") % GameState.outruns, Color(0.4, 1.0, 0.5), 1000)
+		Sfx.ui("install")
+	else:
+		challenger.base_speed = challenger.get_meta("top")
+		_flash(tr("DUELL VERLOREN") if _off_ring_t <= 4.0 else tr("DUELL AUFGEGEBEN"), Color(1.0, 0.35, 0.3))
+
+
+func _remove_challenger() -> void:
+	if is_instance_valid(challenger):
+		traffic.erase(challenger)
+		challenger.queue_free()
+	challenger = null
+	_duel = 0
+	_ch_prompt = false
+	if _ch_pin:
+		_ch_pin.set_meta("off", true)
+	if hud.has("duel"):
+		hud["duel"].visible = false
+		hud["duel_prompt"].visible = false
+	_ch_t = randf_range(90.0, 200.0)
 
 
 ## Test (--wdrive): fährt die Hauptstraße der aktuellen Strecke entlang (Ring: von Stück zu Stück), mit Nitro.
@@ -907,6 +1206,9 @@ func _traffic_end(t: Node) -> void:
 			t.set_meta("e", n2)
 			t.move_to(nt, 1.5 if fwd else float(nt["length"]) - 1.5)
 			return
+	if t == challenger:
+		_remove_challenger()  # nächstes Stück noch nicht gebaut: lieber weg als außer Sicht neu einsetzen
+		return
 	var tr: Dictionary = e["track"]
 	var L: float = tr["length"]
 	var lp: Vector3 = (e["xf"] as Transform3D).affine_inverse() * player.global_position
@@ -1005,6 +1307,8 @@ func _ctest_setup(case: String) -> void:
 		"wall90": [11.25, 30.0, 90.0, 0.0, 0.0, 0.0, ""],
 		"median30": [2.25, 42.0, -30.0, 0.0, 0.0, 0.0, ""],
 		"accel": [6.75, 0.0, 0.0, 0.0, 0.0, 0.0, ""],
+		"near": [4.0, 42.0, 0.0, 6.75, 14.0, 30.0, "sedan"],  # knapp vorbei: 2,75 m daneben überholen (Nitro)
+		"chal": [-6.75, 0.0, 0.0, 6.75, 90.0, 30.0, "sedan"],  # Herausforderer (160 km/h) hinter einem Pkw: Spurwechsel?
 	}
 	var k: Array = cases[case]
 	var xf := Track.xform_at(c, d0, Track.lane_lat(tr, d0, k[0]), true)
@@ -1012,6 +1316,8 @@ func _ctest_setup(case: String) -> void:
 	player.place(xf)
 	player.velocity = -xf.basis.z * absf(k[1])
 	player.speed_fwd = absf(k[1])
+	if case == "near":
+		player.nitro = 0.3
 	if k[6] != "":
 		_tq.append([active, {"d": d0 + k[4], "lane": k[3], "speed": k[5], "kind": k[6]}])
 		var rd := _ready_done
@@ -1027,6 +1333,25 @@ func _ctest_setup(case: String) -> void:
 		_spawn_queued(1)
 		_ready_done = rd2
 		traffic[1].push(Vector3.ZERO)
+	if case == "chal":
+		var ch := Challenger.new()
+		ch.curve = c
+		ch.track = tr
+		ch.blocks = tr["blocks"]
+		ch.progress = d0 + 10.0
+		ch.lane = 6.75
+		ch.dir = 1.0
+		ch.speed = 44.0
+		ch.base_speed = 44.0
+		ch.track_length = tr["length"]
+		ch.parent_basis = (active["xf"] as Transform3D).basis
+		ch.player_path = -1
+		ch.others = traffic
+		(tr["node"] as Node).add_child(ch)
+		ch.setup_racer("kumo", {})
+		ch.place()
+		traffic.append(ch)
+		challenger = ch
 	_ct = {"case": case, "t": 0.0, "next": 0.0, "hold": case.begins_with("wall") or case.begins_with("median") or case == "accel",
 		"marks": [60, 100, 150, 200, 250]}
 
@@ -1035,7 +1360,7 @@ func _ctest_step(dt: float) -> void:
 	_ct["t"] += dt
 	for a in ["steer_left", "steer_right", "accelerate", "nitro", "brake", "handbrake"]:
 		Input.action_release(a)
-	if _ct["hold"] or _ct["case"].begins_with("rear") or _ct["case"] == "bus":
+	if _ct["hold"] or _ct["case"].begins_with("rear") or _ct["case"] in ["bus", "near"]:
 		Input.action_press("accelerate")
 	if _ct["case"] == "accel":
 		# Beschleunigung ohne Nitro: Zeit bis 60/100/150/200/250 km/h, danach Endtempo nach 40 s
@@ -1051,9 +1376,9 @@ func _ctest_step(dt: float) -> void:
 		return
 	_ct["next"] += 0.1
 	var pl = player
-	var s := "CT %s t=%.1f v=%3d fwd=%3d gier=%4d stun=%.2f spin=%.1f roll=%s crashes=%d wand=%d" % [_ct["case"], _ct["t"],
+	var s := "CT %s t=%.1f v=%3d fwd=%3d gier=%4d stun=%.2f spin=%.1f roll=%s crashes=%d wand=%d nitro=%.3f" % [_ct["case"], _ct["t"],
 		int(pl.velocity.length() * 3.6), int(pl.speed_fwd * 3.6), int(rad_to_deg(pl.global_basis.z.signed_angle_to(Track.frame_at(pl.track["curve"], pl.progress)["fwd"] * -1.0, Vector3.UP))),
-		pl.stun, pl._spin, str(pl.tumbling), pl.crashes, pl.wall_hits]
+		pl.stun, pl._spin, str(pl.tumbling), pl.crashes, pl.wall_hits, pl.nitro]
 	if not traffic.is_empty():
 		var t = traffic[0]
 		var q: Vector3 = t.global_transform.affine_inverse() * pl.global_position
@@ -1062,8 +1387,12 @@ func _ctest_step(dt: float) -> void:
 			s += " | B v=%d spur=%.1f luecke=%.0f" % [int(t.speed * 3.6), t.lateral(), traffic[1].progress - t.progress]
 		s += " | ver v=%3d wrack=%s abst=%.1f quer=%.1f laengs=%.1f%s" % [int(t.velocity_vec.length() * 3.6), str(t.wrecked),
 			t.global_position.distance_to(pl.global_position), q.x, q.z, " DRIN" if inside else ""]
+	if is_instance_valid(challenger) and _ct["case"] == "chal":
+		var t0 = traffic[0]
+		s += " | herausf v=%d spur=%.1f/%.1f vor_pkw=%.1f" % [int(challenger.speed * 3.6), challenger.lane, challenger.lateral(),
+			(t0.progress - challenger.progress)]
 	print(s)
-	if _ct["t"] > (8.0 if _ct["case"] in ["wreck", "bus", "standing"] else 3.0):
+	if _ct["t"] > (8.0 if _ct["case"] in ["wreck", "bus", "standing", "chal"] else 3.0):
 		get_tree().quit()
 
 
