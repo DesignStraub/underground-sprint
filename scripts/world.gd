@@ -247,11 +247,59 @@ func _shot_check(dt: float) -> void:
 			if _shot_t < 0.0:
 				_shot_t = float(parts[1]) if parts.size() > 1 else 4.0
 			_shot_t -= dt
+			if _shot_t <= 0.0 and not _hid:
+				for b in OS.get_cmdline_user_args():
+					if b.begins_with("--whathide="):  # Test: Meshes mit diesem Shader/Farbe am Punkt --whatsat ausblenden
+						var xz := PackedStringArray(["0", "0"])
+						for c2 in OS.get_cmdline_user_args():
+							if c2.begins_with("--whatsat="):
+								xz = c2.substr(10).split(":")
+						_hide_at(self, Vector3(float(xz[0]), 0.0, float(xz[1])), b.substr(11))
+						_hid = true
+						_shot_t = 0.3
+						return
 			if _shot_t <= 0.0:
 				get_viewport().get_texture().get_image().save_png(parts[0])
 				print("WSHOT ", parts[0])
+				for b in OS.get_cmdline_user_args():
+					if b.begins_with("--whatsat="):  # Test: welche Meshes liegen flach an diesem Weltpunkt (x:z)?
+						var xz := b.substr(10).split(":")
+						_whats_at(self, Vector3(float(xz[0]), 0.0, float(xz[1])))
 				get_tree().quit()
 			return
+
+
+var _hid := false
+
+
+func _hide_at(n: Node, p: Vector3, what: String) -> void:
+	for c in n.get_children():
+		if c is MeshInstance3D and (c as MeshInstance3D).mesh != null:
+			var mi := c as MeshInstance3D
+			var bb: AABB = mi.global_transform * mi.get_aabb()
+			var mo = mi.material_override if mi.material_override else mi.mesh.surface_get_material(0)
+			var tag := (mo as ShaderMaterial).shader.resource_path if mo is ShaderMaterial else "std"
+			if p.x > bb.position.x and p.x < bb.end.x and p.z > bb.position.z and p.z < bb.end.z and (what in tag or what == str(mi.name)):
+				mi.visible = false
+				print("HIDE ", mi.name, " ", tag)
+		_hide_at(c, p, what)
+
+
+func _whats_at(n: Node, p: Vector3) -> void:
+	for c in n.get_children():
+		if c is MeshInstance3D and (c as MeshInstance3D).mesh != null and (c as MeshInstance3D).is_visible_in_tree():
+			var bb: AABB = (c as MeshInstance3D).global_transform * (c as MeshInstance3D).get_aabb()
+			if p.x > bb.position.x and p.x < bb.end.x and p.z > bb.position.z and p.z < bb.end.z \
+					and bb.position.y < 0.5 and bb.end.y > -1.0 and bb.size.x < 2000.0:
+				var mi := c as MeshInstance3D
+				var mo = mi.material_override if mi.material_override else mi.mesh.surface_get_material(0)
+				var info := str(mi.mesh.get_class()) + " v=" + str(mi.mesh.surface_get_array_len(0) if mi.mesh is ArrayMesh else -1)
+				if mo is ShaderMaterial:
+					info += " shader=" + str((mo as ShaderMaterial).shader.resource_path)
+				elif mo is StandardMaterial3D:
+					info += " col=" + str((mo as StandardMaterial3D).albedo_color)
+				print("WHAT ", c.name, " aabb=", bb, " ", info)
+		_whats_at(c, p)
 
 
 func _prof_mark(key: String) -> void:
@@ -630,11 +678,14 @@ func _setup_environment() -> void:
 	moon.rotation_degrees = Vector3(-50, 30, 0)
 	world.add_child(moon)
 	# Boden überall (zwischen den Städten), knapp unter dem Boden der Strecken
+	# mit Löchern über allen Tunneltrögen und Flussbetten (sonst lag er wie ein Deckel über dem Trog)
 	var ground := MeshInstance3D.new()
-	var pm := PlaneMesh.new()
 	var ext: float = (layout["ring_r"] + 9000.0) * 2.0
-	pm.size = Vector2(ext, ext)
-	ground.mesh = pm
+	var gst := SurfaceTool.new()
+	gst.begin(Mesh.PRIMITIVE_TRIANGLES)
+	gst.set_normal(Vector3.UP)
+	Track.ground_cell(gst, Vector2(-ext / 2.0, -ext / 2.0), ext, layout["holes"])
+	ground.mesh = gst.commit()
 	var gm := StandardMaterial3D.new()
 	gm.albedo_color = Color(0.025, 0.028, 0.03)
 	gm.roughness = 0.95
@@ -645,7 +696,8 @@ func _setup_environment() -> void:
 			tod = float(a.substr(6))
 	_update_daylight(0.0, true)
 	ground.position.y = -0.12
-	world.add_child(ground)
+	if not OS.get_cmdline_user_args().has("--noground"):  # Test: ohne den großen Boden (was deckt was zu?)
+		world.add_child(ground)
 
 
 func _cover() -> CanvasLayer:

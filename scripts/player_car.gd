@@ -221,6 +221,9 @@ var _jc_landed := false
 var _jc_hold := 0.0  # Echtzeit seit dem Aufsetzen
 var _slowmo := 1.0  # Zeitfaktor, weich ein- und ausgeblendet
 var _jc_slow := 1.0  # Ziel-Zeitfaktor dieses Sprungs
+var _crash_slow := 0.0  # s (Echtzeit): Crash-Zeitlupe nach einem schweren Unfall mit Verkehr oder Zug
+const CRASH_SLOW := 0.35
+const CRASH_SLOW_TIME := 0.9
 var _jc_light: OmniLight3D  # Aufhelllicht auf der Kameraseite: nachts von vorn wäre das Auto sonst fast schwarz
 var _respawn_xf := Transform3D.IDENTITY
 var _last_prog := 0.0
@@ -1396,7 +1399,9 @@ func _hit_wall(pre: Vector3, n: Vector3, small := false, pole := false) -> void:
 		return
 	_wall_t = 0.0
 	# Überschlag nach der Lage beim Aufprall beurteilen (vor jeder Drehung durch die Wand)
-	var trip := _trips(pre, n, pre) and not drag_mode and not drift_mode and not tumbling
+	# Wie in Underground: an Wänden überschlägt man sich nicht (vorher kippte, wer quer gegen eine Wand rutschte, und
+	# flog durch die Gegend). Überschläge gibt es nur noch durch Verkehr, Zug und schiefe Landungen.
+	var trip := false
 	var head_on := clampf(vn / spd, 0.0, 1.0)  # Sinus des Aufprallwinkels
 	var fwd := -global_basis.z
 	fwd.y = 0.0
@@ -1458,11 +1463,18 @@ func _hit_traffic(other: Node, pre: Vector3, n: Vector3) -> void:
 		totaled = true  # Drag: wer frontal oder ins Heck kracht, ist raus
 	if _trips(pre, n, rel) and not drag_mode:
 		other.push(-n * j / mt)
+		if other.has_method("launch"):
+			other.launch(-n, hit)
+		_crash_fx(global_position - n * 1.6, hit)
 		velocity = after * 0.5 + n * 3.0
 		_crash_cooldown = 0.7
 		start_tumble(n, absf(rel.dot(global_basis.x)))
 	elif hit > 9.0 and head_on > 0.5:
 		other.push(-n * j / mt)
+		# wie in Underground: der getroffene Wagen fliegt aus dem Verkehr, kurz Zeitlupe, Funken und Glas
+		if other.has_method("launch"):
+			other.launch(-n, hit)
+		_crash_fx(global_position - n * 1.6, hit)
 		velocity = after * 0.4 + n * 2.0
 		velocity.y = 0.0
 		_spin = randf_range(1.2, 2.4) * (1.0 if randf() < 0.5 else -1.0) * clampf(hit / 25.0, 0.5, 1.0)
@@ -1482,6 +1494,48 @@ func _hit_traffic(other: Node, pre: Vector3, n: Vector3) -> void:
 			stun = 0.2
 
 
+## Schwerer Unfall: Zeitlupe, Funken und Glassplitter an der Stelle des Aufpralls
+func _crash_fx(at: Vector3, hit: float) -> void:
+	_crash_slow = CRASH_SLOW_TIME
+	_shake = 1.0
+	if DisplayServer.get_name() == "headless":
+		return
+	for kind in 2:
+		var p := CPUParticles3D.new()
+		p.amount = 26 if kind == 0 else 18
+		p.lifetime = 0.5 if kind == 0 else 1.3
+		p.one_shot = true
+		p.explosiveness = 1.0
+		p.direction = Vector3.UP
+		p.spread = 80.0
+		p.gravity = Vector3(0, -14.0 if kind == 0 else -16.0, 0)
+		p.initial_velocity_min = 3.0 + hit * 0.15
+		p.initial_velocity_max = 6.0 + hit * 0.35
+		p.scale_amount_min = 0.5
+		p.scale_amount_max = 1.2
+		var m := BoxMesh.new()
+		var mat := StandardMaterial3D.new()
+		if kind == 0:
+			m.size = Vector3(0.02, 0.02, 0.16)  # Funken
+			mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			mat.albedo_color = Color(1.0, 0.75, 0.3)
+			mat.emission_enabled = true
+			mat.emission = Color(1.0, 0.6, 0.2)
+			mat.emission_energy_multiplier = 4.0
+			p.particle_flag_align_y = true
+		else:
+			m.size = Vector3(0.09, 0.02, 0.09)  # Glas
+			mat.albedo_color = Color(0.7, 0.85, 0.95, 0.8)
+			mat.metallic = 0.6
+			mat.roughness = 0.1
+		m.material = mat
+		p.mesh = m
+		p.position = at + Vector3(0, 0.7, 0)
+		get_parent().add_child(p)
+		p.emitting = true
+		get_tree().create_timer(2.0).timeout.connect(p.queue_free)
+
+
 ## Vom Zug erfasst (rail_crossing._sweep_player): mitgerissen und seitlich weggeschleudert, Dreher, kurz keine
 ## Kontrolle. Die Lage hat der Bahnübergang schon neben den Zug gesetzt (auf Straßenhöhe, nie in den Boden).
 func hit_by_train(v_train: Vector3, away: Vector3) -> void:
@@ -1490,11 +1544,15 @@ func hit_by_train(v_train: Vector3, away: Vector3) -> void:
 		return
 	velocity = v_train * 0.5 + away * 10.0
 	velocity.y = 0.0
+	_crash_fx(global_position - away * 1.5, 30.0)
+	_crash_cooldown = 0.8
+	if not drag_mode:
+		start_tumble(away, 30.0)  # der Zug wirft das Auto um (rollt seitlich weg)
+		return
 	_spin = randf_range(2.0, 3.0) * (1.0 if randf() < 0.5 else -1.0)
 	stun = 1.2
 	_shake = 1.0
 	crashes += 1
-	_crash_cooldown = 0.8
 	audio.crash(1.0)
 
 
@@ -1544,6 +1602,10 @@ func _describe(c: KinematicCollision3D) -> String:
 func _process(dt: float) -> void:
 	var real := dt / maxf(Engine.time_scale, 0.01)
 	var want := _jc_slow if jump_cam and GameState.jump_cam == 0 and (not _jc_landed or tumbling or sinking > 0.0) else 1.0
+	if _crash_slow > 0.0:
+		_crash_slow -= real
+		if GameState.jump_cam == 0:
+			want = minf(want, CRASH_SLOW)
 	if _slowmo >= 1.0 and want >= 1.0:
 		return
 	_slowmo = move_toward(_slowmo, want, real * (4.0 if want < _slowmo else 2.5))

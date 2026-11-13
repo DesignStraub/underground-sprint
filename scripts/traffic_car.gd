@@ -385,6 +385,22 @@ func push(dv: Vector3) -> void:
 		_wreck_roll_v = randf_range(4.0, 7.0) * (1.0 if randf() < 0.5 else -1.0)
 
 
+## Schwerer Crash mit dem Spieler: der Wagen hebt ab und überschlägt sich (Busse nur ein Ruck), egal wie schwer
+## der Stoß rechnerisch war. dir: Richtung vom Spieler weg (Welt), hit: Aufpralltempo (m/s)
+func launch(dir: Vector3, hit: float) -> void:
+	if not wrecked:
+		push(dir * 0.1)
+	if kind == "bus":
+		_wreck_spin += randf_range(-0.6, 0.6)
+		return
+	if _wreck_roll_v == 0.0 and position.y <= _wreck_ground + 0.01:
+		_wreck_vy = clampf(hit * 0.35, 4.5, 9.0)
+		_wreck_roll_v = randf_range(5.0, 8.0) * (1.0 if randf() < 0.5 else -1.0)
+	var d := parent_basis.inverse() * dir
+	_wreck_vel += Vector3(d.x, 0, d.z) * clampf(hit * 0.25, 2.0, 8.0)
+	_wreck_spin += randf_range(-2.5, 2.5)
+
+
 ## Open World: auf einen anderen Weg (nächstes Autobahnstück) oder an eine andere Stelle desselben Wegs setzen
 func move_to(new_track: Dictionary, d: float) -> void:
 	track = new_track

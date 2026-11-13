@@ -83,6 +83,7 @@ static func build() -> Dictionary:
 		cities.append({"race_index": i, "b0": b0, "end_local": ex["end"], "lat0": lat0 - SIDE_MARGIN / 2.0,
 			"lat1": lat1 + SIDE_MARGIN / 2.0, "gap": maxf(GAP_MIN, -rad0 + 160.0), "far": far,
 			"phi": atan2(gz, gx) + i * 1e-4, "start_local": Track.frame_at(tr["curve"], tr["start"])["pos"], "polys_local": polys,
+			"holes_local": Track.ground_holes(tr),
 			"exit2_local": tr["world_exit2"]})
 	cities.sort_custom(func(a, b): return a["phi"] < b["phi"])
 	# Platz am Ring: zwischen zwei Nachbarn rechte Kante des einen + linke Kante des anderen (am Ring gemessen)
@@ -180,7 +181,19 @@ static func build() -> Dictionary:
 	for c in cities:
 		roads.append_array(c["roads"])
 	_add_keepout(cities, ring, ramps + oramps, oring, osegs)
-	_cache = {"cities": cities, "segments": segments, "ring_r": R, "ring": ring, "oring": oring, "roads": roads}
+	# Löcher im Boden (Tunneltröge, Flussbetten) aller Städte in Weltkoordinaten an jede Strecke: ihr Boden darf sie
+	# nicht zudecken, auch nicht den Trog der Nachbarstadt
+	var holes := PackedVector3Array()
+	for c in cities:
+		var cx: Transform3D = c["xf"]
+		for h in c["holes_local"]:
+			var w: Vector3 = cx * Vector3(h.x, 0.0, h.y)
+			holes.append(Vector3(w.x, w.z, h.z))
+	for c in cities:
+		c["race"]["world_holes"] = holes
+	for sg in segments:
+		sg["race"]["world_holes"] = holes
+	_cache = {"cities": cities, "segments": segments, "ring_r": R, "ring": ring, "oring": oring, "roads": roads, "holes": holes}
 	if OS.get_cmdline_user_args().has("--worldlog"):
 		var olen := 0.0
 		for k in oring.size():

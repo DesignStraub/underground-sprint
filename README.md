@@ -181,6 +181,20 @@ Außenring → nächste Stadt → Autobahn. Rundkurse und Drift-Kurse sind Schle
   Auch der Gehweg wechselt mit dem Viertel (`Track.PAVE`, `pave` im Gehweg-Shader): Betonplatten, kleines Pflaster
   (Altstadt, Kurviertel), Klinker im Läuferverband (Hafen, Marktviertel, Kiez), große helle Granitplatten
   (Bankenviertel, Prachtallee, Innenstadt, Campus), rote Platten (Chinatown).
+- **Crashs wie in Underground:** an Wänden überschlägt man sich nicht mehr (vorher kippte, wer quer gegen eine Wand
+  rutschte, und flog durch die Gegend); frontal steht man, streifend schrammt man entlang. Ein schwerer Crash mit
+  Verkehr (frontal oder Auffahren ab gut 30 km/h Unterschied) ist dagegen groß: der getroffene Wagen hebt ab und
+  überschlägt sich (Busse nur ein Ruck, `traffic_car.launch`), kurz Zeitlupe (0,35-fach, knapp 1 s, mit der
+  Einstellung der Sprungkamera abschaltbar), Funken und Glassplitter (`player_car._crash_fx`). Der Zug wirft das
+  Auto um (Überschlag zur Seite). Test: `--ctest=rear40` (151 auf 37 km/h, Wagen fliegt), `wall60` (steht, kein
+  Überschlag).
+- **Kein Deckel über Tunneltrögen:** über dem Hafentunnel in Rostock lag eine schwarze Fläche, bis man durch war:
+  der große Weltboden und der Boden des Außenrings hatten keine Löcher über fremden Trögen. Jetzt bekommt jeder Boden
+  die Tröge und Flussbetten aller Städte als Löcher (`world_layout` → `race["world_holes"]`, `Track.ground_holes`),
+  der Weltboden ebenso. Test: `--whatsat=x:z` listet beim Bild (`--wshot`) alle flachen Meshes an dem Punkt,
+  `--whathide=<shader|std|Name>` blendet sie vorher aus, `--noground` ohne Weltboden.
+- **Keine Start- und Zieltore in der Welt:** Rennen starten an ihrer Lichtsäule; Tore, Schachbrett-Linien und
+  START/ZIEL-Schilder gibt es nur noch im Rennen.
 - **Abfahrten:** die Lärmschutzwand endet 90 m vor und hinter jeder Abfahrt (auf deren Seite); dort stehen die Häuser
   an der Straße wie an einer Kreuzung, statt dicker Mauern links und rechts der Einmündung.
 - **Tag und Nacht:** die Uhr läuft (1 Spielstunde je echter Minute, ein Tag in 24 Minuten, Start 20 Uhr). Himmel,

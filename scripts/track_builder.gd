@@ -224,7 +224,7 @@ static func begin(race: Dictionary) -> Dictionary:
 		"extra": 2.5 if type == "drift" else (AB_EXTRA if type == "autobahn" else 0.0),  # Drift breiter, Autobahn 3 Spuren je Richtung
 		"paths": [{"id": 0, "kind": "main", "curve": curve, "half_w": HALF_W, "length": length, "from": 0.0, "to": length}],
 		# Open World: Lage der Strecke in der Welt (die Strecke selbst bleibt in ihren eigenen Koordinaten)
-		"xf": race.get("xf", Transform3D.IDENTITY), "world_exit": {}, "world_exit2": {}, "tail_join": race.get("tail_join", false), "keepout": race.get("keepout", []), "world": race.get("world", false) or type == "autobahn",
+		"xf": race.get("xf", Transform3D.IDENTITY), "world_exit": {}, "world_exit2": {}, "tail_join": race.get("tail_join", false), "keepout": race.get("keepout", []), "world_holes": race.get("world_holes", PackedVector3Array()), "world": race.get("world", false) or type == "autobahn",
 	}
 	var weights: Dictionary = race.get("districts", {"downtown": 1.0})
 	var dd := 0.0
@@ -357,8 +357,8 @@ static func step(job: Dictionary) -> float:
 				_build_city_signs(root, track, race)
 			if race.get("city", "") == "kreuzberg":
 				_east_side_gallery(root, track)
-			if type == "autobahn":
-				pass
+			if type == "autobahn" or track["world"]:
+				pass  # Open World: keine Start- und Zieltore, Rennen starten an ihrer Lichtsäule
 			elif job["loop"]:
 				_gate(root, track, track["start"] + 12.0, "START · ZIEL", Color(0.2, 1.0, 0.4))
 			else:
@@ -526,9 +526,10 @@ static func batch_progress(job: Dictionary) -> float:
 
 ## Boden der Stadt als Quadtree: grobe Platten weit weg, feine Kacheln am Rand der offenen Tröge, über dem Trog
 ## selbst nichts (sonst läge die Bodenfläche wie ein Deckel über der abgesenkten Fahrbahn).
-static func _build_ground(root: Node3D, track: Dictionary) -> void:
+## Löcher im Boden (Streckenkoordinaten x, z, Radius): Tunneltröge und Flussbetten
+static func ground_holes(track: Dictionary) -> PackedVector3Array:
 	var curve: Curve3D = track["curve"]
-	var holes := PackedVector3Array()  # x, z, Radius
+	var holes := PackedVector3Array()
 	for t in track["tunnels"]:
 		for span in [[t["r0"], t["from"] + 1.0], [t["to"] - 1.0, t["r1"]]]:
 			var d: float = span[0]
@@ -548,6 +549,11 @@ static func _build_ground(root: Node3D, track: Dictionary) -> void:
 				if hr > 1.5:
 					var q := pts[i].lerp(pts[i + 1], t)
 					holes.append(Vector3(q.x, q.y, hr))
+	return holes
+
+
+static func _build_ground(root: Node3D, track: Dictionary) -> void:
+	var holes := ground_holes(track)  # x, z, Radius
 	var lo := Vector2(1e9, 1e9)
 	var hi := Vector2(-1e9, -1e9)
 	for p in track["paths"]:
@@ -558,10 +564,19 @@ static func _build_ground(root: Node3D, track: Dictionary) -> void:
 	var margin := 260.0 if track["world"] else 1500.0
 	lo -= Vector2(margin, margin)
 	hi += Vector2(margin, margin)
+	# Open World: auch die Tröge und Flussbetten der Nachbarn freilassen (sonst lag dieser Boden schwarz über dem
+	# Hafentunnel in Rostock, bis man durch war)
+	if track["world"] and not (track["world_holes"] as PackedVector3Array).is_empty():
+		var inv: Transform3D = (track["xf"] as Transform3D).affine_inverse()
+		var side := maxf(hi.x - lo.x, hi.y - lo.y)  # der Boden ist ein Quadrat ab lo
+		for h in track["world_holes"]:
+			var q: Vector3 = inv * Vector3(h.x, 0.0, h.y)
+			if q.x > lo.x - h.z and q.x < lo.x + side + h.z and q.z > lo.y - h.z and q.z < lo.y + side + h.z:
+				holes.append(Vector3(q.x, q.z, h.z))
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	st.set_normal(Vector3.UP)
-	_ground_cell(st, lo, maxf(hi.x - lo.x, hi.y - lo.y), holes)
+	ground_cell(st, lo, maxf(hi.x - lo.x, hi.y - lo.y), holes)
 	var mi := MeshInstance3D.new()
 	mi.mesh = st.commit()
 	mi.material_override = Builder.mat(Color(0.03, 0.03, 0.035), 0.0, 0.9)
@@ -569,7 +584,7 @@ static func _build_ground(root: Node3D, track: Dictionary) -> void:
 	root.add_child(mi)
 
 
-static func _ground_cell(st: SurfaceTool, o: Vector2, s: float, holes: PackedVector3Array) -> void:
+static func ground_cell(st: SurfaceTool, o: Vector2, s: float, holes: PackedVector3Array) -> void:
 	var c := o + Vector2(s, s) * 0.5
 	var near := PackedVector3Array()
 	for h in holes:
@@ -580,7 +595,7 @@ static func _ground_cell(st: SurfaceTool, o: Vector2, s: float, holes: PackedVec
 		if s > 2.0:
 			var hs := s * 0.5
 			for k in 4:
-				_ground_cell(st, o + Vector2(k % 2, k / 2) * hs, hs, near)
+				ground_cell(st, o + Vector2(k % 2, k / 2) * hs, hs, near)
 			return
 		for h in near:
 			if Vector2(h.x, h.y).distance_squared_to(c) < h.z * h.z:
