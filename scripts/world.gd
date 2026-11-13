@@ -62,6 +62,8 @@ var _cam_yaw_prev := 0.0
 var _swing := 0.0
 var _area_t := 0.0
 var _area_name := ""
+var _district_entry := {}  # Strecke, deren Viertel gerade gilt
+var _district_key := ""
 var _ready_done := false
 var traffic: Array = []
 var _near := {}  # Verkehrsautos, für die es schon „knapp vorbei“ gab
@@ -959,12 +961,33 @@ func _process(dt: float) -> void:
 	tacho.nitro = player.nitro
 	tacho.heat = player.engine_heat
 	tacho.nitro_on = player.nitro_on
+	_update_district()
 	if _area_t > 0.0:
 		_area_t -= dt
 		hud["area"].modulate.a = 0.85 * clampf(_area_t / 0.6, 0.0, 1.0)
 	else:
 		hud["area"].modulate.a = 0.0
 	_update_speed_fx(dt)
+
+
+## Stadtviertel: beim Wechsel in eine andere Gegend steht ihr Name oben (wie im Rennen), nicht beim ersten Hineinfahren
+## in die Stadt (da steht der Ortsname)
+func _update_district() -> void:
+	if active.is_empty() or active["kind"] == "seg" or player.path_id != 0:
+		return
+	var arr: Array = (active["track"] as Dictionary)["districts"]
+	if arr.is_empty():
+		return
+	var di := clampi(int(player.progress / Track.DISTRICT_LEN), 0, arr.size() - 1)
+	var key: String = arr[di]
+	if active != _district_entry:
+		_district_entry = active
+		_district_key = key
+		return
+	if key != _district_key:
+		_district_key = key
+		hud["area"].text = tr(Track.DISTRICTS[key]["name"])
+		_area_t = 4.0
 
 
 ## Knapp vorbei (wie in Underground): nur bei hohem Tempo und wirklich knapp. Ab 120 km/h, mindestens 40 km/h

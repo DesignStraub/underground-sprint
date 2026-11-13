@@ -159,6 +159,22 @@ Außenring → nächste Stadt → Autobahn. Rundkurse und Drift-Kurse sind Schle
   ihre Meshes im Hauptbild hoch), und 50–110 ms im Bild, in dem sie fertig in die Welt kommt. Ein eigener Render-Thread
   (`--render-thread separate`) glättete das, machte das Bauen aber 3–7-mal langsamer (Würzburg 17 statt 5,5 s): bei
   hohem Tempo käme man vor der Stadt an.
+- **Nebenstraßen zwischen den Häusern** (`track_builder._plan_lanes`, nur in der Welt): in den Städten zweigen
+  Nebenstraßen rechtwinklig ab, laufen gut 26 m hinter der Gehwegkante (hinter der ersten Häuserreihe) parallel zur
+  Hauptstraße und münden 75–160 m weiter wieder ein: ein Block zum Drumherumfahren. Zwei Spuren (10 m), Ecken mit
+  18 m Radius, an beiden Seiten Häuser, wo keins steht ein Zaun, eigene Laternen; die Wände dahinter halten einen auf
+  der Straße. Sie folgen auch Kurven der Hauptstraße (nach innen nur bei weitem Bogen), nicht an Tunneln, Trögen,
+  Brücken, Hochbahn, Bahnübergang, Flüssen, Seen, Hügeln, anderen Abzweigen, fremden Fahrbahnen der Welt und nicht, wo
+  an der Einmündung ein Mittelstreifen liegt. 69 in 16 Strecken (Kreuzberg 13, Würzburg und Aachen je 8). In der Welt
+  gibt es dafür keine abgesperrten Sackgassen mehr (`_drop_spurs`; geplant werden sie trotzdem, damit der Zufall der
+  übrigen Strecke wie im Rennen bleibt). Rennen bauen ihre Strecke ohne `world`: dort gibt es die Nebenstraßen nicht,
+  die Strecke ist abgesperrt wie bisher. Auf Minikarte und großer Karte sind Abzweige, Gassen und Auffahrten
+  hellgrau wie Straßen (vorher orange als „Abkürzung“). Rundfahrt-Test: alle Städte 77 km, ohne Hänger; übrig sind
+  Schrammer des Autopiloten, der die 90°-Ecken mit 40 km/h schneidet (2–5 m/s gegen die Wand).
+- **Viertel als Gegenden:** die Viertel einer Strecke wechseln nicht mehr alle 400 m, sondern bleiben je zwei bis drei
+  Abschnitte gleich (800–1200 m, eigener Zufall, auch im Rennen). In der Welt steht beim Wechsel ihr Name oben.
+  Chinatown kommt jetzt vor (Frankfurt, Köln), die Fassaden haben je Viertel eigene, kräftigere Farben (Marktviertel
+  bunt, Altstadt Ocker, Rosa, Salbei, Bankenviertel kühles Glas, Hafen roter Klinker, deutsche Altstadt Pastell).
 - **Abfahrten:** die Lärmschutzwand endet 90 m vor und hinter jeder Abfahrt (auf deren Seite); dort stehen die Häuser
   an der Straße wie an einer Kreuzung, statt dicker Mauern links und rechts der Einmündung.
 - **Tag und Nacht:** die Uhr läuft (1 Spielstunde je echter Minute, ein Tag in 24 Minuten, Start 20 Uhr). Himmel,
@@ -413,8 +429,9 @@ in den Altstädten und Graffiti an den Altbauten im Kiez.
 <img src="update_bilder/stimmungen.jpg" alt="Stimmungen" width="480">
 
 ## Musik und Sounds
-Musik (`music/`, 15 Tracks in zwei Listen: 8 Phonk/Trap beim Fahren in Rennen und Open World, 7 Hip-Hop, Boom Bap
-und Drill in der Garage und den Menüs) und Intro-Sound (`assets/intro_sound.mp3`) sind lizenzfreie Tracks von Pixabay
+Musik (`music/`, 31 Tracks in zwei Listen: 8 Phonk/Trap beim Fahren in Rennen und Open World, in der Garage und den
+Menüs Hip-Hop, Boom Bap, Drill, West Coast und dunkle Gangsta-Beats; 6 G-Funk/West-Coast-Tracks laufen in beiden Listen,
+beim Spielstart kommt zuerst einer von 5 G-Funk-Tracks, ohne Titel-Blase) und Intro-Sound (`assets/intro_sound.mp3`) sind lizenzfreie Tracks von Pixabay
 (`scripts/music.gd`, Liste je Track in `TRACKS`, Quellen in `CREDITS.md`): zufällige Reihenfolge je Liste, beim
 Wechsel zwischen Garage und Fahrt kommt ein Track der anderen Liste, die letzten 6 s blendet der nächste über;
 ist die Liste durch, wird neu gemischt. Seit 2.22 haben Menü und Rennen je ihren eigenen Track: beim Laden eines

@@ -83,11 +83,12 @@ const RIVER_Y := -2.2  # Wasserspiegel der Flüsse (Ufermauer bis Straßenniveau
 ## props: welche Gehweg-Möbel vorkommen (Nummern siehe _build_props).
 const DISTRICTS := {
 	"downtown": {"name": "BANKENVIERTEL", "shop": 0.3, "low": [6.0, 10.0], "tall": [24.0, 90.0], "tall_p": 0.7, "styles": [0, 1, 3, 3],
-		"tints": [Color(0.08, 0.09, 0.11), Color(0.13, 0.14, 0.17), Color(0.05, 0.07, 0.1)], "lit": 0.45,
+		"tints": [Color(0.08, 0.1, 0.14), Color(0.13, 0.15, 0.2), Color(0.05, 0.09, 0.13), Color(0.07, 0.13, 0.13)], "lit": 0.45,
 		"trees": 0.1, "billboard": 0.3, "neon_edge": 0.3, "lamp": Color(0.8, 0.88, 1.0), "lamp_kind": "modern",
 		"screens": 0.35, "gantry": 0.5, "props": [0, 3, 7, 8, 9, 10, 11, 12, 13], "median": 0.35},
 	"shops": {"name": "MARKTVIERTEL", "shop": 0.8, "low": [10.0, 16.0], "tall": [16.0, 24.0], "tall_p": 0.3, "styles": [6, 6, 4, 0],
-		"tints": [Color(0.3, 0.25, 0.2), Color(0.26, 0.25, 0.23), Color(0.3, 0.16, 0.11), Color(0.2, 0.21, 0.23)], "lit": 0.5,
+		"tints": [Color(0.3, 0.25, 0.2), Color(0.3, 0.16, 0.11), Color(0.42, 0.33, 0.16), Color(0.36, 0.2, 0.2), Color(0.22, 0.3, 0.3),
+			Color(0.38, 0.3, 0.26)], "lit": 0.5,
 		"roof": 0.55, "gable": 0.15, "roof_tints": [Color(0.12, 0.13, 0.15), Color(0.3, 0.12, 0.08), Color(0.22, 0.1, 0.07)],
 		"trees": 0.35, "billboard": 0.15, "neon_edge": 0.1, "lamp": Color(1.0, 0.68, 0.35), "lamp_kind": "classic",
 		"blade": 0.3, "bulbs": true, "props": [0, 1, 2, 4, 5, 6, 8, 9, 11, 12]},
@@ -97,12 +98,12 @@ const DISTRICTS := {
 		"trees": 0.7, "billboard": 0.15, "neon_edge": 0.1, "lamp": Color(1.0, 0.82, 0.55), "lamp_kind": "classic",
 		"median": 1.0, "blade": 0.15, "props": [0, 4, 5, 8, 9, 10, 13]},
 	"residential": {"name": "ALTSTADT", "shop": 0.25, "low": [9.0, 15.0], "tall": [15.0, 21.0], "tall_p": 0.2, "styles": [6, 5, 4, 6],
-		"tints": [Color(0.36, 0.31, 0.24), Color(0.3, 0.14, 0.09), Color(0.34, 0.28, 0.2), Color(0.28, 0.27, 0.25)], "lit": 0.55,
+		"tints": [Color(0.36, 0.31, 0.24), Color(0.3, 0.14, 0.09), Color(0.44, 0.36, 0.2), Color(0.42, 0.3, 0.28), Color(0.3, 0.34, 0.26)], "lit": 0.55,
 		"trees": 0.6, "billboard": 0.0, "neon_edge": 0.0, "lamp": Color(1.0, 0.75, 0.45), "lamp_kind": "classic",
 		"roof": 0.95, "gable": 0.4, "roof_tints": [Color(0.32, 0.12, 0.07), Color(0.26, 0.1, 0.07), Color(0.13, 0.14, 0.16)],
 		"props": [0, 4, 5, 6, 8, 13, 14]},
 	"industrial": {"name": "HAFEN", "shop": 0.05, "low": [7.0, 12.0], "tall": [12.0, 22.0], "tall_p": 0.25, "styles": [2, 2, 4, 4],
-		"tints": [Color(0.15, 0.17, 0.18), Color(0.28, 0.12, 0.08), Color(0.24, 0.11, 0.07), Color(0.1, 0.14, 0.15)], "lit": 0.3,
+		"tints": [Color(0.15, 0.17, 0.18), Color(0.32, 0.12, 0.07), Color(0.28, 0.1, 0.06), Color(0.1, 0.16, 0.17), Color(0.2, 0.22, 0.12)], "lit": 0.3,
 		"roof": 0.3, "gable": 0.5, "roof_tints": [Color(0.1, 0.11, 0.12), Color(0.16, 0.2, 0.18)],
 		"trees": 0.0, "billboard": 0.1, "neon_edge": 0.0, "lamp": Color(1.0, 0.62, 0.3), "lamp_kind": "sodium",
 		"containers": true, "cranes": 0.14, "stacks": 0.35, "overpass": 0.5, "props": [2, 2, 6, 7, 14, 15]},
@@ -117,7 +118,7 @@ const DISTRICTS := {
 	# --- deutsche Städte (Orts-Strecken): Fachwerk, Putz, Ziegeldächer. roof = Anteil Satteldächer,
 	# gable = Anteil mit Giebel zur Straße, roof_tints = Dachfarben
 	"altstadt_de": {"name": "ALTSTADT", "shop": 0.55, "low": [9.0, 14.0], "tall": [14.0, 18.0], "tall_p": 0.15, "styles": [5, 5, 6],
-		"tints": [Color(0.5, 0.46, 0.38), Color(0.54, 0.5, 0.42), Color(0.5, 0.42, 0.3), Color(0.46, 0.44, 0.4)], "lit": 0.6,
+		"tints": [Color(0.5, 0.46, 0.38), Color(0.56, 0.48, 0.28), Color(0.54, 0.4, 0.36), Color(0.42, 0.48, 0.4), Color(0.52, 0.38, 0.24)], "lit": 0.6,
 		"trees": 0.12, "billboard": 0.0, "neon_edge": 0.0, "lamp": Color(1.0, 0.72, 0.42), "lamp_kind": "classic",
 		"roof": 1.0, "gable": 0.6, "roof_tints": [Color(0.36, 0.13, 0.08), Color(0.3, 0.12, 0.08), Color(0.25, 0.1, 0.07)],
 		"names": GERMAN_SHOPS, "de": true, "props": [0, 4, 5, 6, 8, 13]},
@@ -136,12 +137,12 @@ const DISTRICTS := {
 		"trees": 0.4, "billboard": 0.0, "neon_edge": 0.0, "lamp": Color(0.85, 0.92, 1.0), "lamp_kind": "modern",
 		"names": GERMAN_SHOPS, "de": true, "props": [0, 3, 8, 9, 13]},
 	"kiez_de": {"name": "KIEZ", "shop": 0.65, "low": [16.0, 21.0], "tall": [21.0, 38.0], "tall_p": 0.12, "styles": [8, 8, 8, 6, 0],
-		"tints": [Color(0.42, 0.36, 0.3), Color(0.36, 0.34, 0.33), Color(0.44, 0.33, 0.26), Color(0.3, 0.33, 0.36)], "lit": 0.65,
+		"tints": [Color(0.42, 0.36, 0.3), Color(0.36, 0.34, 0.33), Color(0.48, 0.3, 0.22), Color(0.26, 0.32, 0.4), Color(0.4, 0.42, 0.3)], "lit": 0.65,
 		"trees": 0.35, "billboard": 0.08, "neon_edge": 0.06, "lamp": Color(1.0, 0.78, 0.5), "lamp_kind": "classic",
 		"roof": 0.35, "gable": 0.0, "roof_tints": [Color(0.14, 0.15, 0.17), Color(0.3, 0.13, 0.09)],
 		"names": GERMAN_SHOPS, "de": true, "blade": 0.25, "props": [0, 3, 8, 9, 11, 12]},
 	"vorstadt_de": {"name": "VORSTADT", "shop": 0.15, "low": [7.0, 11.0], "tall": [11.0, 15.0], "tall_p": 0.15, "styles": [6, 6, 4, 5],
-		"tints": [Color(0.46, 0.42, 0.36), Color(0.42, 0.4, 0.38), Color(0.48, 0.4, 0.3), Color(0.38, 0.36, 0.34)], "lit": 0.45,
+		"tints": [Color(0.5, 0.48, 0.44), Color(0.42, 0.4, 0.38), Color(0.5, 0.42, 0.3), Color(0.46, 0.44, 0.36)], "lit": 0.45,
 		"trees": 0.65, "billboard": 0.0, "neon_edge": 0.0, "lamp": Color(1.0, 0.7, 0.4), "lamp_kind": "classic",
 		"roof": 1.0, "gable": 0.3, "roof_tints": [Color(0.34, 0.13, 0.08), Color(0.16, 0.16, 0.18), Color(0.28, 0.12, 0.08)],
 		"names": GERMAN_SHOPS, "de": true, "props": [0, 4, 5, 6, 13]},
@@ -236,6 +237,21 @@ static func begin(race: Dictionary) -> Dictionary:
 		track["districts"].append(key)
 		prev_key = key
 		dd += DISTRICT_LEN
+	# Viertel als zusammenhängende Gegend: je zwei bis drei Abschnitte (800-1200 m) gleich, sonst wechselte es alle
+	# 400 m und jede Stadt sah wie ein Mix aus allem aus. Eigener Zufall: der übrige Bau bleibt unverändert.
+	var drng := RandomNumberGenerator.new()
+	drng.seed = int(race["seed"]) * 13 + 5
+	var arr: Array = track["districts"]
+	var di := 0
+	while di < arr.size():
+		var run := drng.randi_range(2, 3)
+		for k in range(di + 1, mini(di + run, arr.size())):
+			arr[k] = arr[di]
+		di += run
+		# nächste Gegend anders als diese (wenn die Strecke mehr als ein Viertel kennt)
+		if di < arr.size() and arr[di] == arr[di - 1] and weights.size() > 1:
+			var keys: Array = weights.keys().filter(func(k2): return k2 != arr[di - 1])
+			arr[di] = keys[drng.randi() % keys.size()]
 
 	for b in gen["bulges"]:
 		_plan_shortcut(track, b, rng)
@@ -264,7 +280,10 @@ static func begin(race: Dictionary) -> Dictionary:
 	if not track["elev0"].is_empty():
 		curve.set_meta("elev", track["elev0"])
 	if race.get("world", false):
+		_drop_spurs(track)
 		_plan_world_exit(track)
+		if type == "sprint" or type == "circuit":
+			_plan_lanes(track, int(race["seed"]))
 	return {"race": race, "rng": rng, "root": root, "track": track, "city": city, "type": type, "loop": loop,
 		"occupied": [], "buildings": [], "i": 0, "us": []}
 
@@ -972,6 +991,159 @@ static func _plan_shortcut(track: Dictionary, b: Dictionary, rng: RandomNumberGe
 		track["lakes"].append({"path": path["id"], "center": p0 + du * (0.52 * a) + dv * vb * 6.0,
 			"au": du, "av": dv * vb, "hu": 0.22 * a, "hv": 29.0, "gap0": 1e9, "gap1": -1e9})
 		track["parks"].append([p0, b["p1"], b["p2"]])
+
+
+const LANE_HALF := 5.0  # Nebenstraße: zwei Spuren
+const LANE_BACK := 26.0  # so weit hinter der Gehwegkante läuft die Nebenstraße (Platz für die erste Häuserreihe)
+const LANE_R := 18.0  # Eckradius, wo sie abbiegt (enger schneidet man die Ecke und schrammt innen an der Wand)
+
+
+## Open World: Nebenstraßen, auf denen man von der Strecke weg zwischen die Häuser fahren kann. Jede zweigt
+## rechtwinklig ab, läuft hinter der ersten Häuserreihe parallel zur Hauptstraße und mündet wieder ein (ein Block
+## zum Drumherumfahren); an beiden Seiten stehen Häuser, die Wände dahinter halten einen auf der Straße. Eigener
+## Zufall (die übrige Strecke bleibt wie im Rennen). Rennen bauen ihre Strecke ohne "world": dort gibt es sie nicht,
+## die Strecke ist abgesperrt.
+static func _plan_lanes(track: Dictionary, seed: int) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed * 31 + 7
+	var L: float = track["length"]
+	var d := rng.randf_range(70.0, 150.0)
+	var side := 1.0 if rng.randf() < 0.5 else -1.0
+	var end: float = minf(L - 90.0, track["finish"] - 40.0) if not track["loop"] else L - 90.0
+	while d < end:
+		var span := rng.randf_range(75.0, 160.0)
+		var placed := false
+		if d + span < end:
+			for s in [side, -side]:
+				if _try_lane(track, d, d + span, s):
+					placed = true
+					side = -s
+					break
+		d += span + rng.randf_range(70.0, 170.0) if placed else 20.0
+
+
+## Open World: keine abgesperrten Sackgassen (die gibt es nur im Rennen); an ihrer Stelle können Nebenstraßen
+## abzweigen. Geplant werden sie trotzdem, damit der Zufall danach derselbe bleibt wie im Rennen.
+static func _drop_spurs(track: Dictionary) -> void:
+	var keep := []
+	for p in track["paths"]:
+		if p["kind"] == "spur":
+			var d: float = p["from"]
+			track["zones"] = track["zones"].filter(func(z): return not (is_equal_approx(z["from"], d - 20.0) and is_equal_approx(z["to"], d + 20.0)))
+		else:
+			keep.append(p)
+	for i in keep.size():
+		var old_id: int = keep[i]["id"]
+		for lk in track["lakes"]:
+			if lk["path"] == old_id:
+				lk["path"] = i
+		keep[i]["id"] = i
+	track["paths"] = keep
+
+
+## Punkt neben der Hauptstraße: along = Weg-Meter, lat = Abstand von der Mitte (zur Seite s)
+static func _beside(curve: Curve3D, along: float, lat: float) -> Vector3:
+	var f := frame_at(curve, along)
+	var q: Vector3 = f["pos"] + f["right"] * lat
+	return Vector3(q.x, 0.0, q.z)
+
+
+## Test: warum Nebenstraßen nicht passten (Grund -> Anzahl)
+static var lane_why := {}
+
+
+static func _lw(k: String) -> bool:
+	lane_why[k] = lane_why.get(k, 0) + 1
+	return false
+
+
+static func _try_lane(track: Dictionary, d1: float, d2: float, s: float) -> bool:
+	var curve: Curve3D = track["curve"]
+	# Hauptstraße hier flach, ohne Tunnel, Trog, Brücke, Hochbahn auf dieser Seite, Bahnübergang, andere Abzweige
+	var base := 0.0
+	var dd := d1 - 25.0
+	while dd <= d2 + 25.0:
+		if _in_zone(track, dd, 0.0) or _trough_at(track, dd) != 0 or not tunnel_at(track, dd, 12.0).is_empty() \
+				or not bridge_at(track, dd).is_empty() or absf(elev_at(curve, dd)) > 0.05 or _el_side(track, dd, 12.0) == s:
+			return _lw("zone" if _in_zone(track, dd, 0.0) else "main")
+		# an der Einmündung kein Mittelstreifen (man käme von der Gegenfahrbahn nicht hinein, die Mitte der Einmündung
+		# läge auf der Insel)
+		if (absf(dd - d1) < 30.0 or absf(dd - d2) < 30.0) and median_at(track, dd) > 0.05:
+			return _lw("insel")
+		base = maxf(base, hw(track, dd))
+		dd += 6.0
+	if track["crossing_d"] >= 0.0 and track["crossing_d"] > d1 - 50.0 and track["crossing_d"] < d2 + 50.0:
+		return _lw("bahn")
+	var off := base + WALK + LANE_BACK + LANE_HALF  # Mitte der Nebenstraße
+	# Kurven: an den Einmündungen fast gerade (rechtwinklige Ecke), dazwischen darf die Hauptstraße biegen. Biegt sie
+	# zur Seite der Nebenstraße, muss der Bogen weit genug sein (die Nebenstraße läuft innen enger), nach außen geht
+	# fast alles (sie läuft außen weiter herum).
+	dd = d1 - 20.0
+	while dd <= d2 + 20.0:
+		var r := _min_radius(curve, dd, track["loop"])
+		if r < 1e5:
+			var fa := frame_at(curve, dd - 6.0)
+			var fb := frame_at(curve, dd + 6.0)
+			var inner: bool = signf((fb["fwd"] - fa["fwd"]).dot(fa["right"])) == s
+			var mouth: bool = absf(dd - d1) < 22.0 or absf(dd - d2) < 22.0
+			if r < (55.0 if mouth else 30.0) or (inner and r < off + 15.0):
+				return _lw("radius")
+		dd += 8.0
+	var R := LANE_R
+	# (along, lat): hinaus, Bogen, parallel, Bogen, zurück
+	var al := []
+	var lat := 0.0
+	while lat < off - R:
+		al.append(Vector2(d1, lat))
+		lat += 3.0
+	for k in 7:
+		var t := PI * 0.5 * k / 6.0
+		al.append(Vector2(d1 + R - R * cos(t), off - R + R * sin(t)))
+	var a := d1 + R + 4.0
+	while a < d2 - R - 2.0:
+		al.append(Vector2(a, off))
+		a += 4.0
+	for k in 7:
+		var t := PI * 0.5 * k / 6.0
+		al.append(Vector2(d2 - R + R * sin(t), off - R + R * cos(t)))
+	lat = off - R - 3.0
+	while lat > 0.5:
+		al.append(Vector2(d2, lat))
+		lat -= 3.0
+	al.append(Vector2(d2, 0.0))
+	var pts := []
+	for v in al:
+		pts.append(_beside(curve, v.x, v.y * s))
+	# Platz: kein anderer Teil der Hauptstraße, keine andere Nebenstraße, kein Wasser, Bahngelände, Hügel,
+	# keine fremde Fahrbahn der Welt; dahinter noch Platz für eine Häuserreihe
+	var outer := Basis()
+	for i in pts.size():
+		var v: Vector2 = al[i]
+		if v.y < base + WALK:
+			continue
+		var q: Vector3 = pts[i]
+		var behind := _beside(curve, v.x, (v.y + LANE_HALF + 14.0) * s) if v.y > off - R else q
+		for pp in [q, behind]:
+			var want: float = (pp.distance_to(_beside(curve, v.x, 0.0))) - base - 3.0
+			if _main_clearance(track, pp) < want:
+				return _lw("mainnah")
+			if _branch_clearance(track, pp) < LANE_HALF + 12.0:
+				return _lw("abzweig")
+			if _in_river(track, pp, 8.0) or _in_lake(track, pp, 8.0) or _rail_clearance(track, pp) < 12.0:
+				return _lw("wasser")
+			if (not track["hills"].is_empty() and hill_h(track, pp) > 0.2):
+				return _lw("huegel")
+			if _keepout_hit(track, pp, outer, LANE_HALF + 3.0, LANE_HALF + 3.0):
+				return _lw("keepout")
+	var c := Curve3D.new()
+	c.bake_interval = 1.0
+	for q in pts:
+		c.add_point(q)
+	track["paths"].append({"id": track["paths"].size(), "kind": "lane", "curve": c, "half_w": LANE_HALF,
+		"length": c.get_baked_length(), "from": d1, "to": d2, "closed": false, "side": s})
+	track["zones"].append({"from": d1 - 22.0, "to": d1 + 22.0})
+	track["zones"].append({"from": d2 - 22.0, "to": d2 + 22.0})
+	return true
 
 
 ## Open World: Autobahn-Stück. Durchgehender Mittelstreifen (über die Stückenden hinaus, sonst liefe er an jeder
@@ -1814,7 +1986,7 @@ static func _build_branch(root: Node3D, track: Dictionary, p: Dictionary, rng: R
 					root.add_child(hm)
 		prev = cur
 		d += step
-	var lanes := 2.0 if kind == "spur" or kind == "fork" or kind == "ramp" else 0.0
+	var lanes := 2.0 if kind == "spur" or kind == "fork" or kind == "ramp" or kind == "lane" else 0.0
 	_road_mesh(root, road, lanes, half * 2.0, 1.0 if kind == "alley" else 0.0, 0.012)
 	if n_walk > 0:
 		_flush(root, walk, _walk_mat(walk_w))
@@ -2230,7 +2402,7 @@ static func _build_fences(root: Node3D, track: Dictionary, blockers: Array) -> v
 	fan_rng.seed = int(track["length"] * 7.0) + 11
 	var next_fans := {-1.0: 30.0, 1.0: 70.0}  # frühestes d für die nächste Gruppe je Seite
 	for p in track["paths"]:
-		if p["id"] == 0 or p["kind"] == "fork" or p["kind"] == "spur":
+		if p["id"] == 0 or p["kind"] == "fork" or p["kind"] == "spur" or p["kind"] == "lane":
 			lines.append(p)
 	for p in lines:
 		var c: Curve3D = p["curve"]
@@ -3691,7 +3863,7 @@ static func _build_city(root: Node3D, track: Dictionary, rng: RandomNumberGenera
 	for side in [-1.0, 1.0]:
 		frontages.append({"path": track["paths"][0], "side": side, "edge": HALF_W + WALK})
 	for p in track["paths"]:
-		if p["kind"] == "alley" or p["kind"] == "lake" or p["kind"] == "fork":
+		if p["kind"] == "alley" or p["kind"] == "lake" or p["kind"] == "fork" or p["kind"] == "lane":
 			for side in [-1.0, 1.0]:
 				frontages.append({"path": p, "side": side, "edge": p["half_w"] + (3.5 if p["kind"] == "fork" else 0.8)})
 	for fr in frontages:
@@ -4430,6 +4602,21 @@ static func _build_lamps(root: Node3D, track: Dictionary) -> void:
 			_lamp(root, _district_at(track, d), f, side, base, mats)
 		d += LAMP_STEP
 		side = -side
+	# Nebenstraßen (Open World): eigene Laternen, sonst wären sie nachts schwarz
+	for p in track["paths"]:
+		if p["kind"] != "lane":
+			continue
+		var c: Curve3D = p["curve"]
+		var dist := _district_at(track, p["from"])
+		var dl := 8.0
+		var sd := 1.0
+		while dl < p["length"] - 8.0:
+			var fl := frame_at(c, dl)
+			var bl: Vector3 = fl["pos"] + fl["right"] * sd * (LANE_HALF + 0.8) - Vector3(0, CURB_H, 0)
+			if _main_clearance(track, bl) > WALK + 4.0:
+				_lamp(root, dist, fl, sd, bl, mats)
+			dl += 27.0
+			sd = -sd
 
 
 ## modern: Ausleger mit flachem Kopf. classic: Altstadt-Laterne. sodium: hoher Mast, orange. lantern: roter Lampion.

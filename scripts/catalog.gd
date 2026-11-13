@@ -549,7 +549,7 @@ static func rating(car_id: String, cfg: Dictionary) -> int:
 const RACES := [
 	{"name": "Bankenviertel-Sprint", "town": "Frankfurt am Main", "region": "Kreisfreie Stadt", "geo": Vector2(50.1109, 8.6821), "mood": "neon",  "type": "sprint", "tier": 1, "seed": 11, "segments": 18, "max_turn": 50.0,
 		"bulges": {4: "alley", 11: "lake"},
-		"districts": {"downtown": 0.35, "shops": 0.5, "residential": 0.15}},
+		"districts": {"downtown": 0.45, "shops": 0.3, "chinatown": 0.25}},
 	{"name": "Prachtallee-Sprint", "town": "München", "region": "Landeshauptstadt", "geo": Vector2(48.1351, 11.582), "mood": "daemmerung",  "type": "sprint", "tier": 1, "seed": 23, "segments": 20, "max_turn": 40.0,
 		"bulges": {5: "fork", 13: "fork"},
 		"districts": {"boulevard": 0.45, "downtown": 0.25, "shops": 0.3}},
@@ -561,7 +561,7 @@ const RACES := [
 		"districts": {"highway": 0.4, "downtown": 0.2, "industrial": 0.2, "boulevard": 0.2}},
 	{"name": "Innenstadtring", "town": "Köln", "region": "Kreisfreie Stadt", "geo": Vector2(50.9375, 6.9603), "mood": "mitternacht",  "type": "circuit", "tier": 1, "laps": 2, "seed": 101, "corners": 9, "radius": 260.0,
 		"bulges": {3: "alley"},
-		"districts": {"downtown": 0.4, "boulevard": 0.3, "shops": 0.3}},
+		"districts": {"downtown": 0.35, "boulevard": 0.25, "chinatown": 0.4}},
 	{"name": "Hafenring", "town": "Bremen", "region": "Freie Hansestadt Bremen", "geo": Vector2(53.0793, 8.8017), "mood": "regen",  "type": "circuit", "tier": 2, "laps": 2, "seed": 202, "corners": 10, "radius": 300.0,
 		"bulges": {2: "fork", 6: "lake"},
 		"districts": {"industrial": 0.5, "highway": 0.25, "shops": 0.25}},

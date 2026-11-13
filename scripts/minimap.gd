@@ -1,6 +1,6 @@
 extends Control
 ## Radar-Minimap unten links: Die Karte dreht sich mit der Kamera (oben ist da, wo du hinschaust), du bist der
-## gelbe Pfeil in der Mitte, Gegner sind Punkte in ihrer Lackfarbe (außer Sicht am Rand), Abkürzungen orange,
+## gelbe Pfeil in der Mitte, Gegner sind Punkte in ihrer Lackfarbe (außer Sicht am Rand), Abzweige und Gassen hellgrau,
 ## gesperrte Seitenstraßen grau, Flüsse und Seen blau, das Ziel eine Schachbrettflagge (außer Sicht am Rand,
 ## zeigt so die Richtung). Weiter raus gezoomt, je schneller du fährst.
 ##
@@ -18,7 +18,7 @@ const STEP := 8.0  # Abstand der Kartenpunkte in Metern
 const PX := 180.0 / R  # Meter je Pixel bei mittlerem Zoom (Linienbreiten in Metern)
 const COL_MAIN := Color(0.93, 0.96, 1.0)
 const COL_EDGE := Color(0.45, 0.6, 0.8, 0.55)
-const COL_ALT := Color(1.0, 0.62, 0.15)
+const COL_ALT := Color(0.78, 0.82, 0.9)  # Abzweige, Gassen, Auffahrten: wie Straßen, nur schmaler (früher orange)
 const COL_SPUR := Color(0.6, 0.65, 0.75, 0.45)
 const COL_WATER := Color(0.12, 0.35, 0.75, 0.75)
 

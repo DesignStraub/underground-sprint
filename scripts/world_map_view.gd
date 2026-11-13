@@ -112,7 +112,7 @@ func _draw() -> void:
 			if pass_i == 0:
 				draw_polyline(pts, Color(0.35, 0.5, 0.7, 0.35), 4.0 if kind == 0 else 3.0, true)
 			else:
-				var col := Color(0.92, 0.95, 1.0, 0.9) if kind == 0 else (Color(1.0, 0.62, 0.15, 0.8) if kind == 1 else Color(0.6, 0.65, 0.75, 0.4))
+				var col := Color(0.92, 0.95, 1.0, 0.9) if kind == 0 else (Color(0.78, 0.82, 0.9, 0.75) if kind == 1 else Color(0.6, 0.65, 0.75, 0.4))
 				draw_polyline(pts, col, 1.6 if kind == 0 else 1.2, true)
 	# Rennen (Ortsnamen nur, wo Platz ist; das gewählte zuerst)
 	var taken := []
