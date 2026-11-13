@@ -1533,7 +1533,7 @@ func _describe(c: KinematicCollision3D) -> String:
 				bi = i
 		var gt := cs.global_transform
 		return "Wand %s-%s bei %s (%s)" % [(gt * f[bi]).snapped(Vector3.ONE * 0.1), (gt * f[bi + 1]).snapped(Vector3.ONE * 0.1), p.snapped(Vector3.ONE * 0.1),
-			str(cs.get_parent().get_path()).right(60)]
+			"%s/%s" % [cs.get_parent().get_parent().get_meta("race_name", "?"), cs.get_parent().name]]
 	return str(cs.shape)
 
 

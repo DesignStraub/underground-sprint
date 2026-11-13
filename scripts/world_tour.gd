@@ -160,6 +160,7 @@ func _physics_process(dt: float) -> void:
 		_path = _track["paths"][pid]
 		if OS.get_cmdline_user_args().has("--wpaths") and not _track.has("_dumped"):
 			_track["_dumped"] = true
+			print("STRECKE %s länge=%.0f bahn=%.0f" % [_leg["name"], _track["length"], _track.get("crossing_d", -1.0)])
 			for q in _track["paths"]:
 				var qc: Curve3D = q["curve"]
 				print("PFAD %d %s from=%.0f to=%.0f len=%.0f hw=%.1f tail=%s conn=%s a=%s b=%s" % [q["id"], q["kind"], q["from"], q["to"], qc.get_baked_length(),
@@ -225,7 +226,19 @@ func _physics_process(dt: float) -> void:
 	# Auffälligkeiten
 	if pl.wall_hits != _walls:
 		_walls = pl.wall_hits
-		_report("WAND", "%s quer=%.1f" % [pl.last_hit if "last_hit" in pl else pl._collider_name, lat_now])
+		var dm := fposmod(_d, L2)
+		var extra := ""
+		if _path["id"] == 0:
+			extra = " hw=%.1f mitte=%.1f trog=%d" % [Track.hw(_track, dm), Track.median_at(_track, dm), Track._trough_at(_track, dm)]
+			if OS.get_cmdline_user_args().has("--wpaths"):
+				# Verlauf um die Stelle: Richtung (Grad) und Höhe alle 10 m
+				var cv: Curve3D = _track["curve"]
+				var prof := []
+				for k in range(-6, 7):
+					var fk := Track.frame_at(cv, fposmod(dm + k * 10.0, L2))
+					prof.append("%.0f/%.1f" % [rad_to_deg(atan2(fk["fwd"].x, fk["fwd"].z)), fk["y"]])
+				extra += " verlauf=" + " ".join(prof)
+		_report("WAND", "%s quer=%.1f%s" % [pl.last_hit if "last_hit" in pl else pl._collider_name, lat_now, extra])
 	var half: float = Track.hw(_track, fposmod(_d, L2)) if _path["id"] == 0 else float(_path.get("half_w", Track.HALF_W))
 	if absf(lat_now) > half + Track.WALK + 3.0:
 		if _d * _dir - _last_off > 50.0:

@@ -176,6 +176,7 @@ static func begin(race: Dictionary) -> Dictionary:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = race["seed"]
 	var root := Node3D.new()
+	root.set_meta("race_name", race.get("name", "?"))  # für Testmeldungen (woran ist das Auto gestoßen)
 	root.name = "Track"
 	root.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED  # Schilder in der Welt bleiben deutsch
 	_bb = {}

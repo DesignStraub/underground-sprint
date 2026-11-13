@@ -121,9 +121,12 @@ Außenring → nächste Stadt → Autobahn. Rundkurse und Drift-Kurse sind Schle
   `--wpaths`: alle Wege jeder Strecke mit Anfang und Ende). Headless baut die Welt ohne Thread (der Ersatz-Renderer
   ist nicht threadsicher, Meshes aus dem Bau-Thread zerschossen dort die RIDs und das Log lief in die Gigabytes);
   `--log-file` hält Godots eigenes Log aus dem Benutzerordner. Ergebnis: innerer Ring 26,6 km und Außenring 43,9 km
-  ohne Befund, alle Städte (66 km) ohne Hängenbleiben; übrig sind 4 Berührungen: zwei streifend am Fahrbahnrand
-  (2 m/s quer), eine gewollte Kiste in einer Gasse, und am Altstadtring trägt es den Autopiloten in einer Kurve an die
-  Randmauer. `--worldcheck`: 0 Überschneidungen.
+  ohne Befund, alle Städte (66 km) ohne Straßenfehler. Übrig, alle geprüft: in den engen 135°-Kehren mit
+  Mittelstreifen (Hafenrunde, Hafen-Sprint, Prachtallee) schneidet der Autopilot die Kurve und streift mit 2 m/s die
+  Kante des Mittelstreifens; eine gewollte Kiste in einer Gasse; am Altstadtring erwischt ihn je nach Zeitpunkt der Zug
+  am Bahnübergang (d = 809) und schleudert ihn auf den Gehweg. Jede Wand nennt ihre Strecke
+  (`root.get_meta("race_name")`), mit `--wpaths` auch Richtung und Höhe der Straße um die Stelle.
+  `--worldcheck`: 0 Überschneidungen.
 - **Gewonnene Rennen** verschwinden aus der Welt und von der Minikarte; die große Karte zeigt sie als goldenen Haken.
 - **Tasten:** Esc (oder P) öffnet das Menü, Enter bestätigt nur noch, M (oder Tab) öffnet die Karte, „.“ wechselt die
   Musik. Test: `world.tscn -- --wspawn=ring:10 --ctest=rear40` (auch rear120, side,
