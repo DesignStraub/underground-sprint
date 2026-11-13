@@ -5670,6 +5670,13 @@ static func _sound_walls(root: Node3D, track: Dictionary, d0: float, d1: float) 
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var quads := 0
+	# Open World: an den Abfahrten keine Wand bis an die Einmündung (wirkte wie dicke Mauern links und rechts der
+	# Abzweigung); 90 m davor und dahinter endet sie, dort stehen die Häuser an der Straße wie an einer Kreuzung
+	var junctions := []
+	if track["world"]:
+		for p in track["paths"]:
+			if p["id"] != 0 and p["kind"] == "ramp" and not p.get("tail", false):
+				junctions.append([float(p["from"]), float(p.get("side", 0.0))])
 	var d := d0
 	while d < d1:
 		var e := minf(d + 3.0, d1)
@@ -5677,6 +5684,12 @@ static func _sound_walls(root: Node3D, track: Dictionary, d0: float, d1: float) 
 			var fa := frame_at(curve, d)
 			var fb := frame_at(curve, e)
 			for s in [-1.0, 1.0]:
+				var at_junction := false
+				for j in junctions:
+					if absf((d + e) / 2.0 - j[0]) < 90.0 and (j[1] == 0.0 or j[1] == s):
+						at_junction = true
+				if at_junction:
+					continue
 				var a: Vector3 = fa["pos"] + fa["right"] * s * (hw(track, d) + WALK + 0.35)
 				var b: Vector3 = fb["pos"] + fb["right"] * s * (hw(track, e) + WALK + 0.35)
 				var m := (a + b) / 2.0

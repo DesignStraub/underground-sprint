@@ -235,6 +235,23 @@ var _prof_t := 0
 var _events := []
 
 
+## Test: --wshot=/pfad/bild.png[:sekunden] speichert nach der Wartezeit (Standard 4 s) ein Bild und beendet das Spiel
+var _shot_t := -1.0
+
+func _shot_check(dt: float) -> void:
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--wshot="):
+			var parts := a.substr(8).split(":")
+			if _shot_t < 0.0:
+				_shot_t = float(parts[1]) if parts.size() > 1 else 4.0
+			_shot_t -= dt
+			if _shot_t <= 0.0:
+				get_viewport().get_texture().get_image().save_png(parts[0])
+				print("WSHOT ", parts[0])
+				get_tree().quit()
+			return
+
+
 func _prof_mark(key: String) -> void:
 	if not _hitch:
 		return
@@ -518,6 +535,50 @@ func _start_race(i: int) -> void:
 
 # --- Umgebung, HUD -------------------------------------------------------------------
 
+## Tag-Nacht-Wechsel: die Uhr läuft 1 Spielstunde je echter Minute (ein Tag in 24 Minuten), Start am Abend.
+## Moods.at_hour überblendet Himmel, Licht, Nebel und Farbfilter; Sonne und Mond wandern mit.
+const DAY_MINUTES := 24.0
+var tod := 20.0  # Uhrzeit (Stunden)
+var _sky_mat: ShaderMaterial
+var _ground_mat: StandardMaterial3D
+var _tod_t := 0.0
+
+
+func _update_daylight(dt: float, force := false) -> void:
+	tod = fposmod(tod + dt * 24.0 / (DAY_MINUTES * 60.0), 24.0)
+	_tod_t -= dt
+	if _tod_t > 0.0 and not force:
+		return
+	_tod_t = 0.25  # viermal je Sekunde reicht, die Uhr geht langsam
+	var m := Moods.at_hour(tod)
+	mood = m
+	env.ambient_light_color = m["amb"]
+	env.ambient_light_energy = m["amb_e"]
+	env.fog_light_color = m["fog"]
+	env.fog_density = m["fog_d"]
+	env.adjustment_saturation = m["sat"]
+	env.adjustment_contrast = m["con"]
+	env.adjustment_brightness = m["bri"]
+	var day: float = m["day"]
+	# Sonne: geht um 6 Uhr im Osten auf, steht mittags hoch, um 18 Uhr im Westen unter; nachts der Mond (fest)
+	var sun_e := sin(PI * (tod - 6.0) / 12.0)
+	var sun_az := lerpf(-100.0, 100.0, clampf((tod - 6.0) / 12.0, 0.0, 1.0))
+	var sun_rot := Vector3(-maxf(rad_to_deg(asin(clampf(sun_e, 0.0, 1.0))) * 0.9, 10.0), sun_az, 0.0)
+	moon.rotation_degrees = Vector3(-50.0, 30.0, 0.0).lerp(sun_rot, clampf(day * 1.5, 0.0, 1.0))
+	moon.light_color = m["moon"]
+	moon.light_energy = m["moon_e"]
+	env.tonemap_exposure = lerpf(0.88, 0.8, day)
+	if _sky_mat:
+		_sky_mat.set_shader_parameter("top_col", m["top"])
+		_sky_mat.set_shader_parameter("hor_col", m["hor"])
+		_sky_mat.set_shader_parameter("glow_col", m["glow"])
+		_sky_mat.set_shader_parameter("stars", m["stars"])
+		_sky_mat.set_shader_parameter("day", day)
+		_sky_mat.set_shader_parameter("sun_dir", -moon.global_basis.z if moon.is_inside_tree() else -moon.basis.z)
+	if _ground_mat:
+		_ground_mat.albedo_color = Color(0.025, 0.028, 0.03).lerp(Color(0.16, 0.17, 0.15), day)
+
+
 func _setup_environment() -> void:
 	mood = Moods.get_mood(Layout.MOOD)
 	env = Environment.new()
@@ -527,6 +588,7 @@ func _setup_environment() -> void:
 	sky_mat.set_shader_parameter("hor_col", mood["hor"])
 	sky_mat.set_shader_parameter("glow_col", mood["glow"])
 	sky_mat.set_shader_parameter("stars", mood["stars"])
+	_sky_mat = sky_mat
 	var sky := Sky.new()
 	sky.sky_material = sky_mat
 	env.background_mode = Environment.BG_SKY
@@ -575,6 +637,11 @@ func _setup_environment() -> void:
 	gm.albedo_color = Color(0.025, 0.028, 0.03)
 	gm.roughness = 0.95
 	ground.material_override = gm
+	_ground_mat = gm
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--tod="):  # Test: Uhrzeit beim Start (Stunden), z.B. --tod=13
+			tod = float(a.substr(6))
+	_update_daylight(0.0, true)
 	ground.position.y = -0.12
 	world.add_child(ground)
 
@@ -872,6 +939,8 @@ func _process(dt: float) -> void:
 			_ctest_step(dt)
 	if _hitch:
 		_hitch_frame(dt)
+	_shot_check(dt)
+	_update_daylight(dt)
 	_prof_t = Time.get_ticks_usec()
 	_update_streaming()
 	_prof_mark("streaming")

@@ -34,6 +34,61 @@ const MOODS := {
 }
 
 
+## Open World, Tag-Nacht-Wechsel (world.gd): Stützstellen über den Tag, dazwischen wird überblendet. Die Nacht ist
+## heller als „mitternacht“ (im Rennen), damit es zwischen den Laternen keine fast schwarzen Ecken gibt.
+const CYCLE := [
+	[0.0, "_nacht"], [5.0, "_nacht"], [6.5, "_morgen"], [8.0, "_tag"], [17.0, "_tag"], [19.0, "daemmerung"],
+	[20.5, "_nacht"], [24.0, "_nacht"],
+]
+const CYCLE_MOODS := {
+	"_nacht": {"top": Color(0.004, 0.008, 0.026), "hor": Color(0.03, 0.06, 0.14), "glow": Color(0.08, 0.18, 0.32), "stars": 1.6,
+		"amb": Color(0.24, 0.3, 0.48), "amb_e": 0.36, "fog": Color(0.04, 0.07, 0.13), "fog_d": 0.0036,
+		"moon": Color(0.6, 0.75, 1.0), "moon_e": 0.4, "sat": 0.92, "con": 1.08, "bri": 1.02, "day": 0.0},
+	"_morgen": {"top": Color(0.1, 0.16, 0.36), "hor": Color(0.85, 0.5, 0.36), "glow": Color(0.9, 0.45, 0.25), "stars": 0.1,
+		"amb": Color(0.62, 0.52, 0.56), "amb_e": 0.62, "fog": Color(0.52, 0.4, 0.4), "fog_d": 0.0030,
+		"moon": Color(1.0, 0.72, 0.52), "moon_e": 0.85, "sat": 1.05, "con": 1.0, "bri": 1.0, "day": 0.6},
+	"_tag": {"top": Color(0.16, 0.36, 0.72), "hor": Color(0.62, 0.74, 0.88), "glow": Color(0.28, 0.26, 0.22), "stars": 0.0,
+		"amb": Color(0.72, 0.78, 0.9), "amb_e": 0.95, "fog": Color(0.6, 0.68, 0.78), "fog_d": 0.0020,
+		"moon": Color(1.0, 0.95, 0.86), "moon_e": 1.5, "sat": 1.0, "con": 1.0, "bri": 1.0, "day": 1.0},
+}
+
+
+## Stimmung zur Uhrzeit h (0..24), überblendet zwischen den Stützstellen von CYCLE
+static func at_hour(h: float) -> Dictionary:
+	h = fposmod(h, 24.0)
+	for i in CYCLE.size() - 1:
+		var a: Array = CYCLE[i]
+		var b: Array = CYCLE[i + 1]
+		if h >= a[0] and h <= b[0]:
+			var t := smoothstep(0.0, 1.0, (h - a[0]) / maxf(b[0] - a[0], 0.001))
+			return _blend(_cycle_mood(a[1]), _cycle_mood(b[1]), t)
+	return _cycle_mood("_nacht")
+
+
+static func _cycle_mood(key: String) -> Dictionary:
+	if CYCLE_MOODS.has(key):
+		return CYCLE_MOODS[key]
+	var m: Dictionary = MOODS[key].duplicate()
+	m["day"] = 0.25
+	return m
+
+
+static func _blend(a: Dictionary, b: Dictionary, t: float) -> Dictionary:
+	var out := {}
+	for k in a:
+		if not b.has(k):
+			continue
+		var va = a[k]
+		var vb = b[k]
+		if va is Color:
+			out[k] = (va as Color).lerp(vb, t)
+		elif va is float or va is int:
+			out[k] = lerpf(float(va), float(vb), t)
+		else:
+			out[k] = va if t < 0.5 else vb
+	return out
+
+
 static func get_mood(key: String) -> Dictionary:
 	return MOODS.get(key, MOODS["neon"])
 

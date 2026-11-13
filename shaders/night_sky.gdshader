@@ -6,6 +6,9 @@ uniform vec3 top_col = vec3(0.008, 0.01, 0.03);
 uniform vec3 hor_col = vec3(0.09, 0.05, 0.14);
 uniform vec3 glow_col = vec3(0.3, 0.14, 0.32);
 uniform float stars = 1.0;
+// Tag-Nacht-Wechsel (world.gd): 0 Nacht, 1 Tag; Richtung zur Sonne (am Tag Sonnenscheibe statt Mond)
+uniform float day = 0.0;
+uniform vec3 sun_dir = vec3(0.0, 0.5, -0.86);
 
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 
@@ -23,16 +26,19 @@ void sky() {
 	float cell = floor(az * 90.0);
 	float bh = 0.012 + hash(vec2(cell, 3.0)) * 0.05 * (0.6 + 0.4 * sin(az * 3.0 + 1.0));
 	if (h < bh && h > -0.2) {
-		col = vec3(0.012, 0.012, 0.025);
+		col = mix(vec3(0.012, 0.012, 0.025), hor_col * 0.55, day);
 		vec2 wv = vec2(az * 1400.0, h * 500.0);
 		float w = step(0.78, hash(floor(wv))) * step(0.35, fract(wv.x)) * step(0.4, fract(wv.y));
-		col += w * vec3(1.0, 0.75, 0.45) * 0.5;
+		col += w * vec3(1.0, 0.75, 0.45) * 0.5 * (1.0 - day);
 		float tip = step(bh - 0.0015, h) * step(0.85, hash(vec2(cell, 9.0))) * step(0.5, fract(TIME * 0.5 + hash(vec2(cell, 4.0))));
 		col += tip * vec3(1.0, 0.1, 0.05) * 3.0;
 	}
 	vec3 md = normalize(vec3(-0.45, 0.32, -0.83));
 	float m = dot(d, md);
-	col += vec3(0.95, 0.95, 1.0) * smoothstep(0.99935, 0.9996, m) * 2.0 * step(0.05, stars);
-	col += vec3(0.2, 0.25, 0.45) * pow(max(m, 0.0), 120.0) * 0.6;
+	col += vec3(0.95, 0.95, 1.0) * smoothstep(0.99935, 0.9996, m) * 2.0 * step(0.05, stars) * (1.0 - day);
+	col += vec3(0.2, 0.25, 0.45) * pow(max(m, 0.0), 120.0) * 0.6 * (1.0 - day);
+	float sm = dot(d, normalize(sun_dir));
+	col += vec3(1.0, 0.95, 0.8) * smoothstep(0.9990, 0.9994, sm) * 6.0 * day;
+	col += vec3(1.0, 0.8, 0.55) * pow(max(sm, 0.0), 40.0) * 0.5 * day;
 	COLOR = col;
 }

@@ -146,8 +146,26 @@ Außenring → nächste Stadt → Autobahn. Rundkurse und Drift-Kurse sind Schle
   beim Rempeln nur geschoben. 300 m Vorsprung gewinnt (zählt in `GameState.outruns`, füllt Nitro), 300 m Rückstand
   verliert, wer die Autobahn verlässt, gibt auf. Test: `world.tscn -- --wspawn=ring:10 --wdrive --challenger`
   (kommt nach 3 s, Duell startet von selbst, „CH …“), Spurwechsel: `--ctest=chal`.
-- **Knapp vorbei** gibt jetzt auch in der freien Fahrt Nitro (wie im Rennen: ab 90 km/h seitlich 1,7–3,4 m an einem
-  fahrenden Auto vorbei); Einblendung über der Minikarte. Test: `--ctest=near`.
+- **Knapp vorbei** gibt in der freien Fahrt Nitro, aber nur, wenn es wirklich knapp und schnell ist: ab 120 km/h,
+  mindestens 40 km/h schneller als das Auto, an dem man vorbeizieht (oder Gegenverkehr), höchstens 1,2 m Luft
+  zwischen den Karosserien. Je knapper und schneller, desto mehr (250–600 Punkte, bis 12 % der Flasche), unter 0,5 m
+  „SEHR KNAPP“, mehrere innerhalb von 4 s als Kette (x2, x3 …). Vorher reichten 90 km/h und 1,7–3,4 m von Mitte zu
+  Mitte. Test: `--ctest=near` (0,9 m Luft, +8 %), `nearclose` (0,3 m, +12 %), `nearslow` und `nearwide` (nichts).
+- **Ruckler beim Nachladen behoben:** alle paar Sekunden ruckelte es eine Sekunde lang, bei hohem Tempo öfter. Ursache:
+  jedes Verkehrsauto wurde beim Einsetzen aus Teilen gebaut und verschmolzen (gut 20 ms), nach jeder fertigen Strecke
+  kamen ein Dutzend auf einmal (70 ms je Bild über eine Sekunde). Jetzt wird jedes Modell (Art und Farbe) einmal beim
+  Laden gebaut und dann geteilt. Messen: `world.tscn -- --wspawn=ring:5 --wdrive --hitch` („HITCH …“: jedes Bild über
+  25 ms mit Ursache). Übrig: kurze Einbrüche um 30 ms, während eine Strecke im Thread entsteht (der Grafikserver lädt
+  ihre Meshes im Hauptbild hoch), und 50–110 ms im Bild, in dem sie fertig in die Welt kommt. Ein eigener Render-Thread
+  (`--render-thread separate`) glättete das, machte das Bauen aber 3–7-mal langsamer (Würzburg 17 statt 5,5 s): bei
+  hohem Tempo käme man vor der Stadt an.
+- **Abfahrten:** die Lärmschutzwand endet 90 m vor und hinter jeder Abfahrt (auf deren Seite); dort stehen die Häuser
+  an der Straße wie an einer Kreuzung, statt dicker Mauern links und rechts der Einmündung.
+- **Tag und Nacht:** die Uhr läuft (1 Spielstunde je echter Minute, ein Tag in 24 Minuten, Start 20 Uhr). Himmel,
+  Umgebungslicht, Nebel und Farbfilter blenden zwischen Nacht, Morgen (6:30), Tag (8–17 Uhr) und Abend (19 Uhr) über
+  (`Moods.at_hour`); die Sonne geht im Osten auf und wandert, nachts steht der Mond, die Skyline im Himmel wird am Tag
+  hell und ohne Fensterlichter. Die Nacht ist heller als „mitternacht“ im Rennen (keine fast schwarzen Ecken mehr).
+  Test: `--tod=13` (Uhrzeit beim Start), Bild: `--wshot=/pfad.png:5`.
 - **Motorklang bei Höchsttempo:** bei gleichbleibender hoher Drehzahl liefen dieselben zwei kurzen Schleifen
   (0,4–0,5 s) in fester Tonhöhe und klangen nach Endlosschleife. Jetzt wandern Drehzahl (±1 %), Mischung der beiden
   Schleifen und Pegel langsam, eine dritte Schleife kommt zeitweise dazu, und ein leises Getriebesingen
@@ -395,8 +413,10 @@ in den Altstädten und Graffiti an den Altbauten im Kiez.
 <img src="update_bilder/stimmungen.jpg" alt="Stimmungen" width="480">
 
 ## Musik und Sounds
-Musik (`music/`, sieben Tracks: Phonk, Trap, Drill, Rap-Beat) und Intro-Sound (`assets/intro_sound.mp3`) sind
-lizenzfreie Tracks von Pixabay (`scripts/music.gd`): zufällige Reihenfolge, die letzten 6 s blendet der nächste über;
+Musik (`music/`, 15 Tracks in zwei Listen: 8 Phonk/Trap beim Fahren in Rennen und Open World, 7 Hip-Hop, Boom Bap
+und Drill in der Garage und den Menüs) und Intro-Sound (`assets/intro_sound.mp3`) sind lizenzfreie Tracks von Pixabay
+(`scripts/music.gd`, Liste je Track in `TRACKS`, Quellen in `CREDITS.md`): zufällige Reihenfolge je Liste, beim
+Wechsel zwischen Garage und Fahrt kommt ein Track der anderen Liste, die letzten 6 s blendet der nächste über;
 ist die Liste durch, wird neu gemischt. Seit 2.22 haben Menü und Rennen je ihren eigenen Track: beim Laden eines
 Rennens wird die Menümusik um 13 dB leiser und bleibt das über Kameraflug und Countdown (Motoren und Starttöne sind
 gut zu hören, wie in vielen Rennspielen), bei LOS setzt ein neuer Track voll ein; zurück im Menü beginnt wieder ein
