@@ -466,7 +466,13 @@ in den Altstädten und Graffiti an den Altbauten im Kiez.
 Musik (`music/`, 30 Tracks in zwei Listen: beim Fahren in Rennen und Open World vor allem Funk (11), dazu G-Funk,
 dreckige Gangsta-Beats und 4 Phonk; in der Garage und den Menüs Hip-Hop, West Coast, Boom Bap und Drill; G-Funk und
 Gangsta-Beats laufen in beiden Listen, beim Spielstart kommt zuerst einer von 4 West-Coast-Tracks, ohne Titel-Blase.
-Ausgesucht nach Downloads auf Pixabay (2.28: die erste West-Coast-Auswahl nach Titeln klang nicht danach)) und Intro-Sound (`assets/intro_sound.mp3`) sind lizenzfreie Tracks von Pixabay
+Ausgesucht nach Downloads auf Pixabay (2.28: die erste West-Coast-Auswahl nach Titeln klang nicht danach).
+**Stadt-Tracks:** in manchen Städten läuft immer ein eigener Track, in der Open World solange man dort ist und im
+Rennen der Stadt, in Schleife (`Music.city`, `Music.race_go(town)`); M springt dort zur normalen Liste, bis man die
+Stadt verlässt. Aachen: Bruder Jakob x Jonas Platin „AC“ (mit Freigabe der Künstler). Datei:
+`music/staedte/<stadt>-<Künstler>-<Titel>.mp3` (Stadt klein, Umlaute ausgeschrieben), Angleich in
+`Music.CITY_TRACKS`. Die Stadt-Tracks liegen nicht im öffentlichen Repo (`.gitignore`), nur lokal und im Export.
+Test: `world.tscn -- --wspawn=exit:15:100 --musiclog` („MUSIK …“)) und Intro-Sound (`assets/intro_sound.mp3`) sind lizenzfreie Tracks von Pixabay
 (`scripts/music.gd`, Liste je Track in `TRACKS`, Quellen in `CREDITS.md`): zufällige Reihenfolge je Liste, beim
 Wechsel zwischen Garage und Fahrt kommt ein Track der anderen Liste, die letzten 6 s blendet der nächste über;
 ist die Liste durch, wird neu gemischt. Seit 2.22 haben Menü und Rennen je ihren eigenen Track: beim Laden eines

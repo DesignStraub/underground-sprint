@@ -61,6 +61,13 @@ const TRACKS := {
 
 var lists := {"fahrt": [], "garage": []}  # Pfade je Liste, gemischt
 var intro: Array = []  # West-Coast-Tracks für den Spielstart
+const CITY_DIR := "res://music/staedte/"
+## Stadt-Tracks: Stadt -> [Angleich dB, Musik beginnt bei s, endet bei s] (wie TRACKS)
+const CITY_TRACKS := {
+	"aachen": [1.2, 0.0, 148.0],  # Bruder Jakob x Jonas Platin "AC" (-12,2 LUFS)
+}
+var _town := ""  # Stadt, in der man gerade ist (Stadt-Track)
+var _theme := ""  # Stadt-Track, der gerade läuft ("" = normale Liste)
 var mode := "garage"  # welche Liste gerade läuft (race_go: fahrt, menu: garage)
 var current_title := ""
 var _idx := {"fahrt": -1, "garage": -1}
@@ -138,6 +145,9 @@ func _scan() -> void:
 
 ## Nächster Track; fade: Dauer der Überblendung (s)
 func next(fade := FADE_SKIP) -> void:
+	if _theme != "":
+		_play(_theme, fade)  # Stadt-Track läuft in Schleife, solange man in der Stadt ist
+		return
 	var playlist: Array = lists[mode]
 	if playlist.is_empty():
 		current_title = ""
@@ -150,11 +160,16 @@ func next(fade := FADE_SKIP) -> void:
 		if playlist.size() > 1 and playlist[0] == last:
 			playlist.append(playlist.pop_front())
 		_idx[mode] = 0
-	var path: String = playlist[_idx[mode]]
+	_play(playlist[_idx[mode]], fade)
+
+
+func _play(path: String, fade: float) -> void:
 	var s := _load(path)
 	if s == null:
 		return
 	var info: Array = TRACKS.get(_track_id(path), [0.0, 0.0, 0.0])
+	if path.begins_with(CITY_DIR):
+		info = CITY_TRACKS.get(path.get_file().get_slice("-", 0), [0.0, 0.0, 0.0])
 	var nxt := 1 - _cur
 	var p := _players[nxt]
 	p.stream = s
@@ -167,12 +182,16 @@ func next(fade := FADE_SKIP) -> void:
 	_fade = 0.0
 	_age = 0.0
 	_fade_len = maxf(fade, 0.05)
-	# Pixabay-Dateinamen: "kuenstler-titel-123456.mp3" -> "kuenstler titel"
+	# Pixabay-Dateinamen: "kuenstler-titel-123456.mp3" -> "kuenstler titel"; Stadt-Tracks: "stadt-kuenstler-titel.mp3"
 	var re := RegEx.create_from_string("[-_ ]\\d+$")
-	current_title = re.sub(path.get_file().get_basename(), "").replace("-", " ").replace("_", " ")
-	track_changed.emit(current_title)
-	# Künstler steht vor dem ersten Bindestrich (Pixabay: "sub_clair-drift-phonk-607579")
 	var base := re.sub(path.get_file().get_basename(), "")
+	if path.begins_with(CITY_DIR):
+		base = base.substr(base.find("-") + 1)
+	current_title = base.replace("-", " ").replace("_", " ")
+	track_changed.emit(current_title)
+	if OS.get_cmdline_user_args().has("--musiclog"):
+		print("MUSIK %s (%s, Stadt %s)" % [current_title, mode, _town])
+	# Künstler steht vor dem ersten Bindestrich (Pixabay: "sub_clair-drift-phonk-607579")
 	var cut := base.find("-")
 	_toast_artist = base.substr(0, cut).replace("_", " ") if cut > 0 else ""
 	_toast_title = (base.substr(cut + 1) if cut > 0 else base).replace("-", " ").replace("_", " ").to_upper()
@@ -182,6 +201,37 @@ func next(fade := FADE_SKIP) -> void:
 		_toast_pending = true  # erst nach dem Intro zeigen
 	else:
 		_start_toast()
+
+
+## Stadt-Track: in manchen Städten läuft immer ein eigener Track (Open World, solange man dort ist, und im Rennen
+## der Stadt), in Schleife. Datei: music/staedte/<stadt>-<kuenstler>-<titel>.mp3 (Stadt klein, ohne Umlaute, wie
+## CITY_KEY). town: Ortsname (Catalog "town"), "" = keine Stadt mit eigenem Track: zurück zur Liste. M bzw. "."
+## springt in der Stadt zur normalen Liste, bis man die Stadt verlässt.
+func city(town: String) -> void:
+	if town == _town:
+		return
+	_town = town
+	var path := city_track(town)
+	if path == _theme:
+		return
+	var had := _theme != ""
+	_theme = path
+	if path != "" or had:
+		next(FADE_SKIP)
+
+
+static func city_track(town: String) -> String:
+	var key: String = town.to_lower().replace("ä", "ae").replace("ö", "oe").replace("ü", "ue").replace("ß", "ss").replace(" ", "_")
+	if key == "":
+		return ""
+	var d := DirAccess.open(CITY_DIR)
+	if d == null:
+		return ""
+	for f in d.get_files():
+		var name := f.trim_suffix(".import").trim_suffix(".remap")
+		if name.begins_with(key + "-") and name.get_extension().to_lower() in ["mp3", "ogg", "wav"]:
+			return CITY_DIR + name
+	return ""
 
 
 ## Rennen wird geladen: Musik leiser bis zum Start
@@ -194,19 +244,26 @@ func race_loading() -> void:
 		_toast.queue_redraw()
 
 
-## Start (LOS): neuer Track für das Rennen, voll
-func race_go() -> void:
+## Start (LOS): neuer Track für das Rennen, voll (in einer Stadt mit eigenem Track dieser)
+func race_go(town := "") -> void:
 	_duck_to = 0.0
 	mode = "fahrt"
+	_town = town
+	var t := city_track(town)
+	if t != "" and t == _theme:
+		return  # der Stadt-Track läuft schon (Open World: man startet in der Stadt)
+	_theme = t
 	next(0.7)
 
 
 ## Zurück im Menü: nach einem Rennen ein neuer Track
 func menu() -> void:
-	if _in_race or mode != "garage":
+	if _in_race or mode != "garage" or _theme != "":
 		_in_race = false
 		_duck_to = 0.0
 		mode = "garage"
+		_town = ""
+		_theme = ""
 		next(1.5)
 
 
@@ -334,4 +391,5 @@ func _load(path: String) -> AudioStream:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("next_track"):
+		_theme = ""  # in einer Stadt mit eigenem Track: zur normalen Liste, bis man die Stadt verlässt
 		next(FADE_SKIP)

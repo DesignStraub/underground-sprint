@@ -806,7 +806,7 @@ func _process(dt: float) -> void:
 				if b:
 					b.bus = "Master"  # Ansage, kein Hall
 				if n == 0:
-					Music.race_go()  # neuer Track zum Start
+					Music.race_go(str(race.get("town", "")))  # neuer Track zum Start (in Aachen der Aachen-Track)
 			hud["goal"].visible = true
 			if countdown <= 1.0 and not player.controls_enabled:
 				player.controls_enabled = true

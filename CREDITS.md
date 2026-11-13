@@ -44,6 +44,9 @@ frei auch für kommerzielle Nutzung, ohne Namensnennung). Der Dateiname nennt K�
 | Beide (G-Funk, Gangsta-Beats) | 5XBeatz „Epic West Coast G Funk Type Beat“, 47643651 „Funk x G-Funk Music (Sacred Beast)“, vaitsez „Gangster – Gangsta Beat“, „Hip Hop – Hip-Hop Beat“, GR0ZA „Criminal Mafia Gangster Music“ |
 | Garage (Hip-Hop, West Coast) | free-rap-beats „Modern Gangsta/Gangster West Coast Free Rap Beat“, 5XBeatz „West Coast Type Beat“, „Dope West Coast Type Beat“, kontraa „Goldn – UK Drill“, AudioDollar „Rap Beat“, agerabeatz „Spray“, AtlasAudio „90s Hip Hop“, SolarFLEX „Hip-Hop Boom Bap“, SoundSurfer „Street Hip-Hop“, Sub_Clair „Hip Hop Instrumental“ |
 
+Stadt-Track Aachen: Bruder Jakob x Jonas Platin, „AC“, mit freundlicher Genehmigung der Künstler (nicht im
+öffentlichen Repo, `music/staedte/`).
+
 ## Schrift
 Menüs und Anzeigen seit 2.28: Rajdhani von der Indian Type Foundry, SIL Open Font License 1.1
 (`assets/fonts/rajdhani/OFL.txt`), von Google Fonts. Zum Vergleich liegen Chakra Petch (The Chakra Petch Project
