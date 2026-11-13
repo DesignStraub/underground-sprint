@@ -162,6 +162,7 @@ var _wall_turn := 0.0  # Restdrehung parallel zur Wand (rad), wird über einige 
 var _wall_t := 10.0  # Zeit seit dem letzten Wandkontakt (kurz danach zählt Rutschen nicht als Drift)
 var debug_hits := false  # nur für Tests (--handling, --trace): merkt sich, woran das Auto angeeckt ist
 var last_hit := ""
+var half_width := 0.95  # halbe Breite des Modells (world.gd: Abstand beim Knapp-vorbei)
 var _collider_name := ""
 ## Rundkurs: abgeschlossene Runden und Gesamtfortschritt (Runden * Länge + Position)
 var lap := 0
@@ -248,6 +249,7 @@ func setup(car_id: String, cfg: Dictionary) -> void:
 	# statt frontal hängen zu bleiben
 	var col := CollisionShape3D.new()
 	var w: float = model.get_meta("width") / 2.0
+	half_width = w
 	var l := _length / 2.0
 	var pts := PackedVector3Array()
 	for y in [-0.6, 0.6]:

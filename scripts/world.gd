@@ -65,6 +65,8 @@ var _area_name := ""
 var _ready_done := false
 var traffic: Array = []
 var _near := {}  # Verkehrsautos, für die es schon „knapp vorbei“ gab
+var _near_chain := 0  # Knapp-vorbei-Kette (je höchstens 4 s Abstand)
+var _near_chain_t := 0.0
 var _feed: VBoxContainer  # Einblendungen über der Minikarte (knapp vorbei)
 var _tq: Array = []  # [Eintrag, Plan] wartet aufs Einsetzen (ein paar pro Bild, sonst ruckelt es beim Nachladen)
 var _trng := RandomNumberGenerator.new()
@@ -88,6 +90,7 @@ func _ready() -> void:
 	GameState.in_world = true
 	quiet = Array(OS.get_cmdline_user_args()).any(func(a): return a.begins_with("--wtour"))
 	# headless (Tests): der Ersatz-Renderer ist nicht threadsicher, Meshes aus dem Bau-Thread zerschießen dort die RIDs
+	_hitch = OS.get_cmdline_user_args().has("--hitch")
 	_threads = not OS.has_feature("web") and OS.get_processor_count() > 1 and not OS.get_cmdline_user_args().has("--nothreads") \
 		and DisplayServer.get_name() != "headless"
 	var view_layer := CanvasLayer.new()
@@ -115,6 +118,7 @@ func _ready() -> void:
 		_segs.append(entries[-1])
 	_trng.seed = 4711
 	Traffic.prepare_sound()
+	Traffic.prewarm()
 	_setup_environment()
 
 	var spawn := _spawn_xf()
@@ -224,7 +228,43 @@ func _entry_of(track: Dictionary) -> Dictionary:
 
 # --- Nachladen ------------------------------------------------------------------
 
+# --- Ruckler messen (--hitch): Bilder über 25 ms mit dem, was im Bild davor Zeit kostete ---------------------------
+var _hitch := false
+var _prof := {}
+var _prof_t := 0
+var _events := []
+
+
+func _prof_mark(key: String) -> void:
+	if not _hitch:
+		return
+	var now := Time.get_ticks_usec()
+	_prof[key] = _prof.get(key, 0) + now - _prof_t
+	_prof_t = now
+
+
+func _event(what: String) -> void:
+	if _hitch:
+		_events.append(what)
+
+
+func _hitch_frame(dt: float) -> void:
+	if dt > 0.025:
+		var parts := []
+		for k in _prof:
+			if _prof[k] > 1500:
+				parts.append("%s=%.1f" % [k, _prof[k] / 1000.0])
+		print("HITCH %.0f ms bei %.0f km/h t=%.1f | %s | %s | proc=%.1f phys=%.1f bau=%s | draw=%d obj=%d" % [dt * 1000.0, player.velocity.length() * 3.6,
+			Time.get_ticks_msec() / 1000.0, " ".join(parts), ", ".join(_events),
+			Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0, Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0,
+			"ja" if _task >= 0 else "nein",
+			Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME), Performance.get_monitor(Performance.OBJECT_COUNT)])
+	_prof.clear()
+	_events.clear()
+
+
 func _finish(e: Dictionary, job: Dictionary) -> void:
+	_event("fertig " + str(e["race"].get("name", "?")))
 	var tr: Dictionary = job["track"]
 	var root: Node3D = tr["node"]
 	root.transform = e["xf"]
@@ -248,6 +288,7 @@ func _finish(e: Dictionary, job: Dictionary) -> void:
 func _drop(e: Dictionary) -> void:
 	if e["state"] != "ready" or e == active:
 		return
+	_event("weg " + str(e["race"].get("name", "?")))
 	var root: Node = e["track"]["node"]
 	traffic = traffic.filter(func(t): return is_instance_valid(t) and not root.is_ancestor_of(t))
 	_tq = _tq.filter(func(q): return not is_same(q[0], e))
@@ -335,6 +376,7 @@ func _best_track(p: Vector3) -> Dictionary:
 
 
 func _set_active(e: Dictionary) -> void:
+	_event("aktiv " + str(e["race"].get("name", "?")))
 	if e.is_empty():
 		return
 	active = e
@@ -828,13 +870,19 @@ func _process(dt: float) -> void:
 			if _ct.is_empty():
 				_ctest_setup(a.substr(8))
 			_ctest_step(dt)
+	if _hitch:
+		_hitch_frame(dt)
+	_prof_t = Time.get_ticks_usec()
 	_update_streaming()
+	_prof_mark("streaming")
 	_spawn_queued(3)
+	_prof_mark("spawn")
 	_update_traffic_sound(dt)
 	_update_markers()
 	_check_near_miss()
 	_update_challenger(dt)
 	_update_feed(dt)
+	_prof_mark("rest")
 	var tacho = hud["tacho"]
 	tacho.rpm = player.rpm
 	tacho.speed_kmh = int(absf(player.speed_fwd) * 3.6)
@@ -850,14 +898,24 @@ func _process(dt: float) -> void:
 	_update_speed_fx(dt)
 
 
-## Knapp vorbei (wie im Rennen und in Underground): seitlich 1,7–3,4 m an einem fahrenden Verkehrsauto vorbei, ab
-## 90 km/h, füllt Nitro etwas auf. Wer es rammt, bekommt nichts (das Auto ist dann ein Wrack).
+## Knapp vorbei (wie in Underground): nur bei hohem Tempo und wirklich knapp. Ab 120 km/h, mindestens 40 km/h
+## schneller als das Auto, an dem man vorbeizieht (oder Gegenverkehr), mit höchstens 1,2 m Luft zwischen den
+## Karosserien. Je knapper und schneller, desto mehr Nitro; unter 0,5 m „SEHR KNAPP“. Mehrere hintereinander
+## (je höchstens 4 s Abstand) zählen als Kette und geben mehr. Wer es rammt, bekommt nichts (das Auto ist dann ein
+## Wrack, und eine Berührung schließt den Bonus ohnehin aus: die Luft muss größer als 0,1 m bleiben).
+const NEAR_MIN_V := 120.0 / 3.6
+const NEAR_REL_V := 40.0 / 3.6
+const NEAR_GAP := 1.2
+
 func _check_near_miss() -> void:
 	if not player.controls_enabled:
 		return
+	_near_chain_t -= get_process_delta_time()
+	if _near_chain_t <= 0.0:
+		_near_chain = 0
 	var fwd: Vector3 = -player.global_basis.z
 	var right := Vector3(-fwd.z, 0, fwd.x).normalized()
-	var fast := player.velocity.length() > 25.0
+	var v := player.velocity.length()
 	for t in traffic:
 		if not is_instance_valid(t) or t.wrecked or not t.is_inside_tree() or t == challenger:
 			continue
@@ -866,12 +924,26 @@ func _check_near_miss() -> void:
 		if rel.length() > 30.0:
 			_near.erase(id)
 			continue
+		if v < NEAR_MIN_V or _near.has(id) or absf(rel.y) > 3.0:
+			continue
 		var along := rel.dot(fwd)
-		var side := absf(rel.dot(right))
-		if fast and absf(rel.y) < 3.0 and absf(along) < 2.5 and side > 1.7 and side < 3.4 and not _near.has(id):
-			_near[id] = true
-			_flash(tr("KNAPP VORBEI"), Color(1.0, 0.85, 0.2), 300)
-			Sfx.play("whoosh", -12.0, randf_range(1.1, 1.3))
+		if absf(along) > (float(t.length) / 2.0 + 1.0):
+			continue  # erst zählen, wenn man auf gleicher Höhe ist
+		var gap: float = absf(rel.dot(right)) - player.half_width - float(t._half_w)
+		var tv: Vector3 = -t.global_basis.z * float(t.speed)
+		var relv := (player.velocity - tv).dot(fwd)
+		if gap < 0.1 or gap > NEAR_GAP or absf(relv) < NEAR_REL_V:
+			continue
+		_near[id] = true
+		_near_chain += 1
+		_near_chain_t = 4.0
+		var close := 1.0 - (gap - 0.1) / (NEAR_GAP - 0.1)  # 0 bei 1,2 m, 1 bei 0,1 m
+		var pts := int(round((250.0 + 350.0 * close) * clampf(v / NEAR_MIN_V, 1.0, 1.6) * (1.0 + 0.25 * (_near_chain - 1))))
+		var txt := tr("SEHR KNAPP") if gap < 0.5 else tr("KNAPP VORBEI")
+		if _near_chain > 1:
+			txt += "  x%d" % _near_chain
+		_flash(txt, Color(1.0, 0.55, 0.15) if gap < 0.5 else Color(1.0, 0.85, 0.2), pts)
+		Sfx.play("whoosh", -9.0 if gap < 0.5 else -12.0, randf_range(1.1, 1.3))
 
 
 ## Einblendung über der Minikarte; Punkte füllen Nitro (wie im Rennen: 300 Punkte = 7,5 % einer Serienflasche)
@@ -1330,6 +1402,9 @@ func _ctest_setup(case: String) -> void:
 		"median30": [2.25, 42.0, -30.0, 0.0, 0.0, 0.0, ""],
 		"accel": [6.75, 0.0, 0.0, 0.0, 0.0, 0.0, ""],
 		"near": [4.0, 42.0, 0.0, 6.75, 14.0, 30.0, "sedan"],  # knapp vorbei: 2,75 m daneben überholen (Nitro)
+		"nearslow": [4.0, 30.0, 0.0, 6.75, 14.0, 18.0, "sedan"],  # nur 108 km/h: kein Nitro
+		"nearwide": [3.0, 42.0, 0.0, 6.75, 14.0, 30.0, "sedan"],  # 1,9 m Luft: kein Nitro
+		"nearclose": [4.6, 42.0, 0.0, 6.75, 14.0, 30.0, "sedan"],  # 0,3 m Luft: SEHR KNAPP
 		"chal": [-6.75, 0.0, 0.0, 6.75, 90.0, 30.0, "sedan"],  # Herausforderer (160 km/h) hinter einem Pkw: Spurwechsel?
 	}
 	var k: Array = cases[case]
@@ -1338,7 +1413,7 @@ func _ctest_setup(case: String) -> void:
 	player.place(xf)
 	player.velocity = -xf.basis.z * absf(k[1])
 	player.speed_fwd = absf(k[1])
-	if case == "near":
+	if case.begins_with("near"):
 		player.nitro = 0.3
 	if k[6] != "":
 		_tq.append([active, {"d": d0 + k[4], "lane": k[3], "speed": k[5], "kind": k[6]}])
@@ -1382,7 +1457,7 @@ func _ctest_step(dt: float) -> void:
 	_ct["t"] += dt
 	for a in ["steer_left", "steer_right", "accelerate", "nitro", "brake", "handbrake"]:
 		Input.action_release(a)
-	if _ct["hold"] or _ct["case"].begins_with("rear") or _ct["case"] in ["bus", "near"]:
+	if _ct["hold"] or _ct["case"].begins_with("rear") or _ct["case"] in ["bus", "near", "nearslow", "nearwide", "nearclose"]:
 		Input.action_press("accelerate")
 	if _ct["case"] == "accel":
 		# Beschleunigung ohne Nitro: Zeit bis 60/100/150/200/250 km/h, danach Endtempo nach 40 s

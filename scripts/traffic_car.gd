@@ -60,6 +60,9 @@ var lane_rate := 2.0  # Spurwechsel m/s quer (Herausforderer: schneller)
 var accel_up := 4.0  # Beschleunigen m/s² (Herausforderer: wie ein Sportwagen)
 
 
+static var _models := {}  # Art + Farbe -> [[Mesh, Lage, Material, Schatten]] (setup)
+
+
 func setup(kind_: String, rng: RandomNumberGenerator) -> void:
 	kind = kind_
 	add_to_group("traffic")
@@ -70,32 +73,84 @@ func setup(kind_: String, rng: RandomNumberGenerator) -> void:
 	collision_mask = 0
 	var col: Color = COLORS[rng.randi() % COLORS.size()]
 	var size := Vector3(1.8, 1.5, 4.5)
+	# Lackfarbe festlegen (Zufallszahlen in derselben Reihenfolge wie bisher)
 	match kind:
-		"sedan":
-			_body(Vector2(1.8, 4.5), 0.65, col, Vector2(1.6, 2.2), 0.5)
 		"taxi":
-			_body(Vector2(1.8, 4.6), 0.65, Color(0.95, 0.75, 0.05), Vector2(1.6, 2.3), 0.5)
-			Builder._add(self, Builder.box(Vector3(0.7, 0.22, 0.3)), Builder.mat(Color(1, 1, 0.8), 0, 0.4, Color(1, 0.95, 0.6), 2.5), Vector3(0, 1.62, 0.2))
+			col = Color(0.95, 0.75, 0.05)
 		"van":
 			size = Vector3(2.0, 2.3, 5.2)
-			_body(Vector2(2.0, 5.2), 1.6, Color(0.85, 0.85, 0.85) if rng.randf() < 0.6 else col, Vector2(1.9, 1.0), 0.45, -1.9)
+			col = Color(0.85, 0.85, 0.85) if rng.randf() < 0.6 else col
 		"bus":
 			size = Vector3(2.5, 3.2, 11.0)
-			_body(Vector2(2.5, 11.0), 2.6, Color(0.9, 0.85, 0.1) if rng.randf() < 0.5 else Color(0.85, 0.85, 0.85), Vector2.ZERO, 0.0)
-			var win := Builder.mat(Color(0.1, 0.1, 0.1), 0.5, 0.2, Color(1, 0.9, 0.6), 1.2)
-			for s in [-1, 1]:
-				Builder._add(self, Builder.box(Vector3(0.05, 0.9, 9.0)), win, Vector3(s * 1.26, 2.1, 0.5))
-			Builder._add(self, Builder.box(Vector3(2.3, 1.0, 0.05)), win, Vector3(0, 2.0, -5.51))
+			col = Color(0.9, 0.85, 0.1) if rng.randf() < 0.5 else Color(0.85, 0.85, 0.85)
 	length = size.z
 	_half_w = size.x / 2.0
 	mass = {"van": 4.0, "bus": 10.0}.get(kind, 2.5)
-	Builder.merge_static(self)
+	# Modell je Art und Farbe nur einmal bauen: Bauen und Verschmelzen kostete gut 20 ms je Auto, beim Laden einer
+	# Strecke kamen so ein Dutzend Autos auf einmal und das Bild ruckelte eine Sekunde lang (alle paar Sekunden)
+	_model(col)
 	var cs := CollisionShape3D.new()
 	var bs := BoxShape3D.new()
 	bs.size = size
 	cs.shape = bs
 	cs.position.y = size.y / 2.0 + 0.1
 	add_child(cs)
+
+
+## Modell aus dem Zwischenspeicher oder neu bauen (dann merken)
+func _model(col: Color) -> void:
+	var key := kind + col.to_html()
+	if _models.has(key):
+		for it in _models[key]:
+			var mi := MeshInstance3D.new()
+			mi.mesh = it[0]
+			mi.transform = it[1]
+			mi.material_override = it[2]
+			mi.cast_shadow = it[3]
+			add_child(mi)
+	else:
+		match kind:
+			"sedan":
+				_body(Vector2(1.8, 4.5), 0.65, col, Vector2(1.6, 2.2), 0.5)
+			"taxi":
+				_body(Vector2(1.8, 4.6), 0.65, col, Vector2(1.6, 2.3), 0.5)
+				Builder._add(self, Builder.box(Vector3(0.7, 0.22, 0.3)), Builder.mat(Color(1, 1, 0.8), 0, 0.4, Color(1, 0.95, 0.6), 2.5), Vector3(0, 1.62, 0.2))
+			"van":
+				_body(Vector2(2.0, 5.2), 1.6, col, Vector2(1.9, 1.0), 0.45, -1.9)
+			"bus":
+				_body(Vector2(2.5, 11.0), 2.6, col, Vector2.ZERO, 0.0)
+				var win := Builder.mat(Color(0.1, 0.1, 0.1), 0.5, 0.2, Color(1, 0.9, 0.6), 1.2)
+				for s in [-1, 1]:
+					Builder._add(self, Builder.box(Vector3(0.05, 0.9, 9.0)), win, Vector3(s * 1.26, 2.1, 0.5))
+				Builder._add(self, Builder.box(Vector3(2.3, 1.0, 0.05)), win, Vector3(0, 2.0, -5.51))
+		Builder.merge_static(self)
+		var items := []
+		var cacheable := true
+		for c in get_children():
+			if c is MeshInstance3D and c.get_child_count() == 0:
+				items.append([c.mesh, c.transform, c.material_override, c.cast_shadow])
+			else:
+				cacheable = false  # unerwartete Teile: lieber nicht zwischenspeichern
+		if cacheable:
+			_models[key] = items
+
+
+## Alle Modelle beim Laden der Welt vorbauen (hinter dem Ladebild), damit auch das erste Auto jeder Farbe nicht ruckelt
+static func prewarm() -> void:
+	var plan := []
+	for c in COLORS:
+		plan.append(["sedan", c])
+		plan.append(["van", c])
+	plan.append_array([["taxi", Color(0.95, 0.75, 0.05)], ["van", Color(0.85, 0.85, 0.85)], ["bus", Color(0.9, 0.85, 0.1)],
+		["bus", Color(0.85, 0.85, 0.85)]])
+	var Self: GDScript = load("res://scripts/traffic_car.gd")
+	for it in plan:
+		if _models.has(it[0] + (it[1] as Color).to_html()):
+			continue
+		var t: Node3D = Self.new()
+		t.kind = it[0]
+		t._model(it[1])
+		t.free()
 
 
 func _body(fp: Vector2, h: float, col: Color, cabin: Vector2, cabin_h: float, cabin_z := 0.2) -> void:

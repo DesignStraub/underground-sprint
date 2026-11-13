@@ -34,7 +34,14 @@ Schleife geschnitten.
 | `assets/sfx/rumble.wav` | [Freight train passes Phelan, startles Canadian geese](https://commons.wikimedia.org/wiki/File:Freight_train_passes_Phelan,_startles_Canadian_geese.flac) (4 s Rollen als Schleife, auch für die Hochbahn) | Extemporalist | [CC0](https://creativecommons.org/publicdomain/zero/1.0/) |
 
 ## Musik
-Tracks in `music/` und der Intro-Sound: Pixabay (Pixabay Content License).
+Tracks in `music/` und der Intro-Sound: Pixabay ([Pixabay Content License](https://pixabay.com/service/license-summary/),
+frei auch für kommerzielle Nutzung, ohne Namensnennung). Der Dateiname nennt Künstler, Titel und Pixabay-Nummer
+(`pixabay.com/music/…-<Nummer>/`).
+
+| Liste | Tracks |
+|---|---|
+| Fahrt (Phonk, Trap) | absolutesound „Hard Phonk“, Artissizm „Hard Drift Phonk“, Sub_Clair „Drift Phonk“, „Phonk Hard“, alexzavesa „Dark Trap – Most Dangerous“, „Devil Forces“, Kulakovka „Phonk Reel“, „Gym Phonk“ |
+| Garage (Hip-Hop) | kontraa „Goldn – UK Drill“, AudioDollar „Rap Beat“, agerabeatz „Spray“, AtlasAudio „90s Hip Hop“, SolarFLEX „Hip-Hop Boom Bap“, SoundSurfer „Street Hip-Hop“, Sub_Clair „Hip Hop Instrumental“ |
 
 ## Schrift
 Menüs und Anzeigen seit 2.27: Saira Condensed von Omnibus-Type (The Saira Project Authors), SIL Open Font License 1.1

@@ -1,5 +1,6 @@
 extends Node
-## Musik: alle Tracks aus res://music/ (mp3, ogg, wav) in zufälliger Reihenfolge; kurz vor Schluss blendet der
+## Musik: alle Tracks aus res://music/ (mp3, ogg, wav) in zwei Listen: Phonk und Trap beim Fahren (Rennen, Open
+## World), Hip-Hop in der Garage und den Menüs (TRACKS). Je Liste zufällige Reihenfolge; kurz vor Schluss blendet der
 ## nächste weich über. Ist die Liste einmal durch, wird neu gemischt (ohne denselben Track zweimal hintereinander).
 ## Menü und Rennen haben je ihren eigenen Track: beim Laden eines Rennens wird die Menümusik leiser und bleibt das
 ## über Kameraflug und Countdown (Motoren und Starttöne sind gut zu hören), bei LOS setzt ein neuer Track voll ein.
@@ -17,21 +18,31 @@ const TOAST_TIME := 4.8  # s: aufploppen, aufklappen, stehen, zuklappen, weg
 const BASE_DB := -7.0
 const FADE := 6.0  # Überblendung am Ende eines Tracks (s)
 const FADE_SKIP := 1.2  # Überblendung beim Weiterschalten mit M
-## Je Track (Pixabay-Nummer am Ende des Dateinamens): [Angleich dB, Musik beginnt bei s, Musik endet bei s (0 = Datei-Ende)]
-## Unbekannte Tracks laufen ohne Angleich von Anfang bis Ende.
+## Je Track (Pixabay-Nummer am Ende des Dateinamens): [Angleich dB, Musik beginnt bei s, Musik endet bei s (0 = Datei-Ende),
+## Liste]. Zwei Listen: "fahrt" (Phonk, Trap: Rennen und Open World) und "garage" (Hip-Hop: Garage und Menüs).
+## Unbekannte Tracks laufen ohne Angleich von Anfang bis Ende in der Fahrt-Liste.
 const TRACKS := {
-	"529766": [4.2, 0.0, 0.0],  # absolutesound hard phonk (-15,2 LUFS)
-	"223224": [-1.0, 0.0, 116.1],  # artissizm hard drift phonk
-	"607579": [-1.3, 0.0, 130.4],  # sub_clair drift phonk
-	"510715": [-4.3, 0.0, 103.9],  # alexzavesa dark trap (-6,7 LUFS)
-	"10944": [-1.1, 0.0, 0.0],  # alexzavesa devil forces
-	"116392": [0.1, 0.0, 0.0],  # kontraa uk drill
-	"495946": [-2.6, 0.8, 150.8],  # audiodollar rap beat
+	"529766": [4.2, 0.0, 0.0, "fahrt"],  # absolutesound hard phonk (-15,2 LUFS)
+	"223224": [-1.0, 0.0, 116.1, "fahrt"],  # artissizm hard drift phonk
+	"607579": [-1.3, 0.0, 130.4, "fahrt"],  # sub_clair drift phonk
+	"510715": [-4.3, 0.0, 103.9, "fahrt"],  # alexzavesa dark trap (-6,7 LUFS)
+	"10944": [-1.1, 0.0, 0.0, "fahrt"],  # alexzavesa devil forces
+	"614877": [2.6, 0.55, 146.3, "fahrt"],  # kulakovka phonk reel (-13,6 LUFS)
+	"624946": [-5.9, 0.0, 124.8, "fahrt"],  # sub_clair phonk hard (-5,1 LUFS)
+	"620567": [-0.9, 0.0, 84.0, "fahrt"],  # kulakovka gym phonk
+	"116392": [0.1, 0.0, 0.0, "garage"],  # kontraa uk drill
+	"495946": [-2.6, 0.8, 150.8, "garage"],  # audiodollar rap beat
+	"171167": [-5.9, 0.0, 211.8, "garage"],  # agerabeatz spray (-5,1 LUFS)
+	"617537": [-2.7, 0.0, 129.3, "garage"],  # atlasaudio 90s hip hop
+	"569539": [-0.6, 0.0, 0.0, "garage"],  # solarflex hip hop boom bap
+	"599534": [-2.2, 0.0, 113.6, "garage"],  # soundsurfer street hip hop
+	"623482": [-3.5, 0.72, 94.3, "garage"],  # sub_clair hip hop instrumental
 }
 
-var playlist: Array[String] = []
+var lists := {"fahrt": [], "garage": []}  # Pfade je Liste, gemischt
+var mode := "garage"  # welche Liste gerade läuft (race_go: fahrt, menu: garage)
 var current_title := ""
-var _index := -1
+var _idx := {"fahrt": -1, "garage": -1}
 var _players: Array[AudioStreamPlayer] = []
 var _cur := 0  # Player des laufenden Tracks
 var _gain := [0.0, 0.0]  # Angleich je Player (dB)
@@ -83,25 +94,31 @@ func _scan() -> void:
 	for f in d.get_files():
 		var name := f.trim_suffix(".import").trim_suffix(".remap")
 		var ext := name.get_extension().to_lower()
-		if ext in ["mp3", "ogg", "wav"] and not playlist.has(DIR + name):
-			playlist.append(DIR + name)
-	playlist.shuffle()
+		if ext in ["mp3", "ogg", "wav"]:
+			var l: String = (TRACKS.get(_track_id(DIR + name), [0.0, 0.0, 0.0, "fahrt"]) as Array)[3]
+			if not lists[l].has(DIR + name):
+				lists[l].append(DIR + name)
+	for l in lists:
+		lists[l].shuffle()
+	if lists["garage"].is_empty():
+		lists["garage"] = lists["fahrt"].duplicate()  # nur eine Sorte da: überall dieselbe Liste
 
 
 ## Nächster Track; fade: Dauer der Überblendung (s)
 func next(fade := FADE_SKIP) -> void:
+	var playlist: Array = lists[mode]
 	if playlist.is_empty():
 		current_title = ""
 		return
-	_index += 1
-	if _index >= playlist.size():
+	_idx[mode] += 1
+	if _idx[mode] >= playlist.size():
 		# einmal durch: neu mischen, aber nicht mit dem gerade laufenden Track anfangen
-		var last := playlist[playlist.size() - 1]
+		var last: String = playlist[playlist.size() - 1]
 		playlist.shuffle()
 		if playlist.size() > 1 and playlist[0] == last:
 			playlist.append(playlist.pop_front())
-		_index = 0
-	var path := playlist[_index]
+		_idx[mode] = 0
+	var path: String = playlist[_idx[mode]]
 	var s := _load(path)
 	if s == null:
 		return
@@ -146,14 +163,16 @@ func race_loading() -> void:
 ## Start (LOS): neuer Track für das Rennen, voll
 func race_go() -> void:
 	_duck_to = 0.0
+	mode = "fahrt"
 	next(0.7)
 
 
 ## Zurück im Menü: nach einem Rennen ein neuer Track
 func menu() -> void:
-	if _in_race:
+	if _in_race or mode != "garage":
 		_in_race = false
 		_duck_to = 0.0
+		mode = "garage"
 		next(1.5)
 
 
@@ -236,7 +255,7 @@ func _process(_dt: float) -> void:
 		if _toast_t > TOAST_TIME:
 			_toast_t = -1.0
 		_toast.queue_redraw()
-	if _paused or playlist.is_empty():
+	if _paused or (lists[mode] as Array).is_empty():
 		return
 	var cur := _players[_cur]
 	var old := _players[1 - _cur]

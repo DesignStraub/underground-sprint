@@ -144,7 +144,7 @@ const EN := {
 		"W Throttle  S shift up, X down\nA/D Change lane  Shift Nitro\nC Camera  F Fullscreen  Esc Pause",
 	"HOCHSCHALTEN  S   ·   RUNTER  X": "SHIFT UP  S   ·   DOWN  X", "MOTOR HEISS – SCHALTEN!": "ENGINE HOT – SHIFT!",
 	"ABKÜRZUNG": "SHORTCUT", "GEGENVERKEHR": "ONCOMING TRAFFIC", "BANDE: KETTE VERLOREN": "BARRIER: CHAIN LOST",
-	"KNAPP VORBEI": "NEAR MISS", "… und %d weitere": "… and %d more", "GANG +": "GEAR +", "GANG -": "GEAR -",
+	"KNAPP VORBEI": "NEAR MISS", "SEHR KNAPP": "VERY CLOSE", "… und %d weitere": "… and %d more", "GANG +": "GEAR +", "GANG -": "GEAR -",
 	"LOS!": "GO!", "Gas kurz vor LOS = perfekter Start": "Throttle just before GO = perfect start",
 	"BANKENVIERTEL": "FINANCIAL DISTRICT", "MARKTVIERTEL": "MARKET DISTRICT", "PRACHTALLEE": "BOULEVARD", "ALTSTADT": "OLD TOWN",
 	"HAFEN": "HARBOR", "CHINATOWN": "CHINATOWN", "SCHNELLSTRASSE": "HIGHWAY", "INNENSTADT": "CITY CENTER",
