@@ -40,10 +40,9 @@ frei auch für kommerzielle Nutzung, ohne Namensnennung). Der Dateiname nennt K�
 
 | Liste | Tracks |
 |---|---|
-| Fahrt (Phonk, Trap) | absolutesound „Hard Phonk“, Artissizm „Hard Drift Phonk“, Sub_Clair „Drift Phonk“, „Phonk Hard“, alexzavesa „Dark Trap – Most Dangerous“, „Devil Forces“, Kulakovka „Phonk Reel“, „Gym Phonk“ |
-| Garage (Hip-Hop) | kontraa „Goldn – UK Drill“, AudioDollar „Rap Beat“, agerabeatz „Spray“, AtlasAudio „90s Hip Hop“, SolarFLEX „Hip-Hop Boom Bap“, SoundSurfer „Street Hip-Hop“, Sub_Clair „Hip Hop Instrumental“ |
-| Beide (West Coast, G-Funk) | HarmonixHub „G Funk I“, 99Instrumentals „G-Funk Old School Hip-Hop“, Colt_Fingaz „Lowrider Gang“, catch22music „Cruising West Coast Hip Hop“, TouchProRecords „California (West Coast Hip Hop Instrumental)“, -SunSet- „West Coast Beat“ |
-| Garage (West Coast, dunkel) | YuraSoop „West Coast Beats“, ArtIssizm „West Coast“, CNABeatsAfrica „West Coast Rap Beat“, Colt_Fingaz „Hip Hop West Coast Type Beat“, mastermath „West Coast Hip Hop Type Beat“, kond1 „DS Tales“, 5xBeatz „Dope West Coast Type Beat“, vaitsez „Gangster – Gangsta Beat“, „Mafia Gangster Criminal Beat“, KrissMcMass „Gangsta Music Theme“ |
+| Fahrt (Funk, Phonk) | prettyjohn1 „Funk“, Poradovskyi „Funk Funky Music“, NastelBom „Funk“ (2), GR0ZA „Funk“ (2), AtlasAudio „Funk Rhythm“, lNPLUSMUSIC „Funk“, Kulakovka „Upbeat Funk“, SoundSurfer „Funk“, Sub_Clair „Funk“, absolutesound „Hard Phonk“, Artissizm „Hard Drift Phonk“, Sub_Clair „Drift Phonk“, alexzavesa „Dark Trap – Most Dangerous“ |
+| Beide (G-Funk, Gangsta-Beats) | 5XBeatz „Epic West Coast G Funk Type Beat“, 47643651 „Funk x G-Funk Music (Sacred Beast)“, vaitsez „Gangster – Gangsta Beat“, „Hip Hop – Hip-Hop Beat“, GR0ZA „Criminal Mafia Gangster Music“ |
+| Garage (Hip-Hop, West Coast) | free-rap-beats „Modern Gangsta/Gangster West Coast Free Rap Beat“, 5XBeatz „West Coast Type Beat“, „Dope West Coast Type Beat“, kontraa „Goldn – UK Drill“, AudioDollar „Rap Beat“, agerabeatz „Spray“, AtlasAudio „90s Hip Hop“, SolarFLEX „Hip-Hop Boom Bap“, SoundSurfer „Street Hip-Hop“, Sub_Clair „Hip Hop Instrumental“ |
 
 ## Schrift
 Menüs und Anzeigen seit 2.28: Rajdhani von der Indian Type Foundry, SIL Open Font License 1.1

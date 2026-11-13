@@ -1,7 +1,7 @@
 extends Node
-## Musik: alle Tracks aus res://music/ (mp3, ogg, wav) in zwei Listen: Phonk und Trap beim Fahren (Rennen, Open
-## World), Hip-Hop (West Coast, G-Funk, dunkle Gangsta-Beats) in der Garage und den Menüs (TRACKS). Die G-Funk-Tracks
-## laufen in beiden Listen; beim Spielstart kommt immer zuerst einer von ihnen. Je Liste zufällige Reihenfolge; kurz vor Schluss blendet der
+## Musik: alle Tracks aus res://music/ (mp3, ogg, wav) in zwei Listen: beim Fahren (Rennen, Open World) vor allem
+## Funk, dazu G-Funk, dreckige Gangsta-Beats und etwas Phonk; in der Garage und den Menüs Hip-Hop, West Coast, Boom Bap
+## (TRACKS). G-Funk und Gangsta-Beats laufen in beiden Listen; beim Spielstart kommt zuerst ein West-Coast-Track. Je Liste zufällige Reihenfolge; kurz vor Schluss blendet der
 ## nächste weich über. Ist die Liste einmal durch, wird neu gemischt (ohne denselben Track zweimal hintereinander).
 ## Menü und Rennen haben je ihren eigenen Track: beim Laden eines Rennens wird die Menümusik leiser und bleibt das
 ## über Kameraflug und Countdown (Motoren und Starttöne sind gut zu hören), bei LOS setzt ein neuer Track voll ein.
@@ -24,14 +24,32 @@ const FADE_SKIP := 1.2  # Überblendung beim Weiterschalten mit M
 ## true = darf erster Track beim Spielstart sein.
 ## Unbekannte Tracks laufen ohne Angleich von Anfang bis Ende in der Fahrt-Liste.
 const TRACKS := {
+	# Fahrt: vor allem Funk, dazu G-Funk, dreckige Gangsta-Beats und etwas Phonk (Auswahl nach Downloads auf Pixabay)
+	"503900": [-2.2, 0.58, 129.2, "fahrt"],  # prettyjohn1 funk (13 000 Downloads)
+	"628015": [-2.5, 0.0, 121.7, "fahrt"],  # poradovskyi funk funky music
+	"437330": [-0.7, 0.0, 114.3, "fahrt"],  # nastelbom funk
+	"425092": [-1.7, 0.0, 120.3, "fahrt"],  # nastelbom funk
+	"557572": [0.0, 0.0, 120.0, "fahrt"],  # gr0za funk
+	"591743": [1.2, 0.0, 148.3, "fahrt"],  # gr0za funk music
+	"593046": [-0.9, 0.0, 100.3, "fahrt"],  # atlasaudio funk rhythm
+	"611911": [-2.3, 0.0, 0.0, "fahrt"],  # lnplusmusic funk
+	"614901": [1.7, 0.0, 101.9, "fahrt"],  # kulakovka upbeat funk
+	"591582": [-1.6, 0.0, 192.4, "fahrt"],  # soundsurfer funk
+	"550488": [1.9, 0.0, 171.8, "fahrt"],  # sub_clair funk
 	"529766": [4.2, 0.0, 0.0, "fahrt"],  # absolutesound hard phonk (-15,2 LUFS)
 	"223224": [-1.0, 0.0, 116.1, "fahrt"],  # artissizm hard drift phonk
 	"607579": [-1.3, 0.0, 130.4, "fahrt"],  # sub_clair drift phonk
 	"510715": [-4.3, 0.0, 103.9, "fahrt"],  # alexzavesa dark trap (-6,7 LUFS)
-	"10944": [-1.1, 0.0, 0.0, "fahrt"],  # alexzavesa devil forces
-	"614877": [2.6, 0.55, 146.3, "fahrt"],  # kulakovka phonk reel (-13,6 LUFS)
-	"624946": [-5.9, 0.0, 124.8, "fahrt"],  # sub_clair phonk hard (-5,1 LUFS)
-	"620567": [-0.9, 0.0, 84.0, "fahrt"],  # kulakovka gym phonk
+	# beide Listen: G-Funk und dreckige Gangsta-Beats; true am Ende = erster Track beim Spielstart (West Coast)
+	"129290": [6.0, 0.0, 271.1, "garage", true],  # free-rap-beats modern gangster west coast (-18,3 LUFS, 5 100 Downloads)
+	"213452": [3.3, 0.0, 170.5, "garage", true],  # 5xbeatz west coast type beat (4 800 Downloads)
+	"210671": [1.0, 0.0, 210.3, "beide", true],  # 5xbeatz epic west coast g-funk
+	"331753": [-0.7, 2.15, 161.3, "beide", true],  # sacred beast funk x g-funk (Bass, Synth)
+	"565462": [-3.4, 0.0, 0.0, "beide"],  # vaitsez gangster beat (-7,6 LUFS)
+	"461849": [-1.9, 0.0, 121.0, "beide"],  # gr0za criminal mafia gangster
+	"595812": [-2.4, 0.0, 0.0, "beide"],  # vaitsez hip-hop beat
+	# Garage: Hip-Hop, Boom Bap, Drill
+	"206680": [3.8, 0.0, 183.4, "garage"],  # 5xbeatz dope west coast type beat (-14,8 LUFS)
 	"116392": [0.1, 0.0, 0.0, "garage"],  # kontraa uk drill
 	"495946": [-2.6, 0.8, 150.8, "garage"],  # audiodollar rap beat
 	"171167": [-5.9, 0.0, 211.8, "garage"],  # agerabeatz spray (-5,1 LUFS)
@@ -39,24 +57,6 @@ const TRACKS := {
 	"569539": [-0.6, 0.0, 0.0, "garage"],  # solarflex hip hop boom bap
 	"599534": [-2.2, 0.0, 113.6, "garage"],  # soundsurfer street hip hop
 	"623482": [-3.5, 0.72, 94.3, "garage"],  # sub_clair hip hop instrumental
-	# West Coast, G-Funk: laufen auch beim Fahren mit ("beide"); die mit true am Ende kommen als erster Track beim Spielstart
-	"277088": [3.4, 0.0, 176.6, "beide", true],  # harmonixhub g funk i (-14,4 LUFS)
-	"617964": [-2.6, 0.0, 159.9, "beide", true],  # 99instrumentals g-funk old school hip-hop
-	"403801": [-3.3, 0.0, 201.9, "beide", true],  # colt_fingaz lowrider gang
-	"381610": [-1.5, 0.0, 192.5, "beide", true],  # catch22music cruising west coast hip hop
-	"603358": [-1.5, 0.0, 217.2, "beide", true],  # touchprorecords california west coast
-	"571783": [-1.5, 0.0, 168.3, "beide"],  # sunset west coast beat
-	"511076": [0.0, 0.0, 147.0, "garage"],  # yurasoop west coast beats
-	"201590": [-1.0, 0.0, 93.7, "garage"],  # artissizm west coast
-	"284891": [-0.5, 0.0, 236.7, "garage"],  # cnabeatsafrica west coast rap beat
-	"373908": [2.0, 0.42, 156.6, "garage"],  # colt_fingaz hip hop west coast type beat
-	"219337": [3.0, 0.53, 200.7, "garage"],  # mastermath west coast type beat (-14,0 LUFS)
-	"193603": [-0.4, 0.0, 160.5, "garage"],  # kond1 ds tales cinematic west coast rap jam
-	"206680": [3.8, 0.0, 183.4, "garage"],  # 5xbeatz dope west coast type beat (-14,8 LUFS)
-	# dunkel, Gangsta
-	"607210": [-0.9, 0.0, 138.4, "garage"],  # vaitsez gangster gangsta beat
-	"595783": [-4.0, 0.0, 166.2, "garage"],  # vaitsez mafia gangster criminal beat (-7,0 LUFS)
-	"183588": [1.5, 0.0, 181.4, "garage"],  # krissmcmass gangsta music theme
 }
 
 var lists := {"fahrt": [], "garage": []}  # Pfade je Liste, gemischt
