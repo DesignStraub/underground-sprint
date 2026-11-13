@@ -1,13 +1,14 @@
 extends Node
 ## Musik: alle Tracks aus res://music/ (mp3, ogg, wav) in zwei Listen: Phonk und Trap beim Fahren (Rennen, Open
-## World), Hip-Hop in der Garage und den Menüs (TRACKS). Je Liste zufällige Reihenfolge; kurz vor Schluss blendet der
+## World), Hip-Hop (West Coast, G-Funk, dunkle Gangsta-Beats) in der Garage und den Menüs (TRACKS). Die G-Funk-Tracks
+## laufen in beiden Listen; beim Spielstart kommt immer zuerst einer von ihnen. Je Liste zufällige Reihenfolge; kurz vor Schluss blendet der
 ## nächste weich über. Ist die Liste einmal durch, wird neu gemischt (ohne denselben Track zweimal hintereinander).
 ## Menü und Rennen haben je ihren eigenen Track: beim Laden eines Rennens wird die Menümusik leiser und bleibt das
 ## über Kameraflug und Countdown (Motoren und Starttöne sind gut zu hören), bei LOS setzt ein neuer Track voll ein.
 ## Zurück im Menü beginnt wieder ein neuer.
 ## Die Tracks sind gleich laut gemacht (gemessen mit ffmpeg ebur128, Ziel -11 LUFS), Stille am Anfang und Ende wird
 ## übersprungen. Taste M springt mit kurzer Überblendung zum nächsten Track.
-## Beim Trackwechsel klappt unten in der Mitte (Garage: rechts unten) kurz eine kleine Blase mit dem Titel auf und wieder zu (wie in NFS),
+## Beim Trackwechsel (nicht beim allerersten Track) klappt unten in der Mitte (Garage: rechts unten) kurz eine kleine Blase mit dem Titel auf und wieder zu (wie in NFS),
 ## sonst steht der Titel nirgends. Auf Handy und Tablet bleibt sie weg (kleiner Bildschirm).
 
 signal track_changed(title: String)
@@ -19,7 +20,8 @@ const BASE_DB := -7.0
 const FADE := 6.0  # Überblendung am Ende eines Tracks (s)
 const FADE_SKIP := 1.2  # Überblendung beim Weiterschalten mit M
 ## Je Track (Pixabay-Nummer am Ende des Dateinamens): [Angleich dB, Musik beginnt bei s, Musik endet bei s (0 = Datei-Ende),
-## Liste]. Zwei Listen: "fahrt" (Phonk, Trap: Rennen und Open World) und "garage" (Hip-Hop: Garage und Menüs).
+## Liste ("fahrt": Phonk, Trap für Rennen und Open World; "garage": Hip-Hop für Garage und Menüs; "beide"), optional
+## true = darf erster Track beim Spielstart sein.
 ## Unbekannte Tracks laufen ohne Angleich von Anfang bis Ende in der Fahrt-Liste.
 const TRACKS := {
 	"529766": [4.2, 0.0, 0.0, "fahrt"],  # absolutesound hard phonk (-15,2 LUFS)
@@ -37,9 +39,28 @@ const TRACKS := {
 	"569539": [-0.6, 0.0, 0.0, "garage"],  # solarflex hip hop boom bap
 	"599534": [-2.2, 0.0, 113.6, "garage"],  # soundsurfer street hip hop
 	"623482": [-3.5, 0.72, 94.3, "garage"],  # sub_clair hip hop instrumental
+	# West Coast, G-Funk: laufen auch beim Fahren mit ("beide"); die mit true am Ende kommen als erster Track beim Spielstart
+	"277088": [3.4, 0.0, 176.6, "beide", true],  # harmonixhub g funk i (-14,4 LUFS)
+	"617964": [-2.6, 0.0, 159.9, "beide", true],  # 99instrumentals g-funk old school hip-hop
+	"403801": [-3.3, 0.0, 201.9, "beide", true],  # colt_fingaz lowrider gang
+	"381610": [-1.5, 0.0, 192.5, "beide", true],  # catch22music cruising west coast hip hop
+	"603358": [-1.5, 0.0, 217.2, "beide", true],  # touchprorecords california west coast
+	"571783": [-1.5, 0.0, 168.3, "beide"],  # sunset west coast beat
+	"511076": [0.0, 0.0, 147.0, "garage"],  # yurasoop west coast beats
+	"201590": [-1.0, 0.0, 93.7, "garage"],  # artissizm west coast
+	"284891": [-0.5, 0.0, 236.7, "garage"],  # cnabeatsafrica west coast rap beat
+	"373908": [2.0, 0.42, 156.6, "garage"],  # colt_fingaz hip hop west coast type beat
+	"219337": [3.0, 0.53, 200.7, "garage"],  # mastermath west coast type beat (-14,0 LUFS)
+	"193603": [-0.4, 0.0, 160.5, "garage"],  # kond1 ds tales cinematic west coast rap jam
+	"206680": [3.8, 0.0, 183.4, "garage"],  # 5xbeatz dope west coast type beat (-14,8 LUFS)
+	# dunkel, Gangsta
+	"607210": [-0.9, 0.0, 138.4, "garage"],  # vaitsez gangster gangsta beat
+	"595783": [-4.0, 0.0, 166.2, "garage"],  # vaitsez mafia gangster criminal beat (-7,0 LUFS)
+	"183588": [1.5, 0.0, 181.4, "garage"],  # krissmcmass gangsta music theme
 }
 
 var lists := {"fahrt": [], "garage": []}  # Pfade je Liste, gemischt
+var intro: Array = []  # West-Coast-Tracks für den Spielstart
 var mode := "garage"  # welche Liste gerade läuft (race_go: fahrt, menu: garage)
 var current_title := ""
 var _idx := {"fahrt": -1, "garage": -1}
@@ -58,6 +79,7 @@ var _toast_title := ""
 var _toast_artist := ""
 var _toast_pending := false
 var _toast_hold := false
+var _first := true  # erster Track beim Spielstart: keine Blase, sie stört beim Reinkommen
 var toast_corner := false  # Garage: Blase rechts unten in der Tastenleiste (links Menü, darüber das Infofeld)
 var _duck := 0.0  # dB: leiser während Laden, Kameraflug und Countdown
 var _duck_to := 0.0
@@ -95,11 +117,21 @@ func _scan() -> void:
 		var name := f.trim_suffix(".import").trim_suffix(".remap")
 		var ext := name.get_extension().to_lower()
 		if ext in ["mp3", "ogg", "wav"]:
-			var l: String = (TRACKS.get(_track_id(DIR + name), [0.0, 0.0, 0.0, "fahrt"]) as Array)[3]
-			if not lists[l].has(DIR + name):
-				lists[l].append(DIR + name)
+			var info: Array = TRACKS.get(_track_id(DIR + name), [0.0, 0.0, 0.0, "fahrt"])
+			for l in (["fahrt", "garage"] if info[3] == "beide" else [info[3]]):
+				if not lists[l].has(DIR + name):
+					lists[l].append(DIR + name)
+			if info.size() > 4 and info[4] and not intro.has(DIR + name):
+				intro.append(DIR + name)
 	for l in lists:
 		lists[l].shuffle()
+	# Spielstart: zuerst ein West-Coast-Track (zufällig einer der markierten), danach gemischt
+	if not intro.is_empty():
+		var first: String = intro[randi() % intro.size()]
+		var g: Array = lists["garage"]
+		if g.has(first):
+			g.erase(first)
+			g.push_front(first)
 	if lists["garage"].is_empty():
 		lists["garage"] = lists["fahrt"].duplicate()  # nur eine Sorte da: überall dieselbe Liste
 
@@ -144,7 +176,9 @@ func next(fade := FADE_SKIP) -> void:
 	var cut := base.find("-")
 	_toast_artist = base.substr(0, cut).replace("_", " ") if cut > 0 else ""
 	_toast_title = (base.substr(cut + 1) if cut > 0 else base).replace("-", " ").replace("_", " ").to_upper()
-	if _paused:
+	if _first:
+		_first = false  # Spielstart: Musik läuft einfach los, die Blase kommt erst beim ersten Wechsel
+	elif _paused:
 		_toast_pending = true  # erst nach dem Intro zeigen
 	else:
 		_start_toast()

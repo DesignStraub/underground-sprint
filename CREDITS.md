@@ -42,6 +42,8 @@ frei auch für kommerzielle Nutzung, ohne Namensnennung). Der Dateiname nennt K�
 |---|---|
 | Fahrt (Phonk, Trap) | absolutesound „Hard Phonk“, Artissizm „Hard Drift Phonk“, Sub_Clair „Drift Phonk“, „Phonk Hard“, alexzavesa „Dark Trap – Most Dangerous“, „Devil Forces“, Kulakovka „Phonk Reel“, „Gym Phonk“ |
 | Garage (Hip-Hop) | kontraa „Goldn – UK Drill“, AudioDollar „Rap Beat“, agerabeatz „Spray“, AtlasAudio „90s Hip Hop“, SolarFLEX „Hip-Hop Boom Bap“, SoundSurfer „Street Hip-Hop“, Sub_Clair „Hip Hop Instrumental“ |
+| Beide (West Coast, G-Funk) | HarmonixHub „G Funk I“, 99Instrumentals „G-Funk Old School Hip-Hop“, Colt_Fingaz „Lowrider Gang“, catch22music „Cruising West Coast Hip Hop“, TouchProRecords „California (West Coast Hip Hop Instrumental)“, -SunSet- „West Coast Beat“ |
+| Garage (West Coast, dunkel) | YuraSoop „West Coast Beats“, ArtIssizm „West Coast“, CNABeatsAfrica „West Coast Rap Beat“, Colt_Fingaz „Hip Hop West Coast Type Beat“, mastermath „West Coast Hip Hop Type Beat“, kond1 „DS Tales“, 5xBeatz „Dope West Coast Type Beat“, vaitsez „Gangster – Gangsta Beat“, „Mafia Gangster Criminal Beat“, KrissMcMass „Gangsta Music Theme“ |
 
 ## Schrift
 Menüs und Anzeigen seit 2.27: Saira Condensed von Omnibus-Type (The Saira Project Authors), SIL Open Font License 1.1
