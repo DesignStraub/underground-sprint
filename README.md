@@ -163,9 +163,12 @@ Außenring → nächste Stadt → Autobahn. Rundkurse und Drift-Kurse sind Schle
   Nebenstraßen rechtwinklig ab, laufen gut 26 m hinter der Gehwegkante (hinter der ersten Häuserreihe) parallel zur
   Hauptstraße und münden 75–160 m weiter wieder ein: ein Block zum Drumherumfahren. Zwei Spuren (10 m), Ecken mit
   18 m Radius, an beiden Seiten Häuser, wo keins steht ein Zaun, eigene Laternen; die Wände dahinter halten einen auf
-  der Straße. Sie folgen auch Kurven der Hauptstraße (nach innen nur bei weitem Bogen), nicht an Tunneln, Trögen,
+  der Straße. Bei Blöcken ab gut 100 m führt in der Mitte zusätzlich eine schmale Durchfahrt (eine Spur, 6,8 m) zwischen
+  den Häusern von der Hauptstraße zur Nebenstraße; wo eine Durchfahrt einmündet, sind Wand und Zaun der Nebenstraße
+  offen (`_other_branch_clear`). Sie folgen auch Kurven der Hauptstraße (nach innen nur bei weitem Bogen), nicht an Tunneln, Trögen,
   Brücken, Hochbahn, Bahnübergang, Flüssen, Seen, Hügeln, anderen Abzweigen, fremden Fahrbahnen der Welt und nicht, wo
-  an der Einmündung ein Mittelstreifen liegt. 69 in 16 Strecken (Kreuzberg 13, Würzburg und Aachen je 8). In der Welt
+  an der Einmündung ein Mittelstreifen liegt. 69 Nebenstraßen und 34 Durchfahrten in 16 Strecken (Kreuzberg 21
+  Abzweige). In der Welt
   gibt es dafür keine abgesperrten Sackgassen mehr (`_drop_spurs`; geplant werden sie trotzdem, damit der Zufall der
   übrigen Strecke wie im Rennen bleibt). Rennen bauen ihre Strecke ohne `world`: dort gibt es die Nebenstraßen nicht,
   die Strecke ist abgesperrt wie bisher. Auf Minikarte und großer Karte sind Abzweige, Gassen und Auffahrten
@@ -175,6 +178,9 @@ Außenring → nächste Stadt → Autobahn. Rundkurse und Drift-Kurse sind Schle
   Abschnitte gleich (800–1200 m, eigener Zufall, auch im Rennen). In der Welt steht beim Wechsel ihr Name oben.
   Chinatown kommt jetzt vor (Frankfurt, Köln), die Fassaden haben je Viertel eigene, kräftigere Farben (Marktviertel
   bunt, Altstadt Ocker, Rosa, Salbei, Bankenviertel kühles Glas, Hafen roter Klinker, deutsche Altstadt Pastell).
+  Auch der Gehweg wechselt mit dem Viertel (`Track.PAVE`, `pave` im Gehweg-Shader): Betonplatten, kleines Pflaster
+  (Altstadt, Kurviertel), Klinker im Läuferverband (Hafen, Marktviertel, Kiez), große helle Granitplatten
+  (Bankenviertel, Prachtallee, Innenstadt, Campus), rote Platten (Chinatown).
 - **Abfahrten:** die Lärmschutzwand endet 90 m vor und hinter jeder Abfahrt (auf deren Seite); dort stehen die Häuser
   an der Straße wie an einer Kreuzung, statt dicker Mauern links und rechts der Einmündung.
 - **Tag und Nacht:** die Uhr läuft (1 Spielstunde je echter Minute, ein Tag in 24 Minuten, Start 20 Uhr). Himmel,

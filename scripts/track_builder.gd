@@ -910,6 +910,18 @@ static func _branch_clearance(track: Dictionary, pos: Vector3, skip_spurs := fal
 	return best
 
 
+## Abstand zum nächsten anderen Abzweig (ohne Sackgassen und ohne den Weg own) minus dessen halbe Breite: wo eine
+## Durchfahrt in eine Nebenstraße mündet, bleibt dort keine Wand stehen
+static func _other_branch_clear(track: Dictionary, pos: Vector3, own: int) -> float:
+	var best := 1e9
+	for p in track["paths"]:
+		if p["id"] == 0 or p["id"] == own or p["kind"] == "spur":
+			continue
+		var q := (p["curve"] as Curve3D).get_closest_point(pos)
+		best = minf(best, _flat(pos - q).length() - p["half_w"])
+	return best
+
+
 static func _main_clearance(track: Dictionary, pos: Vector3) -> float:
 	var c: Curve3D = track["curve"]
 	return _flat(pos - c.get_closest_point(pos)).length() - hw(track, c.get_closest_offset(pos))
@@ -995,6 +1007,7 @@ static func _plan_shortcut(track: Dictionary, b: Dictionary, rng: RandomNumberGe
 
 const LANE_HALF := 5.0  # Nebenstraße: zwei Spuren
 const LANE_BACK := 26.0  # so weit hinter der Gehwegkante läuft die Nebenstraße (Platz für die erste Häuserreihe)
+const PASSAGE_HALF := 3.4  # Durchfahrt zwischen zwei Häusern (eine breite Spur)
 const LANE_R := 18.0  # Eckradius, wo sie abbiegt (enger schneidet man die Ecke und schrammt innen an der Wand)
 
 
@@ -1143,6 +1156,19 @@ static func _try_lane(track: Dictionary, d1: float, d2: float, s: float) -> bool
 		"length": c.get_baked_length(), "from": d1, "to": d2, "closed": false, "side": s})
 	track["zones"].append({"from": d1 - 22.0, "to": d1 + 22.0})
 	track["zones"].append({"from": d2 - 22.0, "to": d2 + 22.0})
+	# Langer Block: in der Mitte eine schmale Durchfahrt zwischen den Häusern zur Nebenstraße
+	if d2 - d1 >= 105.0:
+		var mid := (d1 + d2) / 2.0
+		var pc := Curve3D.new()
+		pc.bake_interval = 1.0
+		var ll := 0.0
+		while ll < off:
+			pc.add_point(_beside(curve, mid, ll * s))
+			ll += 3.0
+		pc.add_point(_beside(curve, mid, off * s))
+		track["paths"].append({"id": track["paths"].size(), "kind": "passage", "curve": pc, "half_w": PASSAGE_HALF,
+			"length": pc.get_baked_length(), "from": mid, "to": mid, "closed": false, "side": s})
+		track["zones"].append({"from": mid - 12.0, "to": mid + 12.0})
 	return true
 
 
@@ -1458,13 +1484,24 @@ static func _road_mesh(root: Node3D, st: SurfaceTool, lanes: float, width: float
 
 ## Gehweg-Material (Betonplatten, Bordsteine) für eine Gehwegbreite; liegt bei den Fahrbahn-Materialien, damit
 ## die Stimmung (nass/trocken) beide erreicht
-static func _walk_mat(width: float) -> ShaderMaterial:
-	var key := Vector3(-1.0, width, 0.0)
+## Gehweg-Belag je Viertel (shaders/pavement.gdshader, pave): Viertel -> [Belag, Tönung]
+const PAVE := {"downtown": [3, Color(0.95, 0.97, 1.05)], "boulevard": [3, Color(1.05, 1.0, 0.92)], "shops": [2, Color(1, 1, 1)],
+	"residential": [1, Color(1.05, 1.0, 0.92)], "industrial": [2, Color(0.8, 0.8, 0.8)], "chinatown": [4, Color(1, 1, 1)],
+	"altstadt_de": [1, Color(1.1, 1.02, 0.9)], "innenstadt_de": [3, Color(1, 1, 1)], "kurviertel_de": [1, Color(1.15, 1.1, 0.98)],
+	"campus_de": [3, Color(0.9, 0.92, 0.95)], "kiez_de": [2, Color(0.85, 0.9, 0.95)]}
+
+
+static func _walk_mat(width: float, district := "") -> ShaderMaterial:
+	var pv: Array = PAVE.get(district, [0, Color(1, 1, 1)])
+	var key := Vector3(-1.0, width, float(pv[0]) + (pv[1] as Color).r * 0.01 + (pv[1] as Color).b * 0.0001)
 	if not _road_mats.has(key):
 		var m := ShaderMaterial.new()
 		m.shader = PAVEMENT_SHADER
 		m.set_shader_parameter("walk_w", width)
 		m.set_shader_parameter("detail", ASPHALT_TEX)
+		m.set_shader_parameter("pave", pv[0])
+		var c: Color = pv[1]
+		m.set_shader_parameter("pave_tint", Vector3(c.r, c.g, c.b))
 		_road_mats[key] = m
 	return _road_mats[key]
 
@@ -1564,7 +1601,6 @@ static func _build_road(root: Node3D, track: Dictionary) -> void:
 	var walls := StaticBody3D.new()
 	walls.name = "WallsRoad"
 	root.add_child(walls)
-	var walk_m := _walk_mat(WALK)
 	var grass_m := Builder.mat(Color(0.05, 0.11, 0.05), 0.0, 0.95)
 	var trough := SurfaceTool.new()  # Trogmauern vor und hinter den Tunneln
 	trough.begin(Mesh.PRIMITIVE_TRIANGLES)
@@ -1698,7 +1734,7 @@ static func _build_road(root: Node3D, track: Dictionary) -> void:
 				_flush(root, grass, grass_m)
 			if n_trough > 0:
 				_flush(root, trough, trough_m)
-			_flush(root, walk, walk_m)
+			_flush(root, walk, _walk_mat(WALK, track["districts"][clampi(int((piece_d0 + 30.0) / DISTRICT_LEN), 0, track["districts"].size() - 1)]))
 			for st in [road, walk, carr, grass, trough]:
 				st.clear()
 				st.begin(Mesh.PRIMITIVE_TRIANGLES)
@@ -1967,6 +2003,8 @@ static func _build_branch(root: Node3D, track: Dictionary, p: Dictionary, rng: R
 				# Sackgassen: Wände erst hinter der durchlaufenden Randmauer der Hauptstraße (keine Kante in deren Linie)
 				if not free_end and _main_clearance(track, wm) < WALK + (1.6 if kind == "spur" else 0.4):
 					continue
+				if (kind == "lane" or kind == "passage") and _other_branch_clear(track, wm, p["id"]) < 0.3:
+					continue
 				_wall_shape(walls, prev[side], cur[side])
 				# Über der Sprunglücke nur unsichtbar: wer in der Luft seitlich abtreibt, schrammt daran entlang, statt
 				# frontal gegen den Anfang der Wand hinter der Lücke zu prallen
@@ -1987,7 +2025,7 @@ static func _build_branch(root: Node3D, track: Dictionary, p: Dictionary, rng: R
 		prev = cur
 		d += step
 	var lanes := 2.0 if kind == "spur" or kind == "fork" or kind == "ramp" or kind == "lane" else 0.0
-	_road_mesh(root, road, lanes, half * 2.0, 1.0 if kind == "alley" else 0.0, 0.012)
+	_road_mesh(root, road, lanes, half * 2.0, 1.0 if kind == "alley" else 0.0, 0.018 if kind == "passage" else 0.012)
 	if n_walk > 0:
 		_flush(root, walk, _walk_mat(walk_w))
 	if n_ret > 0:
@@ -2402,7 +2440,7 @@ static func _build_fences(root: Node3D, track: Dictionary, blockers: Array) -> v
 	fan_rng.seed = int(track["length"] * 7.0) + 11
 	var next_fans := {-1.0: 30.0, 1.0: 70.0}  # frühestes d für die nächste Gruppe je Seite
 	for p in track["paths"]:
-		if p["id"] == 0 or p["kind"] == "fork" or p["kind"] == "spur" or p["kind"] == "lane":
+		if p["id"] == 0 or p["kind"] == "fork" or p["kind"] == "spur" or p["kind"] == "lane" or p["kind"] == "passage":
 			lines.append(p)
 	for p in lines:
 		var c: Curve3D = p["curve"]
@@ -2420,7 +2458,8 @@ static func _build_fences(root: Node3D, track: Dictionary, blockers: Array) -> v
 					if _branch_clearance(track, pos) <= 1.0 or not tunnel_at(track, d, 3.0).is_empty() \
 							or _district_at(track, d).has("soundwall") or _rail_clearance(track, pos) < 1.0:
 						continue
-				elif _main_clearance(track, pos) < WALK + 0.4:
+				elif _main_clearance(track, pos) < WALK + 0.4 or ((p["kind"] == "lane" or p["kind"] == "passage") \
+						and _other_branch_clear(track, pos, p["id"]) < 0.3):
 					continue
 				var hidden := false
 				var pk := Vector2i(floori(pos.x / LOT_CELL), floori(pos.z / LOT_CELL))
@@ -4604,15 +4643,15 @@ static func _build_lamps(root: Node3D, track: Dictionary) -> void:
 		side = -side
 	# Nebenstraßen (Open World): eigene Laternen, sonst wären sie nachts schwarz
 	for p in track["paths"]:
-		if p["kind"] != "lane":
+		if p["kind"] != "lane" and p["kind"] != "passage":
 			continue
 		var c: Curve3D = p["curve"]
 		var dist := _district_at(track, p["from"])
-		var dl := 8.0
+		var dl: float = 8.0 if p["kind"] == "lane" else p["length"] * 0.6
 		var sd := 1.0
 		while dl < p["length"] - 8.0:
 			var fl := frame_at(c, dl)
-			var bl: Vector3 = fl["pos"] + fl["right"] * sd * (LANE_HALF + 0.8) - Vector3(0, CURB_H, 0)
+			var bl: Vector3 = fl["pos"] + fl["right"] * sd * (p["half_w"] + 0.8) - Vector3(0, CURB_H, 0)
 			if _main_clearance(track, bl) > WALK + 4.0:
 				_lamp(root, dist, fl, sd, bl, mats)
 			dl += 27.0

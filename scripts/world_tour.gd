@@ -76,7 +76,7 @@ func _plan() -> void:
 			legs.append({"e": e, "find": func(tr): return _city_path(tr, "exit"), "rev": true, "name": nm + ": Ausfahrt"})
 			legs.append({"e": e, "find": func(_tr): return 0, "rev": false, "name": nm + ": Runde", "loop": true})
 			legs.append({"e": e, "find": func(tr): return _city_path(tr, "exit"), "rev": false, "name": nm + ": hinaus"})
-		for k in 8:
+		for k in 24:  # Abkürzungen, Gabelungen, Nebenstraßen und Durchfahrten (Kreuzberg hat gut 20)
 			legs.append({"e": e, "find": func(tr): return _city_path(tr, "branch%d" % k), "rev": false, "name": nm + ": Abzweig %d" % k,
 				"optional": true})
 
@@ -98,7 +98,7 @@ func _ramp_finder(town: String, conn: bool) -> Callable:
 
 
 ## Wege einer Stadt: tail0 (Ausfahrt am Start), tail1 (hinter dem Ziel), exit (Ausfahrt eines Rundkurses),
-## branchN (N-te Abkürzung/Gabelung/See-Umfahrung; Sackgassen und Ausfahrten zählen nicht)
+## branchN (N-te Abkürzung/Gabelung/See-Umfahrung/Nebenstraße/Durchfahrt; Sackgassen und Ausfahrten zählen nicht)
 func _city_path(tr: Dictionary, what: String) -> int:
 	var L: float = tr["length"]
 	var bi := 0
