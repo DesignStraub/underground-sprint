@@ -46,8 +46,10 @@ frei auch für kommerzielle Nutzung, ohne Namensnennung). Der Dateiname nennt K�
 | Garage (West Coast, dunkel) | YuraSoop „West Coast Beats“, ArtIssizm „West Coast“, CNABeatsAfrica „West Coast Rap Beat“, Colt_Fingaz „Hip Hop West Coast Type Beat“, mastermath „West Coast Hip Hop Type Beat“, kond1 „DS Tales“, 5xBeatz „Dope West Coast Type Beat“, vaitsez „Gangster – Gangsta Beat“, „Mafia Gangster Criminal Beat“, KrissMcMass „Gangsta Music Theme“ |
 
 ## Schrift
-Menüs und Anzeigen seit 2.27: Saira Condensed von Omnibus-Type (The Saira Project Authors), SIL Open Font License 1.1
-(`assets/fonts/saira/OFL.txt`), von Google Fonts. Ladenschilder und Kennzeichen: D-DIN von Datto, SIL Open Font
+Menüs und Anzeigen seit 2.28: Rajdhani von der Indian Type Foundry, SIL Open Font License 1.1
+(`assets/fonts/rajdhani/OFL.txt`), von Google Fonts. Zum Vergleich liegen Chakra Petch (The Chakra Petch Project
+Authors, OFL, `assets/fonts/chakrapetch/`) und die frühere Saira Condensed (Omnibus-Type, OFL, `assets/fonts/saira/`)
+bei. Ladenschilder und Kennzeichen: D-DIN von Datto, SIL Open Font
 License 1.1 (`assets/fonts/COPYING.txt`).
 
 ## Kartendaten

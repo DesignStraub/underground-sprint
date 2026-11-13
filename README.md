@@ -656,9 +656,10 @@ in der Welt bleiben deutsch.
 
 ## Schrift und Texte
 Alles auf Deutsch, im Ton von NFS Underground (KNAPP VORBEI +300, DRIFT +240, SPRUNG, Tuning-Marken auf den
-Dächern, Ladetipps im Menü). Menüs und Anzeigen seit 2.27 in Saira Condensed (Omnibus-Type, SIL Open Font License
-1.1, `assets/fonts/saira/`), schräg gestellt wie in NFS; bis 2.26 D-DIN im Stil der Straßenschilder, das wirkte eher
-verspielt als nach Rennen. Ladenschilder und Kennzeichen bleiben D-DIN von Datto, SIL Open Font License 1.1
+Dächern, Ladetipps im Menü). Menüs und Anzeigen seit 2.28 in Rajdhani (Indian Type Foundry, SIL Open Font License
+1.1, `assets/fonts/rajdhani/`), schräg gestellt wie in NFS: technischer als Saira Condensed (2.27, wirkte rundlich und
+kindlich) und genauso schmal, die Menüs passen ohne Umbruch. Vergleich im Spiel: `--uifont=chakra` (Chakra Petch,
+kantiger und breiter) oder `--uifont=saira`. Bis 2.26 D-DIN im Stil der Straßenschilder. Ladenschilder und Kennzeichen bleiben D-DIN von Datto, SIL Open Font License 1.1
 (`assets/fonts/COPYING.txt`). Alte englische Eventnamen werden im
 Spielstand automatisch umgeschrieben, der Spielstand aus „Underground Sprint“ wird beim ersten Start übernommen.
 

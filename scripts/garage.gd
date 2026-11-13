@@ -564,7 +564,7 @@ func _show_main() -> void:
 	_focus_first()
 
 
-const CREDITS_TEXT := "Motorklänge aus echten Aufnahmen (Wikimedia Commons, CC BY 3.0/4.0): prone, Y Racing, Tyler Riddle, Great Explorer, NEW CARS 2015 Official, Fabio Rojas Pichardo, Taz Ringer, asTUBE, Super Cars for you, Work With Sounds / Technisches Museum Slowenien. Reifenquietschen: Joseph Sardin, BigSoundBank (CC0). Bahnübergang: Renardo la vulpo (CC0), Work With Sounds / Konrad Gutkowski (CC BY 4.0), Extemporalist (CC0). Musik: Pixabay. Schrift: Saira Condensed (Omnibus-Type, OFL), D-DIN (Datto, OFL). Karten © OpenStreetMap-Mitwirkende."
+const CREDITS_TEXT := "Motorklänge aus echten Aufnahmen (Wikimedia Commons, CC BY 3.0/4.0): prone, Y Racing, Tyler Riddle, Great Explorer, NEW CARS 2015 Official, Fabio Rojas Pichardo, Taz Ringer, asTUBE, Super Cars for you, Work With Sounds / Technisches Museum Slowenien. Reifenquietschen: Joseph Sardin, BigSoundBank (CC0). Bahnübergang: Renardo la vulpo (CC0), Work With Sounds / Konrad Gutkowski (CC BY 4.0), Extemporalist (CC0). Musik: Pixabay. Schrift: Rajdhani (Indian Type Foundry, OFL), D-DIN (Datto, OFL). Karten © OpenStreetMap-Mitwirkende."
 
 ## Erklärung je Einstellung (unten im Infofeld)
 const SETTING_HINTS := {

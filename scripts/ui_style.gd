@@ -15,18 +15,31 @@ static var _theme: Theme
 static var _fonts := {}
 
 
-## Schräggestellte Schrift (kursiv wie die NFS-Menüs). kind: cond, bold, wide. Seit 2.27 Saira Condensed (renniger als
-## D-DIN, das nach Straßenschild aussah): cond = ExtraBold (Überschriften, Knöpfe), bold = SemiBold (Text), wide = Black
-## mit etwas mehr Abstand (Logo, große Zahlen)
+## Schräggestellte Schrift (kursiv wie die NFS-Menüs). kind: cond, bold, wide. Seit 2.28 Rajdhani (Indian Type
+## Foundry, OFL): technisch und schmal wie die alte Saira Condensed (die wirkte rundlich und verspielt), die Menüs passen
+## ohne Umbruch. cond und wide = Bold (Überschriften, Knöpfe, große Zahlen; wide mit etwas mehr Abstand), bold =
+## SemiBold (Text). Zum Vergleich: --uifont=chakra (Chakra Petch, kantiger, breiter) oder --uifont=saira.
 static func font(kind := "cond", slant := 0.2) -> Font:
 	var key := "%s_%.2f" % [kind, slant]
 	if _fonts.has(key):
 		return _fonts[key]
 	var base: Font
-	match kind:
-		"wide":
+	var fam := "rajdhani"
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--uifont="):  # Test: Schrift vergleichen (rajdhani, chakra, saira)
+			fam = a.substr(9)
+	match fam + "/" + kind:
+		"rajdhani/bold":
+			base = load("res://assets/fonts/rajdhani/Rajdhani-SemiBold.ttf")
+		"rajdhani/wide", "rajdhani/cond":
+			base = load("res://assets/fonts/rajdhani/Rajdhani-Bold.ttf")
+		"chakra/bold":
+			base = load("res://assets/fonts/chakrapetch/ChakraPetch-SemiBold.ttf")
+		"chakra/wide", "chakra/cond":
+			base = load("res://assets/fonts/chakrapetch/ChakraPetch-Bold.ttf")
+		"saira/wide":
 			base = load("res://assets/fonts/saira/SairaCondensed-Black.ttf")
-		"bold":
+		"saira/bold":
 			base = load("res://assets/fonts/saira/SairaCondensed-SemiBold.ttf")
 		_:
 			base = load("res://assets/fonts/saira/SairaCondensed-ExtraBold.ttf")

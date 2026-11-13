@@ -23,7 +23,7 @@ window/stretch/aspect="expand"
 
 [gui]
 
-theme/custom_font="res://assets/fonts/D-DIN-Bold.otf"
+theme/custom_font="res://assets/fonts/rajdhani/Rajdhani-SemiBold.ttf"
 
 [internationalization]
 
