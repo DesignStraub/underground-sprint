@@ -187,6 +187,16 @@ func _spawn_xf() -> Transform3D:
 			if parts[0] == "xy":  # --wspawn=xy:x:z:grad (Blickrichtung, 0 = Norden/-Z)
 				var yaw := deg_to_rad(float(parts[3]) if parts.size() > 3 else 0.0)
 				return Transform3D(Basis(Vector3.UP, -yaw), Vector3(float(parts[1]), 0.5, float(parts[2])))
+			if parts[0] == "seg":  # --wspawn=seg:ring:stück:meter  auf einem Autobahnstück (Ring 2 Kreisel, 3-6 Diagonalen)
+				for sg in layout["segments"]:
+					if sg.get("ring", 0) == int(parts[1]):
+						if int(parts[2]) == 0:
+							var sj := Track.begin(sg["race"])
+							(sj["root"] as Node).free()
+							var sxf := Track.xform_at(sj["track"]["curve"], float(parts[3]), 6.75, true)
+							sxf.origin.y += 0.5
+							return sxf
+						parts[2] = str(int(parts[2]) - 1)
 			if parts[0] == "ring":
 				var ring: Array = layout["ring"]
 				var k := int(parts[1]) % ring.size()
@@ -1424,7 +1434,10 @@ func _spawn_queued(n: int) -> void:
 ## Nächstes (fwd) oder voriges Stück desselben Rings
 func _seg_next(e: Dictionary, fwd: bool) -> Dictionary:
 	var rg: Array = _rings[e["ring"]]
-	return rg[(int(e["seg_i"]) + (1 if fwd else -1) + rg.size()) % rg.size()]
+	var i := int(e["seg_i"]) + (1 if fwd else -1)
+	if e["race"].get("open", false) and (i < 0 or i >= rg.size()):
+		return {"state": "none"}  # Diagonale: am Ende geht es über die Auffahrt weiter, der Verkehr nicht
+	return rg[(i + rg.size()) % rg.size()]
 
 
 ## Wagen am Ende seines Wegs: aufs nächste (oder vorige) Autobahnstück, sonst außer Sicht neu einsetzen
@@ -1705,4 +1718,4 @@ func _world_check() -> void:
 
 
 func _wc_name(e: Dictionary) -> String:
-	return ("%s %d" % [["Autobahn", "Außenring"][e["ring"]], e["seg_i"]]) if e["kind"] == "seg" else str(Catalog.RACES[e["race_index"]]["name"])
+	return ("%s %d/%d" % [e["race"]["name"], e["ring"], e["seg_i"]]) if e["kind"] == "seg" else str(Catalog.RACES[e["race_index"]]["name"])

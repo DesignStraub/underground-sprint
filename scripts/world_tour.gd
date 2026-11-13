@@ -51,7 +51,16 @@ func _plan() -> void:
 	if only == "" or only == "outer":
 		for e in rings[1]:
 			legs.append({"e": e, "find": func(_tr): return 0, "rev": false, "name": "Außenring %d" % e["seg_i"]})
-	if only == "ring" or only == "outer":
+	if only == "" or only == "mitte":
+		for ri in range(2, rings.size()):
+			for e in rings[ri]:
+				legs.append({"e": e, "find": func(_tr): return 0, "rev": false, "name": "%s %d/%d" % [e["race"]["name"], ri, e["seg_i"]]})
+		for e in rings[0]:
+			for k in 2:  # Auffahrten vom Ring zu den Diagonalen
+				legs.append({"e": e, "find": func(tr): return _wide_ramp(tr, k), "rev": false, "name": "Ring %d: Auffahrt Mitte %d" % [e["seg_i"], k], "optional": true})
+		for k in 4:
+			legs.append({"e": rings[2][0], "find": func(tr): return _wide_ramp(tr, k), "rev": false, "name": "Kreisel: Auffahrt %d" % k, "optional": true})
+	if only == "ring" or only == "outer" or only == "mitte":
 		return
 	for e in w.entries:
 		if e["kind"] != "city":
@@ -79,6 +88,17 @@ func _plan() -> void:
 		for k in 24:  # Abkürzungen, Gabelungen, Nebenstraßen und Durchfahrten (Kreuzberg hat gut 20)
 			legs.append({"e": e, "find": func(tr): return _city_path(tr, "branch%d" % k), "rev": false, "name": nm + ": Abzweig %d" % k,
 				"optional": true})
+
+
+## k-te breite Auffahrt (zu einer Diagonale) eines Autobahnstücks, -1 wenn es sie nicht gibt
+func _wide_ramp(tr: Dictionary, k: int) -> int:
+	var i := 0
+	for p in tr["paths"]:
+		if p["kind"] == "ramp" and p["half_w"] > Track.HALF_W + 1.0:
+			if i == k:
+				return p["id"]
+			i += 1
+	return -1
 
 
 func _seg_with_ramp(town: String, conn: bool) -> Dictionary:

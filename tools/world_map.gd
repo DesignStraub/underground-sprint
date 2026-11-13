@@ -28,6 +28,13 @@ func _ready() -> void:
 				var b: Vector3 = rg[(k + 1) % rg.size()]
 				for j in 8:
 					_dot(img, px.call(a.lerp(b, j / 8.0)), Color(1, 0.8, 0.2), 2)
+		# Mitte: Kreisel und Diagonalen (Autobahnstücke ab Ring 2)
+		for sg in w["segments"]:
+			if sg.get("ring", 0) >= 2:
+				var sp: Array = sg["race"]["pts"]
+				for k in sp.size() - 1:
+					for j in 8:
+						_dot(img, px.call((sp[k] as Vector3).lerp(sp[k + 1], j / 8.0)), Color(1, 0.8, 0.2), 2)
 		# Auffahrten (gerade und Bögen zu den Ziel-Ausfahrten)
 		for rd in w["roads"]:
 			if rd[1] == 1:

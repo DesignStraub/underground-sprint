@@ -181,6 +181,20 @@ Außenring → nächste Stadt → Autobahn. Rundkurse und Drift-Kurse sind Schle
   Auch der Gehweg wechselt mit dem Viertel (`Track.PAVE`, `pave` im Gehweg-Shader): Betonplatten, kleines Pflaster
   (Altstadt, Kurviertel), Klinker im Läuferverband (Hafen, Marktviertel, Kiez), große helle Granitplatten
   (Bankenviertel, Prachtallee, Innenstadt, Campus), rote Platten (Chinatown).
+- **Mitte: Kreisel und Querspangen** (`world_layout._plan_middle`): die leere Mitte des inneren Rings hat jetzt einen
+  großen Kreisel (Autobahn 3+3 um einen Platz, 150 m Radius) und vier Diagonalen („Querspange“, je knapp 4 km, eine
+  sanfte S-Kurve), die über breite Auffahrten am inneren Ring und am Kreisel hängen. Ihre Winkel liegen möglichst weit
+  von den Auffahrten der Städte weg. Der Verkehr fährt am Ende einer Diagonale nicht aufs erste Stück zurück
+  (`race["open"]`), an den Enden hat der Mittelstreifen eine Lücke (`gap_start`, `gap_end`).
+- **Kuppen:** jedes Stück einer Diagonale hat eine Kuppe von 5–9 m (170 m Anstieg, `race["crests"]` → Höhenprofil der
+  Hauptstraße). Gehweg, Wände, Laternen, Schilderbrücken, Zäune und Kleinteile stehen auf Fahrbahnhöhe
+  (`Track._lift`), darunter läuft eine Grasböschung (1:1,6) zum Boden, die Häuser bleiben am Boden und rücken um die
+  Böschung ab; oben steht statt der Lärmschutzwand ein Geländer, der Blick geht über die Stadt. Straßenbrücken nicht
+  über Kuppen. Test: `world.tscn -- --wspawn=seg:4:0:820` (Ring 2 Kreisel, 3–6 Diagonalen, Stück, Meter),
+  Rundfahrt `--wtour=mitte` (17 km, ohne Befund).
+- **Unsichtbare Wände an den Nahtstellen der Autobahn behoben:** jedes Autobahnstück bekam wie eine Stadt an beiden
+  Enden ein 45 m langes Ausfahrtsstück („tail“); dessen Wände standen bei 9,3 m quer durch die äußere Spur des
+  nächsten Stücks (im Kreisel mitten auf der Fahrbahn). Autobahnstücke haben jetzt keine Ausfahrt mehr.
 - **Crashs wie in Underground:** an Wänden überschlägt man sich nicht mehr (vorher kippte, wer quer gegen eine Wand
   rutschte, und flog durch die Gegend); frontal steht man, streifend schrammt man entlang. Ein schwerer Crash mit
   Verkehr (frontal oder Auffahren ab gut 30 km/h Unterschied) ist dagegen groß: der getroffene Wagen hebt ab und

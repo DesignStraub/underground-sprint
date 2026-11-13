@@ -152,6 +152,9 @@ static func build() -> Dictionary:
 			c["roads"].append([w2, pl[1]])
 		ramps.append({"k": k, "from": rp, "end": exit_w, "name": Catalog.RACES[c["race_index"]].get("town", "")})
 	# Außenring um alle Städte und zweite Ausfahrten der Sprints (hinter dem Ziel) an einen der beiden Ringe
+	# Mitte: Kreisel mit vier Diagonalen zum inneren Ring (Querverbindungen durch die Mitte), vor den Ziel-Ausfahrten
+	# geplant, damit die ihnen am Ring ausweichen
+	var mid := _plan_middle(ring, ramps)
 	var oring := _outer_ring(cities, R)
 	var oramps := []
 	_connect_ends(cities, ring, oring, ramps, oramps)
@@ -161,6 +164,10 @@ static func build() -> Dictionary:
 	var segments := _split(ring, ramps, 9000, 0)
 	var osegs := _split(oring, oramps, 9500, 1)
 	segments.append_array(osegs)
+	var msegs := _split(mid["rb"], mid["rb_ramps"], 9800, 2, "Kreisel")
+	for i in mid["arms"].size():
+		msegs.append_array(_split_open(mid["arms"][i], 9900 + i * 50, 3 + i, "Querspange"))
+	segments.append_array(msegs)
 	# Straßen für die Karten (Weltkoordinaten x, z): Ring, Auffahrten, alle Wege der Städte
 	var roads := []
 	var rl := PackedVector2Array()
@@ -173,7 +180,12 @@ static func build() -> Dictionary:
 		orl.append(Vector2(q.x, q.z))
 	orl.append(orl[0])
 	roads.append([orl, 0])
-	for r in ramps + oramps:
+	for line in [mid["rb"] + [mid["rb"][0]]] + mid["arms"]:
+		var ml := PackedVector2Array()
+		for q in line:
+			ml.append(Vector2(q.x, q.z))
+		roads.append([ml, 0])
+	for r in ramps + oramps + mid["rb_ramps"]:
 		var rp2 := PackedVector2Array()
 		for q in _ramp_pts(r):
 			rp2.append(Vector2(q.x, q.z))
@@ -181,6 +193,7 @@ static func build() -> Dictionary:
 	for c in cities:
 		roads.append_array(c["roads"])
 	_add_keepout(cities, ring, ramps + oramps, oring, osegs)
+	_middle_keepout(msegs, ring, mid)
 	# Löcher im Boden (Tunneltröge, Flussbetten) aller Städte in Weltkoordinaten an jede Strecke: ihr Boden darf sie
 	# nicht zudecken, auch nicht den Trog der Nachbarstadt
 	var holes := PackedVector3Array()
@@ -211,7 +224,7 @@ static func build() -> Dictionary:
 
 
 ## Ring in Stücke teilen (Grenzen nicht in der Nähe einer Auffahrt). ring_i: 0 innen, 1 außen
-static func _split(ring: Array, ramps: Array, seed0: int, ring_i: int) -> Array:
+static func _split(ring: Array, ramps: Array, seed0: int, ring_i: int, name := "") -> Array:
 	var m := ring.size()
 	var ramp_k := {}
 	for r in ramps:
@@ -234,11 +247,116 @@ static func _split(ring: Array, ramps: Array, seed0: int, ring_i: int) -> Array:
 			if ramp_k.has(k % m):
 				rs.append(ramp_k[k % m])
 		var mid: Vector3 = pts[pts.size() / 2]
-		segments.append({"race": {"name": "Autobahn" if ring_i == 0 else "Außenring", "type": "autobahn", "seed": seed0 + segments.size(),
+		segments.append({"race": {"name": name if name != "" else ("Autobahn" if ring_i == 0 else "Außenring"), "type": "autobahn", "seed": seed0 + segments.size(),
 			"pts": pts, "districts": {"highway": 1.0}, "mood": MOOD, "ramps": rs, "world": true},
 			"center": mid, "radius": (k1 - k0) * RING_STEP / 2.0 + 150.0, "ring": ring_i})
 		k0 = k1
 	return segments
+
+
+const RB_R := 150.0  # Kreisel in der Kartenmitte: Radius seiner Mittellinie
+const ARM_IN := 130.0  # Auffahrt vom Ring bzw. vom Kreisel bis zum Anfang einer Diagonale
+
+
+## Mitte der Karte: ein großer Kreisel (Autobahn 3+3 rund um einen Platz) und vier Diagonalen ("Querspange") vom
+## inneren Ring dorthin, leicht geschwungen (eine S-Kurve, an den Enden gerade). Die Winkel liegen möglichst weit weg
+## von den Auffahrten der Städte. Die Diagonalen hängen wie Städte über Auffahrten am Ring und am Kreisel (ramps,
+## "wide": so breit wie die Autobahn); ihre Auffahrten am Ring kommen in ramps dazu.
+static func _plan_middle(ring: Array, ramps: Array) -> Dictionary:
+	var m := ring.size()
+	var taken := []
+	for r in ramps:
+		taken.append(TAU * float(r["k"]) / m)
+	var best_a := 0.0
+	var best_s := -1.0
+	for deg in 90:
+		var a0 := deg_to_rad(float(deg))
+		var sc := 1e9
+		for i in 4:
+			for t in taken:
+				sc = minf(sc, absf(wrapf(a0 + i * PI / 2.0 - t, -PI, PI)))
+		if sc > best_s:
+			best_s = sc
+			best_a = a0
+	var nrb := 24
+	var rb := []
+	for k in nrb:
+		var a := best_a + PI / 4.0 + TAU * k / nrb  # Punkt 0 zwischen zwei Diagonalen (dort schließt der Kreis)
+		rb.append(Vector3(cos(a) * RB_R, 0.0, sin(a) * RB_R))
+	var arms := []
+	var rb_ramps := []
+	for i in 4:
+		var a := best_a + i * PI / 2.0
+		var kr := posmod(int(round(a / TAU * m)), m)
+		var rp: Vector3 = ring[kr]
+		var dir_in := -Vector3(rp.x, 0.0, rp.z).normalized()
+		var p0 := rp + dir_in * ARM_IN
+		var krb := posmod(6 * i - 3, nrb)
+		var bp: Vector3 = rb[krb]
+		var p1 := bp + Vector3(bp.x, 0.0, bp.z).normalized() * ARM_IN
+		var L := p0.distance_to(p1)
+		var n := int(ceil(L / RING_STEP))
+		var side := Vector3(-dir_in.z, 0.0, dir_in.x) * (1.0 if i % 2 == 0 else -1.0)
+		var pts := []
+		for j in n + 1:
+			var t := float(j) / n
+			pts.append(p0.lerp(p1, t) + side * sin(t * TAU) * sin(t * PI) * 170.0)
+		arms.append(pts)
+		ramps.append({"k": kr, "from": rp, "end": p0, "name": "", "wide": true})
+		rb_ramps.append({"k": krb, "from": bp, "end": p1, "name": "", "wide": true})
+	return {"rb": rb, "rb_ramps": rb_ramps, "arms": arms}
+
+
+## Offene Straße (Diagonale) in Stücke von gut SEG_LEN teilen; die Enden bekommen im Mittelstreifen eine Lücke
+## (dort mündet die Auffahrt). "open": der Verkehr fährt am Ende nicht auf das erste Stück weiter.
+static func _split_open(pts: Array, seed0: int, ring_i: int, name: String) -> Array:
+	var per := int(SEG_LEN / RING_STEP)
+	var out := []
+	var k0 := 0
+	var m := pts.size() - 1
+	while k0 < m:
+		var k1 := mini(k0 + per, m)
+		if m - k1 < per / 2:
+			k1 = m
+		var sp := pts.slice(k0, k1 + 1)
+		# eine Kuppe je Stück (über die Häuser hinweg, mit Tempo hebt man oben kurz ab), weit weg von den Nähten
+		var crng := RandomNumberGenerator.new()
+		crng.seed = seed0 * 7 + out.size()
+		var c0 := crng.randf_range(0.18, 0.3)
+		var crests := [[c0, c0 + crng.randf_range(0.35, 0.5), crng.randf_range(5.0, 9.0)]]
+		out.append({"race": {"name": name, "type": "autobahn", "seed": seed0 + out.size(), "pts": sp,
+			"districts": {"highway": 1.0}, "mood": MOOD, "ramps": [], "world": true, "open": true,
+			"gap_start": k0 == 0, "gap_end": k1 == m, "crests": crests},
+			"center": sp[sp.size() / 2], "radius": (k1 - k0) * RING_STEP / 2.0 + 150.0, "ring": ring_i})
+		k0 = k1
+	return out
+
+
+## Häuser der Mitte (Kreisel, Diagonalen) nicht auf den Ring, den Kreisel oder eine andere Diagonale
+static func _middle_keepout(msegs: Array, ring: Array, mid: Dictionary) -> void:
+	var r: float = Track.HALF_W + Track.AB_EXTRA + Track.MED + Track.WALK + 3.0
+	var lines := [[ring + [ring[0]], -1], [mid["rb"] + [mid["rb"][0]], 2]]
+	for i in mid["arms"].size():
+		lines.append([mid["arms"][i], 3 + i])
+	for rr in mid["rb_ramps"]:
+		lines.append([[rr["from"], rr["end"]], 2])
+	for sg in msegs:
+		var ctr: Vector3 = sg["center"]
+		var reach: float = sg["radius"] + 300.0
+		var ko := []
+		for ln in lines:
+			if ln[1] == sg["ring"]:
+				continue
+			var pts: Array = ln[0]
+			for k in pts.size() - 1:
+				var a: Vector3 = pts[k]
+				var b: Vector3 = pts[k + 1]
+				var n := maxi(int(a.distance_to(b) / 8.0), 1)
+				for j in n:
+					var q := a.lerp(b, float(j) / n)
+					if Vector2(q.x - ctr.x, q.z - ctr.z).length() < reach:
+						ko.append({"pos": q, "r": r, "ko": true})
+		sg["race"]["keepout"] = ko
 
 
 ## Außenring: läuft in sanften Bögen außen um alle Städte. Jeder Straßenpunkt einer Stadt hebt den Ring an seiner
@@ -473,13 +591,13 @@ static func _add_keepout(cities: Array, ring: Array, ramps: Array, oring: Array,
 	lines.append([orl, ring_r, -2])
 	for r in ramps:
 		# Bögen zu den Ziel-Ausfahrten: etwas mehr Platz (die Kreise sitzen auf den Sehnen des Bogens)
-		lines.append([_ramp_pts(r), Track.HALF_W + Track.WALK + (8.0 if r.has("c1") else 2.0), -1])
+		lines.append([_ramp_pts(r), Track.HALF_W + Track.WALK + (8.0 if r.has("c1") else 2.0) + (Track.AB_EXTRA + 3.0 if r.get("wide", false) else 0.0), -1])
 	for c in cities:
 		for road in c["roads"]:
 			var pl := []
 			for q in road[0]:
 				pl.append(Vector3(q.x, 0.0, q.y))
-			lines.append([pl, Track.HALF_W + Track.WALK + 2.0 if road[1] == 0 else 9.0, c["race_index"]])
+			lines.append([pl, Track.HALF_W + Track.WALK + 2.0 if road[1] == 0 else 12.0, c["race_index"]])
 	for c in cities:
 		var inv: Transform3D = (c["xf"] as Transform3D).affine_inverse()
 		var ctr: Vector3 = c["center"]
