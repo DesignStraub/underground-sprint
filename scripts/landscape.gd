@@ -199,8 +199,7 @@ func _make_materials() -> void:
 	land_mat.shader = LAND_SHADER
 	house_mat = ShaderMaterial.new()
 	house_mat.shader = HOUSE_SHADER
-	fog_mat = ShaderMaterial.new()
-	fog_mat.shader = FOG_SHADER
+	fog_mat = Mist.material()
 	beacon_mat = ShaderMaterial.new()
 	beacon_mat.shader = BEACON_SHADER
 	_roof_mat = StandardMaterial3D.new()

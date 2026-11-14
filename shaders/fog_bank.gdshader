@@ -35,6 +35,8 @@ void fragment() {
 	float scene_z = -vp.z / vp.w;
 	float my_z = -VERTEX.z;
 	a *= clamp((scene_z - my_z) / 6.0, 0.0, 1.0) * smoothstep(2.0, 12.0, my_z);
+	// flach von der Seite gesehen (Schicht auf Augenhöhe) nicht als harte Linie zeigen
+	a *= smoothstep(0.04, 0.3, abs(dot(normalize(NORMAL), normalize(VIEW))));
 	ALBEDO = tint;
 	ALPHA = a * strength;
 }

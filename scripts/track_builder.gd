@@ -384,6 +384,7 @@ static func step(job: Dictionary) -> float:
 			else:
 				_build_props(root, track, rng)
 			_build_steam(root, track, rng)
+			_build_mist(root, track)
 			if type != "autobahn":
 				_build_spectators(root, track, rng)
 				_build_walkers(root, track)
@@ -5224,6 +5225,34 @@ static func set_daytime(track: Dictionary, day: float) -> void:
 	for h in track.get("walker_nodes", []):
 		if is_instance_valid(h):
 			(h as Node3D).visible = (day > 0.3) == (str(h.name) == "PassantenTag")
+
+
+## Hafennebel (seit 2.29): im Hafenviertel und auf Brücken über Flüssen ziehen nachts flache Nebelschichten über
+## die Straße (Material Mist, Stärke setzt die Uhr bzw. die Stimmung des Rennens)
+static func _build_mist(root: Node3D, track: Dictionary) -> void:
+	var curve: Curve3D = track["curve"]
+	var rng := RandomNumberGenerator.new()
+	rng.seed = int(track["length"]) + 4040
+	var d := 60.0
+	while d < track["length"] - 60.0:
+		var dist := _district_at(track, d)
+		var wet: bool = dist.has("containers") or not bridge_at(track, d).is_empty() or dist.get("forest", false)
+		if wet and rng.randf() < 0.6 and tunnel_at(track, d, 30.0).is_empty():
+			var f := frame_at(curve, d)
+			var size := rng.randf_range(90.0, 150.0)
+			for layer in 2:
+				var q := MeshInstance3D.new()
+				var pm := PlaneMesh.new()
+				pm.size = Vector2(size, size) * (1.0 - layer * 0.2)
+				q.mesh = pm
+				q.material_override = Mist.material()
+				q.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+				q.position = f["pos"] + Vector3(0, _lift(track, d) + 1.0 + layer * 1.5, 0) + f["right"] * rng.randf_range(-8.0, 8.0)
+				q.visibility_range_end = 700.0
+				root.add_child(q)
+			d += rng.randf_range(140.0, 220.0)
+		else:
+			d += 60.0
 
 
 ## Dampf aus Gullys

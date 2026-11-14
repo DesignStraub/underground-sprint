@@ -131,6 +131,10 @@ func _ready() -> void:
 	track["node"].process_mode = Node.PROCESS_MODE_PAUSABLE
 	world.add_child(track["node"])
 	_setup_environment()
+	# Nebelschichten (Hafen, Flüsse, Wald): nachts und bei Nebel/Regen kräftig
+	var mday: float = mood.get("day", 0.0)
+	Mist.material().set_shader_parameter("strength", clampf((1.0 - mday) * 0.5 + (0.3 if race.get("mood", "") in ["nebel", "regen"] else 0.0), 0.0, 0.8))
+	Mist.material().set_shader_parameter("tint", Color(0.55, 0.6, 0.72).lerp(Color(0.85, 0.85, 0.82), mday))
 	if race.get("forest", false):
 		_build_land()
 

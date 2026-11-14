@@ -1405,6 +1405,8 @@ func _plan_traffic(e: Dictionary) -> void:
 		return
 	var tr: Dictionary = e["track"]
 	var L: float = tr["length"]
+	# nachts weniger Verkehr (seit 2.29): die Abstände wachsen bis aufs 1,8-Fache
+	var dens := lerpf(1.8, 1.0, float(mood.get("day", 0.0)))
 	if e["kind"] == "seg":
 		var d := _trng.randf_range(10.0, 80.0)
 		while d < L - 10.0:
@@ -1412,7 +1414,7 @@ func _plan_traffic(e: Dictionary) -> void:
 			var outer := absf(lane) > 10.0
 			var kind: String = ["bus", "van", "van", "sedan"][_trng.randi() % 4] if outer else ["sedan", "sedan", "taxi", "van"][_trng.randi() % 4]
 			_tq.append([e, {"d": d, "lane": lane, "speed": AB_SPEED[absf(lane)], "kind": kind}])
-			d += _trng.randf_range(60.0, 120.0)
+			d += _trng.randf_range(60.0, 120.0) * dens
 		return
 	var d2: float = 30.0
 	while d2 < L - 30.0:
@@ -1424,7 +1426,7 @@ func _plan_traffic(e: Dictionary) -> void:
 		if not blocked:
 			_tq.append([e, {"d": d2, "lane": lane2, "speed": _trng.randf_range(10.0, 16.0),
 				"kind": Traffic.KINDS[_trng.randi() % Traffic.KINDS.size()]}])
-		d2 += _trng.randf_range(70.0, 140.0)
+		d2 += _trng.randf_range(70.0, 140.0) * dens
 
 
 func _spawn_queued(n: int) -> void:
