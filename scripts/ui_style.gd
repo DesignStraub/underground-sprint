@@ -15,7 +15,9 @@ static var _theme: Theme
 static var _fonts := {}
 
 
-## Schräggestellte Schrift (kursiv wie die NFS-Menüs). kind: cond, bold, wide. Seit 2.28 Rajdhani (Indian Type
+## Schräggestellte Schrift (leicht kursiv wie die NFS-Menüs). kind: cond, bold, wide. Seit 2.29 D-DIN (datto, OFL):
+## die DIN der deutschen Straßenschilder, kühl und eng laufend; cond = D-DIN Condensed Bold, bold/wide = D-DIN Bold.
+## Davor Rajdhani (Indian Type
 ## Foundry, OFL): technisch und schmal wie die alte Saira Condensed (die wirkte rundlich und verspielt), die Menüs passen
 ## ohne Umbruch. cond und wide = Bold (Überschriften, Knöpfe, große Zahlen; wide mit etwas mehr Abstand), bold =
 ## SemiBold (Text). Zum Vergleich: --uifont=chakra (Chakra Petch, kantiger, breiter) oder --uifont=saira.
@@ -24,11 +26,15 @@ static func font(kind := "cond", slant := 0.2) -> Font:
 	if _fonts.has(key):
 		return _fonts[key]
 	var base: Font
-	var fam := "rajdhani"
+	var fam := "din"
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--uifont="):  # Test: Schrift vergleichen (rajdhani, chakra, saira)
 			fam = a.substr(9)
 	match fam + "/" + kind:
+		"din/cond":
+			base = load("res://assets/fonts/D-DINCondensed-Bold.otf")
+		"din/bold", "din/wide":
+			base = load("res://assets/fonts/D-DIN-Bold.otf")
 		"rajdhani/bold":
 			base = load("res://assets/fonts/rajdhani/Rajdhani-SemiBold.ttf")
 		"rajdhani/wide", "rajdhani/cond":
@@ -45,9 +51,13 @@ static func font(kind := "cond", slant := 0.2) -> Font:
 			base = load("res://assets/fonts/saira/SairaCondensed-ExtraBold.ttf")
 	var fv := FontVariation.new()
 	fv.base_font = base
-	if kind == "wide":
+	# Pfeile, Mittelpunkt & Co. fehlen in D-DIN: aus Rajdhani nachladen
+	fv.fallbacks = [load("res://assets/fonts/rajdhani/Rajdhani-SemiBold.ttf")]
+	if fam != "din" and kind == "wide":
 		fv.spacing_glyph = 2
-	fv.variation_transform = Transform2D(Vector2(1.0, 0.0), Vector2(-slant, 1.0), Vector2.ZERO)
+	# DIN nur leicht schräg: kühler, weniger Spielzeug-Look
+	var sl := slant * (0.55 if fam == "din" else 1.0)
+	fv.variation_transform = Transform2D(Vector2(1.0, 0.0), Vector2(-sl, 1.0), Vector2.ZERO)
 	_fonts[key] = fv
 	return fv
 
@@ -120,9 +130,8 @@ static func section(parent: Control, pos: Vector2) -> Label:
 	ls.font = font("cond", 0.22)
 	ls.font_size = 30
 	ls.font_color = GREEN
-	ls.outline_size = 3
-	ls.outline_color = Color(0, 0, 0, 0.9)
-	ls.shadow_color = Color(GREEN.r, GREEN.g, GREEN.b, 0.35)
+	ls.outline_size = 0
+	ls.shadow_color = Color(GREEN.r, GREEN.g, GREEN.b, 0.2)
 	ls.shadow_size = 6
 	ls.shadow_offset = Vector2.ZERO
 	l.label_settings = ls

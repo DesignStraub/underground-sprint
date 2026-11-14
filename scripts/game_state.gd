@@ -15,8 +15,8 @@ var save_path := SAVE_PATH
 ## Im Browser: Schlüssel der Kopie im localStorage (falls der Browser das Dateisystem im Rahmen nicht dauerhaft hält)
 const WEB_KEY := "nfg_save"
 ## Rajdhani (Indian Type Foundry, SIL Open Font License 1.1, siehe assets/fonts/rajdhani/OFL.txt), seit 2.28 statt Saira
-const FONT := preload("res://assets/fonts/rajdhani/Rajdhani-SemiBold.ttf")
-const FONT_WIDE := preload("res://assets/fonts/rajdhani/Rajdhani-Bold.ttf")
+const FONT := preload("res://assets/fonts/D-DIN-Bold.otf")
+const FONT_WIDE := preload("res://assets/fonts/D-DINCondensed-Bold.otf")
 ## Grafik wie in großen PC-Spielen: eine Voreinstellung (Niedrig bis Ultra) setzt alle Einzeloptionen, jede lässt
 ## sich danach einzeln verstellen (dann "Benutzerdefiniert"). Je Option: Stufen, Werte je Stufe, Stufe je Voreinstellung.
 ##   res: höchste 3D-Auflösung (Zeilen), darüber wird weich hochskaliert. dynres: senkt sie, wenn die Bildrate fällt.
@@ -91,6 +91,7 @@ var kept_cars: Array = []  # schon mit den alten Schwellen (bis 2.10) freigescha
 func _ready() -> void:
 	# Schrift im Stil der deutschen Straßenschilder (DIN 1451) für alles: Menü, HUD, Schilder in der Welt
 	ThemeDB.fallback_font = FONT
+	SignIcons.warm()  # Laden-Piktogramme im Hauptthread anlegen (die Welt baut in Hintergrund-Threads)
 	# Hauptausgang mit hartem Limiter: Motor, Nitro, Reifen, Gegner, Verkehr und Musik zusammen übersteuerten bis 2.22
 	# in gut einem Drittel der Sekunden (Spitzen über 0 dB klingen kratzig); der Limiter fängt die Spitzen ab.
 	var lim := AudioEffectHardLimiter.new()

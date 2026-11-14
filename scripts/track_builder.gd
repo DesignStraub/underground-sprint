@@ -2839,7 +2839,11 @@ static func _shop_sign(root: Node3D, text: String, xf: Transform3D, max_w: float
 	var tw := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x * px
 	var pad := size * px * 0.5
 	var bh := size * px * 0.85 + pad
-	var em := bh * 0.78 if st.get("emblem", "") == "apo" else 0.0
+	# Piktogramm links (Brezel, Schere, Tasse …) oder ein ausgedachtes Markenzeichen (seit 2.29)
+	var ic := "" if st.get("emblem", "") == "apo" else SignIcons.icon_for(text)
+	if ic == "" and st.get("emblem", "") == "" and absi(text.hash()) % 4 != 0:
+		ic = SignIcons.mark_for(text)
+	var em := bh * 0.78 if st.get("emblem", "") == "apo" or ic != "" else 0.0
 	if tw + em + 2.0 * pad > max_w:
 		var k := maxf(max_w - em - 2.0 * pad, 0.5) / tw
 		px *= k
@@ -2877,6 +2881,15 @@ static func _shop_sign(root: Node3D, text: String, xf: Transform3D, max_w: float
 	l.double_sided = false
 	l.position = Vector3(em / 2.0, 0.0 if st.get("band", 0) == 0 else bh * 0.05, d / 2.0 + 0.02)
 	n.add_child(l)
+	if ic != "":
+		var iq := QuadMesh.new()
+		iq.size = Vector2(em, em) * 0.92
+		var ii := MeshInstance3D.new()
+		ii.mesh = iq
+		ii.material_override = SignIcons.material(ic, l.modulate)
+		ii.position = Vector3(-bw / 2.0 + pad * 0.6 + em / 2.0, 0, d / 2.0 + 0.016)
+		ii.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		n.add_child(ii)
 	match st.get("emblem", ""):
 		"apo":
 			# rotes Apotheken-A auf weißem Grund links im Schild
@@ -2914,12 +2927,15 @@ static func _shop_sign(root: Node3D, text: String, xf: Transform3D, max_w: float
 static func _sign_box(root: Node3D, text: String, col: Color, size: int, px: float, xf: Transform3D, max_w: float) -> void:
 	var tw := ThemeDB.fallback_font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x * px
 	var pad := size * px * 0.45
-	if tw + 2.0 * pad > max_w:
-		var k := maxf(max_w - 2.0 * pad, 0.5) / tw
+	var ic := SignIcons.icon_for(text)
+	var em := size * px * 0.9 if ic != "" else 0.0
+	if tw + em + 2.0 * pad > max_w:
+		var k := maxf(max_w - em - 2.0 * pad, 0.5) / tw
 		px *= k
 		tw *= k
+		em *= k
 		pad = size * px * 0.45
-	var bw := tw + 2.0 * pad
+	var bw := tw + em + 2.0 * pad
 	var bh := size * px * 0.8 + pad
 	var d := 0.2
 	var n := Node3D.new()
@@ -2938,8 +2954,17 @@ static func _sign_box(root: Node3D, text: String, col: Color, size: int, px: flo
 	l.modulate = Color(col.r * 1.8, col.g * 1.8, col.b * 1.8)
 	l.shaded = false
 	l.double_sided = false
-	l.position = Vector3(0, 0, d / 2.0 + 0.02)
+	l.position = Vector3(em / 2.0, 0, d / 2.0 + 0.02)
 	n.add_child(l)
+	if ic != "":
+		var iq := QuadMesh.new()
+		iq.size = Vector2(em, em)
+		var ii := MeshInstance3D.new()
+		ii.mesh = iq
+		ii.material_override = SignIcons.material(ic, l.modulate)
+		ii.position = Vector3(-bw / 2.0 + pad * 0.7 + em / 2.0, 0, d / 2.0 + 0.016)
+		ii.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		n.add_child(ii)
 
 
 ## Baut Kirche, Krankenhaus, Tankstelle, Stadion. Liefert belegte Flächen [{pos, r}] für die übrige Bebauung.
@@ -4531,16 +4556,29 @@ static func _billboard(root: Node3D, pos: Vector3, face_dir: Vector3, roof_y: fl
 		Builder._add(n, Builder.box(Vector3(0.2, 2.4, 0.2)), dark, Vector3(x, 1.2, 0))
 	var l := Label3D.new()
 	l.text = BRANDS[rng.randi() % BRANDS.size()]
-	l.font_size = 120 if l.text.length() <= 13 else 76
+	# Marke links (ausgedachtes Zeichen), Schrift einzeilig auf die Restbreite eingepasst (seit 2.29; vorher
+	# brach die schmale DIN lange Namen mitten im Wort um)
+	var em := 2.6
+	l.font_size = 120
 	l.pixel_size = 0.012
-	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	l.width = 8.4 / l.pixel_size
+	var tw := ThemeDB.fallback_font.get_string_size(l.text, HORIZONTAL_ALIGNMENT_LEFT, -1, 120).x * l.pixel_size
+	if tw > 8.2 - em:
+		l.pixel_size *= (8.2 - em) / tw
+		tw = 8.2 - em
 	l.modulate = Color(2.5, 2.5, 2.5)
 	l.outline_modulate = Color(col.r, col.g, col.b, 1.0)
 	l.outline_size = 16
 	l.shaded = false
-	l.position = Vector3(0, 4.2, 0.17)
+	l.position = Vector3(em * 0.5, 4.2, 0.17)
 	n.add_child(l)
+	var iq := QuadMesh.new()
+	iq.size = Vector2(em, em) * 0.9
+	var ii := MeshInstance3D.new()
+	ii.mesh = iq
+	ii.material_override = SignIcons.material(SignIcons.mark_for(l.text), Color(2.2, 2.2, 2.2))
+	ii.position = Vector3(-tw * 0.5 - 0.15, 4.2, 0.17)
+	ii.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	n.add_child(ii)
 	if rng.randf() < 0.5:
 		return  # nur jede zweite Tafel mit Strahler (Lichter sind im Browser teuer)
 	var sl := SpotLight3D.new()
@@ -5716,7 +5754,7 @@ static func _build_structures(root: Node3D, track: Dictionary, rng: RandomNumber
 				# zwischen zwei Laternen, damit sich Masten nicht in die Quere kommen
 				var gd := 39.0 + roundf((target - 39.0) / LAMP_STEP) * LAMP_STEP
 				if _overhead_free(track, gd, 12.0) and not _near_post(track, gd, 25.0):
-					_gantry(root, track, gd, rng)
+					_gantry(root, track, gd, rng, [], [], key == "highway")
 		if rng.randf() < dist.get("overpass", 0.0):
 			for off in [0.0, 30.0, -30.0, 60.0, -60.0, 90.0]:
 				var od: float = d0 + DISTRICT_LEN * 0.5 + off
@@ -5847,12 +5885,17 @@ static func _china_gate(root: Node3D, track: Dictionary, d: float) -> void:
 	track["posts"].append(d)
 
 
-## Schilderbrücke mit zwei grünen Wegweisern über den Spuren
-static func _gantry(root: Node3D, track: Dictionary, d: float, rng: RandomNumberGenerator, texts := [], subs := []) -> void:
+## Schilderbrücke mit zwei Wegweisern über den Spuren, wie in Deutschland (seit 2.29; davor grün wie in den USA):
+## auf Autobahn und Schnellstraße blau mit weißer Schrift, in der Stadt gelb mit schwarzer Schrift, dazu Pfeile
+## ("< ZIEL" / "ZIEL >" zeigen nach links/rechts, sonst Spurpfeil nach unten).
+static func _gantry(root: Node3D, track: Dictionary, d: float, rng: RandomNumberGenerator, texts := [], subs := [], blue := false) -> void:
 	var f := frame_at(track["curve"], d)
 	var xf := Transform3D(Basis.looking_at(f["fwd"], Vector3.UP), f["pos"] + Vector3(0, _lift(track, d), 0))
 	var steel := Builder.mat(Color(0.45, 0.46, 0.48), 0.8, 0.35)
-	var green := Builder.mat(Color(0.02, 0.3, 0.13), 0.1, 0.4, Color(0.02, 0.3, 0.12), 0.5)
+	blue = blue or track.get("type", "") == "autobahn"
+	var face := Color(0.0, 0.2, 0.52) if blue else Color(0.98, 0.78, 0.0)
+	var ink := Color(1.6, 1.6, 1.6) if blue else Color(0.02, 0.02, 0.02)
+	var green := Builder.mat(face, 0.1, 0.4, face, 0.35 if blue else 0.25)
 	var white := Builder.mat(Color(0.9, 0.9, 0.9), 0.0, 0.4, Color(1, 1, 1), 0.6)
 	var lamp := Builder.mat(Color(1, 1, 0.9), 0.0, 0.3, Color(1, 0.95, 0.8), 4.0)
 	var px := hw(track, d) + 1.0
@@ -5872,24 +5915,44 @@ static func _gantry(root: Node3D, track: Dictionary, d: float, rng: RandomNumber
 		_part(g, green, Builder.box(Vector3(7.0, 2.3, 0.1)), Transform3D(Basis(), Vector3(x, 6.95, 0.28)))
 		for lx in [-2.0, 2.0]:
 			_part(g, lamp, Builder.box(Vector3(0.5, 0.1, 0.3)), Transform3D(Basis(), Vector3(x + lx, 8.3, 0.55)))
+		var tx: String = texts[k]
+		var arrow := "pfeil_unten"
+		if tx.begins_with("< "):
+			arrow = "pfeil_links"
+			tx = tx.substr(2)
+		elif tx.ends_with(" >"):
+			arrow = "pfeil_rechts"
+			tx = tx.substr(0, tx.length() - 2)
+		var ax := -2.75 if arrow == "pfeil_links" else 2.75
 		var l := Label3D.new()
-		l.text = texts[k]
+		l.text = tx
 		l.font_size = 48
 		l.pixel_size = 0.02
-		l.modulate = Color(1.7, 1.7, 1.7)
+		var tw := ThemeDB.fallback_font.get_string_size(tx, HORIZONTAL_ALIGNMENT_LEFT, -1, 48).x * 0.02
+		if tw > 5.0:
+			l.pixel_size *= 5.0 / tw
+		l.modulate = ink
 		l.shaded = false
 		l.double_sided = false
-		l.transform = xf * Transform3D(Basis(), Vector3(x, 6.95 if subs.is_empty() else 7.25, 0.35))
+		l.transform = xf * Transform3D(Basis(), Vector3(x - ax * 0.22, 6.95 if subs.is_empty() else 7.25, 0.35))
 		root.add_child(l)
+		var aq := QuadMesh.new()
+		aq.size = Vector2(1.3, 1.3)
+		var ai := MeshInstance3D.new()
+		ai.mesh = aq
+		ai.material_override = SignIcons.material(arrow, ink)
+		ai.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		ai.transform = xf * Transform3D(Basis(), Vector3(x + ax, 6.95, 0.35))
+		root.add_child(ai)
 		if not subs.is_empty():
 			var sl := Label3D.new()
 			sl.text = subs[k]
 			sl.font_size = 26
 			sl.pixel_size = 0.02
-			sl.modulate = Color(1.4, 1.4, 1.2)
+			sl.modulate = ink
 			sl.shaded = false
 			sl.double_sided = false
-			sl.transform = xf * Transform3D(Basis(), Vector3(x, 6.35, 0.35))
+			sl.transform = xf * Transform3D(Basis(), Vector3(x - ax * 0.22, 6.35, 0.35))
 			root.add_child(sl)
 	_bake(root, g, xf)
 	track["posts"].append(d)

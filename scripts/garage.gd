@@ -211,7 +211,7 @@ func _build_ui() -> void:
 	title.label_settings.font = UI.font("cond", 0.2)
 	title.text = "GESCHWINDIGKEIT"
 	title.label_settings.font_color = UI.CYAN
-	title.label_settings.shadow_color = Color(UI.PINK.r, UI.PINK.g, UI.PINK.b, 0.5)
+	title.label_settings.shadow_color = Color(UI.PINK.r, UI.PINK.g, UI.PINK.b, 0.25)
 	title.label_settings.shadow_size = 4
 	title.label_settings.shadow_offset = Vector2.ZERO
 	title.position = Vector2(13, 15)
