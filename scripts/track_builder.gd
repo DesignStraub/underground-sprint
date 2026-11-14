@@ -122,6 +122,11 @@ const DISTRICTS := {
 		"tints": [Color(0.4, 0.38, 0.34)], "lit": 0.3, "rural": true, "lamp_every": 3,
 		"trees": 0.0, "billboard": 0.0, "neon_edge": 0.0, "lamp": Color(1.0, 0.62, 0.3), "lamp_kind": "sodium",
 		"gantry": 0.3, "prop_gap": 3.0, "props": [2, 7, 15], "median": 0.6},
+	# Wald (Waldstrecke): Landstraße zwischen Bäumen, Bäume dicht am Bankett, Leitpfosten, kaum Laternen
+	"wald": {"name": "WALD", "shop": 0.0, "low": [8.0, 12.0], "tall": [12.0, 16.0], "tall_p": 0.0, "styles": [5],
+		"tints": [Color(0.4, 0.38, 0.34)], "lit": 0.3, "rural": true, "lamp_every": 5, "forest": true,
+		"trees": 0.0, "billboard": 0.0, "neon_edge": 0.0, "lamp": Color(1.0, 0.75, 0.45), "lamp_kind": "classic",
+		"gantry": 0.0, "prop_gap": 3.0, "props": [2], "median": 0.0},
 	# --- deutsche Städte (Orts-Strecken): Fachwerk, Putz, Ziegeldächer. roof = Anteil Satteldächer,
 	# gable = Anteil mit Giebel zur Straße, roof_tints = Dachfarben
 	"altstadt_de": {"name": "ALTSTADT", "shop": 0.55, "low": [9.0, 14.0], "tall": [14.0, 18.0], "tall_p": 0.15, "styles": [5, 5, 6],
@@ -288,6 +293,15 @@ static func begin(race: Dictionary) -> Dictionary:
 		# Drag: vier freie Spuren geradeaus (kein Bahnübergang, keine Hochbahnstützen, kein Mittelstreifen)
 		_plan_tunnels(track, rng)
 		_plan_spurs(track, rng)
+	elif race.get("forest", false):
+		# Waldstrecke (seit 2.29): Landstraße mit Bahnübergang und Tunnel, ohne Hochbahn, Mittelstreifen und
+		# Seitenstraßen; dafür Kuppen ([Anfang, Ende als Anteil der Länge, Höhe], 170 m Anstieg)
+		_plan_crossing(track, rng)
+		_plan_tunnels(track, rng)
+		for cr in race.get("crests", []):
+			var a: float = cr[0] * length
+			var e: float = cr[1] * length
+			track["elev0"].append({"a": a, "b": a + 170.0, "c": e - 170.0, "e": e, "h": cr[2]})
 	elif type != "drift":
 		# Drift-Kurse sind abgesperrt: keine Seitenstraßen, Tunnel, Hochbahn, Mittelstreifen, Bahnübergang
 		_plan_crossing(track, rng)
@@ -303,7 +317,7 @@ static func begin(race: Dictionary) -> Dictionary:
 		# Fahrbahn
 		_drop_spurs(track)
 		_plan_world_exit(track)
-		if type == "sprint" or type == "circuit":
+		if (type == "sprint" or type == "circuit") and not race.get("forest", false):
 			_plan_lanes(track, int(race["seed"]))
 	return {"race": race, "rng": rng, "root": root, "track": track, "city": city, "type": type, "loop": loop,
 		"occupied": [], "buildings": [], "i": 0, "us": []}
@@ -1538,7 +1552,7 @@ static func _road_mesh(root: Node3D, st: SurfaceTool, lanes: float, width: float
 const PAVE := {"downtown": [3, Color(0.95, 0.97, 1.05)], "boulevard": [3, Color(1.05, 1.0, 0.92)], "shops": [2, Color(1, 1, 1)],
 	"residential": [1, Color(1.05, 1.0, 0.92)], "industrial": [2, Color(0.8, 0.8, 0.8)], "chinatown": [4, Color(1, 1, 1)],
 	"altstadt_de": [1, Color(1.1, 1.02, 0.9)], "innenstadt_de": [3, Color(1, 1, 1)], "kurviertel_de": [1, Color(1.15, 1.1, 0.98)],
-	"campus_de": [3, Color(0.9, 0.92, 0.95)], "kiez_de": [2, Color(0.85, 0.9, 0.95)], "land": [5, Color(1, 1, 1)]}
+	"campus_de": [3, Color(0.9, 0.92, 0.95)], "kiez_de": [2, Color(0.85, 0.9, 0.95)], "land": [5, Color(1, 1, 1)], "wald": [5, Color(0.8, 0.85, 0.75)]}
 
 
 static func _walk_mat(width: float, district := "") -> ShaderMaterial:

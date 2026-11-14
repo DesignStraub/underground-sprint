@@ -619,6 +619,12 @@ const RACES := [
 		"shops": ["SPÄTI", "DÖNER", "CURRYWURST", "PLATTENLADEN", "VEGAN", "SHISHA BAR", "KIEZKNEIPE", "FAHRRADLADEN", "TATTOO"],
 		"districts": {"kiez_de": 0.7, "innenstadt_de": 0.3},
 		"desc": "Unter der Hochbahn der U1 durch die Skalitzer Straße, über die Oberbaumbrücke, an der East Side Gallery entlang und über die Schillingbrücke zurück zum Kotti."},
+	# Waldstrecke (seit 2.29): Landstraße durch den Schwarzwald, keine Häuser, dichter Wald, Kuppen
+	{"name": "Freudenstadt Waldpass", "town": "Freudenstadt", "region": "Landkreis Freudenstadt", "geo": Vector2(48.4633, 8.4111),
+		"mood": "nebel", "type": "sprint", "tier": 2, "seed": 901, "segments": 24, "max_turn": 62.0, "forest": true,
+		"crests": [[0.12, 0.3, 8.0], [0.42, 0.58, 6.0], [0.68, 0.88, 10.0]],
+		"districts": {"wald": 1.0},
+		"desc": "Landstraße durch den Schwarzwald: enge Kurven zwischen Tannen, Kuppen mit Sprung, ein Bahnübergang. Nachts nur Scheinwerfer und Leitpfosten."},
 ]
 
 const EVENT_TYPES := {

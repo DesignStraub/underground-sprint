@@ -11,6 +11,7 @@ const HOUSE_SHADER := preload("res://shaders/house.gdshader")
 const FOG_SHADER := preload("res://shaders/fog_bank.gdshader")
 const BEACON_SHADER := preload("res://shaders/beacon.gdshader")
 const Layout := preload("res://scripts/world_layout.gd")
+const Catalog := preload("res://scripts/catalog.gd")
 
 const CHUNK := 1000.0
 const STEP := 25.0  # Gitterweite des Geländes
@@ -19,6 +20,7 @@ const VIEW := 3300.0  # so weit werden Kacheln geladen
 const ROAD_CELL := 100.0
 const ROAD_FLAT := 55.0  # bis hier neben einer Straße ist das Gelände flach
 const RISE := 420.0  # dann steigt es auf dieser Strecke an
+const FOREST_FLAT := 30.0  # Waldstrecke: schmal flach, dann gleich Hang
 const CITY_FLAT := 150.0  # neben Stadtstraßen flach (dort stehen zwei, drei Häuserreihen)
 const HILL_H := 115.0
 
@@ -36,6 +38,7 @@ var _blade_mat: StandardMaterial3D
 
 var _road := {}  # Rasterzelle -> PackedVector2Array (Punkte alle 20 m auf Autobahnen und Auffahrten)
 var _croad := {}  # dasselbe für die Straßen der Städte
+var _froad := {}  # Waldstrecken: Landstraße ohne Häuser, der Wald reicht bis ans Bankett
 var _urban := []
 var _villages := []  # {pos, r, level, seed, name}
 var _parks := []  # {pos, seed, dir}
@@ -75,8 +78,9 @@ func setup(lay: Dictionary) -> void:
 			pl.append(Vector2(q.x, q.z))
 		_add_line(_road, pl)
 	for c in layout["cities"]:
+		var forest: bool = c.get("forest", false) or Catalog.RACES[c["race_index"]].get("forest", false) if c.has("race_index") else c.get("forest", false)
 		for rd in c["roads"]:
-			_add_line(_croad, rd[0])
+			_add_line(_froad if forest else _croad, rd[0])
 	_urban = layout.get("urban", [])
 	_plan_sites()
 	_make_materials()
@@ -120,7 +124,11 @@ func city_dist(p: Vector2) -> float:
 
 ## Wie weit ist p vom Rand der flachen Zone entfernt (unter 0: in der Zone neben einer Straße oder in der Stadt)?
 func free_dist(p: Vector2) -> float:
-	return minf(road_dist(p) - ROAD_FLAT, city_dist(p) - CITY_FLAT)
+	return minf(minf(road_dist(p) - ROAD_FLAT, city_dist(p) - CITY_FLAT), _dist(_froad, p) - FOREST_FLAT)
+
+
+func forest_dist(p: Vector2) -> float:
+	return _dist(_froad, p) if not _froad.is_empty() else 400.0
 
 
 ## Geländehöhe ohne Rücksicht auf Straßen (für Dörfer und Windparks)
@@ -216,12 +224,15 @@ func _make_materials() -> void:
 func _make_mask() -> void:
 	var S := 1024
 	var ext: float = layout["ring_r"] + 5200.0
-	var img := Image.create(S, S, false, Image.FORMAT_L8)
+	var img := Image.create(S, S, false, Image.FORMAT_RG8)
 	var k := S / (2.0 * ext)
-	var paint := func(p: Vector2, r: float) -> void:
+	var paint := func(p: Vector2, r: float, col := Color(1, 0, 0)) -> void:
 		var c := Vector2i(int((p.x + ext) * k), int((p.y + ext) * k))
 		var rr := maxi(int(r * k), 1)
-		img.fill_rect(Rect2i(c.x - rr, c.y - rr, rr * 2 + 1, rr * 2 + 1), Color(1, 1, 1))
+		img.fill_rect(Rect2i(c.x - rr, c.y - rr, rr * 2 + 1, rr * 2 + 1), col)
+	for arr in _froad.values():
+		for q in arr:
+			paint.call(q, 380.0, Color(0, 1, 0))  # Waldboden
 	for arr in _croad.values():
 		for q in arr:
 			paint.call(q, 125.0)
@@ -419,6 +430,9 @@ func _trees(root: Node3D, o: Vector2, dr: PackedFloat32Array, rng: RandomNumberG
 			var p := o + Vector2(x + rng.randf_range(0, step), y + rng.randf_range(0, step))
 			x += step
 			var f := _forest.get_noise_2d(p.x, p.y)
+			var fd := forest_dist(p)
+			if fd < 420.0:
+				f = maxf(f, 0.35 - fd / 1600.0)  # an der Waldstrecke dichter Wald
 			var single := rng.randf() < 0.0025
 			if f < 0.1 and not single:
 				continue
@@ -426,8 +440,8 @@ func _trees(root: Node3D, o: Vector2, dr: PackedFloat32Array, rng: RandomNumberG
 			var i := clampi(int(g.x), 0, N - 1)
 			var j := clampi(int(g.y), 0, N - 1)
 			var d := dr[j * (N + 1) + i]
-			if d < -20.0:
-				continue  # Autobahn: ab 35 m Bäume; Stadt: erst hinter den Häusern
+			if d < -20.0 and not (fd < 60.0 and fd > 16.0 and d > -FOREST_FLAT + 16.0):
+				continue  # Autobahn: ab 35 m Bäume; Stadt: erst hinter den Häusern; Waldstrecke: ab dem Bankett
 			if d < 90.0 and Layout.is_urban(Vector3(p.x, 0, p.y), _urban, 150.0):
 				continue
 			if f < 0.17 and not single and rng.randf() < 0.6:

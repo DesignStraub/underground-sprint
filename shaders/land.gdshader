@@ -66,7 +66,11 @@ void fragment() {
 	float slope = 1.0 - clamp(wnrm.y, 0.0, 1.0);
 	col = mix(col, vec3(0.13, 0.2, 0.08), smoothstep(0.08, 0.3, slope));
 	// Stadt: dunkler Asphalt- und Pflasterboden (Parkplätze, Höfe), weich zu den Feldern
-	float urb = smoothstep(0.25, 0.6, texture(urban_mask, (p - mask_rect.xy) / mask_rect.z).r);
+	vec2 mk = texture(urban_mask, (p - mask_rect.xy) / mask_rect.z).rg;
+	float urb = smoothstep(0.25, 0.6, mk.r);
+	// Waldboden: Nadeln, Moos, dunkle Erde (rund um Waldstrecken)
+	vec3 floor_c = mix(vec3(0.07, 0.1, 0.04), vec3(0.12, 0.09, 0.05), vnoise(p / 7.0)) * (0.8 + 0.4 * vnoise(p / 40.0));
+	col = mix(col, floor_c, smoothstep(0.2, 0.6, mk.g));
 	vec3 town = vec3(0.055, 0.056, 0.06) * (0.8 + 0.4 * vnoise(p / 9.0)) * (0.85 + 0.3 * h21(floor(p / 14.0)));
 	col = mix(col, town, urb);
 	// etwas satter als gemischt (der Dunst nimmt Farbe weg)

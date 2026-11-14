@@ -110,6 +110,9 @@ func _ready() -> void:
 	world.render_target_update_mode = SubViewport.UPDATE_DISABLED  # während des Ladens nichts zeichnen
 
 	var t_load := Time.get_ticks_msec()
+	if race.get("forest", false):
+		race = race.duplicate()
+		race["no_ground"] = true  # Waldstrecke: Boden und Umland kommen von der Landschaft
 	var job := Track.begin(race)
 	_loading.progress = 0.04
 	await get_tree().process_frame
@@ -128,6 +131,8 @@ func _ready() -> void:
 	track["node"].process_mode = Node.PROCESS_MODE_PAUSABLE
 	world.add_child(track["node"])
 	_setup_environment()
+	if race.get("forest", false):
+		_build_land()
 
 	_loading.progress = 0.72
 	await get_tree().process_frame
@@ -145,6 +150,8 @@ func _ready() -> void:
 	pc.accel *= 0.8 + 0.2 * GameState.pace()
 	pc.place(Track.xform_at(curve, track["start"], Track.LANES[2]))
 	player = pc  # erst fertig eingerichtet sichtbar machen (Testwerkzeug fragt race.player ab)
+	if land:
+		land.target = pc
 	_loading.progress = 0.77
 	await get_tree().process_frame
 	if mood["rain"]:
@@ -437,6 +444,37 @@ func _exit_tree() -> void:
 
 var mood: Dictionary = {}
 var _rain: CPUParticles3D
+
+
+var land: Landscape
+
+
+## Waldstrecke im Rennmodus: dieselbe Landschaft wie in der Open World (Hänge, Wald, Felder, Dörfer), die Strecke
+## als Waldstraße; dazu der flache Feldboden mit den Löchern der Strecke (Tunnel)
+func _build_land() -> void:
+	var roads := []
+	for p in track["paths"]:
+		var pl := PackedVector2Array()
+		var bp: PackedVector3Array = (p["curve"] as Curve3D).get_baked_points()
+		for k in range(0, bp.size(), 8):
+			pl.append(Vector2(bp[k].x, bp[k].z))
+		pl.append(Vector2(bp[bp.size() - 1].x, bp[bp.size() - 1].z))
+		roads.append([pl, 0])
+	land = Landscape.new()
+	land.setup({"roads": [], "segments": [], "cities": [{"forest": true, "roads": roads}], "ring_r": 0.0, "urban": []})
+	world.add_child(land)
+	var day: float = mood.get("day", 0.0)
+	land.set_daylight(day, clampf((1.0 - day) * 0.45 + (0.35 if race.get("mood", "") == "nebel" else 0.0), 0.0, 0.75))
+	var ground := MeshInstance3D.new()
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	st.set_normal(Vector3.UP)
+	Track.ground_cell(st, Vector2(-9000, -9000), 18000.0, Track.ground_holes(track))
+	ground.mesh = st.commit()
+	ground.material_override = land.land_mat
+	ground.position.y = -0.12
+	world.add_child(ground)
+	land.build_near(Track.frame_at(curve, track["start"])["pos"], 2200.0)
 
 
 func _setup_environment() -> void:

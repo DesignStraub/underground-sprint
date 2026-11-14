@@ -151,7 +151,8 @@ static func build() -> Dictionary:
 				var wq: Vector3 = xf * q
 				w2.append(Vector2(wq.x, wq.z))
 			c["roads"].append([w2, pl[1]])
-		ramps.append({"k": k, "from": rp, "end": exit_w, "name": Catalog.RACES[c["race_index"]].get("town", "")})
+		ramps.append({"k": k, "from": rp, "end": exit_w, "name": Catalog.RACES[c["race_index"]].get("town", ""),
+			"forest": Catalog.RACES[c["race_index"]].get("forest", false)})
 	# Außenring um alle Städte und zweite Ausfahrten der Sprints (hinter dem Ziel) an einen der beiden Ringe
 	# Mitte: Kreisel mit vier Diagonalen zum inneren Ring (Querverbindungen durch die Mitte), vor den Ziel-Ausfahrten
 	# geplant, damit die ihnen am Ring ausweichen
@@ -173,7 +174,7 @@ static func build() -> Dictionary:
 	# die ganze Autobahn, und die Welt sah überall gleich aus). Die Landschaft (landscape.gd) fragt dasselbe ab.
 	var urban := []
 	for r in ramps + oramps:
-		if not r.get("wide", false):
+		if not r.get("wide", false) and not r.get("forest", false):
 			urban.append(r["from"])
 	var rbc := Vector3.ZERO
 	for q in mid["rb"]:
@@ -593,7 +594,7 @@ static func _connect_ends(cities: Array, ring: Array, oring: Array, ramps_in: Ar
 				if ok and length < best_len:
 					best_len = length
 					best = {"k": k, "from": rp, "end": e2, "c1": c1, "c2": c2, "pts": pts, "ring": which,
-						"name": Catalog.RACES[c["race_index"]].get("town", "")}
+						"name": Catalog.RACES[c["race_index"]].get("town", ""), "forest": Catalog.RACES[c["race_index"]].get("forest", false)}
 		if not best.is_empty():
 			(ramps_in if best["ring"] == 0 else ramps_out).append(best)
 			c["exit2_ring"] = best["ring"]
