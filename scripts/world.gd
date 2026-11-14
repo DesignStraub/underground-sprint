@@ -465,9 +465,9 @@ func _best_track(p: Vector3) -> Dictionary:
 
 
 func _set_active(e: Dictionary) -> void:
-	_event("aktiv " + str(e["race"].get("name", "?")))
 	if e.is_empty():
 		return
+	_event("aktiv " + str(e["race"].get("name", "?")))
 	active = e
 	player.track = e["track"]
 	Track.apply_street_light(e["track"])

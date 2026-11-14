@@ -20,7 +20,7 @@ const N := 40  # Zellen je Kachel und Richtung
 var VIEW := 3300.0  # so weit werden Kacheln geladen (setup: Sichtweite der Kamera plus Rand)
 const ROAD_CELL := 100.0
 const ROAD_FLAT := 55.0  # bis hier neben einer Straße ist das Gelände flach
-const RISE := 420.0  # dann steigt es auf dieser Strecke an
+const RISE := 330.0  # dann steigt es auf dieser Strecke an
 const FOREST_FLAT := 30.0  # Waldstrecke: schmal flach, dann gleich Hang
 const CITY_FLAT := 150.0  # neben Stadtstraßen flach (dort stehen zwei, drei Häuserreihen)
 const HILL_H := 115.0
@@ -45,6 +45,9 @@ var _villages := []  # {pos, r, level, seed, name}
 var _parks := []  # {pos, seed, dir}
 var _lakes := []  # {pos, r, level}
 var _lines := []  # Hochspannungsleitungen: Masten [Vector2] je Leitung
+var _marks := []  # Wahrzeichen: {kind ("kraftwerk", "burg", "turm"), pos}
+var _concrete_mat: StandardMaterial3D
+var _steam_mat: StandardMaterial3D
 var _water_mat: ShaderMaterial
 var _steel_mat: StandardMaterial3D
 var _hill := FastNoiseLite.new()
@@ -111,12 +114,14 @@ func _add_line(grid: Dictionary, pl: PackedVector2Array) -> void:
 			grid[c] = arr  # Packed-Arrays kommen als Kopie aus dem Dictionary: zurückschreiben
 
 
-## Abstand zur nächsten Straße im Raster grid (bis 400 m genau, sonst 400)
+## Abstand zur nächsten Straße im Raster grid (bis 500 m genau; nichts gefunden: 10 km). Flachzone plus Anstieg
+## (CITY_FLAT + RISE) bleiben unter 500 m, so springt das Gelände an der Suchgrenze nicht (bis 2.29 nur 400 m:
+## die Hügel erreichten nie ihre volle Höhe)
 func _dist(grid: Dictionary, p: Vector2) -> float:
 	var c := Vector2i(floori(p.x / ROAD_CELL), floori(p.y / ROAD_CELL))
-	var best := 160000.0
-	for dy in range(-4, 5):
-		for dx in range(-4, 5):
+	var best := 1e8
+	for dy in range(-5, 6):
+		for dx in range(-5, 6):
 			var arr = grid.get(c + Vector2i(dx, dy))
 			if arr == null:
 				continue
@@ -199,7 +204,7 @@ func _plan_sites() -> void:
 		var z := -ext
 		while z < ext:
 			var p := Vector2(x + rng.randf_range(200, 1500), z + rng.randf_range(200, 1500))
-			var ok := road_dist(p) >= 280.0 and city_dist(p) > 400.0 and rng.randf() < 0.7
+			var ok := road_dist(p) >= 280.0 and city_dist(p) > 400.0 and rng.randf() < 0.4
 			for v in _villages:
 				if p.distance_to(v["pos"]) < 700.0:
 					ok = false
@@ -252,6 +257,47 @@ func _plan_sites() -> void:
 			t += 320.0
 		if masts.size() >= 2:
 			_lines.append(masts)
+	# Wahrzeichen: zwei Kraftwerke mit Kühltürmen (freie Lage), drei Burgen auf den höchsten freien Kuppen
+	var tries := 0
+	while _marks.filter(func(m): return m["kind"] == "kraftwerk").size() < 2 and tries < 400:
+		tries += 1
+		var p := Vector2(rng.randf_range(-ext, ext), rng.randf_range(-ext, ext)) * 0.8
+		if free_dist(p) > 230.0 and _site_free(p, 520.0):
+			_marks.append({"kind": "kraftwerk", "pos": p})
+	var cands := []
+	for k in 900:
+		var p := Vector2(rng.randf_range(-ext, ext), rng.randf_range(-ext, ext)) * 0.85
+		if free_dist(p) > 240.0:
+			cands.append([raw_height(p), p])
+	cands.sort_custom(func(a, b): return a[0] > b[0])
+	for cd in cands:
+		if _marks.filter(func(m): return m["kind"] == "burg").size() >= 3:
+			break
+		if _site_free(cd[1], 900.0):
+			_marks.append({"kind": "burg", "pos": cd[1]})
+	# Fernsehturm in der Mitte des Kreisels
+	var rbc := Vector3.ZERO
+	var urb: Array = layout.get("urban", [])
+	if not urb.is_empty():
+		rbc = urb[urb.size() - 1]
+	_marks.append({"kind": "turm", "pos": Vector2(rbc.x, rbc.z)})
+
+
+## Abstand zu Dörfern, Seen, Windparks und anderen Wahrzeichen
+func _site_free(p: Vector2, gap: float) -> bool:
+	for v in _villages:
+		if p.distance_to(v["pos"]) < v["r"] + gap * 0.5:
+			return false
+	for lk in _lakes:
+		if p.distance_to(lk["pos"]) < lk["r"] + gap * 0.4:
+			return false
+	for pk in _parks:
+		if p.distance_to(pk["pos"]) < gap * 0.6:
+			return false
+	for m in _marks:
+		if p.distance_to(m["pos"]) < gap:
+			return false
+	return true
 
 
 func _make_materials() -> void:
@@ -276,6 +322,14 @@ func _make_materials() -> void:
 	_blade_mat = StandardMaterial3D.new()
 	_blade_mat.albedo_color = Color(0.9, 0.91, 0.92)
 	_blade_mat.roughness = 0.4
+	_concrete_mat = StandardMaterial3D.new()
+	_concrete_mat.albedo_color = Color(0.68, 0.67, 0.64)
+	_concrete_mat.roughness = 0.9
+	_steam_mat = StandardMaterial3D.new()
+	_steam_mat.albedo_color = Color(0.95, 0.96, 0.98, 0.75)
+	_steam_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_steam_mat.shading_mode = BaseMaterial3D.SHADING_MODE_PER_VERTEX
+	_steam_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 	_water_mat = ShaderMaterial.new()
 	_water_mat.shader = WATER_SHADER
 	_water_mat.set_shader_parameter("mirror", 0.6)
@@ -472,6 +526,9 @@ func build_chunk(key: Vector2i) -> Node3D:
 		if _in_chunk(lk["pos"], o):
 			_lake(root, lk)
 	_power_lines(root, o)
+	for m in _marks:
+		if _in_chunk(m["pos"], o):
+			_landmark(root, m)
 	_fog_banks(root, o, dr, hs, rng)
 	return root
 
@@ -567,6 +624,9 @@ func _trees(root: Node3D, o: Vector2, dr: PackedFloat32Array, rng: RandomNumberG
 					skip = true
 			for lk in _lakes:
 				if p.distance_to(lk["pos"]) < lk["r"] + 12.0:
+					skip = true
+			for m in _marks:
+				if p.distance_to(m["pos"]) < (160.0 if m["kind"] == "kraftwerk" else 70.0):
 					skip = true
 			if skip:
 				continue
@@ -756,6 +816,148 @@ func _village(root: Node3D, v: Dictionary) -> void:
 	ol.distance_fade_length = 300.0
 	ol.shadow_enabled = false
 	root.add_child(ol)
+
+
+## Wahrzeichen: Kraftwerk mit Kühltürmen und Dampf, Burg auf der Kuppe, Fernsehturm am Kreisel
+func _landmark(root: Node3D, m: Dictionary) -> void:
+	var p: Vector2 = m["pos"]
+	var h := maxf(height_at(p, free_dist(p)), 0.0) - 0.5
+	var base := Vector3(p.x, h, p.y)
+	var add := func(mesh: Mesh, mat: Material, pos: Vector3, rot := 0.0) -> MeshInstance3D:
+		var mi := MeshInstance3D.new()
+		mi.mesh = mesh
+		mi.material_override = mat
+		mi.position = pos
+		mi.rotation.y = rot
+		root.add_child(mi)
+		return mi
+	match m["kind"]:
+		"kraftwerk":
+			# zwei Kühltürme (taillierte Schale aus drei Kegelstümpfen), Maschinenhaus, rot-weißer Schornstein
+			for k in 2:
+				var tp := base + Vector3(k * 120.0 - 60.0, 0, 0)
+				var parts := [[46.0, 30.0, 70.0, 35.0], [30.0, 28.0, 30.0, 85.0], [28.0, 31.0, 30.0, 115.0]]
+				for pr in parts:
+					var cm := CylinderMesh.new()
+					cm.bottom_radius = pr[0]
+					cm.top_radius = pr[1]
+					cm.height = pr[2]
+					cm.radial_segments = 28
+					cm.rings = 1
+					cm.cap_top = false
+					cm.cap_bottom = false
+					add.call(cm, _concrete_mat, tp + Vector3(0, pr[3], 0))
+				# Dampfwolke über dem Turm
+				for c in 4:
+					var sp := SphereMesh.new()
+					sp.radius = 26.0 + c * 6.0
+					sp.height = (26.0 + c * 6.0) * 1.4
+					sp.radial_segments = 12
+					sp.rings = 6
+					var sm := add.call(sp, _steam_mat, tp + Vector3(c * 9.0, 140.0 + c * 22.0, c * 4.0)) as MeshInstance3D
+					sm.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			var hall := BoxMesh.new()
+			hall.size = Vector3(110, 35, 50)
+			add.call(hall, _tower_mat, base + Vector3(0, 17.5, 110))
+			for k in 6:
+				var cs := CylinderMesh.new()
+				cs.top_radius = 3.0
+				cs.bottom_radius = 3.6
+				cs.height = 25.0
+				cs.radial_segments = 12
+				cs.rings = 1
+				var red := StandardMaterial3D.new()
+				red.albedo_color = Color(0.75, 0.1, 0.08) if k % 2 == 0 else Color(0.92, 0.92, 0.9)
+				add.call(cs, red, base + Vector3(80, 12.5 + k * 25.0, 110))
+			var lamp := BoxMesh.new()
+			lamp.size = Vector3(1.5, 1.0, 1.5)
+			add.call(lamp, beacon_mat, base + Vector3(80, 151, 110))
+		"burg":
+			# Burg: Ringmauer, Bergfried, Palas mit Dach, zwei Ecktürme
+			var stone := StandardMaterial3D.new()
+			stone.albedo_color = Color(0.55, 0.5, 0.44)
+			stone.roughness = 0.95
+			var roof := StandardMaterial3D.new()
+			roof.albedo_color = Color(0.3, 0.12, 0.08)
+			for k in 4:
+				var wall := BoxMesh.new()
+				wall.size = Vector3(70, 10, 3) if k % 2 == 0 else Vector3(3, 10, 50)
+				var wp := Vector3(0, 5, 25 if k == 0 else -25) if k % 2 == 0 else Vector3(35 if k == 1 else -35, 5, 0)
+				add.call(wall, stone, base + wp)
+			var keep := BoxMesh.new()
+			keep.size = Vector3(11, 38, 11)
+			add.call(keep, stone, base + Vector3(-18, 19, -6))
+			var kr := CylinderMesh.new()
+			kr.top_radius = 0.0
+			kr.bottom_radius = 8.5
+			kr.height = 10.0
+			kr.radial_segments = 4
+			add.call(kr, roof, base + Vector3(-18, 43, -6), PI / 4.0)
+			var palas := BoxMesh.new()
+			palas.size = Vector3(30, 16, 14)
+			add.call(palas, stone, base + Vector3(14, 8, 4))
+			var pr := PrismMesh.new()
+			pr.size = Vector3(30, 8, 14)
+			var prm := add.call(pr, roof, base + Vector3(14, 20, 4)) as MeshInstance3D
+			prm.rotation.y = 0.0
+			for cx in [-35.0, 35.0]:
+				var tw := CylinderMesh.new()
+				tw.top_radius = 4.5
+				tw.bottom_radius = 5.0
+				tw.height = 16.0
+				tw.radial_segments = 12
+				add.call(tw, stone, base + Vector3(cx, 8, 25))
+				var tc := CylinderMesh.new()
+				tc.top_radius = 0.0
+				tc.bottom_radius = 5.6
+				tc.height = 7.0
+				tc.radial_segments = 12
+				add.call(tc, roof, base + Vector3(cx, 19.5, 25))
+			var ol := OmniLight3D.new()
+			ol.light_color = Color(1.0, 0.75, 0.45)
+			ol.light_energy = 2.0
+			ol.omni_range = 45.0
+			ol.position = base + Vector3(0, 12, 0)
+			ol.distance_fade_enabled = true
+			ol.distance_fade_begin = 1000.0
+			root.add_child(ol)
+		"turm":
+			# Fernsehturm: Betonschaft, Kugel mit Aussichtsfenstern, Antenne mit Gefahrenfeuer
+			var shaft := CylinderMesh.new()
+			shaft.top_radius = 4.5
+			shaft.bottom_radius = 9.0
+			shaft.height = 190.0
+			shaft.radial_segments = 20
+			shaft.rings = 1
+			add.call(shaft, _concrete_mat, base + Vector3(0, 95, 0))
+			var ball := SphereMesh.new()
+			ball.radius = 16.0
+			ball.height = 30.0
+			ball.radial_segments = 24
+			ball.rings = 12
+			add.call(ball, _tower_mat, base + Vector3(0, 195, 0))
+			var ring := CylinderMesh.new()
+			ring.top_radius = 16.4
+			ring.bottom_radius = 16.4
+			ring.height = 2.2
+			ring.radial_segments = 24
+			var glass := StandardMaterial3D.new()
+			glass.albedo_color = Color(0.1, 0.12, 0.16)
+			glass.emission_enabled = true
+			glass.emission = Color(1.0, 0.8, 0.5)
+			glass.emission_energy_multiplier = 0.8
+			add.call(ring, glass, base + Vector3(0, 195, 0))
+			var ant := CylinderMesh.new()
+			ant.top_radius = 0.6
+			ant.bottom_radius = 1.6
+			ant.height = 60.0
+			ant.radial_segments = 8
+			var red := StandardMaterial3D.new()
+			red.albedo_color = Color(0.8, 0.12, 0.08)
+			add.call(ant, red, base + Vector3(0, 240, 0))
+			var lamp := BoxMesh.new()
+			lamp.size = Vector3(1.4, 1.2, 1.4)
+			add.call(lamp, beacon_mat, base + Vector3(0, 271, 0))
 
 
 ## Kreisstraße vom Dorf zur nächsten Autobahn oder Stadtstraße (nur Optik, folgt dem Gelände, endet vor der
