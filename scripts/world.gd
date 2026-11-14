@@ -907,6 +907,10 @@ func _build_hud() -> void:
 	map_view.visible = false
 	map_layer.add_child(map_view)
 	map_view.setup(layout["roads"], layout["cities"], player)
+	if land:
+		map_view.relief = land.map_texture(map_view._lo, map_view._hi)
+		map_view.villages = land.villages().filter(func(v): return v[0].x > map_view._lo.x and v[0].x < map_view._hi.x \
+			and v[0].y > map_view._lo.y and v[0].y < map_view._hi.y)
 	map_view.target = target
 	map_view.target_chosen.connect(_set_target)
 	map_view.closed.connect(_close_map)
@@ -1012,7 +1016,11 @@ func _process(dt: float) -> void:
 	if not _ready_done:
 		return
 	if get_tree().paused:
+		if OS.get_cmdline_user_args().has("--wmap"):
+			_shot_check(dt)  # Test: Bild der offenen Karte
 		return
+	if OS.get_cmdline_user_args().has("--wmap") and _shot_t < 0.0 and map_view and not map_view.visible:
+		_open_map()
 	if OS.get_cmdline_user_args().has("--wdrive"):
 		_autopilot()
 	for a in OS.get_cmdline_user_args():

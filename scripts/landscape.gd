@@ -54,8 +54,7 @@ var _rotors := []
 var _tree_step := 9.0
 var _meshes := {}
 
-const VILLAGE_NAMES := ["Oberweiler", "Kirchheim", "Lindenau", "Birkenfeld", "Hohenstein", "Mühlbach", "Eichstetten",
-	"Wiesental", "Rotenburg", "Sonnenberg", "Tannhausen", "Grünwald", "Steinach", "Haselbach", "Altdorf", "Buchholz"]
+const VILLAGE_NAMES := ["Oberweiler", "Kirchheim", "Lindenau", "Birkenfeld", "Hohenstein", "Mühlbach", "Eichstetten", "Wiesental", "Rotenburg", "Sonnenberg", "Tannhausen", "Grünwald", "Steinach", "Haselbach", "Altdorf", "Buchholz", "Unterried", "Waldhausen", "Kleinfeld", "Bergrheinfeld", "Erlenbach", "Hirschau", "Fischbach", "Ahornhof", "Weidenstetten", "Lerchenau", "Rabenstein", "Moosbrunn", "Hagenau", "Kesselbach", "Ulmenhof", "Dornstetten", "Falkenried", "Brunnthal", "Eschenau", "Hüttenbach", "Kranichfeld", "Lauterbach", "Mittelweiler", "Neuhaus", "Ochsenfurt-Au", "Pfaffenhofen", "Quellbach", "Reichenau", "Schönwald", "Talheim", "Uhlenhorst", "Vogelsang", "Wolfsried", "Zellerau", "Amselfeld", "Bärental", "Dachsberg", "Eulenbach", "Fuchsstadt", "Gänsewies", "Hasenmühle", "Igelsbach", "Krähenwinkel", "Lindenhof", "Marderau", "Nesselried", "Otterbach", "Rehweiler"]
 
 
 func setup(lay: Dictionary) -> void:
@@ -249,6 +248,38 @@ func _make_mask() -> void:
 	img.resize(S, S, Image.INTERPOLATE_CUBIC)
 	land_mat.set_shader_parameter("urban_mask", ImageTexture.create_from_image(img))
 	land_mat.set_shader_parameter("mask_rect", Vector3(-ext, -ext, 2.0 * ext))
+
+
+## Reliefkarte für die große Karte (seit 2.29): Hügel schattiert, Wald grün, Stadt grau, auf Kartenfarben abgedunkelt
+func map_texture(lo: Vector2, hi: Vector2, px := 220) -> ImageTexture:
+	var img := Image.create(px, px, false, Image.FORMAT_RGBA8)
+	var ext := hi - lo
+	var mask: Texture2D = land_mat.get_shader_parameter("urban_mask")
+	var mimg: Image = mask.get_image() if mask else null
+	var mr: Vector3 = land_mat.get_shader_parameter("mask_rect")
+	for j in px:
+		for i in px:
+			var p := lo + Vector2((i + 0.5) / px * ext.x, (j + 0.5) / px * ext.y)
+			var h := raw_height(p)
+			var hx := raw_height(p + Vector2(60, 0))
+			var hz := raw_height(p + Vector2(0, 60))
+			var shade := clampf(0.5 + (h - hx) * 0.02 + (h - hz) * 0.02, 0.0, 1.0)
+			var c := Color(0.05, 0.07, 0.1).lerp(Color(0.13, 0.17, 0.2), shade)
+			var f := _forest.get_noise_2d(p.x, p.y)
+			if f > 0.1:
+				c = c.lerp(Color(0.05, 0.2, 0.1), 0.7)
+			if mimg:
+				var u := (p - Vector2(mr.x, mr.y)) / mr.z
+				var mp := mimg.get_pixel(clampi(int(u.x * mimg.get_width()), 0, mimg.get_width() - 1), clampi(int(u.y * mimg.get_height()), 0, mimg.get_height() - 1))
+				c = c.lerp(Color(0.16, 0.17, 0.2), smoothstep(0.3, 0.6, mp.r))
+				c = c.lerp(Color(0.04, 0.22, 0.1), smoothstep(0.3, 0.6, mp.g) * 0.8)
+			img.set_pixel(i, j, c)
+	return ImageTexture.create_from_image(img)
+
+
+## Dörfer für die Karte: [Lage, Name]
+func villages() -> Array:
+	return _villages.map(func(v): return [v["pos"], v["name"]])
 
 
 ## Tag/Nacht: day 0..1 (aus der Weltuhr), fog_k 0..1 (Nebelstärke für die Nebelbänke)

@@ -15,6 +15,8 @@ var player: Node3D
 var target := -1
 var sel := 0
 
+var relief: Texture2D  # Reliefkarte der Landschaft (Landscape.map_texture)
+var villages: Array = []  # [Lage, Name]
 var _lo := Vector2.ZERO
 var _hi := Vector2.ZERO
 var _cond: Font
@@ -100,6 +102,15 @@ func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, size), Color(0.01, 0.015, 0.03, 0.94))
 	draw_rect(Rect2(0, 0, size.x, 2), Color(UI.CYAN.r, UI.CYAN.g, UI.CYAN.b, 0.8))
 	draw_string(_wide, Vector2(20, 28), tr("KARTE"), HORIZONTAL_ALIGNMENT_LEFT, -1, 16, UI.CYAN)
+	if relief:
+		var a := _to_screen(_lo)
+		var b := _to_screen(_hi)
+		draw_texture_rect(relief, Rect2(a, b - a), false, Color(1, 1, 1, 0.85))
+	# Dörfer: kleine Punkte mit Namen (klein, grau)
+	for v in villages:
+		var vp := _to_screen(v[0])
+		draw_rect(Rect2(vp - Vector2(2, 2), Vector2(4, 4)), Color(0.75, 0.6, 0.45, 0.8))
+		draw_string(_cond, vp + Vector2(5, 3), v[1], HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color(0.7, 0.72, 0.78, 0.55))
 	# Straßen: erst Ränder, dann helle Linien (Ring etwas kräftiger)
 	for pass_i in 2:
 		for r in roads:
