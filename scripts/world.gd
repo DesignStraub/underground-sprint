@@ -220,6 +220,16 @@ func _spawn_xf() -> Transform3D:
 	if has_return:
 		has_return = false
 		return return_xf
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--wstart="):  # Test: Startstadt wie aus der Garage (Rennen-Nummer)
+			GameState.world_start = int(a.substr(9))
+	# Startstadt aus der Garage: an ihrer Ausfahrt, 40 m in die Stadt hinein, Blick in die Stadt
+	if GameState.world_start >= 0:
+		for c in layout["cities"]:
+			if c["race_index"] == GameState.world_start:
+				var ex: Vector3 = c["exit_world"]
+				var n := Vector3(ex.x, 0, ex.z).normalized()
+				return Transform3D(Basis.looking_at(n, Vector3.UP), ex + n * 40.0 + Vector3(0, 0.5, 0))
 	var c: Dictionary = layout["cities"][0]
 	for cc in layout["cities"]:
 		if cc["race_index"] == 0:

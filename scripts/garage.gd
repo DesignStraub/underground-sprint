@@ -552,7 +552,7 @@ func _show_main() -> void:
 	_show_car(preview_car, preview_cfg)
 	_set_section("GARAGE", true)
 	# Seit 2.28: Open World statt Rennen-Liste. Die Rennen findet man als Marker in den Städten.
-	_button("Losfahren", _drive_world)
+	_button("Losfahren", _show_start_city)
 	_button("Tuning", _show_tuning)
 	_button("Auto wechseln", _show_cars)
 	_button("Einstellungen", _show_settings)
@@ -834,6 +834,44 @@ func _show_events(type: String) -> void:
 ## Rennen starten: sofort den Ladebildschirm zeigen (das Rennen übernimmt ihn), Musik leiser, dann Szene wechseln.
 ## Ohne das stand das Menü einige Sekunden still, während die Strecke gebaut wurde.
 var _starting := false
+
+
+## Losfahren: erst die Startstadt wählen (seit 2.29), oben "Wo ich zuletzt war" (Standard: Frankfurt)
+func _show_start_city() -> void:
+	_clear_menu()
+	_back = _show_main
+	_set_section("STARTSTADT")
+	var first := _button("Zufällige Stadt", func():
+		var towns := _start_towns()
+		GameState.world_start = towns[randi() % towns.size()][1]
+		_drive_world())
+	for t in _start_towns():
+		var ri: int = t[1]
+		var b := _button(t[0], func():
+			GameState.world_start = ri
+			_drive_world())
+		b.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
+		b.focus_entered.connect(func(): info.text = str(Catalog.RACES[ri].get("region", "")) + "\n" + tr("Start an der Ausfahrt der Stadt, Blick in die Stadt."))
+		if ri == GameState.world_start:
+			first = b
+	info.text = tr("Wähle, in welcher Stadt du in die offene Welt startest.")
+	_focus_first()
+	_grab.call_deferred(first)
+
+
+## Städte der Open World: [Ort, Rennen] je Ort einmal (das erste Rennen dort), nach Namen sortiert
+func _start_towns() -> Array:
+	var seen := {}
+	var out := []
+	for i in Catalog.RACES.size():
+		var r: Dictionary = Catalog.RACES[i]
+		var town: String = r.get("town", "")
+		if r.get("type", "sprint") == "drag" or town == "" or seen.has(town):
+			continue
+		seen[town] = true
+		out.append([town, i])
+	out.sort_custom(func(a, b): return a[0].naturalnocasecmp_to(b[0]) < 0)
+	return out
 
 
 func _drive_world() -> void:

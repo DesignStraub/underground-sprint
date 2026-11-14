@@ -269,6 +269,8 @@ gesäumt. Seit 2.29:
   Bahnübergang und Tunnel, ohne Häuser; die Landschaft gibt es dafür auch im Rennmodus. Ihre Auffahrt am Ring bleibt
   Überland.
 - **Große Karte**: Relief, Wälder, Stadtflächen und Dorfnamen.
+- **Startstadt**: Garage → Losfahren fragt, in welcher Stadt man startet (alphabetisch, oben „Zufällige Stadt“); man
+  steht 40 m hinter der Ausfahrt mit Blick in die Stadt (`GameState.world_start`, Test: `--wstart=<Rennen>`).
 - Test: `--wcam=zurück:höhe:voraus[:drehung]` (Kamera über dem Auto), `--wmap` (Bild der offenen Karte),
   `--signlog`, `--oplog`.
 

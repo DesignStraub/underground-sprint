@@ -77,6 +77,7 @@ var wins := 0  # Rennsiege (Sprint + Rundkurs)
 var drift_wins := 0
 var current_car := "kaizen"
 var race_index := 0
+var world_start := -1  # Open World: Rennen, an dessen Stadt-Ausfahrt man startet (-1 = Frankfurt, erstes Rennen)
 var world_menu := ""  # Open World > Esc > Tuning/Autohaus: Garage öffnet dort, "Fertig" führt zurück in die Welt
 var in_world := false  # Rennen aus der Open World gestartet: danach zurück in die Welt (nicht gespeichert)
 var best_times := {}  # Rennname -> Sekunden

@@ -8,7 +8,9 @@ const NAMES := {"en": "English", "de": "Deutsch"}
 
 const EN := {
 	# --- Menü ---
-	"Rennen fahren": "Race", "Losfahren": "Drive", "Welt wird gebaut …": "Building the world …",
+	"Rennen fahren": "Race", "Losfahren": "Drive", "STARTSTADT": "START CITY", "Zufällige Stadt": "Random city",
+	"Wähle, in welcher Stadt du in die offene Welt startest.": "Pick the city where you start in the open world.",
+	"Start an der Ausfahrt der Stadt, Blick in die Stadt.": "You start at the city's exit, facing into town.", "Welt wird gebaut …": "Building the world …",
 	"Welt wird gebaut … %d / %d": "Building the world … %d / %d", "Enter: Rennen starten": "Enter: start race",
 	"Frei fahren: Marker anfahren startet ein Rennen\nC Kamera  R Zurücksetzen  Esc Menü": "Free roam: drive into a marker to start a race\nC camera  R reset  Esc menu",
 	"ZUR WELT": "BACK TO THE WORLD", "Zur Welt": "Back to the world",
