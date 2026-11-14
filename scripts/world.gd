@@ -157,7 +157,8 @@ func _ready() -> void:
 		if e["state"] == "ready" and e["track"]["crossing"]:
 			e["track"]["crossing"].player = player
 	_set_active(_entry_of(pc.track))
-	while not _tq.is_empty():
+	# bis die Warteschlange leer oder der Verkehr voll ist (sonst hing das Laden, wenn mehr geplant war als Platz)
+	while not _tq.is_empty() and traffic.size() < TRAFFIC_MAX:
 		_spawn_queued(100)
 	_build_hud()
 	world.render_target_update_mode = SubViewport.UPDATE_ALWAYS
