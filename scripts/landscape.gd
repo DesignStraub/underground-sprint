@@ -417,6 +417,8 @@ func set_daylight(day: float, fog_k: float) -> void:
 
 ## Alles in der Nähe sofort bauen (hinter dem Ladebild)
 func build_near(p: Vector3, radius := 1600.0) -> void:
+	if _web():
+		return
 	for key in _wanted(p, radius):
 		var n := build_chunk(key)
 		_chunks[key] = n
@@ -455,7 +457,7 @@ func _process(dt: float) -> void:
 		else:
 			_task_out.free()
 	_t -= dt
-	if _t > 0.0 or target == null or not is_instance_valid(target):
+	if _t > 0.0 or target == null or not is_instance_valid(target) or _web():
 		return
 	_t = 0.4
 	var p := target.global_position
@@ -474,7 +476,7 @@ func _process(dt: float) -> void:
 		if not _chunks.has(key):
 			_chunks[key] = null
 			_task_key = key
-			if OS.has_feature("web") or DisplayServer.get_name() == "headless":
+			if DisplayServer.get_name() == "headless":
 				_task_out = build_chunk(key)
 				_chunks[key] = _task_out
 				add_child(_task_out)
@@ -483,6 +485,12 @@ func _process(dt: float) -> void:
 			else:
 				_task = WorkerThreadPool.add_task(func(): _task_out = build_chunk(key))
 			return
+
+
+## Im Browser (ohne Threads) nur der Feldboden: das Bauen einer Kachel dauert dort ein paar hundert Millisekunden am
+## Stück und ruckelte bei jeder neuen Kachel
+func _web() -> bool:
+	return OS.has_feature("web")
 
 
 func _exit_tree() -> void:
