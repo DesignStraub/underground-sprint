@@ -119,7 +119,7 @@ const DISTRICTS := {
 	# Rand (rural), dahinter Felder, Wald, Dörfer und Windräder der Landschaft (scripts/landscape.gd), Laternen nur an
 	# jedem dritten Platz, selten eine Schilderbrücke
 	"land": {"name": "AUTOBAHN", "shop": 0.0, "low": [8.0, 12.0], "tall": [12.0, 16.0], "tall_p": 0.0, "styles": [5],
-		"tints": [Color(0.4, 0.38, 0.34)], "lit": 0.3, "rural": true, "lamp_every": 3,
+		"tints": [Color(0.4, 0.38, 0.34)], "lit": 0.3, "rural": true, "lamp_every": 3, "overpass": 0.3,
 		"trees": 0.0, "billboard": 0.0, "neon_edge": 0.0, "lamp": Color(1.0, 0.62, 0.3), "lamp_kind": "sodium",
 		"gantry": 0.3, "prop_gap": 3.0, "props": [2, 7, 15], "median": 0.6},
 	# Wald (Waldstrecke): Landstraße zwischen Bäumen, Bäume dicht am Bankett, Leitpfosten, kaum Laternen
@@ -5884,6 +5884,8 @@ static func _build_structures(root: Node3D, track: Dictionary, rng: RandomNumber
 				if _overhead_free(track, od, 25.0) and not _near_post(track, od, 18.0) and _main_clear_across(track, od) \
 						and _lift(track, od - 40.0) + _lift(track, od) + _lift(track, od + 40.0) < 0.3:
 					occupied.append_array(_overpass(root, track, od, rng))
+					if OS.get_cmdline_user_args().has("--oplog"):
+						print("UEBERFUEHRUNG ", track.get("name", ""), " d=", int(od), " ", _district_at(track, od)["name"])
 					break
 
 	var red_m := Builder.mat(Color(0.9, 0.1, 0.05), 0.0, 0.5, Color(1.0, 0.15, 0.05), 1.8)
@@ -6123,6 +6125,16 @@ static func _overpass(root: Node3D, track: Dictionary, d: float, rng: RandomNumb
 		_part(g, car_m, Builder.box(Vector3(1.6, 0.6, 2.2)), Transform3D(Basis(), Vector3(x, y + 2.5, z + 0.2 * dirz)))
 		_part(g, tail, Builder.box(Vector3(1.5, 0.15, 0.05)), Transform3D(Basis(), Vector3(x, y + 1.95, z + 2.12 * dirz)))
 		_part(g, head, Builder.box(Vector3(1.5, 0.12, 0.05)), Transform3D(Basis(), Vector3(x, y + 1.9, z - 2.12 * dirz)))
+	if _district_at(track, d).get("rural", false):
+		# Überland: Erddamm mit Grasböschung an beiden Brückenenden hinunter zum Feld (sonst endete die Brücke in der Luft)
+		var earth := Builder.mat(Color(0.12, 0.2, 0.07), 0.0, 0.95)
+		var ramp_len := 70.0
+		var r_ang := atan2(y + 1.4, ramp_len)
+		for s in [-1.0, 1.0]:
+			var mid := Vector3(0, (y + 1.4) / 2.0 - 0.4, s * (span / 2.0 + ramp_len / 2.0 - 1.0))
+			var b := Basis(Vector3.RIGHT, s * r_ang)
+			_part(g, earth, Builder.box(Vector3(16.0, 1.6, sqrt(ramp_len * ramp_len + (y + 1.4) * (y + 1.4)))), Transform3D(b, mid))
+			_part(g, panel, Builder.box(Vector3(9.0, 0.3, sqrt(ramp_len * ramp_len + (y + 1.4) * (y + 1.4)))), Transform3D(b, mid + Vector3(0, 0.85, 0)))
 	_bake(root, g, xf)
 	var light := OmniLight3D.new()
 	light.light_color = Color(1.0, 0.65, 0.35)
