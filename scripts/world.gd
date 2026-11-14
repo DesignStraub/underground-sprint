@@ -162,7 +162,7 @@ func _ready() -> void:
 		_spawn_queued(100)
 	_build_hud()
 	world.render_target_update_mode = SubViewport.UPDATE_ALWAYS
-	Music.race_go("" if active.is_empty() or active["kind"] == "seg" else str(Catalog.RACES[active["race_index"]].get("town", "")))
+	Music.world_go("" if active.is_empty() or active["kind"] == "seg" else str(Catalog.RACES[active["race_index"]].get("town", "")))
 	await get_tree().process_frame
 	cover.queue_free()
 	_ready_done = true

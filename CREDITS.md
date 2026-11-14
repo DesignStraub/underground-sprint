@@ -35,14 +35,13 @@ Schleife geschnitten.
 
 ## Musik
 Tracks in `music/` und der Intro-Sound: Pixabay ([Pixabay Content License](https://pixabay.com/service/license-summary/),
-frei auch für kommerzielle Nutzung, ohne Namensnennung). Der Dateiname nennt Künstler, Titel und Pixabay-Nummer
-(`pixabay.com/music/…-<Nummer>/`).
+frei nutzbar, keine Namensnennung nötig; trotzdem hier aufgeführt). Seit 2.30:
 
-| Liste | Tracks |
+| Art | Tracks |
 |---|---|
-| Fahrt (Funk, Phonk) | prettyjohn1 „Funk“, Poradovskyi „Funk Funky Music“, NastelBom „Funk“ (2), GR0ZA „Funk“ (2), AtlasAudio „Funk Rhythm“, lNPLUSMUSIC „Funk“, Kulakovka „Upbeat Funk“, SoundSurfer „Funk“, Sub_Clair „Funk“, absolutesound „Hard Phonk“, Artissizm „Hard Drift Phonk“, Sub_Clair „Drift Phonk“, alexzavesa „Dark Trap – Most Dangerous“ |
-| Beide (G-Funk, Gangsta-Beats) | 5XBeatz „Epic West Coast G Funk Type Beat“, 47643651 „Funk x G-Funk Music (Sacred Beast)“, vaitsez „Gangster – Gangsta Beat“, „Hip Hop – Hip-Hop Beat“, GR0ZA „Criminal Mafia Gangster Music“ |
-| Garage (Hip-Hop, West Coast) | free-rap-beats „Modern Gangsta/Gangster West Coast Free Rap Beat“, 5XBeatz „West Coast Type Beat“, „Dope West Coast Type Beat“, kontraa „Goldn – UK Drill“, AudioDollar „Rap Beat“, agerabeatz „Spray“, AtlasAudio „90s Hip Hop“, SolarFLEX „Hip-Hop Boom Bap“, SoundSurfer „Street Hip-Hop“, Sub_Clair „Hip Hop Instrumental“ |
+| Intro (Spielstart) | jonasblakewood „Metal“ |
+| Phonk, Drift-Phonk | alex-morgan „Phonk Aggressive Drift Night“, „Brazilian Phonk“; artissizm „Drift Phonk“; gr0za „Drift Drifting Car Music“; kiravale „Phonk Music“; kontraa „Supra – Drift Phonk“; Sub_Clair „Drift Phonk“, „Indian Phonk“, „Phonk Hard“, „Phonk Instrumental“; vaitsez „Drift Drifting Car Music“; zephiramusic „Drift Phonk“, „Phonk Hard“ |
+| Metal | alex-morgan „Thrash Metal“; alexgrohl „Void Construct – Epic Metal“; strawberry_candy „Powerful Heavy Metal – Heavy Force“; williamsmyname „Alternative Metal – Macfly“ |
 
 Stadt-Track Aachen: Bruder Jakob x Jonas Platin, „AC“, mit freundlicher Genehmigung der Künstler (nicht im
 öffentlichen Repo, `music/staedte/`).

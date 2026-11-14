@@ -1,15 +1,15 @@
 extends Node
-## Musik: alle Tracks aus res://music/ (mp3, ogg, wav) in zwei Listen: beim Fahren (Rennen, Open World) vor allem
-## Funk, dazu G-Funk, dreckige Gangsta-Beats und etwas Phonk; in der Garage und den Menüs Hip-Hop, West Coast, Boom Bap
-## (TRACKS). G-Funk und Gangsta-Beats laufen in beiden Listen; beim Spielstart kommt zuerst ein West-Coast-Track. Je Liste zufällige Reihenfolge; kurz vor Schluss blendet der
-## nächste weich über. Ist die Liste einmal durch, wird neu gemischt (ohne denselben Track zweimal hintereinander).
-## Menü und Rennen haben je ihren eigenen Track: beim Laden eines Rennens wird die Menümusik leiser und bleibt das
-## über Kameraflug und Countdown (Motoren und Starttöne sind gut zu hören), bei LOS setzt ein neuer Track voll ein.
-## Zurück im Menü beginnt wieder ein neuer.
-## Die Tracks sind gleich laut gemacht (gemessen mit ffmpeg ebur128, Ziel -11 LUFS), Stille am Anfang und Ende wird
-## übersprungen. Taste M springt mit kurzer Überblendung zum nächsten Track.
-## Beim Trackwechsel (nicht beim allerersten Track) klappt unten in der Mitte (Garage: rechts unten) kurz eine kleine Blase mit dem Titel auf und wieder zu (wie in NFS),
-## sonst steht der Titel nirgends. Auf Handy und Tablet bleibt sie weg (kleiner Bildschirm).
+## Musik (seit 2.30): Phonk, Drift-Phonk und Metal von Pixabay (TRACKS), eine gemeinsame Liste für Menü, Welt und
+## Rennen. Beim Spielstart läuft zuerst ein kurzes Metal-Intro, danach die Liste in zufälliger Reihenfolge; kurz vor
+## Schluss blendet der nächste weich über, ist die Liste durch, wird neu gemischt.
+## Neue Tracks nur beim Spielstart und beim Start eines Rennens. Menü, Garage, Tuning und der Weg in die Welt und
+## zurück lassen den laufenden Track weiterlaufen (beim Laden eines Rennens wird er nur leiser).
+## Die Tracks sind gleich laut gemacht (ffmpeg ebur128, Ziel -11 LUFS), Stille am Anfang und Ende wird übersprungen.
+## Taste "." springt zum nächsten Track, "," wechselt den Sender, "-" sortiert den laufenden Track aus.
+## Bei jedem Trackwechsel klappt unten in der Mitte (Garage: rechts unten) kurz eine Blase mit Titel und Künstler auf
+## (wie in NFS). Auf Handy und Tablet bleibt sie weg (kleiner Bildschirm).
+## Stadt-Tracks (CITY_TRACKS): fährt man in die Stadt oder startet dort ein Rennen, läuft ihr Track einmal, danach
+## geht es mit der Liste weiter (seit 2.30 keine Schleife mehr).
 
 signal track_changed(title: String)
 
@@ -24,66 +24,50 @@ const FADE_SKIP := 1.2  # Überblendung beim Weiterschalten mit M
 ## true = darf erster Track beim Spielstart sein.
 ## Unbekannte Tracks laufen ohne Angleich von Anfang bis Ende in der Fahrt-Liste.
 const TRACKS := {
-	# Fahrt: vor allem Funk, dazu G-Funk, dreckige Gangsta-Beats und etwas Phonk (Auswahl nach Downloads auf Pixabay)
-	"503900": [-2.2, 0.58, 129.2, "fahrt"],  # prettyjohn1 funk (13 000 Downloads)
-	"628015": [-2.5, 0.0, 121.7, "fahrt"],  # poradovskyi funk funky music
-	"437330": [-0.7, 0.0, 114.3, "fahrt"],  # nastelbom funk
-	"425092": [-1.7, 0.0, 120.3, "fahrt"],  # nastelbom funk
-	"557572": [0.0, 0.0, 120.0, "fahrt"],  # gr0za funk
-	"591743": [1.2, 0.0, 148.3, "fahrt"],  # gr0za funk music
-	"593046": [-0.9, 0.0, 100.3, "fahrt"],  # atlasaudio funk rhythm
-	"611911": [-2.3, 0.0, 0.0, "fahrt"],  # lnplusmusic funk
-	"614901": [1.7, 0.0, 101.9, "fahrt"],  # kulakovka upbeat funk
-	"591582": [-1.6, 0.0, 192.4, "fahrt"],  # soundsurfer funk
-	"550488": [1.9, 0.0, 171.8, "fahrt"],  # sub_clair funk
-	"529766": [4.2, 0.0, 0.0, "fahrt"],  # absolutesound hard phonk (-15,2 LUFS)
-	"223224": [-1.0, 0.0, 116.1, "fahrt"],  # artissizm hard drift phonk
-	"607579": [-1.3, 0.0, 130.4, "fahrt"],  # sub_clair drift phonk
-	"510715": [-4.3, 0.0, 103.9, "fahrt"],  # alexzavesa dark trap (-6,7 LUFS)
-	# beide Listen: G-Funk und dreckige Gangsta-Beats; true am Ende = erster Track beim Spielstart (West Coast)
-	"129290": [6.0, 0.0, 271.1, "garage", true],  # free-rap-beats modern gangster west coast (-18,3 LUFS, 5 100 Downloads)
-	"213452": [3.3, 0.0, 170.5, "garage", true],  # 5xbeatz west coast type beat (4 800 Downloads)
-	"210671": [1.0, 0.0, 210.3, "beide", true],  # 5xbeatz epic west coast g-funk
-	"331753": [-0.7, 2.15, 161.3, "beide", true],  # sacred beast funk x g-funk (Bass, Synth)
-	"565462": [-3.4, 0.0, 0.0, "beide"],  # vaitsez gangster beat (-7,6 LUFS)
-	"461849": [-1.9, 0.0, 121.0, "beide"],  # gr0za criminal mafia gangster
-	"595812": [-2.4, 0.0, 0.0, "beide"],  # vaitsez hip-hop beat
-	# Garage: Hip-Hop, Boom Bap, Drill
-	"206680": [3.8, 0.0, 183.4, "garage"],  # 5xbeatz dope west coast type beat (-14,8 LUFS)
-	"116392": [0.1, 0.0, 0.0, "garage"],  # kontraa uk drill
-	"495946": [-2.6, 0.8, 150.8, "garage"],  # audiodollar rap beat
-	"171167": [-5.9, 0.0, 211.8, "garage"],  # agerabeatz spray (-5,1 LUFS)
-	"617537": [-2.7, 0.0, 129.3, "garage"],  # atlasaudio 90s hip hop
-	"569539": [-0.6, 0.0, 0.0, "garage"],  # solarflex hip hop boom bap
-	"599534": [-2.2, 0.0, 113.6, "garage"],  # soundsurfer street hip hop
-	"623482": [-3.5, 0.72, 94.3, "garage"],  # sub_clair hip hop instrumental
+	# Intro beim Spielstart (nur dort, nicht in der Liste)
+	"595519": [-3.3, 0.0, 0.0, "intro", true],  # jonasblakewood metal (31 s)
+	# Phonk und Drift-Phonk
+	"573644": [-1.9, 0.0, 0.0, "beide"],  # alex-morgan phonk aggressive drift night
+	"545509": [3.0, 0.0, 0.0, "beide"],  # alex-morgan brazilian phonk
+	"200108": [-2.7, 0.0, 152.8, "beide"],  # artissizm drift phonk
+	"503853": [-1.7, 0.0, 128.8, "beide"],  # gr0za drift drifting car music
+	"593661": [-1.8, 0.0, 0.0, "beide"],  # kiravale phonk music
+	"139106": [-5.8, 0.0, 143.2, "beide"],  # kontraa supra drift phonk
+	"550480": [-3.6, 0.0, 82.9, "beide"],  # sub_clair drift phonk
+	"594713": [-3.8, 0.0, 96.7, "beide"],  # sub_clair indian phonk
+	"624946": [-5.9, 0.0, 124.8, "beide"],  # sub_clair phonk hard
+	"588308": [-0.8, 0.0, 104.7, "beide"],  # sub_clair phonk instrumental
+	"565487": [-1.2, 0.0, 0.0, "beide"],  # vaitsez drift drifting car music
+	"616472": [3.0, 0.0, 133.8, "beide"],  # zephiramusic drift phonk
+	"616925": [2.7, 0.0, 0.0, "beide"],  # zephiramusic phonk hard
+	# Metal
+	"591343": [-1.1, 0.0, 181.4, "beide"],  # alex-morgan thrash metal
+	"366833": [-3.5, 0.0, 149.9, "beide"],  # alexgrohl void construct epic metal
+	"572627": [-4.3, 0.47, 125.7, "beide"],  # strawberry_candy powerful heavy metal
+	"588662": [-5.4, 0.0, 96.4, "beide"],  # williamsmyname alternative metal macfly
 }
 
 var lists := {"fahrt": [], "garage": []}  # Pfade je Liste, gemischt
 ## Radiosender wie in NFS (seit 2.29): "," schaltet weiter, "-" sortiert den laufenden Track für immer aus.
 ## mix = wie bisher (beim Fahren Funk und Beats, in der Garage Hip-Hop), sonst nur die Sorte des Senders.
-const STATIONS := [["mix", "MIX"], ["funk", "FUNKWERK"], ["westcoast", "WEST COAST"], ["phonk", "NACHTDRIFT"],
-	["hiphop", "BORDSTEIN BEATS"]]
-const GENRE := {"503900": "funk", "628015": "funk", "437330": "funk", "425092": "funk", "557572": "funk", "591743": "funk",
-	"593046": "funk", "611911": "funk", "614901": "funk", "591582": "funk", "550488": "funk",
-	"529766": "phonk", "223224": "phonk", "607579": "phonk", "510715": "phonk",
-	"129290": "westcoast", "213452": "westcoast", "210671": "westcoast", "331753": "westcoast", "206680": "westcoast",
-	"565462": "hiphop", "461849": "hiphop", "595812": "hiphop", "116392": "hiphop", "495946": "hiphop", "171167": "hiphop",
-	"617537": "hiphop", "569539": "hiphop", "599534": "hiphop", "623482": "hiphop"}
+const STATIONS := [["mix", "MIX"], ["phonk", "NACHTDRIFT"], ["metal", "METALWERK"]]
+const GENRE := {"573644": "phonk", "545509": "phonk", "200108": "phonk", "503853": "phonk", "593661": "phonk",
+	"139106": "phonk", "550480": "phonk", "594713": "phonk", "624946": "phonk", "588308": "phonk", "565487": "phonk",
+	"616472": "phonk", "616925": "phonk", "591343": "metal", "366833": "metal", "572627": "metal", "588662": "metal"}
 const PREFS := "user://music.json"
 var station := "mix"
 var banned: Array = []  # Pixabay-Nummern
 var _st_lists := {}  # Sender -> Pfade (gemischt)
 var _st_idx := {}
 var _cur_path := ""
-var intro: Array = []  # West-Coast-Tracks für den Spielstart
+var intro: Array = []  # Intro-Tracks für den Spielstart
+var _intro_path := ""  # noch zu spielendes Intro
 const CITY_DIR := "res://music/staedte/"
 ## Stadt-Tracks: Stadt -> [Angleich dB, Musik beginnt bei s, endet bei s] (wie TRACKS)
 const CITY_TRACKS := {
 	"aachen": [1.2, 0.0, 148.0],  # Bruder Jakob x Jonas Platin "AC" (-12,2 LUFS)
 }
 var _town := ""  # Stadt, in der man gerade ist (Stadt-Track)
-var _theme := ""  # Stadt-Track, der gerade läuft ("" = normale Liste)
 var mode := "garage"  # welche Liste gerade läuft (race_go: fahrt, menu: garage)
 var current_title := ""
 var _idx := {"fahrt": -1, "garage": -1}
@@ -102,7 +86,6 @@ var _toast_title := ""
 var _toast_artist := ""
 var _toast_pending := false
 var _toast_hold := false
-var _first := true  # erster Track beim Spielstart: keine Blase, sie stört beim Reinkommen
 var toast_corner := false  # Garage: Blase rechts unten in der Tastenleiste (links Menü, darüber das Infofeld)
 var _duck := 0.0  # dB: leiser während Laden, Kameraflug und Countdown
 var _duck_to := 0.0
@@ -140,8 +123,8 @@ func _scan() -> void:
 		var name := f.trim_suffix(".import").trim_suffix(".remap")
 		var ext := name.get_extension().to_lower()
 		if ext in ["mp3", "ogg", "wav"]:
-			var info: Array = TRACKS.get(_track_id(DIR + name), [0.0, 0.0, 0.0, "fahrt"])
-			for l in (["fahrt", "garage"] if info[3] == "beide" else [info[3]]):
+			var info: Array = TRACKS.get(_track_id(DIR + name), [0.0, 0.0, 0.0, "beide"])
+			for l in (["fahrt", "garage"] if info[3] == "beide" else ([] if info[3] == "intro" else [info[3]])):
 				if not lists[l].has(DIR + name):
 					lists[l].append(DIR + name)
 			if info.size() > 4 and info[4] and not intro.has(DIR + name):
@@ -160,26 +143,23 @@ func _scan() -> void:
 		_st_lists[g].shuffle()
 		_st_idx[g] = -1
 	_load_prefs()
-	# Spielstart: zuerst ein West-Coast-Track (zufällig einer der markierten), danach gemischt
+	# Spielstart: zuerst das Intro (zufällig eins der markierten), danach die gemischte Liste
 	if not intro.is_empty():
-		var first: String = intro[randi() % intro.size()]
-		var g: Array = lists["garage"]
-		if g.has(first):
-			g.erase(first)
-			g.push_front(first)
-	if lists["garage"].is_empty():
-		lists["garage"] = lists["fahrt"].duplicate()  # nur eine Sorte da: überall dieselbe Liste
+		_intro_path = intro[randi() % intro.size()]
+	lists["garage"] = lists["fahrt"]  # seit 2.30 eine gemeinsame Liste (Menü und Fahrt)
 
 
 ## Nächster Track; fade: Dauer der Überblendung (s)
 func next(fade := FADE_SKIP) -> void:
-	if _theme != "":
-		_play(_theme, fade)  # Stadt-Track läuft in Schleife, solange man in der Stadt ist
+	if _intro_path != "":
+		var ip := _intro_path
+		_intro_path = ""
+		_play(ip, fade)
 		return
 	var use_st := station != "mix" and _st_lists.has(station)
-	var playlist: Array = _st_lists[station] if use_st else lists[mode]
+	var playlist: Array = _st_lists[station] if use_st else lists["fahrt"]
 	var idx: Dictionary = _st_idx if use_st else _idx
-	var key: String = station if use_st else mode
+	var key: String = station if use_st else "fahrt"
 	if playlist.is_empty():
 		current_title = ""
 		return
@@ -231,29 +211,22 @@ func _play(path: String, fade: float) -> void:
 	var cut := base.find("-")
 	_toast_artist = base.substr(0, cut).replace("_", " ") if cut > 0 else ""
 	_toast_title = (base.substr(cut + 1) if cut > 0 else base).replace("-", " ").replace("_", " ").to_upper()
-	if _first:
-		_first = false  # Spielstart: Musik läuft einfach los, die Blase kommt erst beim ersten Wechsel
-	elif _paused:
+	if _paused:
 		_toast_pending = true  # erst nach dem Intro zeigen
 	else:
 		_start_toast()
 
 
-## Stadt-Track: in manchen Städten läuft immer ein eigener Track (Open World, solange man dort ist, und im Rennen
-## der Stadt), in Schleife. Datei: music/staedte/<stadt>-<kuenstler>-<titel>.mp3 (Stadt klein, ohne Umlaute, wie
-## CITY_KEY). town: Ortsname (Catalog "town"), "" = keine Stadt mit eigenem Track: zurück zur Liste. M bzw. "."
-## springt in der Stadt zur normalen Liste, bis man die Stadt verlässt.
+## Stadt-Track: fährt man in eine Stadt mit eigenem Track (Open World), läuft er einmal (nicht in Schleife), danach
+## geht es mit der Liste weiter. Datei: music/staedte/<stadt>-<kuenstler>-<titel>.mp3 (Stadt klein, ohne Umlaute).
+## town: Ortsname (Catalog "town"), "" = Autobahn oder Stadt ohne eigenen Track (die Musik läuft einfach weiter).
 func city(town: String) -> void:
 	if town == _town:
 		return
 	_town = town
 	var path := city_track(town)
-	if path == _theme:
-		return
-	var had := _theme != ""
-	_theme = path
-	if path != "" or had:
-		next(FADE_SKIP)
+	if path != "" and path != _cur_path:
+		_play(path, FADE_SKIP)
 
 
 static func city_track(town: String) -> String:
@@ -280,27 +253,40 @@ func race_loading() -> void:
 		_toast.queue_redraw()
 
 
-## Start (LOS): neuer Track für das Rennen, voll (in einer Stadt mit eigenem Track dieser)
+## Start (LOS): neuer Track für das Rennen, voll; in einer Stadt mit eigenem Track dieser (läuft er schon, bleibt er)
 func race_go(town := "") -> void:
 	_duck_to = 0.0
+	_in_race = false
 	mode = "fahrt"
 	_town = town
 	var t := city_track(town)
-	if t != "" and t == _theme:
-		return  # der Stadt-Track läuft schon (Open World: man startet in der Stadt)
-	_theme = t
+	if t != "":
+		if t != _cur_path:
+			_play(t, 0.7)
+		return
 	next(0.7)
 
 
-## Zurück im Menü: nach einem Rennen ein neuer Track
+## In die Welt (Losfahren, zurück aus einem Rennen oder der Garage): der laufende Track bleibt, nur wieder voll;
+## in einer Stadt mit eigenem Track beginnt dieser (einmal)
+func world_go(town := "") -> void:
+	_duck_to = 0.0
+	_in_race = false
+	hold_toast(false)
+	mode = "fahrt"
+	_town = ""
+	city(town)
+	if (lists[mode] as Array).size() > 0 and not _players[_cur].playing and _fade >= 1.0:
+		next(0.7)
+
+
+## Zurück im Menü: der Track läuft weiter (seit 2.30 kein Wechsel mehr), nur wieder voll
 func menu() -> void:
-	if _in_race or mode != "garage" or _theme != "":
-		_in_race = false
-		_duck_to = 0.0
-		mode = "garage"
-		_town = ""
-		_theme = ""
-		next(1.5)
+	_in_race = false
+	_duck_to = 0.0
+	_town = ""
+	hold_toast(false)
+	mode = "garage"
 
 
 func set_paused(p: bool) -> void:
@@ -457,7 +443,6 @@ func next_station() -> void:
 			i = k
 	station = STATIONS[(i + 1) % STATIONS.size()][0]
 	_save_prefs()
-	_theme = ""
 	next(FADE_SKIP)
 	_toast_artist = "RADIO  " + station_name() + "  ·  , SENDER  · . WEITER  · - AUSSORTIEREN"
 
@@ -482,5 +467,4 @@ func _unhandled_input(event: InputEvent) -> void:
 		ban_current()
 		return
 	if event.is_action_pressed("next_track"):
-		_theme = ""  # in einer Stadt mit eigenem Track: zur normalen Liste, bis man die Stadt verlässt
 		next(FADE_SKIP)

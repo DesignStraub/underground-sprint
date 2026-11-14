@@ -505,26 +505,20 @@ in den Altstädten und Graffiti an den Altbauten im Kiez.
 <img src="update_bilder/stimmungen.jpg" alt="Stimmungen" width="480">
 
 ## Musik und Sounds
-Musik (`music/`, 30 Tracks in zwei Listen: beim Fahren in Rennen und Open World vor allem Funk (11), dazu G-Funk,
-dreckige Gangsta-Beats und 4 Phonk; in der Garage und den Menüs Hip-Hop, West Coast, Boom Bap und Drill; G-Funk und
-Gangsta-Beats laufen in beiden Listen, beim Spielstart kommt zuerst einer von 4 West-Coast-Tracks, ohne Titel-Blase.
-Ausgesucht nach Downloads auf Pixabay (2.28: die erste West-Coast-Auswahl nach Titeln klang nicht danach).
-**Radio (2.29):** wie in NFS mehrere Sender, Taste **,** schaltet weiter: MIX (wie bisher), FUNKWERK (Funk),
-WEST COAST (G-Funk, West Coast), NACHTDRIFT (Phonk, Trap), BORDSTEIN BEATS (Hip-Hop, Boom Bap, Drill). Taste **.**
+**Soundtrack seit 2.30** (`music/`, 18 Tracks von Pixabay, Quellen in `CREDITS.md`): Phonk, Drift-Phonk und Metal in
+einer gemeinsamen Liste. Beim Spielstart läuft zuerst ein 30-Sekunden-Metal-Intro, danach die gemischte Liste.
+Neue Tracks gibt es nur beim Spielstart und beim Start eines Rennens; Menü, Garage, Tuning und der Weg in die Welt
+lassen den laufenden Track weiterlaufen. Bei jedem Trackwechsel blendet unten eine Blase Titel und Künstler ein.
+**Stadt-Tracks:** fährt man in eine Stadt mit eigenem Track (Open World) oder startet dort ein Rennen, läuft er
+einmal, danach geht es mit der Liste weiter (bis 2.29 lief er in Schleife). Aachen: Bruder Jakob x Jonas Platin „AC“
+(mit Freigabe der Künstler, `music/staedte/`, nicht im öffentlichen Repo).
+**Radio:** wie in NFS mehrere Sender, Taste **,** schaltet weiter: MIX (alles), NACHTDRIFT (Phonk), METALWERK (Metal). Taste **.**
 springt zum nächsten Track, **-** sortiert den laufenden Track für immer aus. Sender und aussortierte Tracks stehen in
 `user://music.json` (`Music.STATIONS`, `Music.GENRE`).
-**Stadt-Tracks:** in manchen Städten läuft immer ein eigener Track, in der Open World solange man dort ist und im
-Rennen der Stadt, in Schleife (`Music.city`, `Music.race_go(town)`); M springt dort zur normalen Liste, bis man die
-Stadt verlässt. Aachen: Bruder Jakob x Jonas Platin „AC“ (mit Freigabe der Künstler). Datei:
-`music/staedte/<stadt>-<Künstler>-<Titel>.mp3` (Stadt klein, Umlaute ausgeschrieben), Angleich in
-`Music.CITY_TRACKS`. Die Stadt-Tracks liegen nicht im öffentlichen Repo (`.gitignore`), nur lokal und im Export.
-Test: `world.tscn -- --wspawn=exit:15:100 --musiclog` („MUSIK …“)) und Intro-Sound (`assets/intro_sound.mp3`) sind lizenzfreie Tracks von Pixabay
-(`scripts/music.gd`, Liste je Track in `TRACKS`, Quellen in `CREDITS.md`): zufällige Reihenfolge je Liste, beim
-Wechsel zwischen Garage und Fahrt kommt ein Track der anderen Liste, die letzten 6 s blendet der nächste über;
-ist die Liste durch, wird neu gemischt. Seit 2.22 haben Menü und Rennen je ihren eigenen Track: beim Laden eines
-Rennens wird die Menümusik um 13 dB leiser und bleibt das über Kameraflug und Countdown (Motoren und Starttöne sind
-gut zu hören, wie in vielen Rennspielen), bei LOS setzt ein neuer Track voll ein; zurück im Menü beginnt wieder ein
-neuer. Während des Ladens wartet die Titel-Blase. Die Tracks sind gleich laut gemacht (mit `ffmpeg -af ebur128` gemessen, Ziel -11 LUFS,
+Datei der Stadt-Tracks: `music/staedte/<stadt>-<Künstler>-<Titel>.mp3` (Stadt klein, Umlaute ausgeschrieben),
+Angleich in `Music.CITY_TRACKS`. Test: `world.tscn -- --wstart=15 --musiclog` („MUSIK …“). Die letzten 6 s eines
+Tracks blendet der nächste über. Beim Laden eines Rennens wird die Musik um 13 dB leiser und bleibt das über Kameraflug und Countdown (Motoren
+und Starttöne sind gut zu hören), bei LOS setzt ein neuer Track voll ein. Während des Ladens wartet die Titel-Blase. Die Tracks sind gleich laut gemacht (mit `ffmpeg -af ebur128` gemessen, Ziel -11 LUFS,
 Tabelle `TRACKS`), Stille am Anfang und Ende wird übersprungen. M springt mit kurzer Überblendung weiter. Weitere
 mp3/ogg-Dateien in `music/` laufen automatisch mit (ohne Eintrag in der Tabelle ohne Angleich).
 
