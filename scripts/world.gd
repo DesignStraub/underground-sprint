@@ -1081,7 +1081,25 @@ func _process(dt: float) -> void:
 
 ## Stadtviertel: beim Wechsel in eine andere Gegend steht ihr Name oben (wie im Rennen), nicht beim ersten Hineinfahren
 ## in die Stadt (da steht der Ortsname)
+var _village_shown := ""
+var _vill := []
+
+
 func _update_district() -> void:
+	# Autobahn über Land: Name des nächsten Dorfes einblenden, wenn man vorbeifährt (wie die Gebietsnamen in NFS)
+	if not active.is_empty() and active["kind"] == "seg" and land:
+		var pp := Vector2(player.global_position.x, player.global_position.z)
+		var near := ""
+		if _vill.is_empty():
+			_vill = land.villages()
+		for v in _vill:
+			if pp.distance_to(v[0]) < 650.0:
+				near = v[1]
+		if near != "" and near != _village_shown:
+			hud["area"].text = near.to_upper()
+			_area_t = 4.0
+		_village_shown = near
+		return
 	if active.is_empty() or active["kind"] == "seg" or player.path_id != 0:
 		return
 	var arr: Array = (active["track"] as Dictionary)["districts"]
