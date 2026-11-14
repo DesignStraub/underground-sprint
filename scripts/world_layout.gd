@@ -168,6 +168,19 @@ static func build() -> Dictionary:
 	for i in mid["arms"].size():
 		msegs.append_array(_split_open(mid["arms"][i], 9900 + i * 50, 3 + i, "Querspange"))
 	segments.append_array(msegs)
+	# Autobahn über Land, Stadt nur um die Auffahrten der Städte und am Kreisel (seit 2.29; davor säumten Hochhäuser
+	# die ganze Autobahn, und die Welt sah überall gleich aus). Die Landschaft (landscape.gd) fragt dasselbe ab.
+	var urban := []
+	for r in ramps + oramps:
+		if not r.get("wide", false):
+			urban.append(r["from"])
+	var rbc := Vector3.ZERO
+	for q in mid["rb"]:
+		rbc += q / float(mid["rb"].size())
+	urban.append(rbc)
+	for sg in segments:
+		sg["race"]["district_seq"] = _district_seq(sg["race"]["pts"], urban)
+		sg["race"]["no_ground"] = true
 	# Straßen für die Karten (Weltkoordinaten x, z): Ring, Auffahrten, alle Wege der Städte
 	var roads := []
 	var rl := PackedVector2Array()
@@ -206,7 +219,8 @@ static func build() -> Dictionary:
 		c["race"]["world_holes"] = holes
 	for sg in segments:
 		sg["race"]["world_holes"] = holes
-	_cache = {"cities": cities, "segments": segments, "ring_r": R, "ring": ring, "oring": oring, "roads": roads, "holes": holes}
+	_cache = {"cities": cities, "segments": segments, "ring_r": R, "ring": ring, "oring": oring, "roads": roads, "holes": holes,
+		"urban": urban}
 	if OS.get_cmdline_user_args().has("--worldlog"):
 		var olen := 0.0
 		for k in oring.size():
@@ -221,6 +235,35 @@ static func build() -> Dictionary:
 			print("  %-28s phi=%.2f gap=%.0f breite=%.0f tiefe=%.0f" % [Catalog.RACES[c["race_index"]]["name"], c["phi_w"], c["gap"],
 				c["lat1"] - c["lat0"], c["far"]])
 	return _cache
+
+
+const URBAN_R := 750.0  # so weit um eine Auffahrt (und um den Kreisel) ist die Autobahn Stadt
+
+
+## Viertel je 400 m eines Autobahnstücks: "highway" (Stadt) nahe einer Auffahrt, sonst "land"
+static func _district_seq(pts: Array, urban: Array) -> Array:
+	var seq := []
+	var acc := 0.0
+	var next := 200.0  # Mitte des ersten Abschnitts
+	for k in pts.size() - 1:
+		var a: Vector3 = pts[k]
+		var b: Vector3 = pts[k + 1]
+		var l := a.distance_to(b)
+		while next <= acc + l:
+			var q := a.lerp(b, (next - acc) / maxf(l, 0.001))
+			seq.append("highway" if is_urban(q, urban) else "land")
+			next += 400.0
+		acc += l
+	if seq.is_empty():
+		seq.append("land")
+	return seq
+
+
+static func is_urban(q: Vector3, urban: Array, extra := 0.0) -> bool:
+	for u in urban:
+		if Vector2(q.x - u.x, q.z - u.z).length() < URBAN_R + extra:
+			return true
+	return false
 
 
 ## Ring in Stücke teilen (Grenzen nicht in der Nähe einer Auffahrt). ring_i: 0 innen, 1 außen

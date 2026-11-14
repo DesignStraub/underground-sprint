@@ -136,6 +136,9 @@ func _ready() -> void:
 			pass
 		_finish(near[i], job)
 
+	cover.get_meta("label").text = tr("Welt wird gebaut … Landschaft")
+	await get_tree().process_frame
+	land.build_near(spawn.origin)
 	var pc := PlayerCar.new()
 	pc.process_mode = Node.PROCESS_MODE_PAUSABLE
 	pc.track = _best_track(spawn.origin)
@@ -146,6 +149,7 @@ func _ready() -> void:
 	pc.place(spawn)
 	pc.controls_enabled = true
 	player = pc
+	land.target = pc
 	player.cam.make_current()
 	for n in get_tree().get_nodes_in_group("ambient"):
 		n.target = player
@@ -270,7 +274,9 @@ func _shot_check(dt: float) -> void:
 						return
 			if _shot_t <= 0.0:
 				get_viewport().get_texture().get_image().save_png(parts[0])
-				print("WSHOT ", parts[0])
+				print("WSHOT ", parts[0], " fps=", Engine.get_frames_per_second(), " draw=",
+					RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME), " prims=",
+					RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_PRIMITIVES_IN_FRAME))
 				for b in OS.get_cmdline_user_args():
 					if b.begins_with("--whatsat="):  # Test: welche Meshes liegen flach an diesem Weltpunkt (x:z)?
 						var xz := b.substr(10).split(":")
@@ -601,7 +607,9 @@ func _start_race(i: int) -> void:
 const DAY_MINUTES := 24.0
 var tod := 20.0  # Uhrzeit (Stunden)
 var _sky_mat: ShaderMaterial
-var _ground_mat: StandardMaterial3D
+var _ground_mat: ShaderMaterial
+var land: Landscape
+var _wcam: Camera3D
 var _tod_t := 0.0
 
 
@@ -636,8 +644,10 @@ func _update_daylight(dt: float, force := false) -> void:
 		_sky_mat.set_shader_parameter("stars", m["stars"])
 		_sky_mat.set_shader_parameter("day", day)
 		_sky_mat.set_shader_parameter("sun_dir", -moon.global_basis.z if moon.is_inside_tree() else -moon.basis.z)
-	if _ground_mat:
-		_ground_mat.albedo_color = Color(0.025, 0.028, 0.03).lerp(Color(0.16, 0.17, 0.15), day)
+	if land:
+		# Nebelbänke: nachts, am stärksten im Morgengrauen (5-8 Uhr), tagsüber weg
+		var dawn := sin(PI * clampf((tod - 4.5) / 4.0, 0.0, 1.0))
+		land.set_daylight(day, clampf((1.0 - day) * 0.45 + dawn * 0.5, 0.0, 0.75))
 
 
 func _setup_environment() -> void:
@@ -697,11 +707,13 @@ func _setup_environment() -> void:
 	gst.set_normal(Vector3.UP)
 	Track.ground_cell(gst, Vector2(-ext / 2.0, -ext / 2.0), ext, layout["holes"])
 	ground.mesh = gst.commit()
-	var gm := StandardMaterial3D.new()
-	gm.albedo_color = Color(0.025, 0.028, 0.03)
-	gm.roughness = 0.95
-	ground.material_override = gm
-	_ground_mat = gm
+	# Landschaft (Felder, Hügel, Wald, Dörfer, Windparks); der flache Boden trägt dieselben Felder
+	land = Landscape.new()
+	land.name = "Landschaft"
+	land.setup(layout)
+	world.add_child(land)
+	ground.material_override = land.land_mat
+	_ground_mat = land.land_mat
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--tod="):  # Test: Uhrzeit beim Start (Stunden), z.B. --tod=13
 			tod = float(a.substr(6))
@@ -998,6 +1010,21 @@ func _process(dt: float) -> void:
 	if OS.get_cmdline_user_args().has("--wdrive"):
 		_autopilot()
 	for a in OS.get_cmdline_user_args():
+		# Test: --wcam=zurück:höhe:voraus[:drehung]  Kamera hinter/über dem Auto (Landschaft von oben ansehen)
+		if a.begins_with("--wcam=") and player:
+			var cc := a.substr(7).split(":")
+			if _wcam == null:
+				_wcam = Camera3D.new()
+				_wcam.far = 6000.0
+				_wcam.fov = 60.0
+				world.add_child(_wcam)
+			var fwd := -player.global_basis.z
+			if cc.size() > 3:
+				fwd = fwd.rotated(Vector3.UP, deg_to_rad(float(cc[3])))
+			var cp := player.global_position
+			_wcam.global_position = cp - fwd * float(cc[0]) + Vector3.UP * float(cc[1])
+			_wcam.look_at(cp + fwd * float(cc[2]), Vector3.UP)
+			_wcam.make_current()
 		if a.begins_with("--ctest="):
 			if _ct.is_empty():
 				_ctest_setup(a.substr(8))

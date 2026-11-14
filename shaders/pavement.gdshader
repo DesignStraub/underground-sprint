@@ -47,7 +47,13 @@ void fragment() {
 		vec4 dt2 = texture(detail, vec2(y, xm) / 19.0 + 0.61);
 		float stain = mix(dt.g, dt2.g, 0.6);
 		float edge = min(xm, walk_w - xm);
-		if (edge < 0.32) {
+		if (pave == 5) {
+			// Bankett an der Autobahn über Land: Schotterstreifen an der Kante, dann Gras (seit 2.29)
+			vec3 grass = vec3(0.1, 0.17, 0.06) * (0.75 + 0.5 * dt.r) * (0.8 + 0.4 * stain);
+			vec3 gravel = vec3(0.2, 0.19, 0.17) * (0.7 + 0.5 * dt.r);
+			col = mix(gravel, grass, smoothstep(0.7, 1.3, edge)) * pave_tint;
+			rough = 0.95;
+		} else if (edge < 0.32) {
 			// Bordsteine: helle Granitreihe mit Stößen alle 1 m
 			col = vec3(0.27, 0.27, 0.28) * (0.75 + 0.45 * dt.r);
 			col *= 1.0 - 0.6 * joints(vec2(0.5, y), vec2(10.0, 1.0), 0.012);

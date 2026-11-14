@@ -1,0 +1,686 @@
+class_name Landscape
+extends Node3D
+## Landschaft der Open World zwischen Städten und Autobahnen (seit 2.29; davor lag dort eine leere graue Fläche):
+## Hügel, die abseits der Straßen sanft ansteigen, Felder (shaders/land.gdshader), Wälder, Dörfer mit Kirchturm,
+## Windparks mit Gefahrenfeuer und nachts Nebelbänke über den Wiesen. Gebaut in Kacheln zu 1 km rund um den Spieler,
+## im Hintergrund-Thread; nah an Straßen und in Städten bleibt alles flach (dort liegen Strecken und Häuser).
+## Alles hier ist Kulisse ohne Kollision: Straßen sind ummauert, man kommt nicht hin.
+
+const LAND_SHADER := preload("res://shaders/land.gdshader")
+const HOUSE_SHADER := preload("res://shaders/house.gdshader")
+const FOG_SHADER := preload("res://shaders/fog_bank.gdshader")
+const BEACON_SHADER := preload("res://shaders/beacon.gdshader")
+const Layout := preload("res://scripts/world_layout.gd")
+
+const CHUNK := 1000.0
+const STEP := 25.0  # Gitterweite des Geländes
+const N := 40  # Zellen je Kachel und Richtung
+const VIEW := 3300.0  # so weit werden Kacheln geladen
+const ROAD_CELL := 100.0
+const ROAD_FLAT := 55.0  # bis hier neben einer Straße ist das Gelände flach
+const RISE := 420.0  # dann steigt es auf dieser Strecke an
+const CITY_PAD := 380.0  # um Städte (Mittelpunkt + Radius) flach
+const HILL_H := 115.0
+
+var layout: Dictionary
+var target: Node3D
+var land_mat: ShaderMaterial
+var house_mat: ShaderMaterial
+var fog_mat: ShaderMaterial
+var beacon_mat: ShaderMaterial
+var _roof_mat: StandardMaterial3D
+var _trunk_mat: StandardMaterial3D
+var _crown_mat: StandardMaterial3D
+var _tower_mat: StandardMaterial3D
+var _blade_mat: StandardMaterial3D
+
+var _road := {}  # Rasterzelle -> PackedVector2Array (Punkte alle 20 m auf allen Straßen)
+var _cities := []  # [Mitte (Vector2), Radius]
+var _urban := []
+var _villages := []  # {pos, r, level, seed, name}
+var _parks := []  # {pos, seed, dir}
+var _hill := FastNoiseLite.new()
+var _detail := FastNoiseLite.new()
+var _forest := FastNoiseLite.new()
+var _chunks := {}  # Vector2i -> Node3D (oder null, solange er gebaut wird)
+var _task := -1
+var _task_key := Vector2i.ZERO
+var _task_out: Node3D
+var _t := 0.0
+var _rotors := []
+var _meshes := {}
+
+const VILLAGE_NAMES := ["Oberweiler", "Kirchheim", "Lindenau", "Birkenfeld", "Hohenstein", "Mühlbach", "Eichstetten",
+	"Wiesental", "Rotenburg", "Sonnenberg", "Tannhausen", "Grünwald", "Steinach", "Haselbach", "Altdorf", "Buchholz"]
+
+
+func setup(lay: Dictionary) -> void:
+	layout = lay
+	_hill.seed = 2029
+	_hill.frequency = 1.0 / 1900.0
+	_hill.fractal_octaves = 3
+	_detail.seed = 77
+	_detail.frequency = 1.0 / 420.0
+	_detail.fractal_octaves = 2
+	_forest.seed = 4242
+	_forest.frequency = 1.0 / 750.0
+	_forest.fractal_octaves = 3
+	for rd in layout["roads"]:
+		var pl: PackedVector2Array = rd[0]
+		for k in pl.size() - 1:
+			var a := pl[k]
+			var b := pl[k + 1]
+			var n := maxi(int(a.distance_to(b) / 20.0), 1)
+			for j in n + 1:
+				_add_road(a.lerp(b, j / float(n)))
+	for sg in layout["segments"]:
+		var pts: Array = sg["race"]["pts"]
+		for k in pts.size() - 1:
+			var a := Vector2(pts[k].x, pts[k].z)
+			var b := Vector2(pts[k + 1].x, pts[k + 1].z)
+			var n := maxi(int(a.distance_to(b) / 20.0), 1)
+			for j in n + 1:
+				_add_road(a.lerp(b, j / float(n)))
+	for c in layout["cities"]:
+		_cities.append([Vector2(c["center"].x, c["center"].z), float(c["radius"])])
+	_urban = layout.get("urban", [])
+	_plan_sites()
+	_make_materials()
+
+
+func _add_road(p: Vector2) -> void:
+	var c := Vector2i(floori(p.x / ROAD_CELL), floori(p.y / ROAD_CELL))
+	var arr: PackedVector2Array = _road.get(c, PackedVector2Array())
+	arr.append(p)
+	_road[c] = arr  # Packed-Arrays kommen als Kopie aus dem Dictionary: zurückschreiben
+
+
+## Abstand zur nächsten Straße (bis 400 m genau, sonst 400)
+func road_dist(p: Vector2) -> float:
+	var c := Vector2i(floori(p.x / ROAD_CELL), floori(p.y / ROAD_CELL))
+	var best := 160000.0
+	for dy in range(-4, 5):
+		for dx in range(-4, 5):
+			var arr = _road.get(c + Vector2i(dx, dy))
+			if arr == null:
+				continue
+			for q in arr:
+				best = minf(best, p.distance_squared_to(q))
+	return sqrt(best)
+
+
+func city_dist(p: Vector2) -> float:
+	var best := 1e9
+	for c in _cities:
+		best = minf(best, p.distance_to(c[0]) - c[1] - CITY_PAD)
+	return best
+
+
+## Geländehöhe ohne Rücksicht auf Straßen (für Dörfer und Windparks)
+func raw_height(p: Vector2) -> float:
+	# Simplex liegt meist zwischen -0.5 und 0.5: auf 0..1 strecken, Kuppen betonen
+	var n := clampf(_hill.get_noise_2d(p.x, p.y) * 1.1 + 0.5, 0.0, 1.0)
+	return pow(n, 1.7) * HILL_H + _detail.get_noise_2d(p.x, p.y) * 12.0 + 6.0
+
+
+## Höhe mit vorberechnetem Straßenabstand dr; unter 0 heißt: unter dem flachen Boden versteckt
+func height_at(p: Vector2, dr: float) -> float:
+	var free := minf(dr - ROAD_FLAT, city_dist(p))
+	if free <= 0.0:
+		return -0.6
+	var fade := smoothstep(0.0, RISE, free)
+	var h := raw_height(p)
+	for v in _villages:
+		var dv := p.distance_to(v["pos"])
+		if dv < v["r"] + 160.0:
+			h = lerpf(v["level"], h, smoothstep(v["r"], v["r"] + 160.0, dv))
+	return fade * h - (1.0 - fade) * 0.6
+
+
+func _plan_sites() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 2029
+	var ext: float = layout["ring_r"] + 5200.0
+	var vi := 0
+	var x := -ext
+	while x < ext:
+		var z := -ext
+		while z < ext:
+			var p := Vector2(x + rng.randf_range(200, 1100), z + rng.randf_range(200, 1100))
+			if road_dist(p) >= 400.0 and city_dist(p) > 450.0 and rng.randf() < 0.55:
+				var ok := true
+				for v in _villages:
+					if p.distance_to(v["pos"]) < 1300.0:
+						ok = false
+				if ok:
+					_villages.append({"pos": p, "r": rng.randf_range(90.0, 150.0), "level": raw_height(p), "seed": rng.randi(),
+						"name": VILLAGE_NAMES[vi % VILLAGE_NAMES.size()]})
+					vi += 1
+			z += 1300.0
+		x += 1300.0
+	x = -ext
+	while x < ext:
+		var z := -ext
+		while z < ext:
+			var p := Vector2(x + rng.randf_range(300, 1900), z + rng.randf_range(300, 1900))
+			var ok := road_dist(p) >= 330.0 and city_dist(p) > 500.0 and rng.randf() < 0.6
+			for v in _villages:
+				if p.distance_to(v["pos"]) < 700.0:
+					ok = false
+			if ok:
+				_parks.append({"pos": p, "seed": rng.randi(), "n": rng.randi_range(3, 6)})
+			z += 2200.0
+		x += 2200.0
+
+
+func _make_materials() -> void:
+	land_mat = ShaderMaterial.new()
+	land_mat.shader = LAND_SHADER
+	house_mat = ShaderMaterial.new()
+	house_mat.shader = HOUSE_SHADER
+	fog_mat = ShaderMaterial.new()
+	fog_mat.shader = FOG_SHADER
+	beacon_mat = ShaderMaterial.new()
+	beacon_mat.shader = BEACON_SHADER
+	_roof_mat = StandardMaterial3D.new()
+	_roof_mat.vertex_color_use_as_albedo = true
+	_roof_mat.roughness = 0.8
+	_trunk_mat = StandardMaterial3D.new()
+	_trunk_mat.albedo_color = Color(0.2, 0.14, 0.09)
+	_crown_mat = StandardMaterial3D.new()
+	_crown_mat.vertex_color_use_as_albedo = true
+	_crown_mat.roughness = 0.95
+	_tower_mat = StandardMaterial3D.new()
+	_tower_mat.albedo_color = Color(0.86, 0.87, 0.88)
+	_tower_mat.roughness = 0.5
+	_blade_mat = StandardMaterial3D.new()
+	_blade_mat.albedo_color = Color(0.9, 0.91, 0.92)
+	_blade_mat.roughness = 0.4
+	_meshes["conifer"] = _tree_mesh(true)
+	_meshes["leafy"] = _tree_mesh(false)
+	var box := BoxMesh.new()
+	_meshes["box"] = box
+	_meshes["roof"] = _roof_mesh()
+
+
+## Tag/Nacht: day 0..1 (aus der Weltuhr), fog_k 0..1 (Nebelstärke für die Nebelbänke)
+func set_daylight(day: float, fog_k: float) -> void:
+	land_mat.set_shader_parameter("day", day)
+	house_mat.set_shader_parameter("night", 1.0 - smoothstep(0.15, 0.55, day))
+	beacon_mat.set_shader_parameter("night", 1.0 - smoothstep(0.2, 0.6, day))
+	fog_mat.set_shader_parameter("strength", fog_k)
+	fog_mat.set_shader_parameter("tint", Color(0.55, 0.6, 0.72).lerp(Color(0.85, 0.85, 0.82), day))
+
+
+# --- Bauen ------------------------------------------------------------------------------------------------------
+
+## Alles in der Nähe sofort bauen (hinter dem Ladebild)
+func build_near(p: Vector3, radius := 1600.0) -> void:
+	for key in _wanted(p, radius):
+		var n := build_chunk(key)
+		_chunks[key] = n
+		add_child(n)
+
+
+func _wanted(p: Vector3, radius: float) -> Array:
+	var out := []
+	var c := Vector2i(floori(p.x / CHUNK), floori(p.z / CHUNK))
+	var r := int(ceil(radius / CHUNK)) + 1
+	for dy in range(-r, r + 1):
+		for dx in range(-r, r + 1):
+			var k := c + Vector2i(dx, dy)
+			var mid := (Vector2(k) + Vector2(0.5, 0.5)) * CHUNK
+			if mid.distance_to(Vector2(p.x, p.z)) < radius + CHUNK * 0.71:
+				out.append(k)
+	out.sort_custom(func(a, b): return (Vector2(a) + Vector2(0.5, 0.5)).distance_to(Vector2(p.x, p.z) / CHUNK) \
+		< (Vector2(b) + Vector2(0.5, 0.5)).distance_to(Vector2(p.x, p.z) / CHUNK))
+	return out
+
+
+func _process(dt: float) -> void:
+	for r in _rotors:
+		if is_instance_valid(r):
+			(r as Node3D).rotate_object_local(Vector3.FORWARD, dt * 1.1)
+	if _task >= 0 and WorkerThreadPool.is_task_completed(_task):
+		WorkerThreadPool.wait_for_task_completion(_task)
+		_task = -1
+		if _chunks.has(_task_key):
+			_chunks[_task_key] = _task_out
+			add_child(_task_out)
+			for r in _task_out.get_meta("rotors", []):
+				_rotors.append(r)
+		else:
+			_task_out.free()
+	_t -= dt
+	if _t > 0.0 or target == null or not is_instance_valid(target):
+		return
+	_t = 0.4
+	var p := target.global_position
+	# entfernte Kacheln weg
+	for key in _chunks.keys():
+		var mid := (Vector2(key) + Vector2(0.5, 0.5)) * CHUNK
+		if mid.distance_to(Vector2(p.x, p.z)) > VIEW + CHUNK * 1.5 and _chunks[key] != null:
+			var n: Node3D = _chunks[key]
+			for r in n.get_meta("rotors", []):
+				_rotors.erase(r)
+			n.queue_free()
+			_chunks.erase(key)
+	if _task >= 0:
+		return
+	for key in _wanted(p, VIEW):
+		if not _chunks.has(key):
+			_chunks[key] = null
+			_task_key = key
+			if OS.has_feature("web") or DisplayServer.get_name() == "headless":
+				_task_out = build_chunk(key)
+				_chunks[key] = _task_out
+				add_child(_task_out)
+				for r in _task_out.get_meta("rotors", []):
+					_rotors.append(r)
+			else:
+				_task = WorkerThreadPool.add_task(func(): _task_out = build_chunk(key))
+			return
+
+
+func _exit_tree() -> void:
+	if _task >= 0:
+		WorkerThreadPool.wait_for_task_completion(_task)
+		_task = -1
+		if _task_out and not _task_out.is_inside_tree():
+			_task_out.free()
+
+
+func build_chunk(key: Vector2i) -> Node3D:
+	var root := Node3D.new()
+	root.name = "Land_%d_%d" % [key.x, key.y]
+	var o := Vector2(key) * CHUNK
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash(key) + 99
+	# Straßenabstand und Höhe auf dem Gitter
+	var dr := PackedFloat32Array()
+	var hs := PackedFloat32Array()
+	dr.resize((N + 1) * (N + 1))
+	hs.resize((N + 1) * (N + 1))
+	var any := false
+	for j in N + 1:
+		for i in N + 1:
+			var p := o + Vector2(i, j) * STEP
+			var d := road_dist(p)
+			dr[j * (N + 1) + i] = d
+			var h := height_at(p, d)
+			hs[j * (N + 1) + i] = h
+			any = any or h > 0.0
+	if any:
+		_terrain(root, o, hs)
+	_trees(root, o, dr, rng)
+	for v in _villages:
+		if _in_chunk(v["pos"], o):
+			_village(root, v)
+	for pk in _parks:
+		if _in_chunk(pk["pos"], o):
+			_windpark(root, pk)
+	_fog_banks(root, o, dr, hs, rng)
+	return root
+
+
+func _in_chunk(p: Vector2, o: Vector2) -> bool:
+	return p.x >= o.x and p.x < o.x + CHUNK and p.y >= o.y and p.y < o.y + CHUNK
+
+
+func _grid_h(o: Vector2, hs: PackedFloat32Array, p: Vector2) -> float:
+	var g := (p - o) / STEP
+	var i := clampi(int(g.x), 0, N - 1)
+	var j := clampi(int(g.y), 0, N - 1)
+	var fx := clampf(g.x - i, 0.0, 1.0)
+	var fy := clampf(g.y - j, 0.0, 1.0)
+	var a := lerpf(hs[j * (N + 1) + i], hs[j * (N + 1) + i + 1], fx)
+	var b := lerpf(hs[(j + 1) * (N + 1) + i], hs[(j + 1) * (N + 1) + i + 1], fx)
+	return lerpf(a, b, fy)
+
+
+func _terrain(root: Node3D, o: Vector2, hs: PackedFloat32Array) -> void:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var W := N + 1
+	var nrm := PackedVector3Array()
+	nrm.resize(W * W)
+	for j in W:
+		for i in W:
+			var hl := hs[j * W + maxi(i - 1, 0)]
+			var hr := hs[j * W + mini(i + 1, N)]
+			var hd := hs[maxi(j - 1, 0) * W + i]
+			var hu := hs[mini(j + 1, N) * W + i]
+			nrm[j * W + i] = Vector3(hl - hr, 2.0 * STEP, hd - hu).normalized()
+	for j in N:
+		for i in N:
+			var a := j * W + i
+			var b := a + 1
+			var c := a + W
+			var d := c + 1
+			for tri in [[a, d, b], [a, c, d]]:
+				if maxf(hs[tri[0]], maxf(hs[tri[1]], hs[tri[2]])) <= -0.1:
+					continue
+				for v in tri:
+					st.set_normal(nrm[v])
+					st.add_vertex(Vector3(o.x + (v % W) * STEP, hs[v], o.y + (v / W) * STEP))
+	var mesh := st.commit()
+	if mesh.get_surface_count() == 0:
+		return
+	var mi := MeshInstance3D.new()
+	mi.mesh = mesh
+	mi.material_override = land_mat
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	root.add_child(mi)
+
+
+## Wälder: dichte Bestände, wo das Waldrauschen hoch ist, Nadel- und Laubbäume gemischt; dazu einzelne Bäume
+## und Baumreihen auf den Feldern. Nicht nah an Straßen, nicht in Stadtnähe, nicht im Dorf.
+func _trees(root: Node3D, o: Vector2, dr: PackedFloat32Array, rng: RandomNumberGenerator) -> void:
+	var lists := {"conifer": [], "leafy": []}
+	var cols := {"conifer": [], "leafy": []}
+	var step := 9.0
+	var hs_cache := {}
+	var y := 0.0
+	while y < CHUNK:
+		var x := 0.0
+		while x < CHUNK:
+			var p := o + Vector2(x + rng.randf_range(0, step), y + rng.randf_range(0, step))
+			x += step
+			var f := _forest.get_noise_2d(p.x, p.y)
+			var single := rng.randf() < 0.0025
+			if f < 0.1 and not single:
+				continue
+			var g := (p - o) / STEP
+			var i := clampi(int(g.x), 0, N - 1)
+			var j := clampi(int(g.y), 0, N - 1)
+			var d := dr[j * (N + 1) + i]
+			if d < 34.0 or city_dist(p) < 0.0:
+				continue
+			if d < 140.0 and Layout.is_urban(Vector3(p.x, 0, p.y), _urban, 150.0):
+				continue
+			if f < 0.17 and not single and rng.randf() < 0.6:
+				continue  # Waldrand lichter
+			if f < 0.1 and single and rng.randf() < 0.7:
+				continue
+			var skip := false
+			for v in _villages:
+				if p.distance_to(v["pos"]) < v["r"] + 15.0:
+					skip = true
+			for pk in _parks:
+				if p.distance_to(pk["pos"]) < 600.0 and rng.randf() < 0.85:
+					skip = true
+			if skip:
+				continue
+			var h := maxf(height_at(p, d), -0.12)
+			var kind := "conifer" if _detail.get_noise_2d(p.x * 3.0, p.y * 3.0) > -0.05 else "leafy"
+			var s := rng.randf_range(0.75, 1.35)
+			var b := Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(s, s * rng.randf_range(0.85, 1.2), s))
+			(lists[kind] as Array).append(Transform3D(b, Vector3(p.x, h - 0.2, p.y)))
+			var c := Color(0.09, 0.2, 0.08) if kind == "conifer" else Color(0.16, 0.3, 0.09)
+			(cols[kind] as Array).append(c * rng.randf_range(0.75, 1.2))
+		y += step
+	for kind in lists:
+		var arr: Array = lists[kind]
+		if arr.is_empty():
+			continue
+		var mm := MultiMesh.new()
+		mm.transform_format = MultiMesh.TRANSFORM_3D
+		mm.use_colors = true
+		mm.mesh = _meshes[kind]
+		mm.instance_count = arr.size()
+		for k in arr.size():
+			mm.set_instance_transform(k, arr[k])
+			mm.set_instance_color(k, cols[kind][k])
+		var mi := MultiMeshInstance3D.new()
+		mi.multimesh = mm
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		mi.visibility_range_end = 2600.0
+		root.add_child(mi)
+
+
+func _tree_mesh(conifer: bool) -> ArrayMesh:
+	var am := ArrayMesh.new()
+	var trunk := CylinderMesh.new()
+	trunk.top_radius = 0.25
+	trunk.bottom_radius = 0.35
+	trunk.height = 4.0 if conifer else 3.6
+	trunk.radial_segments = 5
+	trunk.rings = 1
+	var st := SurfaceTool.new()
+	st.append_from(trunk, 0, Transform3D(Basis(), Vector3(0, trunk.height / 2.0, 0)))
+	st.commit(am)
+	am.surface_set_material(0, _trunk_mat)
+	var st2 := SurfaceTool.new()
+	if conifer:
+		for k in 3:
+			var cone := CylinderMesh.new()
+			cone.top_radius = 0.0
+			cone.bottom_radius = 3.0 - k * 0.7
+			cone.height = 5.0 - k * 0.6
+			cone.radial_segments = 7
+			cone.rings = 1
+			st2.append_from(cone, 0, Transform3D(Basis(), Vector3(0, 3.0 + k * 2.6 + cone.height / 2.0, 0)))
+	else:
+		var sph := SphereMesh.new()
+		sph.radius = 3.2
+		sph.height = 5.6
+		sph.radial_segments = 7
+		sph.rings = 4
+		st2.append_from(sph, 0, Transform3D(Basis(), Vector3(0, 5.8, 0)))
+		var sph2 := SphereMesh.new()
+		sph2.radius = 2.2
+		sph2.height = 3.8
+		sph2.radial_segments = 6
+		sph2.rings = 3
+		st2.append_from(sph2, 0, Transform3D(Basis(), Vector3(1.4, 7.4, 0.6)))
+	st2.commit(am)
+	am.surface_set_material(1, _crown_mat)
+	return am
+
+
+## Satteldach: Grundfläche 1 × 1 (x quer, z längs), First in z-Richtung auf Höhe 1
+func _roof_mesh() -> ArrayMesh:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var a := Vector3(-0.5, 0, -0.5)
+	var b := Vector3(0.5, 0, -0.5)
+	var c := Vector3(0.5, 0, 0.5)
+	var d := Vector3(-0.5, 0, 0.5)
+	var t0 := Vector3(0, 1, -0.5)
+	var t1 := Vector3(0, 1, 0.5)
+	var quads := [[a, t0, t1, d], [b, c, t1, t0]]
+	for q in quads:
+		var n: Vector3 = (q[1] - q[0]).cross(q[3] - q[0]).normalized()
+		for v in [q[0], q[1], q[2], q[0], q[2], q[3]]:
+			st.set_normal(n)
+			st.add_vertex(v)
+	for g in [[a, b, t0], [c, d, t1]]:
+		var n: Vector3 = (g[1] - g[0]).cross(g[2] - g[0]).normalized()
+		for v in g:
+			st.set_normal(n)
+			st.add_vertex(v)
+	return st.commit()
+
+
+## Dorf: Häuser um einen Kern mit Kirche, Satteldächer in Ziegelrot und Schiefer, Putz in hellen Farben
+func _village(root: Node3D, v: Dictionary) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = v["seed"]
+	var c: Vector2 = v["pos"]
+	var y0: float = v["level"]
+	var walls := []
+	var wcols := []
+	var roofs := []
+	var rcols := []
+	var put := [Color(0.92, 0.9, 0.84), Color(0.95, 0.88, 0.7), Color(0.86, 0.84, 0.8), Color(0.9, 0.8, 0.72),
+		Color(0.8, 0.82, 0.78), Color(0.96, 0.94, 0.9), Color(0.85, 0.7, 0.55)]
+	var dach := [Color(0.5, 0.16, 0.08), Color(0.42, 0.13, 0.07), Color(0.2, 0.21, 0.24), Color(0.55, 0.22, 0.1)]
+	var placed := []
+	# Kirche in der Mitte
+	var ang0 := rng.randf() * TAU
+	var cb := Basis(Vector3.UP, ang0)
+	walls.append(Transform3D(cb.scaled(Vector3(11, 9, 22)), Vector3(c.x, y0 + 4.5, c.y)))
+	wcols.append(Color(0.93, 0.91, 0.86))
+	roofs.append(Transform3D(cb.scaled(Vector3(12, 7, 23)), Vector3(c.x, y0 + 9.0, c.y)))
+	rcols.append(Color(0.45, 0.14, 0.08))
+	var tower_p := Vector3(c.x, y0, c.y) + cb * Vector3(0, 0, -13.5)
+	var tw := MeshInstance3D.new()
+	var tb := BoxMesh.new()
+	tb.size = Vector3(5.5, 26, 5.5)
+	tw.mesh = tb
+	tw.material_override = _tower_mat
+	tw.position = tower_p + Vector3(0, 13, 0)
+	tw.rotation.y = ang0
+	root.add_child(tw)
+	var sp := MeshInstance3D.new()
+	var cone := CylinderMesh.new()
+	cone.top_radius = 0.0
+	cone.bottom_radius = 4.0
+	cone.height = 14.0
+	cone.radial_segments = 4
+	cone.rings = 1
+	sp.mesh = cone
+	var spm := StandardMaterial3D.new()
+	spm.albedo_color = Color(0.18, 0.2, 0.24)
+	sp.material_override = spm
+	sp.position = tower_p + Vector3(0, 33, 0)
+	sp.rotation.y = ang0 + PI / 4.0
+	root.add_child(sp)
+	placed.append([c, 16.0])
+	# Häuser
+	var n := int(v["r"] / 5.0)
+	for k in n:
+		for attempt in 6:
+			var a := rng.randf() * TAU
+			var rr: float = sqrt(rng.randf()) * float(v["r"])
+			var p := c + Vector2(cos(a), sin(a)) * rr
+			var w := rng.randf_range(8.0, 13.0)
+			var dp := rng.randf_range(9.0, 14.0)
+			var free := true
+			for q in placed:
+				if p.distance_to(q[0]) < q[1] + maxf(w, dp) * 0.6:
+					free = false
+					break
+			if not free:
+				continue
+			var hgt := rng.randf_range(5.5, 8.5)
+			# Häuser zur Dorfmitte ausgerichtet (Straßendorf-Gefühl), leicht verdreht
+			var b := Basis(Vector3.UP, -a + rng.randf_range(-0.25, 0.25))
+			walls.append(Transform3D(b.scaled(Vector3(w, hgt, dp)), Vector3(p.x, y0 + hgt / 2.0 - 0.3, p.y)))
+			wcols.append(put[rng.randi() % put.size()])
+			roofs.append(Transform3D(b.scaled(Vector3(w + 0.8, rng.randf_range(3.5, 5.5), dp + 0.8)), Vector3(p.x, y0 + hgt - 0.3, p.y)))
+			rcols.append(dach[rng.randi() % dach.size()] * rng.randf_range(0.85, 1.1))
+			placed.append([p, maxf(w, dp) * 0.6])
+			break
+	for set in [[walls, wcols, _meshes["box"], house_mat], [roofs, rcols, _meshes["roof"], _roof_mat]]:
+		var mm := MultiMesh.new()
+		mm.transform_format = MultiMesh.TRANSFORM_3D
+		mm.use_colors = true
+		mm.mesh = set[2]
+		mm.instance_count = set[0].size()
+		for k in set[0].size():
+			mm.set_instance_transform(k, set[0][k])
+			mm.set_instance_color(k, set[1][k])
+		var mi := MultiMeshInstance3D.new()
+		mi.multimesh = mm
+		mi.material_override = set[3]
+		root.add_child(mi)
+	# Dorflicht: eine Laterne an der Kirche (warm), damit das Dorf nachts von weitem zu sehen ist
+	var ol := OmniLight3D.new()
+	ol.light_color = Color(1.0, 0.7, 0.4)
+	ol.light_energy = 1.5
+	ol.omni_range = 60.0
+	ol.position = Vector3(c.x, y0 + 6.0, c.y)
+	ol.distance_fade_enabled = true
+	ol.distance_fade_begin = 1200.0
+	ol.distance_fade_length = 300.0
+	ol.shadow_enabled = false
+	root.add_child(ol)
+
+
+## Windpark: drei bis sechs Anlagen in einer lockeren Reihe, alle mit dem Wind (aus Westen) ausgerichtet
+func _windpark(root: Node3D, pk: Dictionary) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = pk["seed"]
+	var c: Vector2 = pk["pos"]
+	var along := Vector2.from_angle(rng.randf() * PI)
+	var rotors := []
+	for k in pk["n"]:
+		var p: Vector2 = c + along * (k - int(pk["n"]) / 2.0) * 280.0 + along.orthogonal() * rng.randf_range(-60, 60)
+		var h := maxf(raw_height(p), 0.0) * smoothstep(0.0, RISE, minf(road_dist(p) - ROAD_FLAT, city_dist(p)))
+		var base := Vector3(p.x, h - 1.0, p.y)
+		var tower := MeshInstance3D.new()
+		var cyl := CylinderMesh.new()
+		cyl.top_radius = 1.3
+		cyl.bottom_radius = 2.6
+		cyl.height = 100.0
+		cyl.radial_segments = 10
+		cyl.rings = 1
+		tower.mesh = cyl
+		tower.material_override = _tower_mat
+		tower.position = base + Vector3(0, 50, 0)
+		root.add_child(tower)
+		var head := Node3D.new()
+		head.position = base + Vector3(0, 100, 0)
+		head.rotation.y = PI * 0.5  # Rotor zeigt nach Westen
+		root.add_child(head)
+		var nac := MeshInstance3D.new()
+		var nb := BoxMesh.new()
+		nb.size = Vector3(3.4, 3.6, 11.0)
+		nac.mesh = nb
+		nac.material_override = _tower_mat
+		nac.position = Vector3(0, 0, 2.5)
+		head.add_child(nac)
+		var lamp := MeshInstance3D.new()
+		var lb := BoxMesh.new()
+		lb.size = Vector3(0.8, 0.6, 0.8)
+		lamp.mesh = lb
+		lamp.material_override = beacon_mat
+		lamp.position = Vector3(0, 2.2, 4.0)
+		head.add_child(lamp)
+		var rotor := Node3D.new()
+		rotor.position = Vector3(0, 0, -3.6)
+		rotor.rotation.z = rng.randf() * TAU
+		head.add_child(rotor)
+		var hub := MeshInstance3D.new()
+		var hs := SphereMesh.new()
+		hs.radius = 1.6
+		hs.height = 3.2
+		hs.radial_segments = 8
+		hs.rings = 4
+		hub.mesh = hs
+		hub.material_override = _blade_mat
+		rotor.add_child(hub)
+		for b in 3:
+			var blade := MeshInstance3D.new()
+			var bm := BoxMesh.new()
+			bm.size = Vector3(2.2, 46.0, 0.5)
+			blade.mesh = bm
+			blade.material_override = _blade_mat
+			var ba := b * TAU / 3.0
+			blade.transform = Transform3D(Basis(Vector3.FORWARD, ba), Basis(Vector3.FORWARD, ba) * Vector3(0, 24.0, 0))
+			rotor.add_child(blade)
+		rotors.append(rotor)
+	root.set_meta("rotors", rotors)
+
+
+## Nebelbänke: weiche Schichten über Wiesen nahe der Straße (sonst sieht man sie nicht), nachts und morgens
+func _fog_banks(root: Node3D, o: Vector2, dr: PackedFloat32Array, hs: PackedFloat32Array, rng: RandomNumberGenerator) -> void:
+	for k in 3:
+		var p := o + Vector2(rng.randf_range(100, CHUNK - 100), rng.randf_range(100, CHUNK - 100))
+		var g := (p - o) / STEP
+		var d := dr[clampi(int(g.y), 0, N) * (N + 1) + clampi(int(g.x), 0, N)]
+		if d < 60.0 or d > 600.0 or city_dist(p) < -200.0 or rng.randf() < 0.35:
+			continue
+		var h := maxf(_grid_h(o, hs, p), 0.0)
+		var size := rng.randf_range(260.0, 420.0)
+		for layer in 3:
+			var q := MeshInstance3D.new()
+			var pm := PlaneMesh.new()
+			pm.size = Vector2(size, size) * (1.0 - layer * 0.15)
+			q.mesh = pm
+			q.material_override = fog_mat
+			q.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			q.position = Vector3(p.x, h + 0.8 + layer * 1.6, p.y)
+			q.visibility_range_end = 1800.0
+			root.add_child(q)

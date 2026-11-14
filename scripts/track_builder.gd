@@ -115,6 +115,13 @@ const DISTRICTS := {
 		"tints": [Color(0.1, 0.11, 0.13), Color(0.15, 0.15, 0.16), Color(0.08, 0.1, 0.12)], "lit": 0.35,
 		"trees": 0.0, "billboard": 0.5, "neon_edge": 0.05, "lamp": Color(1.0, 0.6, 0.28), "lamp_kind": "sodium",
 		"setback": 10.0, "soundwall": true, "gantry": 1.0, "overpass": 1.0, "prop_gap": 3.0, "props": [2, 7, 15], "median": 0.6},
+	# Autobahn über Land (seit 2.29; davor stand an jedem Kilometer Autobahn eine Hochhausstadt): keine Häuser am
+	# Rand (rural), dahinter Felder, Wald, Dörfer und Windräder der Landschaft (scripts/landscape.gd), Laternen nur an
+	# jedem dritten Platz, selten eine Schilderbrücke
+	"land": {"name": "AUTOBAHN", "shop": 0.0, "low": [8.0, 12.0], "tall": [12.0, 16.0], "tall_p": 0.0, "styles": [5],
+		"tints": [Color(0.4, 0.38, 0.34)], "lit": 0.3, "rural": true, "lamp_every": 3,
+		"trees": 0.0, "billboard": 0.0, "neon_edge": 0.0, "lamp": Color(1.0, 0.62, 0.3), "lamp_kind": "sodium",
+		"gantry": 0.3, "prop_gap": 3.0, "props": [2, 7, 15], "median": 0.6},
 	# --- deutsche Städte (Orts-Strecken): Fachwerk, Putz, Ziegeldächer. roof = Anteil Satteldächer,
 	# gable = Anteil mit Giebel zur Straße, roof_tints = Dachfarben
 	"altstadt_de": {"name": "ALTSTADT", "shop": 0.55, "low": [9.0, 14.0], "tall": [14.0, 18.0], "tall_p": 0.15, "styles": [5, 5, 6],
@@ -224,7 +231,7 @@ static func begin(race: Dictionary) -> Dictionary:
 		"extra": 2.5 if type == "drift" else (AB_EXTRA if type == "autobahn" else 0.0),  # Drift breiter, Autobahn 3 Spuren je Richtung
 		"paths": [{"id": 0, "kind": "main", "curve": curve, "half_w": HALF_W, "length": length, "from": 0.0, "to": length}],
 		# Open World: Lage der Strecke in der Welt (die Strecke selbst bleibt in ihren eigenen Koordinaten)
-		"xf": race.get("xf", Transform3D.IDENTITY), "world_exit": {}, "world_exit2": {}, "tail_join": race.get("tail_join", false), "keepout": race.get("keepout", []), "world_holes": race.get("world_holes", PackedVector3Array()), "world": race.get("world", false) or type == "autobahn",
+		"xf": race.get("xf", Transform3D.IDENTITY), "world_exit": {}, "world_exit2": {}, "tail_join": race.get("tail_join", false), "keepout": race.get("keepout", []), "world_holes": race.get("world_holes", PackedVector3Array()), "world": race.get("world", false) or type == "autobahn", "no_ground": race.get("no_ground", false),
 	}
 	var weights: Dictionary = race.get("districts", {"downtown": 1.0})
 	var dd := 0.0
@@ -253,6 +260,11 @@ static func begin(race: Dictionary) -> Dictionary:
 			var keys: Array = weights.keys().filter(func(k2): return k2 != arr[di - 1])
 			arr[di] = keys[drng.randi() % keys.size()]
 
+	# feste Abfolge (Open World: Autobahn über Land, an Auffahrten Stadt), überschreibt die Zufallswahl
+	if race.has("district_seq"):
+		var seq: Array = race["district_seq"]
+		for k in arr.size():
+			arr[k] = seq[mini(k, seq.size() - 1)]
 	for b in gen["bulges"]:
 		_plan_shortcut(track, b, rng)
 	if not city.is_empty():
@@ -569,6 +581,8 @@ static func _build_ground(root: Node3D, track: Dictionary) -> void:
 			lo = Vector2(minf(lo.x, q.x), minf(lo.y, q.z))
 			hi = Vector2(maxf(hi.x, q.x), maxf(hi.y, q.z))
 	# Open World: nur ein Rand um die Strecke (sonst deckte der Boden die Flussbetten und Tröge der Nachbarn zu)
+	if track.get("no_ground", false):
+		return  # Open World, Autobahn: der Landschaftsboden (Felder) liegt schon darunter
 	var margin := 260.0 if track["world"] else 1500.0
 	lo -= Vector2(margin, margin)
 	hi += Vector2(margin, margin)
@@ -1522,7 +1536,7 @@ static func _road_mesh(root: Node3D, st: SurfaceTool, lanes: float, width: float
 const PAVE := {"downtown": [3, Color(0.95, 0.97, 1.05)], "boulevard": [3, Color(1.05, 1.0, 0.92)], "shops": [2, Color(1, 1, 1)],
 	"residential": [1, Color(1.05, 1.0, 0.92)], "industrial": [2, Color(0.8, 0.8, 0.8)], "chinatown": [4, Color(1, 1, 1)],
 	"altstadt_de": [1, Color(1.1, 1.02, 0.9)], "innenstadt_de": [3, Color(1, 1, 1)], "kurviertel_de": [1, Color(1.15, 1.1, 0.98)],
-	"campus_de": [3, Color(0.9, 0.92, 0.95)], "kiez_de": [2, Color(0.85, 0.9, 0.95)]}
+	"campus_de": [3, Color(0.9, 0.92, 0.95)], "kiez_de": [2, Color(0.85, 0.9, 0.95)], "land": [5, Color(1, 1, 1)]}
 
 
 static func _walk_mat(width: float, district := "") -> ShaderMaterial:
@@ -2474,6 +2488,8 @@ static func _build_fences(root: Node3D, track: Dictionary, blockers: Array) -> v
 	var posts := []
 	var rails := []
 	var mesh_panels := []
+	var guard := []
+	var guard_posts := []
 	var lines := []  # [Weg, Querabstand-Funktion, Bedingung]
 	var bgrid := {}  # Rasterzelle -> Häuser/Wahrzeichen (nur die nahen prüfen)
 	var bmax := 0.0
@@ -2546,6 +2562,11 @@ static func _build_fences(root: Node3D, track: Dictionary, blockers: Array) -> v
 							q.y = 0.0
 							track["spectators"].append([Transform3D(face.rotated(Vector3.UP, fan_rng.randf_range(-0.5, 0.5)), q), d])
 					next_fans[side] = d + fan_rng.randf_range(45.0, 110.0)
+				if main and _district_at(track, d).get("rural", false):
+					# Autobahn über Land: Leitplanke statt Stadtgeländer (Pfosten alle 3 m, Schutzplanke in 0,6 m Höhe)
+					guard_posts.append(Transform3D(bf, base + Vector3(0, 0.38, 0)))
+					guard.append(Transform3D(bf, base + Vector3(0, 0.6, -side * 0.12)))
+					continue
 				posts.append(Transform3D(bf, base + Vector3(0, 0.6, 0)))
 				for ry in [0.45, 1.05]:
 					rails.append(Transform3D(bf, base + Vector3(0, ry, 0)))
@@ -2558,6 +2579,10 @@ static func _build_fences(root: Node3D, track: Dictionary, blockers: Array) -> v
 	_multi(root, Builder.box(Vector3(0.07, 1.2, 0.07)), metal, posts)
 	_multi(root, Builder.box(Vector3(0.05, 0.05, 3.05)), metal, rails)
 	_multi(root, Builder.box(Vector3(0.01, 1.05, 3.0)), mesh_m, mesh_panels)
+	if not guard.is_empty():
+		var steel := Builder.mat(Color(0.62, 0.64, 0.66), 0.85, 0.32)
+		_multi(root, Builder.box(Vector3(0.12, 0.76, 0.12)), metal, guard_posts)
+		_multi(root, Builder.box(Vector3(0.06, 0.32, 3.02)), steel, guard)
 
 
 ## Kollisionsform für ein wegfliegendes Teil
@@ -3996,6 +4021,9 @@ static func _build_city(root: Node3D, track: Dictionary, rng: RandomNumberGenera
 		var d := rng.randf_range(0.0, 8.0)
 		while d < len:
 			var dist: Dictionary = _district_at(track, d if p["id"] == 0 else p["from"])
+			if dist.get("rural", false):
+				d += 20.0
+				continue
 			var edge: float = (hw(track, d) + WALK + dist.get("setback", 0.0) + _lift(track, d) * 1.6) if p["id"] == 0 else fr["edge"]
 			var tall: bool = rng.randf() < dist["tall_p"]
 			var shop: bool = not tall and rng.randf() < dist["shop"]
@@ -4069,6 +4097,9 @@ static func _back_row(root: Node3D, track: Dictionary, rng: RandomNumberGenerato
 	var d := rng.randf_range(0.0, 12.0)
 	while d < len:
 		var dist := _district_at(track, d)
+		if dist.get("rural", false):
+			d += 20.0
+			continue
 		var f := frame_at(c, d)
 		var tall: bool = rng.randf() < dist["tall_p"] * (1.0 + 0.3 * row)
 		var w := rng.randf_range(10.0, 18.0) if not tall else rng.randf_range(14.0, 24.0)
@@ -4726,8 +4757,14 @@ static func _build_lamps(root: Node3D, track: Dictionary) -> void:
 	var mats := {}
 	var d := 20.0
 	var side := 1.0
+	var n := 0
 	while d < length:
 		var f := frame_at(curve, d)
+		n += 1
+		if n % int(_district_at(track, d).get("lamp_every", 1)) != 0:
+			d += LAMP_STEP
+			side = -side
+			continue
 		# am Trog stehen die Laternen oben auf dem Gehweg hinter der Mauer
 		var off: float = (TUN_W + 1.3) if _trough_at(track, d) == 1 else (hw(track, d) + 0.8)
 		var base: Vector3 = f["pos"] + f["right"] * side * off + Vector3(0, _lift(track, d), 0)
@@ -4847,6 +4884,8 @@ static func _build_props(root: Node3D, track: Dictionary, rng: RandomNumberGener
 	var red := Builder.mat(Color(0.8, 0.05, 0.05), 0.3, 0.4)
 	var dark := Builder.mat(Color(0.12, 0.12, 0.13), 0.5, 0.5)
 	var concrete := Builder.mat(Color(0.35, 0.35, 0.36), 0.0, 0.9)
+	var lp_mats := [Builder.mat(Color(0.92, 0.92, 0.9), 0.0, 0.6), Builder.mat(Color(0.03, 0.03, 0.03), 0.0, 0.6),
+		Builder.mat(Color(1.0, 0.55, 0.1), 0.0, 0.3, Color(1.0, 0.55, 0.1), 0.6), Builder.mat(Color(1, 1, 1), 0.0, 0.3, Color(1, 1, 1), 0.6)]
 	var bush := Builder.mat(Color(0.05, 0.25, 0.08), 0.0, 0.9)
 	var glass := Builder.mat(Color(0.3, 0.4, 0.5), 0.6, 0.1)
 	glass.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
@@ -4867,6 +4906,15 @@ static func _build_props(root: Node3D, track: Dictionary, rng: RandomNumberGener
 				d += 4.0
 				continue
 			var dist: Dictionary = _district_at(track, d)
+			if dist.get("rural", false):
+				# Autobahn über Land: nur Leitpfosten (weiß, schwarzes Band, Rückstrahler) alle 50 m
+				var lp: Vector3 = f["pos"] + f["right"] * side * (hwd + 0.9) + Vector3(0, _lift(track, d) + CURB_H, 0)
+				var lb := Basis.looking_at(-f["right"] * side, Vector3.UP)
+				Builder._add(root, Builder.box(Vector3(0.12, 1.0, 0.1)), lp_mats[0], lp + Vector3(0, 0.5, 0)).basis = lb
+				Builder._add(root, Builder.box(Vector3(0.13, 0.22, 0.11)), lp_mats[1], lp + Vector3(0, 0.82, 0)).basis = lb
+				Builder._add(root, Builder.box(Vector3(0.05, 0.1, 0.12)), lp_mats[2 if side > 0.0 else 3], lp + Vector3(0, 0.82, 0) - f["right"] * side * 0.06).basis = lb
+				d += 50.0
+				continue
 			if rng.randf() < dist["trees"]:
 				# an der Bordsteinkante: der Streifen an der Mauer bleibt frei zum Entlangschrammen
 				var tp: Vector3 = f["pos"] + f["right"] * side * (hwd + 1.5) + Vector3(0, _lift(track, d), 0)
