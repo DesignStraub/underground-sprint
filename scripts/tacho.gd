@@ -188,7 +188,7 @@ func _draw_static(l: Control) -> void:
 		l.draw_line(c + d * (R - BAND - 3.0), c + d * (R - BAND - 7.0), tick_col, 1.5, true)
 		l.draw_string(_wide, c + d * (R - BAND - 14.0) + Vector2(-8, 4.5), str(i), HORIZONTAL_ALIGNMENT_CENTER, 16, 12, tick_col)
 	if not drag:
-		l.draw_string(_cond, c + Vector2(-30, -24), tr("x1000 U/min").to_upper(), HORIZONTAL_ALIGNMENT_CENTER, 60, 7, Color(0.6, 0.7, 0.85))
+		l.draw_string(_cond, c + Vector2(-30, -26), tr("x1000 U/min").to_upper(), HORIZONTAL_ALIGNMENT_CENTER, 60, 6, Color(0.6, 0.7, 0.85))
 	# Tempofeld (schräg) und Beschriftungen
 	var box := PackedVector2Array([c + Vector2(-27, 24), c + Vector2(33, 24), c + Vector2(28, 46), c + Vector2(-32, 46)])
 	l.draw_colored_polygon(box, Color(0.0, 0.0, 0.0, 0.75))

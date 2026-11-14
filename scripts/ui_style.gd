@@ -15,9 +15,10 @@ static var _theme: Theme
 static var _fonts := {}
 
 
-## Schräggestellte Schrift (leicht kursiv wie die NFS-Menüs). kind: cond, bold, wide. Seit 2.29 D-DIN (datto, OFL):
-## die DIN der deutschen Straßenschilder, kühl und eng laufend; cond = D-DIN Condensed Bold, bold/wide = D-DIN Bold.
-## Davor Rajdhani (Indian Type
+## Schrift der Menüs und Anzeigen. kind: cond (Überschriften, Knöpfe, große Zahlen), bold (Text), wide (kleine
+## Titel, Zahlen). Seit 2.30 Inter (Rasmus Andersson, OFL): schlicht und technisch, gerade, eng gesetzt;
+## cond = Inter Display Bold, wide = Inter Bold, bold = Inter SemiBold. slant wird bei Inter ignoriert.
+## 2.29 D-DIN (leicht schräg), davor Rajdhani (Indian Type
 ## Foundry, OFL): technisch und schmal wie die alte Saira Condensed (die wirkte rundlich und verspielt), die Menüs passen
 ## ohne Umbruch. cond und wide = Bold (Überschriften, Knöpfe, große Zahlen; wide mit etwas mehr Abstand), bold =
 ## SemiBold (Text). Zum Vergleich: --uifont=chakra (Chakra Petch, kantiger, breiter) oder --uifont=saira.
@@ -26,11 +27,17 @@ static func font(kind := "cond", slant := 0.2) -> Font:
 	if _fonts.has(key):
 		return _fonts[key]
 	var base: Font
-	var fam := "din"
+	var fam := "inter"
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--uifont="):  # Test: Schrift vergleichen (rajdhani, chakra, saira)
 			fam = a.substr(9)
 	match fam + "/" + kind:
+		"inter/cond":
+			base = load("res://assets/fonts/inter/InterDisplay-Bold.ttf")
+		"inter/wide":
+			base = load("res://assets/fonts/inter/Inter-Bold.ttf")
+		"inter/bold":
+			base = load("res://assets/fonts/inter/Inter-SemiBold.ttf")
 		"din/cond":
 			base = load("res://assets/fonts/D-DINCondensed-Bold.otf")
 		"din/bold", "din/wide":
@@ -51,12 +58,13 @@ static func font(kind := "cond", slant := 0.2) -> Font:
 			base = load("res://assets/fonts/saira/SairaCondensed-ExtraBold.ttf")
 	var fv := FontVariation.new()
 	fv.base_font = base
-	# Pfeile, Mittelpunkt & Co. fehlen in D-DIN: aus Rajdhani nachladen
-	fv.fallbacks = [load("res://assets/fonts/rajdhani/Rajdhani-SemiBold.ttf")]
-	if fam != "din" and kind == "wide":
+	if fam == "din":
+		# Pfeile, Mittelpunkt & Co. fehlen in D-DIN: aus Rajdhani nachladen
+		fv.fallbacks = [load("res://assets/fonts/rajdhani/Rajdhani-SemiBold.ttf")]
+	if fam != "din" and fam != "inter" and kind == "wide":
 		fv.spacing_glyph = 2
-	# DIN nur leicht schräg: kühler, weniger Spielzeug-Look
-	var sl := slant * (0.55 if fam == "din" else 1.0)
+	# Inter steht gerade (seit 2.30), DIN nur leicht schräg, die alten Schriften kursiv wie in NFS
+	var sl := slant * (0.55 if fam == "din" else (0.0 if fam == "inter" else 1.0))
 	fv.variation_transform = Transform2D(Vector2(1.0, 0.0), Vector2(-sl, 1.0), Vector2.ZERO)
 	_fonts[key] = fv
 	return fv
@@ -96,6 +104,7 @@ static func theme() -> Theme:
 	if _theme:
 		return _theme
 	var t := Theme.new()
+	t.default_font = font("bold")
 	t.set_font("font", "Button", font("cond", 0.2))
 	t.set_font_size("font_size", "Button", 14)
 	t.set_stylebox("normal", "Button", _box(Color(0.0, 0.0, 0.0, 0.42), Color(CYAN.r, CYAN.g, CYAN.b, 0.5), 2))

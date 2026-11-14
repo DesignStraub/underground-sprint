@@ -717,10 +717,11 @@ in der Welt bleiben deutsch.
 
 ## Schrift und Texte
 Alles auf Deutsch, im Ton von NFS Underground (KNAPP VORBEI +300, DRIFT +240, SPRUNG, Tuning-Marken auf den
-Dächern, Ladetipps im Menü). Menüs und Anzeigen seit 2.29 in D-DIN (Datto, SIL Open Font License 1.1): die DIN der
-deutschen Straßenschilder, kühl und eng laufend, nur leicht schräg (Überschriften D-DIN Condensed Bold, Text D-DIN
-Bold), ohne Sperrung und dicke Konturen. 2.28 war es Rajdhani (wirkte verspielt), 2.27 Saira Condensed. Vergleich im
-Spiel: `--uifont=rajdhani`, `--uifont=chakra` oder `--uifont=saira`. Ladenschilder und Kennzeichen ebenfalls D-DIN
+Dächern, Ladetipps im Menü). Menüs und Anzeigen seit 2.30 in Inter (Rasmus Andersson, SIL Open Font License 1.1,
+`assets/fonts/inter/`): schlicht und technisch, gerade statt kursiv, eng gesetzt; Überschriften und Knöpfe in Inter
+Display Bold, Text in Inter SemiBold. Auffallen soll die Grafik, nicht die Schrift. 2.29 war es D-DIN (leicht
+schräg), 2.28 Rajdhani, 2.27 Saira Condensed. Vergleich im Spiel: `--uifont=din`, `--uifont=rajdhani`,
+`--uifont=chakra` oder `--uifont=saira`. Ladenschilder und Kennzeichen ebenfalls D-DIN
 (`assets/fonts/COPYING.txt`). Alte englische Eventnamen werden im
 Spielstand automatisch umgeschrieben, der Spielstand aus „Underground Sprint“ wird beim ersten Start übernommen.
 
