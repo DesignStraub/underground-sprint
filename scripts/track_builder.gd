@@ -394,6 +394,7 @@ static func step(job: Dictionary) -> float:
 				_build_city_signs(root, track, race)
 			if type == "autobahn":
 				_exit_signs(root, track)
+				_flyovers(root, track, rng)
 			if race.get("city", "") == "kreuzberg":
 				_east_side_gallery(root, track)
 			if type == "autobahn" or track["world"]:
@@ -3917,6 +3918,23 @@ static func _east_side_gallery(root: Node3D, track: Dictionary) -> void:
 		_bake(root, groups)
 
 
+## Autobahnbrücken an den Kreuzen (seit 2.29): neben jeder breiten Auffahrt (Querspange, Kreisel) führt eine breite
+## Brücke mit Erddämmen über die Autobahn, wie das Kreuzungsbauwerk eines echten Autobahnkreuzes
+static func _flyovers(root: Node3D, track: Dictionary, rng: RandomNumberGenerator) -> void:
+	for p in track["paths"]:
+		if p["kind"] != "ramp" or p["half_w"] < RAMP_HALF + 1.0:
+			continue
+		for off in [170.0, -170.0, 240.0, -240.0]:
+			var od: float = p["from"] + off
+			if od < 120.0 or od > track["length"] - 120.0:
+				continue
+			if _overhead_free(track, od, 30.0) and not _near_post(track, od, 25.0) and tunnel_at(track, od, 40.0).is_empty() \
+					and _lift(track, od - 60.0) + _lift(track, od) + _lift(track, od + 60.0) < 0.3:
+				_overpass(root, track, od, rng, true)
+				track["posts"].append(od)
+				break
+
+
 ## Blaue Ausfahrt-Wegweiser auf der Autobahn (seit 2.29): 260 m vor jeder Ausfahrt in beiden Fahrtrichtungen rechts
 ## am Bankett, mit Ausfahrtnummer, Stadtname und schrägem Pfeil, nachts angestrahlt
 static func _exit_signs(root: Node3D, track: Dictionary) -> void:
@@ -6178,9 +6196,9 @@ static func _gantry(root: Node3D, track: Dictionary, d: float, rng: RandomNumber
 
 
 ## Straßenbrücke quer über die Hauptstraße, mit Laternen und stehenden Autos. Liefert belegte Flächen.
-static func _overpass(root: Node3D, track: Dictionary, d: float, rng: RandomNumberGenerator) -> Array:
+static func _overpass(root: Node3D, track: Dictionary, d: float, rng: RandomNumberGenerator, wide := false) -> Array:
 	var f := frame_at(track["curve"], d)
-	var ang := rng.randf_range(-0.3, 0.3)
+	var ang := rng.randf_range(-0.3, 0.3) if not wide else 0.0
 	var across: Vector3 = (f["right"] as Vector3).rotated(Vector3.UP, ang)
 	var xf := Transform3D(Basis.looking_at(across, Vector3.UP), f["pos"])  # lokal Z = quer, X = längs
 	var panel := ShaderMaterial.new()
@@ -6190,36 +6208,42 @@ static func _overpass(root: Node3D, track: Dictionary, d: float, rng: RandomNumb
 	var car_m := Builder.mat(Color(0.12, 0.13, 0.16), 0.6, 0.35)
 	var tail := Builder.mat(Color(0.8, 0.0, 0.0), 0.0, 0.3, Color(1.0, 0.05, 0.02), 3.0)
 	var head := Builder.mat(Color(1, 1, 0.9), 0.0, 0.3, Color(1, 0.97, 0.85), 3.0)
-	var span := 110.0
+	# wide: Autobahnbrücke am Kreuz (zwei mal zwei Spuren, Mittelpfeiler, länger), sonst Straßenbrücke
+	var span := 110.0 if not wide else 150.0
 	var y := 8.0
+	var bw := 12.0 if not wide else 26.0
 	var g := {}
-	_part(g, panel, Builder.box(Vector3(12.0, 1.4, span)), Transform3D(Basis(), Vector3(0, y + 0.7, 0)))
+	_part(g, panel, Builder.box(Vector3(bw, 1.4, span)), Transform3D(Basis(), Vector3(0, y + 0.7, 0)))
 	for s in [-1.0, 1.0]:
-		_part(g, panel, Builder.box(Vector3(0.4, 1.0, span)), Transform3D(Basis(), Vector3(s * 5.8, y + 1.9, 0)))
+		_part(g, panel, Builder.box(Vector3(0.4, 1.0, span)), Transform3D(Basis(), Vector3(s * (bw / 2.0 - 0.2), y + 1.9, 0)))
+	if wide:
+		_part(g, panel, Builder.box(Vector3(0.8, 0.9, span)), Transform3D(Basis(), Vector3(0, y + 1.85, 0)))  # Mittelschutz
 	var occ := []
 	var reach := (hw(track, d) + WALK + 2.5) / cos(ang)
-	for s in [-1.0, 1.0]:
-		for x in [-3.5, 3.5]:
+	var cols := [-3.5, 3.5] if not wide else [-10.0, -3.5, 3.5, 10.0]
+	for s in ([-1.0, 1.0] if not wide else [-1.0, 0.0, 1.0]):
+		for x in cols:
 			_part(g, panel, Builder.box(Vector3(1.4, y, 1.4)), Transform3D(Basis(), Vector3(x, y / 2.0, s * reach)))
 			occ.append({"pos": xf * Vector3(x, 0, s * reach), "r": 3.0})
-		_part(g, panel, Builder.box(Vector3(11.0, 1.0, 1.8)), Transform3D(Basis(), Vector3(0, y - 0.5, s * reach)))
+		_part(g, panel, Builder.box(Vector3(bw - 1.0, 1.0, 1.8)), Transform3D(Basis(), Vector3(0, y - 0.5, s * reach)))
 		var z := reach + 8.0
 		while z < span / 2.0:
 			occ.append({"pos": xf * Vector3(0, 0, s * z), "r": 6.5})
 			z += 10.0
 	for z in [-24.0, 0.0, 24.0]:
-		_part(g, pole, Builder.box(Vector3(0.15, 5.0, 0.15)), Transform3D(Basis(), Vector3(5.5, y + 3.9, z)))
-		_part(g, pole, Builder.box(Vector3(1.4, 0.12, 0.12)), Transform3D(Basis(), Vector3(4.9, y + 6.4, z)))
-		_part(g, lamp_m, Builder.box(Vector3(0.9, 0.15, 0.4)), Transform3D(Basis(), Vector3(4.4, y + 6.35, z)))
-	for k in 4:
-		var x := -2.6 if k % 2 == 0 else 2.6
-		var z := -30.0 + k * 17.0 + rng.randf_range(-3.0, 3.0)
+		var lx := bw / 2.0 - 0.5
+		_part(g, pole, Builder.box(Vector3(0.15, 5.0, 0.15)), Transform3D(Basis(), Vector3(lx, y + 3.9, z)))
+		_part(g, pole, Builder.box(Vector3(1.4, 0.12, 0.12)), Transform3D(Basis(), Vector3(lx - 0.6, y + 6.4, z)))
+		_part(g, lamp_m, Builder.box(Vector3(0.9, 0.15, 0.4)), Transform3D(Basis(), Vector3(lx - 1.1, y + 6.35, z)))
+	for k in (4 if not wide else 9):
+		var x: float = (-2.6 if k % 2 == 0 else 2.6) if not wide else [-9.5, -4.5, 4.5, 9.5][k % 4]
+		var z := -30.0 + k * 17.0 + rng.randf_range(-3.0, 3.0) if not wide else -60.0 + k * 14.0 + rng.randf_range(-4.0, 4.0)
 		var dirz := 1.0 if x < 0.0 else -1.0
 		_part(g, car_m, Builder.box(Vector3(1.8, 0.8, 4.2)), Transform3D(Basis(), Vector3(x, y + 1.8, z)))
 		_part(g, car_m, Builder.box(Vector3(1.6, 0.6, 2.2)), Transform3D(Basis(), Vector3(x, y + 2.5, z + 0.2 * dirz)))
 		_part(g, tail, Builder.box(Vector3(1.5, 0.15, 0.05)), Transform3D(Basis(), Vector3(x, y + 1.95, z + 2.12 * dirz)))
 		_part(g, head, Builder.box(Vector3(1.5, 0.12, 0.05)), Transform3D(Basis(), Vector3(x, y + 1.9, z - 2.12 * dirz)))
-	if _district_at(track, d).get("rural", false):
+	if _district_at(track, d).get("rural", false) or wide:
 		# Überland: Erddamm mit Grasböschung an beiden Brückenenden hinunter zum Feld (sonst endete die Brücke in der Luft)
 		var earth := Builder.mat(Color(0.12, 0.2, 0.07), 0.0, 0.95)
 		var ramp_len := 70.0
@@ -6227,8 +6251,8 @@ static func _overpass(root: Node3D, track: Dictionary, d: float, rng: RandomNumb
 		for s in [-1.0, 1.0]:
 			var mid := Vector3(0, (y + 1.4) / 2.0 - 0.4, s * (span / 2.0 + ramp_len / 2.0 - 1.0))
 			var b := Basis(Vector3.RIGHT, s * r_ang)
-			_part(g, earth, Builder.box(Vector3(16.0, 1.6, sqrt(ramp_len * ramp_len + (y + 1.4) * (y + 1.4)))), Transform3D(b, mid))
-			_part(g, panel, Builder.box(Vector3(9.0, 0.3, sqrt(ramp_len * ramp_len + (y + 1.4) * (y + 1.4)))), Transform3D(b, mid + Vector3(0, 0.85, 0)))
+			_part(g, earth, Builder.box(Vector3(bw + 4.0, 1.6, sqrt(ramp_len * ramp_len + (y + 1.4) * (y + 1.4)))), Transform3D(b, mid))
+			_part(g, panel, Builder.box(Vector3(bw - 3.0, 0.3, sqrt(ramp_len * ramp_len + (y + 1.4) * (y + 1.4)))), Transform3D(b, mid + Vector3(0, 0.85, 0)))
 	_bake(root, g, xf)
 	var light := OmniLight3D.new()
 	light.light_color = Color(1.0, 0.65, 0.35)
