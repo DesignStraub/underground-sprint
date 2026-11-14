@@ -663,6 +663,7 @@ func _setup_environment() -> void:
 	sky_mat.set_shader_parameter("hor_col", mood["hor"])
 	sky_mat.set_shader_parameter("glow_col", mood["glow"])
 	sky_mat.set_shader_parameter("stars", mood["stars"])
+	sky_mat.set_shader_parameter("land", 1.0)  # Hügel statt Skyline rundum
 	_sky_mat = sky_mat
 	var sky := Sky.new()
 	sky.sky_material = sky_mat
