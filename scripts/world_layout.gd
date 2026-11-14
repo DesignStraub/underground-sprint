@@ -83,7 +83,7 @@ static func build() -> Dictionary:
 		cities.append({"race_index": i, "b0": b0, "end_local": ex["end"], "lat0": lat0 - SIDE_MARGIN / 2.0,
 			"lat1": lat1 + SIDE_MARGIN / 2.0, "gap": maxf(GAP_MIN, -rad0 + 160.0), "far": far,
 			"phi": atan2(gz, gx) + i * 1e-4, "start_local": Track.frame_at(tr["curve"], tr["start"])["pos"], "polys_local": polys,
-			"holes_local": Track.ground_holes(tr),
+			"holes_local": Track.ground_holes(tr), "bld_local": _building_points(tr),
 			"exit2_local": tr["world_exit2"]})
 	cities.sort_custom(func(a, b): return a["phi"] < b["phi"])
 	# Platz am Ring: zwischen zwei Nachbarn rechte Kante des einen + linke Kante des anderen (am Ring gemessen)
@@ -151,6 +151,11 @@ static func build() -> Dictionary:
 				var wq: Vector3 = xf * q
 				w2.append(Vector2(wq.x, wq.z))
 			c["roads"].append([w2, pl[1]])
+		var bw := PackedVector2Array()
+		for q in c["bld_local"]:
+			var wq: Vector3 = xf * Vector3(q.x, 0.0, q.y)
+			bw.append(Vector2(wq.x, wq.z))
+		c["bld_world"] = bw
 		ramps.append({"k": k, "from": rp, "end": exit_w, "name": Catalog.RACES[c["race_index"]].get("town", ""),
 			"forest": Catalog.RACES[c["race_index"]].get("forest", false)})
 	# Außenring um alle Städte und zweite Ausfahrten der Sprints (hinter dem Ziel) an einen der beiden Ringe
@@ -239,6 +244,17 @@ static func build() -> Dictionary:
 			print("  %-28s phi=%.2f gap=%.0f breite=%.0f tiefe=%.0f" % [Catalog.RACES[c["race_index"]]["name"], c["phi_w"], c["gap"],
 				c["lat1"] - c["lat0"], c["far"]])
 	return _cache
+
+
+## Echte Städte (OpenStreetMap): Lage der Häuser (jedes zweite, Streckenkoordinaten x, z). Die Landschaft hält dort
+## den Boden flach und färbt ihn als Stadt (seit 2.30; davor lagen zwischen Häusern weit weg von der Strecke Wiesen
+## und Hänge mitten in Aachen)
+static func _building_points(tr: Dictionary) -> PackedVector2Array:
+	var out := PackedVector2Array()
+	var data: Array = tr["city"].get("buildings", []) if tr["city"] is Dictionary else []
+	for i in range(0, data.size(), 12):
+		out.append(Vector2(data[i], data[i + 1]))
+	return out
 
 
 const URBAN_R := 420.0  # so weit um eine Auffahrt (und um den Kreisel) ist die Autobahn Stadt

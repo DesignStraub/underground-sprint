@@ -96,6 +96,11 @@ func setup(lay: Dictionary) -> void:
 		var forest: bool = c.get("forest", false) or Catalog.RACES[c["race_index"]].get("forest", false) if c.has("race_index") else c.get("forest", false)
 		for rd in c["roads"]:
 			_add_line(_froad if forest else _croad, rd[0])
+		for q in c.get("bld_world", PackedVector2Array()):
+			var cell := Vector2i(floori(q.x / ROAD_CELL), floori(q.y / ROAD_CELL))
+			var arr: PackedVector2Array = _croad.get(cell, PackedVector2Array())
+			arr.append(q)
+			_croad[cell] = arr
 	_urban = layout.get("urban", [])
 	_plan_sites()
 	_make_materials()

@@ -14,15 +14,70 @@ uniform float land = 0.0;
 
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 
+float vnoise(vec2 p) {
+	vec2 i = floor(p);
+	vec2 f = fract(p);
+	vec2 u = f * f * (3.0 - 2.0 * f);
+	return mix(mix(hash(i), hash(i + vec2(1, 0)), u.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), u.x), u.y);
+}
+
+float fbm(vec2 p) {
+	float v = 0.0;
+	float a = 0.5;
+	for (int k = 0; k < 5; k++) {
+		v += a * vnoise(p);
+		p = p * 2.03 + vec2(1.7, 9.2);
+		a *= 0.5;
+	}
+	return v;
+}
+
+// Sterne (seit 2.30): runde, weich leuchtende Punkte in drei Größen, leicht farbig (bläulich bis gelblich),
+// funkelnd, dazu ein schwaches Band der Milchstraße. Ein Stern je Zelle, zufällig darin versetzt.
+vec3 star_layer(vec2 uv, float density, float size) {
+	size *= 1.25;
+	vec2 c = floor(uv);
+	vec2 f = fract(uv);
+	float h = hash(c);
+	if (h > density) {
+		return vec3(0.0);
+	}
+	vec2 pos = vec2(hash(c + 3.1), hash(c + 7.7)) * 0.7 + 0.15;
+	float d = length(f - pos);
+	float b = hash(c + 11.3);
+	float tw = 0.75 + 0.25 * sin(TIME * (1.5 + b * 4.0) + h * 40.0);
+	vec3 tint = mix(vec3(0.75, 0.85, 1.0), vec3(1.0, 0.92, 0.75), hash(c + 5.5));
+	return tint * smoothstep(size, 0.0, d) * (0.35 + 0.9 * b) * tw;
+}
+
 void sky() {
 	vec3 d = EYEDIR;
 	float h = d.y;
 	vec3 col = mix(hor_col, top_col, smoothstep(0.0, 0.45, h));
 	col += glow_col * exp(-abs(h) * 12.0) * 0.35;
-	if (h > 0.03 && stars > 0.01) {
-		vec2 uv = d.xz / (h + 0.2) * 70.0;
-		float s = step(1.0 - 0.004 * stars, hash(floor(uv)));
-		col += s * smoothstep(0.05, 0.35, h) * (0.4 + 0.6 * hash(floor(uv) + 1.0));
+	if (h > 0.02 && stars > 0.01) {
+		vec2 uv = d.xz / (h + 0.35);
+		float fade = smoothstep(0.02, 0.3, h) * stars * (1.0 - smoothstep(0.1, 0.45, day));
+		vec3 st = star_layer(uv * 60.0, 0.09, 0.07) + star_layer(uv * 130.0 + 17.0, 0.12, 0.09) * 0.7
+			+ star_layer(uv * 26.0 + 5.0, 0.05, 0.05) * 1.6;
+		// Milchstraße: schräges Band aus feinem Nebel und dichteren Sternen
+		float band = exp(-pow(dot(d, normalize(vec3(0.55, 0.45, -0.7))) * 3.2, 2.0));
+		float neb = fbm(uv * 3.0) * band;
+		st += star_layer(uv * 220.0 + 3.0, 0.35, 0.12) * band * 0.6;
+		col += (st * 1.7 + vec3(0.12, 0.13, 0.2) * neb * 0.7) * fade;
+	}
+	// Wolken (seit 2.30): Haufenwolken auf einer gedachten Ebene, ziehen langsam; tagsüber weiß mit grauem Bauch,
+	// abends von der Sonne angestrahlt, nachts dunkel vor dem Sternenhimmel (die Lichtglocke färbt sie von unten)
+	if (h > 0.0) {
+		vec2 cp = d.xz / (h + 0.08) * 1.6 + vec2(TIME * 0.004, TIME * 0.0015);
+		float cov = mix(0.58, 0.47, smoothstep(0.0, 0.5, day)) + 0.05 * sin(TIME * 0.01);  // nachts lockerer
+		float n = fbm(cp);
+		float cl = smoothstep(cov, cov + 0.22, n) * smoothstep(0.0, 0.12, h);
+		float shade = smoothstep(cov, cov + 0.45, fbm(cp + vec2(0.06, 0.04)));
+		vec3 sunlit = mix(vec3(1.0), glow_col * 2.2 + vec3(0.3, 0.2, 0.15), clamp(1.0 - day * 1.6, 0.0, 1.0) * step(0.05, day));
+		vec3 day_c = mix(sunlit, vec3(0.62, 0.66, 0.74), shade * 0.7);
+		vec3 night_c = mix(vec3(0.025, 0.028, 0.045), glow_col * 0.35, smoothstep(0.25, 0.0, h));
+		col = mix(col, mix(night_c, day_c, smoothstep(0.0, 0.6, day)), cl * mix(0.85, 0.95, day));
 	}
 	float az = atan(d.x, d.z);
 	float cell = floor(az * 90.0);

@@ -93,10 +93,23 @@ var _in_race := false
 const DUCK_DB := -13.0
 
 
+## Seit 2.30: Musik auf eigenem Bus, alles andere (Motor, Reifen, Verkehr, Menüklänge) 3 dB leiser (gut 30 %):
+## der Master-Bus wird um SFX_CUT gesenkt, der Musik-Bus um dasselbe angehoben, die Musik bleibt gleich laut
+const SFX_CUT := 3.0
+
+
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	if AudioServer.get_bus_index("Musik") < 0:
+		AudioServer.add_bus()
+		var bi := AudioServer.bus_count - 1
+		AudioServer.set_bus_name(bi, "Musik")
+		AudioServer.set_bus_send(bi, "Master")
+		AudioServer.set_bus_volume_db(bi, SFX_CUT)
+		AudioServer.set_bus_volume_db(0, AudioServer.get_bus_volume_db(0) - SFX_CUT)
 	for i in 2:
 		var p := AudioStreamPlayer.new()
+		p.bus = "Musik"
 		p.volume_db = -80.0
 		add_child(p)
 		_players.append(p)

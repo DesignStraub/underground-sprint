@@ -269,6 +269,11 @@ gesäumt. Seit 2.29:
   Bahnübergang und Tunnel, ohne Häuser; die Landschaft gibt es dafür auch im Rennmodus. Ihre Auffahrt am Ring bleibt
   Überland.
 - **Große Karte**: Relief, Wälder, Stadtflächen und Dorfnamen.
+- **Himmel (2.30)**: Haufenwolken, die langsam ziehen (tagsüber weiß mit grauem Bauch, abends angestrahlt, nachts
+  dunkel und locker), runde funkelnde Sterne in drei Größen mit leichter Farbe und ein Band der Milchstraße.
+- **Echte Städte in der Welt**: Boden um alle OpenStreetMap-Häuser flach und als Stadt gefärbt (davor lagen in Aachen
+  zwischen Häusern weit weg von der Strecke Wiesen und Hänge).
+- **Ton (2.30)**: Motor, Reifen, Verkehr und Effekte gut 30 % (3 dB) leiser, die Musik auf eigenem Bus bleibt gleich laut.
 - **Startstadt**: Garage → Losfahren fragt, in welcher Stadt man startet (alphabetisch, oben „Zufällige Stadt“); man
   steht 40 m hinter der Ausfahrt mit Blick in die Stadt (`GameState.world_start`, Test: `--wstart=<Rennen>`).
 - Test: `--wcam=zurück:höhe:voraus[:drehung]` (Kamera über dem Auto), `--wmap` (Bild der offenen Karte),
