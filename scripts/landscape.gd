@@ -57,6 +57,7 @@ var _task_out: Node3D
 var _t := 0.0
 var _rotors := []
 var _tree_step := 9.0
+var last_event := ""  # für --hitch: was die Landschaft in diesem Bild getan hat
 var _meshes := {}
 
 const VILLAGE_NAMES := ["Oberweiler", "Kirchheim", "Lindenau", "Birkenfeld", "Hohenstein", "Mühlbach", "Eichstetten", "Wiesental", "Rotenburg", "Sonnenberg", "Tannhausen", "Grünwald", "Steinach", "Haselbach", "Altdorf", "Buchholz", "Unterried", "Waldhausen", "Kleinfeld", "Bergrheinfeld", "Erlenbach", "Hirschau", "Fischbach", "Ahornhof", "Weidenstetten", "Lerchenau", "Rabenstein", "Moosbrunn", "Hagenau", "Kesselbach", "Ulmenhof", "Dornstetten", "Falkenried", "Brunnthal", "Eschenau", "Hüttenbach", "Kranichfeld", "Lauterbach", "Mittelweiler", "Neuhaus", "Ochsenfurt-Au", "Pfaffenhofen", "Quellbach", "Reichenau", "Schönwald", "Talheim", "Uhlenhorst", "Vogelsang", "Wolfsried", "Zellerau", "Amselfeld", "Bärental", "Dachsberg", "Eulenbach", "Fuchsstadt", "Gänsewies", "Hasenmühle", "Igelsbach", "Krähenwinkel", "Lindenhof", "Marderau", "Nesselried", "Otterbach", "Rehweiler"]
@@ -392,7 +393,9 @@ func _process(dt: float) -> void:
 		_task = -1
 		if _chunks.has(_task_key):
 			_chunks[_task_key] = _task_out
+			var t0 := Time.get_ticks_usec()
 			add_child(_task_out)
+			last_event = "land+%.1fms" % ((Time.get_ticks_usec() - t0) / 1000.0)
 			for r in _task_out.get_meta("rotors", []):
 				_rotors.append(r)
 		else:

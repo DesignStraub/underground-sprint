@@ -335,6 +335,8 @@ func _event(what: String) -> void:
 func _hitch_frame(dt: float) -> void:
 	if dt > 0.025:
 		var parts := []
+		if land and land.last_event != "":
+			parts.append(land.last_event)
 		for k in _prof:
 			if _prof[k] > 1500:
 				parts.append("%s=%.1f" % [k, _prof[k] / 1000.0])
@@ -345,6 +347,8 @@ func _hitch_frame(dt: float) -> void:
 			Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME), Performance.get_monitor(Performance.OBJECT_COUNT)])
 	_prof.clear()
 	_events.clear()
+	if land:
+		land.last_event = ""
 
 
 func _finish(e: Dictionary, job: Dictionary) -> void:

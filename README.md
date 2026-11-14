@@ -232,6 +232,41 @@ Außenring → nächste Stadt → Autobahn. Rundkurse und Drift-Kurse sind Schle
 - Browser: der Web-Export startet, die Welt baut sich ohne Skriptfehler auf (gut 25 s). Noch offen: eine Testfahrt mit
   Bildrate im sichtbaren Browserfenster (Herausforderer, Nachladen, Verkehr).
 
+## Landschaft und Deutschland-Gefühl (2.29)
+Zwischen Städten und Autobahnen lag bis 2.28 eine leere graue Fläche, jeder Kilometer Autobahn war von Hochhäusern
+gesäumt. Seit 2.29:
+
+- **Landschaft** (`scripts/landscape.gd`): Kacheln zu 1 km rund um den Spieler, im Hintergrund-Thread gebaut, so weit
+  die Sichtweite reicht. Neben Autobahnen (55 m) und Stadtstraßen (150 m, dort stehen Häuser) bleibt das Gelände flach,
+  danach steigen Hügel bis gut 100 m an. Boden als Flickenteppich aus Feldern (`shaders/land.gdshader`: Wiese, Weizen,
+  Acker mit Furchen, Raps, Mais, Feldwege), Hänge dunkler. Städte haben in der Welt keinen eigenen dunklen Boden mehr,
+  eine weiche Stadtmaske im Bodenshader färbt ihn (kein hartes Quadrat mitten in den Feldern).
+- **Wälder** (Nadel- und Laubbäume als MultiMesh), **Dörfer** mit Kirchturm und Satteldächern (nachts Licht in einem
+  Teil der Fenster, `shaders/house.gdshader`), **Windparks** mit drehenden Rotoren und rotem Gefahrenfeuer
+  (`shaders/beacon.gdshader`), **Seen** mit unregelmäßigem Ufer und Schilf, **Hochspannungsleitungen** mit
+  Gittermasten, nachts und morgens **Nebelbänke** über den Wiesen (`shaders/fog_bank.gdshader`, gemeinsames Material
+  `scripts/mist.gd`). Baumdichte nach Detailstufe, Ladeweite nach Sichtweite.
+- **Autobahn über Land**: Viertel „land“ ohne Häuser am Rand, mit Leitplanke, Grasbankett, Leitpfosten (weiß mit
+  schwarzem Band, rechts orange Rückstrahler), Laternen nur an jedem dritten Platz, Brücken mit Erddamm über die
+  Autobahn. Stadtbebauung nur noch 420 m um die Auffahrten der Städte und am Kreisel (`world_layout._district_seq`).
+  In langen Überland-Abschnitten ohne Auffahrt **Kuppen** auf Dämmen (6–10 m, `world_layout._ring_crests`).
+- **Wegweiser wie in Deutschland**: Schilderbrücken blau auf Autobahn und Schnellstraße, gelb in der Stadt, mit
+  Pfeilen; 260 m vor jeder Ausfahrt ein blauer Ausfahrt-Wegweiser mit Nummer, Stadtname und schrägem Pfeil.
+- **Ladenschilder mit Piktogrammen** (`scripts/sign_icons.gd`, SVG im Code): Brezel, Schere, Tasse, Döner, Pizza,
+  Diamant, Handy, Reifen, Hantel, Bierkrug … nach dem Ladennamen; Läden ohne erkannte Art und die Dachtafeln
+  bekommen ein ausgedachtes Markenzeichen.
+- **Passanten** vor den Läden, zwischen Leitwand und Fassade (man fährt nicht durch sie hindurch): tagsüber viele,
+  nachts wenige; die Weltuhr schaltet um (`Track.set_daytime`). Nachts weniger Verkehr, über Hafen, Flüssen und
+  Waldstraßen ziehen Nebelschichten.
+- **Himmel**: in der Open World ferne Hügelketten mit Dorflichtern statt Hochhaus-Kulisse rundum, die Skyline nur in
+  zwei Richtungen.
+- **Waldstrecke „Freudenstadt Waldpass“** (Schwarzwald, neues Rennen): Landstraße durch dichten Wald mit drei Kuppen,
+  Bahnübergang und Tunnel, ohne Häuser; die Landschaft gibt es dafür auch im Rennmodus. Ihre Auffahrt am Ring bleibt
+  Überland.
+- **Große Karte**: Relief, Wälder, Stadtflächen und Dorfnamen.
+- Test: `--wcam=zurück:höhe:voraus[:drehung]` (Kamera über dem Auto), `--wmap` (Bild der offenen Karte),
+  `--signlog`, `--oplog`.
+
 ## Events
 **Karriere:** Garage → Rennen fahren zeigt alle 21 Events als Liste neben einer Deutschlandkarte. Jedes Event liegt in
 einer deutschen Stadt (die ausgedachten Strecken in Frankfurt, München, Hamburg, Köln, Leipzig …, die echten in ihren
@@ -467,6 +502,10 @@ Musik (`music/`, 30 Tracks in zwei Listen: beim Fahren in Rennen und Open World 
 dreckige Gangsta-Beats und 4 Phonk; in der Garage und den Menüs Hip-Hop, West Coast, Boom Bap und Drill; G-Funk und
 Gangsta-Beats laufen in beiden Listen, beim Spielstart kommt zuerst einer von 4 West-Coast-Tracks, ohne Titel-Blase.
 Ausgesucht nach Downloads auf Pixabay (2.28: die erste West-Coast-Auswahl nach Titeln klang nicht danach).
+**Radio (2.29):** wie in NFS mehrere Sender, Taste **,** schaltet weiter: MIX (wie bisher), FUNKWERK (Funk),
+WEST COAST (G-Funk, West Coast), NACHTDRIFT (Phonk, Trap), BORDSTEIN BEATS (Hip-Hop, Boom Bap, Drill). Taste **.**
+springt zum nächsten Track, **-** sortiert den laufenden Track für immer aus. Sender und aussortierte Tracks stehen in
+`user://music.json` (`Music.STATIONS`, `Music.GENRE`).
 **Stadt-Tracks:** in manchen Städten läuft immer ein eigener Track, in der Open World solange man dort ist und im
 Rennen der Stadt, in Schleife (`Music.city`, `Music.race_go(town)`); M springt dort zur normalen Liste, bis man die
 Stadt verlässt. Aachen: Bruder Jakob x Jonas Platin „AC“ (mit Freigabe der Künstler). Datei:
@@ -677,10 +716,10 @@ in der Welt bleiben deutsch.
 
 ## Schrift und Texte
 Alles auf Deutsch, im Ton von NFS Underground (KNAPP VORBEI +300, DRIFT +240, SPRUNG, Tuning-Marken auf den
-Dächern, Ladetipps im Menü). Menüs und Anzeigen seit 2.28 in Rajdhani (Indian Type Foundry, SIL Open Font License
-1.1, `assets/fonts/rajdhani/`), schräg gestellt wie in NFS: technischer als Saira Condensed (2.27, wirkte rundlich und
-kindlich) und genauso schmal, die Menüs passen ohne Umbruch. Vergleich im Spiel: `--uifont=chakra` (Chakra Petch,
-kantiger und breiter) oder `--uifont=saira`. Bis 2.26 D-DIN im Stil der Straßenschilder. Ladenschilder und Kennzeichen bleiben D-DIN von Datto, SIL Open Font License 1.1
+Dächern, Ladetipps im Menü). Menüs und Anzeigen seit 2.29 in D-DIN (Datto, SIL Open Font License 1.1): die DIN der
+deutschen Straßenschilder, kühl und eng laufend, nur leicht schräg (Überschriften D-DIN Condensed Bold, Text D-DIN
+Bold), ohne Sperrung und dicke Konturen. 2.28 war es Rajdhani (wirkte verspielt), 2.27 Saira Condensed. Vergleich im
+Spiel: `--uifont=rajdhani`, `--uifont=chakra` oder `--uifont=saira`. Ladenschilder und Kennzeichen ebenfalls D-DIN
 (`assets/fonts/COPYING.txt`). Alte englische Eventnamen werden im
 Spielstand automatisch umgeschrieben, der Spielstand aus „Underground Sprint“ wird beim ersten Start übernommen.
 

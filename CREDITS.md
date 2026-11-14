@@ -48,11 +48,13 @@ Stadt-Track Aachen: Bruder Jakob x Jonas Platin, „AC“, mit freundlicher Gene
 öffentlichen Repo, `music/staedte/`).
 
 ## Schrift
-Menüs und Anzeigen seit 2.28: Rajdhani von der Indian Type Foundry, SIL Open Font License 1.1
-(`assets/fonts/rajdhani/OFL.txt`), von Google Fonts. Zum Vergleich liegen Chakra Petch (The Chakra Petch Project
-Authors, OFL, `assets/fonts/chakrapetch/`) und die frühere Saira Condensed (Omnibus-Type, OFL, `assets/fonts/saira/`)
-bei. Ladenschilder und Kennzeichen: D-DIN von Datto, SIL Open Font
-License 1.1 (`assets/fonts/COPYING.txt`).
+Menüs, Anzeigen, Ladenschilder und Kennzeichen seit 2.29: D-DIN von Datto, SIL Open Font License 1.1
+(`assets/fonts/COPYING.txt`). Zum Vergleich liegen Rajdhani (Indian Type Foundry, OFL, `assets/fonts/rajdhani/`),
+Chakra Petch (The Chakra Petch Project Authors, OFL, `assets/fonts/chakrapetch/`) und Saira Condensed (Omnibus-Type,
+OFL, `assets/fonts/saira/`) bei.
+
+## Piktogramme und Landschaft
+Ladenpiktogramme, Markenzeichen, Bäume, Dörfer, Windräder und Strommasten: selbst gezeichnet bzw. im Code erzeugt.
 
 ## Kartendaten
 Straßen und Gebäude der Städte-Strecken: © OpenStreetMap-Mitwirkende, ODbL (openstreetmap.org/copyright).
