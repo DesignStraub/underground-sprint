@@ -744,6 +744,7 @@ func _village(root: Node3D, v: Dictionary) -> void:
 		mi.multimesh = mm
 		mi.material_override = set[3]
 		root.add_child(mi)
+	_village_road(root, v)
 	# Dorflicht: eine Laterne an der Kirche (warm), damit das Dorf nachts von weitem zu sehen ist
 	var ol := OmniLight3D.new()
 	ol.light_color = Color(1.0, 0.7, 0.4)
@@ -755,6 +756,72 @@ func _village(root: Node3D, v: Dictionary) -> void:
 	ol.distance_fade_length = 300.0
 	ol.shadow_enabled = false
 	root.add_child(ol)
+
+
+## Kreisstraße vom Dorf zur nächsten Autobahn oder Stadtstraße (nur Optik, folgt dem Gelände, endet vor der
+## Leitplanke): ohne sie standen die Dörfer wie abgeworfen mitten in den Feldern
+func _village_road(root: Node3D, v: Dictionary) -> void:
+	var c: Vector2 = v["pos"]
+	var best := 1e12
+	var q := Vector2.ZERO
+	var cc := Vector2i(floori(c.x / ROAD_CELL), floori(c.y / ROAD_CELL))
+	for grid in [_road, _croad]:
+		for dy in range(-9, 10):
+			for dx in range(-9, 10):
+				var arr = grid.get(cc + Vector2i(dx, dy))
+				if arr == null:
+					continue
+				for p in arr:
+					var d2 := c.distance_squared_to(p)
+					if d2 < best:
+						best = d2
+						q = p
+	if best > 1100.0 * 1100.0:
+		return
+	var len := sqrt(best)
+	var dir := (q - c) / len
+	var side := dir.orthogonal()
+	var bend := (absi(int(c.x * 3.0 + c.y)) % 5 - 2) * 0.12 * len
+	var pts := PackedVector2Array()
+	var n := maxi(int(len / 10.0), 2)
+	for k in n + 1:
+		var t := float(k) / n
+		var p: Vector2 = c.lerp(q, t) + side * sin(t * PI) * bend
+		if p.distance_to(q) < 28.0:
+			break
+		pts.append(p)
+	if pts.size() < 2:
+		return
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var hw := 3.0
+	var prev_l := Vector3.ZERO
+	var prev_r := Vector3.ZERO
+	for k in pts.size():
+		var a: Vector2 = pts[maxi(k - 1, 0)]
+		var b: Vector2 = pts[mini(k + 1, pts.size() - 1)]
+		var nrm := (b - a).normalized().orthogonal()
+		var p: Vector2 = pts[k]
+		var lp := p + nrm * hw
+		var rp := p - nrm * hw
+		var l3 := Vector3(lp.x, maxf(height_at(lp, free_dist(lp)), -0.12) + 0.08, lp.y)
+		var r3 := Vector3(rp.x, maxf(height_at(rp, free_dist(rp)), -0.12) + 0.08, rp.y)
+		if k > 0:
+			for vtx in [prev_l, l3, r3, prev_l, r3, prev_r]:
+				st.set_normal(Vector3.UP)
+				st.add_vertex(vtx)
+		prev_l = l3
+		prev_r = r3
+	var mi := MeshInstance3D.new()
+	st.generate_normals()
+	mi.mesh = st.commit()
+	var m := StandardMaterial3D.new()
+	m.albedo_color = Color(0.13, 0.13, 0.14)
+	m.roughness = 0.85
+	m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	mi.material_override = m
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	root.add_child(mi)
 
 
 ## Windpark: drei bis sechs Anlagen in einer lockeren Reihe, alle mit dem Wind (aus Westen) ausgerichtet
