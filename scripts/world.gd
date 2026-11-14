@@ -356,6 +356,7 @@ func _finish(e: Dictionary, job: Dictionary) -> void:
 	world.add_child(root)
 	e["track"] = tr
 	e["state"] = "ready"
+	Track.set_daytime(tr, mood.get("day", 0.0))
 	e["feet"] = job.get("buildings", []) + job.get("occupied", [])  # Häuser und Bauwerke (für --worldcheck)
 	if e["kind"] == "city":
 		_add_marker(e)
@@ -644,6 +645,9 @@ func _update_daylight(dt: float, force := false) -> void:
 		_sky_mat.set_shader_parameter("stars", m["stars"])
 		_sky_mat.set_shader_parameter("day", day)
 		_sky_mat.set_shader_parameter("sun_dir", -moon.global_basis.z if moon.is_inside_tree() else -moon.basis.z)
+	for e in entries:
+		if e["state"] == "ready":
+			Track.set_daytime(e["track"], day)
 	if land:
 		# Nebelbänke: nachts, am stärksten im Morgengrauen (5-8 Uhr), tagsüber weg
 		var dawn := sin(PI * clampf((tod - 4.5) / 4.0, 0.0, 1.0))

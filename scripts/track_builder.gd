@@ -227,6 +227,7 @@ static func begin(race: Dictionary) -> Dictionary:
 		"districts": [], "parks": [], "ponds": [], "tunnels": [], "el": [], "posts": [], "stadium_d": -1.0, "medians": [], "elev0": [],
 		"force_stadium": race.get("stadium", false), "city": city, "rivers": [], "bridges": [], "hills": [],
 		"spectators": [],  # Zuschauer hinter Zäunen und Absperrungen: [Transform, Wegstück d]
+		"walkers": [],  # Passanten vor Ladenfronten (zwischen Leitwand und Fassade): [Transform, Laden?]
 		"pools": [],  # zusätzliche Lichtflächen für die Lichtkarte (Tunnel): [x, z, Radius, Farbe mal Stärke]
 		"extra": 2.5 if type == "drift" else (AB_EXTRA if type == "autobahn" else 0.0),  # Drift breiter, Autobahn 3 Spuren je Richtung
 		"paths": [{"id": 0, "kind": "main", "curve": curve, "half_w": HALF_W, "length": length, "from": 0.0, "to": length}],
@@ -371,6 +372,7 @@ static func step(job: Dictionary) -> float:
 			_build_steam(root, track, rng)
 			if type != "autobahn":
 				_build_spectators(root, track, rng)
+				_build_walkers(root, track)
 			if type == "drag":
 				_drag_boards(root, track)
 			if not city.is_empty() or race.has("town"):
@@ -4072,6 +4074,10 @@ static func _build_city(root: Node3D, track: Dictionary, rng: RandomNumberGenera
 				var lift: float = f["y"] + CURB_H if f["y"] > 0.3 and track["type"] != "autobahn" else 0.0
 				# am Hang: Haus steht auf Straßenhöhe, darunter reicht es mit dunklen Geschossen bis zum Boden
 				_building(root, center + Vector3(0, lift, 0), basis, w, depth, h, tall, shop, dist, face_dir, f["right"] * side, rng)
+				# Platz vor der Fassade hinter der Leitwand: dort stehen Passanten (man fährt nicht durch sie hindurch)
+				if p["id"] == 0 and gap > 0.95 and lift == 0.0 and absf(f["y"]) < 0.2:
+					var fp: Vector3 = f["pos"] + f["right"] * side * (edge + 0.3 + minf(gap - 0.3, 0.9) * 0.5)
+					track["walkers"].append([Transform3D(basis, fp), shop, w, f["fwd"], f["right"] * side])
 				if lift > 0.0:
 					_bb_box(Transform3D(basis * Basis.from_scale(Vector3(depth, lift + 0.1, w)), center + Vector3(0, lift / 2.0, 0)),
 						Vector3(0.1, 0.1, 0.11), 0.15, rng.randf() * 100.0, 4.0, 0.0, -lift, FACE_WALL)
@@ -5084,6 +5090,61 @@ static func _build_spectators(root: Node3D, track: Dictionary, rng: RandomNumber
 		chunks[k].append(e[0])
 	for k in chunks:
 		People.crowd(root, chunks[k], [People.CHEER, People.WAVE, People.CLAP, People.PHONE, People.WAIT, People.CHEER], rng, 220.0)
+
+
+## Passanten vor den Läden (seit 2.29): tagsüber viele (Schaufenster, Telefonieren, Plaudern zu zweit), nachts
+## wenige vor Läden, die noch offen haben. Zwei Gruppen, die Weltuhr schaltet um (set_daytime).
+static func _build_walkers(root: Node3D, track: Dictionary) -> void:
+	if track["walkers"].is_empty():
+		return
+	var rng := RandomNumberGenerator.new()
+	rng.seed = int(track["length"]) * 3 + 17
+	var day := []
+	var night := []
+	for wk in track["walkers"]:
+		var xf: Transform3D = wk[0]
+		var shop: bool = wk[1]
+		var fwd: Vector3 = wk[3]
+		var n := 0
+		var r := rng.randf()
+		if r < (0.9 if shop else 0.45):
+			n = rng.randi_range(1, 4) if shop else rng.randi_range(1, 2)
+		var night_ok := shop and rng.randf() < 0.4
+		for i in n:
+			var along := rng.randf_range(-0.4, 0.4) * float(wk[2])
+			var pos: Vector3 = xf.origin + fwd * along + fwd * i * 0.75
+			var face: Vector3
+			match rng.randi() % 3:
+				0:
+					face = wk[4]  # Schaufenster: zur Fassade
+				1:
+					face = fwd * (1.0 if rng.randf() < 0.5 else -1.0)
+				_:
+					face = -(wk[4] as Vector3)  # zur Straße
+			if i == 1 and n >= 2 and rng.randf() < 0.6:
+				face = -fwd  # Paar im Gespräch
+			var b := Basis.looking_at(face.rotated(Vector3.UP, rng.randf_range(-0.4, 0.4)), Vector3.UP)
+			var t := Transform3D(b, Vector3(pos.x, CURB_H, pos.z))
+			day.append(t)
+			if night_ok and i < 2:
+				night.append(t)
+	var holders := []
+	if not day.is_empty():
+		var hd := People.crowd(root, day, [People.WAIT, People.WAIT, People.PHONE, People.WAIT, People.WAVE], rng, 160.0)
+		hd.name = "PassantenTag"
+		holders.append(hd)
+	if not night.is_empty():
+		var hn := People.crowd(root, night, [People.WAIT, People.PHONE, People.PHONE], rng, 160.0)
+		hn.name = "PassantenNacht"
+		holders.append(hn)
+	track["walker_nodes"] = holders
+
+
+## Tag oder Nacht für die Passanten (day 0..1 wie in Moods)
+static func set_daytime(track: Dictionary, day: float) -> void:
+	for h in track.get("walker_nodes", []):
+		if is_instance_valid(h):
+			(h as Node3D).visible = (day > 0.3) == (str(h.name) == "PassantenTag")
 
 
 ## Dampf aus Gullys

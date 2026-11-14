@@ -124,6 +124,7 @@ func _ready() -> void:
 	track = job["track"]
 	curve = track["curve"]
 	Track.apply_lod(track["node"], GameState.lod_ranges())
+	Track.set_daytime(track, Moods.get_mood(race.get("mood", "neon")).get("day", 0.0))
 	track["node"].process_mode = Node.PROCESS_MODE_PAUSABLE
 	world.add_child(track["node"])
 	_setup_environment()
