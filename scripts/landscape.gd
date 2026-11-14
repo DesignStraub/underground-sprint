@@ -325,6 +325,7 @@ func _make_materials() -> void:
 	_concrete_mat = StandardMaterial3D.new()
 	_concrete_mat.albedo_color = Color(0.68, 0.67, 0.64)
 	_concrete_mat.roughness = 0.9
+	_concrete_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 	_steam_mat = StandardMaterial3D.new()
 	_steam_mat.albedo_color = Color(0.95, 0.96, 0.98, 0.75)
 	_steam_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
@@ -844,17 +845,9 @@ func _landmark(root: Node3D, m: Dictionary) -> void:
 			# zwei Kühltürme (taillierte Schale aus drei Kegelstümpfen), Maschinenhaus, rot-weißer Schornstein
 			for k in 2:
 				var tp := base + Vector3(k * 120.0 - 60.0, 0, 0)
-				var parts := [[46.0, 30.0, 70.0, 35.0], [30.0, 28.0, 30.0, 85.0], [28.0, 31.0, 30.0, 115.0]]
-				for pr in parts:
-					var cm := CylinderMesh.new()
-					cm.bottom_radius = pr[0]
-					cm.top_radius = pr[1]
-					cm.height = pr[2]
-					cm.radial_segments = 28
-					cm.rings = 1
-					cm.cap_top = false
-					cm.cap_bottom = false
-					add.call(cm, _concrete_mat, tp + Vector3(0, pr[3], 0))
+				if not _meshes.has("cooling"):
+					_meshes["cooling"] = _cooling_tower()
+				add.call(_meshes["cooling"], _concrete_mat, tp)
 				# Dampfwolke über dem Turm
 				for c in 4:
 					var sp := SphereMesh.new()
@@ -966,6 +959,35 @@ func _landmark(root: Node3D, m: Dictionary) -> void:
 			var lamp := BoxMesh.new()
 			lamp.size = Vector3(1.4, 1.2, 1.4)
 			add.call(lamp, beacon_mat, base + Vector3(0, 271, 0))
+
+
+## Kühlturm: Rotationshyperboloid (Taille bei 2/3 der Höhe), 130 m hoch, innen und außen sichtbar
+func _cooling_tower() -> ArrayMesh:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var H := 130.0
+	var segs := 32
+	var rings := 14
+	var prof := func(y: float) -> float:
+		var t := (y - H * 0.68) / (H * 0.42)
+		return 27.0 * sqrt(1.0 + t * t * 1.6)
+	for j in rings:
+		var y0 := H * j / rings
+		var y1 := H * (j + 1) / rings
+		var r0: float = prof.call(y0)
+		var r1: float = prof.call(y1)
+		for i in segs:
+			var a0 := TAU * i / segs
+			var a1 := TAU * (i + 1) / segs
+			var p00 := Vector3(cos(a0) * r0, y0, sin(a0) * r0)
+			var p01 := Vector3(cos(a1) * r0, y0, sin(a1) * r0)
+			var p10 := Vector3(cos(a0) * r1, y1, sin(a0) * r1)
+			var p11 := Vector3(cos(a1) * r1, y1, sin(a1) * r1)
+			for v in [p00, p10, p11, p00, p11, p01]:
+				st.set_normal(Vector3(v.x, 0, v.z).normalized())
+				st.add_vertex(v)
+	var m := st.commit()
+	return m
 
 
 ## Kreisstraße vom Dorf zur nächsten Autobahn oder Stadtstraße (nur Optik, folgt dem Gelände, endet vor der
