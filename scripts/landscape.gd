@@ -10,6 +10,7 @@ const LAND_SHADER := preload("res://shaders/land.gdshader")
 const HOUSE_SHADER := preload("res://shaders/house.gdshader")
 const FOG_SHADER := preload("res://shaders/fog_bank.gdshader")
 const BEACON_SHADER := preload("res://shaders/beacon.gdshader")
+const WATER_SHADER := preload("res://shaders/water.gdshader")
 const Layout := preload("res://scripts/world_layout.gd")
 const Catalog := preload("res://scripts/catalog.gd")
 
@@ -42,6 +43,10 @@ var _froad := {}  # Waldstrecken: Landstraße ohne Häuser, der Wald reicht bis 
 var _urban := []
 var _villages := []  # {pos, r, level, seed, name}
 var _parks := []  # {pos, seed, dir}
+var _lakes := []  # {pos, r, level}
+var _lines := []  # Hochspannungsleitungen: Masten [Vector2] je Leitung
+var _water_mat: ShaderMaterial
+var _steel_mat: StandardMaterial3D
 var _hill := FastNoiseLite.new()
 var _detail := FastNoiseLite.new()
 var _forest := FastNoiseLite.new()
@@ -153,6 +158,16 @@ func height_at(p: Vector2, free: float) -> float:
 		var dv := p.distance_to(v["pos"])
 		if dv < v["r"] + 160.0:
 			h = lerpf(v["level"], h, smoothstep(v["r"], v["r"] + 160.0, dv))
+	for lk in _lakes:
+		var dl := p.distance_to(lk["pos"])
+		if dl < lk["r"] * 1.15 + 180.0:
+			# Mulde: im See bis 5 m unter dem Wasser, am Ufer sanft hinauf ins Gelände (Ufer unregelmäßig, lake_r)
+			var lr := lake_r(lk, (p - lk["pos"]).angle())
+			var bowl: float = lk["level"] - 5.0 * (1.0 - clampf(dl / lr, 0.0, 1.0))
+			if dl < lr:
+				h = bowl
+			else:
+				h = lerpf(lk["level"] + 0.4, h, smoothstep(lr, lr + 180.0, dl))
 	return fade * h - (1.0 - fade) * 0.6
 
 
@@ -191,6 +206,51 @@ func _plan_sites() -> void:
 				_parks.append({"pos": p, "seed": rng.randi(), "n": rng.randi_range(3, 6)})
 			z += 1700.0
 		x += 1700.0
+	# Seen: in freien Lagen (weit genug von Straße, Stadt, Dorf, Windpark), Wasser auf Geländehöhe
+	x = -ext
+	while x < ext:
+		var z := -ext
+		while z < ext:
+			var p := Vector2(x + rng.randf_range(200, 1700), z + rng.randf_range(200, 1700))
+			var r := rng.randf_range(110.0, 240.0)
+			var ok := free_dist(p) > r + 90.0 and rng.randf() < 0.7
+			for v in _villages:
+				if p.distance_to(v["pos"]) < v["r"] + r + 250.0:
+					ok = false
+			for pk in _parks:
+				if p.distance_to(pk["pos"]) < r + 700.0:
+					ok = false
+			if ok:
+				_lakes.append({"pos": p, "r": r, "level": maxf(raw_height(p) - 2.0, 3.0)})
+			z += 1900.0
+		x += 1900.0
+	# Hochspannungsleitungen: gerade Trassen quer über die Karte, Masten alle 320 m (nicht in der Flachzone an
+	# Straßen und Städten, nicht in Dörfern und Seen); wo kein Mast stehen darf, wird die Leitung unterbrochen
+	for li in 5:
+		var ang := rng.randf() * PI
+		var dir := Vector2.from_angle(ang)
+		var off := dir.orthogonal() * rng.randf_range(-ext * 0.7, ext * 0.7)
+		var masts := []
+		var t := -ext
+		while t < ext:
+			var p := off + dir * t
+			var ok := free_dist(p) > 40.0
+			for v in _villages:
+				if p.distance_to(v["pos"]) < v["r"] + 60.0:
+					ok = false
+			for lk in _lakes:
+				if p.distance_to(lk["pos"]) < lk["r"] + 30.0:
+					ok = false
+			if ok:
+				masts.append(p)
+			elif masts.size() >= 2:
+				_lines.append(masts)
+				masts = []
+			else:
+				masts = []
+			t += 320.0
+		if masts.size() >= 2:
+			_lines.append(masts)
 
 
 func _make_materials() -> void:
@@ -215,6 +275,13 @@ func _make_materials() -> void:
 	_blade_mat = StandardMaterial3D.new()
 	_blade_mat.albedo_color = Color(0.9, 0.91, 0.92)
 	_blade_mat.roughness = 0.4
+	_water_mat = ShaderMaterial.new()
+	_water_mat.shader = WATER_SHADER
+	_water_mat.set_shader_parameter("mirror", 0.6)
+	_steel_mat = StandardMaterial3D.new()
+	_steel_mat.albedo_color = Color(0.55, 0.57, 0.6)
+	_steel_mat.metallic = 0.6
+	_steel_mat.roughness = 0.45
 	_meshes["conifer"] = _tree_mesh(true)
 	_meshes["leafy"] = _tree_mesh(false)
 	var box := BoxMesh.new()
@@ -398,6 +465,10 @@ func build_chunk(key: Vector2i) -> Node3D:
 	for pk in _parks:
 		if _in_chunk(pk["pos"], o):
 			_windpark(root, pk)
+	for lk in _lakes:
+		if _in_chunk(lk["pos"], o):
+			_lake(root, lk)
+	_power_lines(root, o)
 	_fog_banks(root, o, dr, hs, rng)
 	return root
 
@@ -490,6 +561,9 @@ func _trees(root: Node3D, o: Vector2, dr: PackedFloat32Array, rng: RandomNumberG
 					skip = true
 			for pk in _parks:
 				if p.distance_to(pk["pos"]) < 600.0 and rng.randf() < 0.85:
+					skip = true
+			for lk in _lakes:
+				if p.distance_to(lk["pos"]) < lk["r"] + 12.0:
 					skip = true
 			if skip:
 				continue
@@ -744,6 +818,131 @@ func _windpark(root: Node3D, pk: Dictionary) -> void:
 			rotor.add_child(blade)
 		rotors.append(rotor)
 	root.set_meta("rotors", rotors)
+
+
+## Uferlinie: Radius je Richtung (0,8- bis 1,15-mal r), fest je See
+func lake_r(lk: Dictionary, a: float) -> float:
+	var ph: float = lk["pos"].x * 0.013 + lk["pos"].y * 0.007
+	return lk["r"] * (0.97 + 0.12 * sin(a * 2.0 + ph) + 0.07 * sin(a * 5.0 + ph * 2.3) + 0.03 * sin(a * 11.0 + ph * 0.7))
+
+
+## See: Wasserfläche (spiegelnd wie die Stadtteiche) mit unregelmäßigem Ufer, Schilf am Ufer
+func _lake(root: Node3D, lk: Dictionary) -> void:
+	var w := MeshInstance3D.new()
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	st.set_normal(Vector3.UP)
+	var n := 64
+	for k in n:
+		var a0 := k * TAU / n
+		var a1 := (k + 1) * TAU / n
+		var r0 := lake_r(lk, a0) + 4.0
+		var r1 := lake_r(lk, a1) + 4.0
+		st.set_uv(Vector2(0.5, 0.5))
+		st.add_vertex(Vector3.ZERO)
+		st.set_uv(Vector2(0.5 + cos(a0) * 0.5, 0.5 + sin(a0) * 0.5))
+		st.add_vertex(Vector3(cos(a0) * r0, 0, sin(a0) * r0))
+		st.set_uv(Vector2(0.5 + cos(a1) * 0.5, 0.5 + sin(a1) * 0.5))
+		st.add_vertex(Vector3(cos(a1) * r1, 0, sin(a1) * r1))
+	w.mesh = st.commit()
+	w.material_override = _water_mat
+	w.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	w.position = Vector3(lk["pos"].x, lk["level"] - 0.25, lk["pos"].y)
+	root.add_child(w)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = int(lk["pos"].x * 7.0 + lk["pos"].y)
+	var reeds := []
+	var cols := []
+	for k in 140:
+		var a := rng.randf() * TAU
+		var rr: float = lake_r(lk, a) + rng.randf_range(-3.0, 7.0)
+		var q: Vector2 = lk["pos"] + Vector2.from_angle(a) * rr
+		var sc := rng.randf_range(0.6, 1.1)
+		reeds.append(Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(sc * 0.5, sc * 0.35, sc * 0.5)), Vector3(q.x, lk["level"] - 0.6, q.y)))
+		cols.append(Color(0.35, 0.4, 0.15) * rng.randf_range(0.8, 1.2))
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.use_colors = true
+	mm.mesh = _meshes["leafy"]
+	mm.instance_count = reeds.size()
+	for k in reeds.size():
+		mm.set_instance_transform(k, reeds[k])
+		mm.set_instance_color(k, cols[k])
+	var mi := MultiMeshInstance3D.new()
+	mi.multimesh = mm
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	root.add_child(mi)
+
+
+## Hochspannungsleitung: Gittermasten (Stahl, vier Ausleger) mit durchhängenden Seilen; je Kachel die Masten,
+## die darin stehen, samt Seilen zum nächsten Mast
+func _power_lines(root: Node3D, o: Vector2) -> void:
+	var g := {}
+	for line in _lines:
+		for k in line.size():
+			var p: Vector2 = line[k]
+			if not _in_chunk(p, o):
+				continue
+			var h := maxf(height_at(p, free_dist(p)), 0.0)
+			var nxt: Vector2 = line[mini(k + 1, line.size() - 1)]
+			var prv: Vector2 = line[maxi(k - 1, 0)]
+			var along := (nxt - prv).normalized()
+			var yaw := atan2(along.x, along.y)
+			var b := Basis(Vector3.UP, yaw)
+			var base := Vector3(p.x, h, p.y)
+			# Mast: vier schräge Eckstiele, oben schmal, Querriegel, zwei Traversen
+			for cx in [-1.0, 1.0]:
+				for cz in [-1.0, 1.0]:
+					var bot := base + b * Vector3(cx * 3.2, 0, cz * 3.2)
+					var top := base + b * Vector3(cx * 0.9, 38.0, cz * 0.9)
+					_beam(g, bot, top, 0.35)
+			for lv in [12.0, 22.0, 30.0]:
+				var wdt := lerpf(3.2, 0.9, lv / 38.0)
+				for cz in [-1.0, 1.0]:
+					_beam(g, base + b * Vector3(-wdt, lv, cz * wdt), base + b * Vector3(wdt, lv, cz * wdt), 0.2)
+			for arm in [[26.0, 9.0], [33.0, 7.0]]:
+				_beam(g, base + b * Vector3(-arm[1], arm[0], 0), base + b * Vector3(arm[1], arm[0], 0), 0.45)
+			_beam(g, base + b * Vector3(0, 38.0, 0), base + b * Vector3(0, 42.0, 0), 0.3)
+			# Seile zum nächsten Mast (drei je Seite), leicht durchhängend in vier Stücken
+			if k + 1 < line.size():
+				var p2: Vector2 = line[k + 1]
+				var h2 := maxf(height_at(p2, free_dist(p2)), 0.0)
+				var b2 := Basis(Vector3.UP, yaw)
+				for arm in [[26.0, 9.0], [33.0, 7.0]]:
+					for sx in [-1.0, 1.0]:
+						var a3 := base + b * Vector3(sx * arm[1], arm[0] - 0.8, 0)
+						var e3 := Vector3(p2.x, h2, p2.y) + b2 * Vector3(sx * arm[1], arm[0] - 0.8, 0)
+						var prev := a3
+						for s2 in range(1, 5):
+							var t := s2 / 4.0
+							var q := a3.lerp(e3, t) - Vector3(0, sin(t * PI) * 7.0, 0)
+							_beam(g, prev, q, 0.06)
+							prev = q
+	if g.is_empty():
+		return
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for part in g["parts"]:
+		st.append_from(_meshes["box"], 0, part)
+	var mi := MeshInstance3D.new()
+	mi.mesh = st.commit()
+	mi.material_override = _steel_mat
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	root.add_child(mi)
+
+
+## Balken von a nach b (Kantenlänge th) als Teil für _power_lines
+func _beam(g: Dictionary, a: Vector3, b: Vector3, th: float) -> void:
+	if not g.has("parts"):
+		g["parts"] = []
+	var d := b - a
+	var l := d.length()
+	if l < 0.01:
+		return
+	var y := d / l
+	var x := y.cross(Vector3.UP if absf(y.y) < 0.95 else Vector3.RIGHT).normalized()
+	var z := x.cross(y).normalized()
+	g["parts"].append(Transform3D(Basis(x * th, y * l, z * th), (a + b) / 2.0))
 
 
 ## Nebelbänke: weiche Schichten über Wiesen nahe der Straße (sonst sieht man sie nicht), nachts und morgens
