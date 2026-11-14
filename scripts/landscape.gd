@@ -61,6 +61,7 @@ var _t := 0.0
 var _rotors := []
 var _tree_step := 9.0
 var last_event := ""  # für --hitch: was die Landschaft in diesem Bild getan hat
+var hold := Callable()  # true = gerade nicht bauen (die Welt baut eine Strecke: beide zugleich ruckelten)
 var _meshes := {}
 
 const VILLAGE_NAMES := ["Oberweiler", "Kirchheim", "Lindenau", "Birkenfeld", "Hohenstein", "Mühlbach", "Eichstetten", "Wiesental", "Rotenburg", "Sonnenberg", "Tannhausen", "Grünwald", "Steinach", "Haselbach", "Altdorf", "Buchholz", "Unterried", "Waldhausen", "Kleinfeld", "Bergrheinfeld", "Erlenbach", "Hirschau", "Fischbach", "Ahornhof", "Weidenstetten", "Lerchenau", "Rabenstein", "Moosbrunn", "Hagenau", "Kesselbach", "Ulmenhof", "Dornstetten", "Falkenried", "Brunnthal", "Eschenau", "Hüttenbach", "Kranichfeld", "Lauterbach", "Mittelweiler", "Neuhaus", "Ochsenfurt-Au", "Pfaffenhofen", "Quellbach", "Reichenau", "Schönwald", "Talheim", "Uhlenhorst", "Vogelsang", "Wolfsried", "Zellerau", "Amselfeld", "Bärental", "Dachsberg", "Eulenbach", "Fuchsstadt", "Gänsewies", "Hasenmühle", "Igelsbach", "Krähenwinkel", "Lindenhof", "Marderau", "Nesselried", "Otterbach", "Rehweiler"]
@@ -471,7 +472,7 @@ func _process(dt: float) -> void:
 				_rotors.erase(r)
 			n.queue_free()
 			_chunks.erase(key)
-	if _task >= 0:
+	if _task >= 0 or (hold.is_valid() and hold.call()):
 		return
 	for key in _wanted(p, VIEW):
 		if not _chunks.has(key):

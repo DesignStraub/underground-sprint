@@ -721,6 +721,7 @@ func _setup_environment() -> void:
 	land = Landscape.new()
 	land.name = "Landschaft"
 	land.setup(layout)
+	land.hold = func() -> bool: return _task >= 0
 	world.add_child(land)
 	ground.material_override = land.land_mat
 	_ground_mat = land.land_mat
