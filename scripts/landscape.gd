@@ -16,7 +16,7 @@ const Catalog := preload("res://scripts/catalog.gd")
 const CHUNK := 1000.0
 const STEP := 25.0  # Gitterweite des Geländes
 const N := 40  # Zellen je Kachel und Richtung
-const VIEW := 3300.0  # so weit werden Kacheln geladen
+var VIEW := 3300.0  # so weit werden Kacheln geladen (setup: Sichtweite der Kamera plus Rand)
 const ROAD_CELL := 100.0
 const ROAD_FLAT := 55.0  # bis hier neben einer Straße ist das Gelände flach
 const RISE := 420.0  # dann steigt es auf dieser Strecke an
@@ -51,6 +51,7 @@ var _task_key := Vector2i.ZERO
 var _task_out: Node3D
 var _t := 0.0
 var _rotors := []
+var _tree_step := 9.0
 var _meshes := {}
 
 const VILLAGE_NAMES := ["Oberweiler", "Kirchheim", "Lindenau", "Birkenfeld", "Hohenstein", "Mühlbach", "Eichstetten",
@@ -59,6 +60,11 @@ const VILLAGE_NAMES := ["Oberweiler", "Kirchheim", "Lindenau", "Birkenfeld", "Ho
 
 func setup(lay: Dictionary) -> void:
 	layout = lay
+	# Die Kamera sieht nur so weit wie die Sichtweite (600-1400 m); weiter draußen stehen die Hügel im Himmel
+	VIEW = maxf(GameState.view_distance() + 700.0, 1300.0)
+	_tree_step = [13.0, 11.0, 9.5, 9.0][clampi(int(GameState.gfx.get("detail", 2)), 0, 3)]
+	if OS.has_feature("web"):
+		_tree_step = maxf(_tree_step, 13.0)
 	_hill.seed = 2029
 	_hill.frequency = 1.0 / 1900.0
 	_hill.fractal_octaves = 3
@@ -421,7 +427,7 @@ func _terrain(root: Node3D, o: Vector2, hs: PackedFloat32Array) -> void:
 func _trees(root: Node3D, o: Vector2, dr: PackedFloat32Array, rng: RandomNumberGenerator) -> void:
 	var lists := {"conifer": [], "leafy": []}
 	var cols := {"conifer": [], "leafy": []}
-	var step := 9.0
+	var step := _tree_step
 	var hs_cache := {}
 	var y := 0.0
 	while y < CHUNK:
@@ -480,7 +486,7 @@ func _trees(root: Node3D, o: Vector2, dr: PackedFloat32Array, rng: RandomNumberG
 		var mi := MultiMeshInstance3D.new()
 		mi.multimesh = mm
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		mi.visibility_range_end = 2600.0
+		mi.visibility_range_end = VIEW - 300.0
 		root.add_child(mi)
 
 
