@@ -138,8 +138,8 @@ const EN := {
 	"%s   ·   %s   ·   Karte © OpenStreetMap-Mitwirkende   ·   Gas/Enter: los": "%s   ·   %s   ·   Map © OpenStreetMap contributors   ·   Throttle/Enter: go",
 	"SPRINT": "SPRINT", "RUNDKURS · %d RUNDEN": "CIRCUIT · %d LAPS", "DRIFT · %d RUNDEN": "DRIFT · %d LAPS",
 	"DRAG · A/D SPUR · S/X SCHALTEN": "DRAG · A/D LANE · S/X SHIFT", "ALLEIN": "SOLO", "4 FAHRER": "4 DRIVERS",
-	"W/S Gas/Bremse  A/D Lenken\nLeertaste Handbremse  Shift Nitro\nC Kamera  R Zurücksetzen  . Musik\nF Vollbild  Esc Pause":
-		"W/S Throttle/Brake  A/D Steer\nSpace Handbrake  Shift Nitro\nC Camera  R Reset  . Music\nF Fullscreen  Esc Pause",
+	"W/S Gas/Bremse  A/D Lenken\nLeertaste Handbremse  Shift Nitro\nC Kamera  R Zurücksetzen\n. Musik  , Sender  - Aussortieren\nF Vollbild  Esc Pause":
+		"W/S Throttle/Brake  A/D Steer\nSpace Handbrake  Shift Nitro\nC Camera  R Reset\n. Music  , Station  - Never again\nF Fullscreen  Esc Pause", ",  Radio": ",  Radio",
 	"W Gas  S hoch-, X runterschalten\nA/D Spur wechseln  Shift Nitro\nC Kamera  F Vollbild  Esc Pause":
 		"W Throttle  S shift up, X down\nA/D Change lane  Shift Nitro\nC Camera  F Fullscreen  Esc Pause",
 	"HOCHSCHALTEN  S   ·   RUNTER  X": "SHIFT UP  S   ·   DOWN  X", "MOTOR HEISS – SCHALTEN!": "ENGINE HOT – SHIFT!",

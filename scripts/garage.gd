@@ -321,7 +321,7 @@ func _build_ui() -> void:
 	var keys := _label(root, 9)
 	_keys = keys
 	keys.label_settings.font = UI.font("bold", 0.12)
-	keys.text = tr("ENTER  Auswählen      ESC  Zurück      ←/→ A/D  Ändern      F11  Vollbild")
+	keys.text = tr("ENTER  Auswählen      ESC  Zurück      ←/→ A/D  Ändern      F11  Vollbild") + "      " + tr(",  Radio")
 	keys.anchor_top = 1.0
 	keys.anchor_bottom = 1.0
 	keys.offset_left = 14.0

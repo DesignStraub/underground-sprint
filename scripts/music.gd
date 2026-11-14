@@ -60,6 +60,22 @@ const TRACKS := {
 }
 
 var lists := {"fahrt": [], "garage": []}  # Pfade je Liste, gemischt
+## Radiosender wie in NFS (seit 2.29): "," schaltet weiter, "-" sortiert den laufenden Track für immer aus.
+## mix = wie bisher (beim Fahren Funk und Beats, in der Garage Hip-Hop), sonst nur die Sorte des Senders.
+const STATIONS := [["mix", "MIX"], ["funk", "FUNKWERK"], ["westcoast", "WEST COAST"], ["phonk", "NACHTDRIFT"],
+	["hiphop", "BORDSTEIN BEATS"]]
+const GENRE := {"503900": "funk", "628015": "funk", "437330": "funk", "425092": "funk", "557572": "funk", "591743": "funk",
+	"593046": "funk", "611911": "funk", "614901": "funk", "591582": "funk", "550488": "funk",
+	"529766": "phonk", "223224": "phonk", "607579": "phonk", "510715": "phonk",
+	"129290": "westcoast", "213452": "westcoast", "210671": "westcoast", "331753": "westcoast", "206680": "westcoast",
+	"565462": "hiphop", "461849": "hiphop", "595812": "hiphop", "116392": "hiphop", "495946": "hiphop", "171167": "hiphop",
+	"617537": "hiphop", "569539": "hiphop", "599534": "hiphop", "623482": "hiphop"}
+const PREFS := "user://music.json"
+var station := "mix"
+var banned: Array = []  # Pixabay-Nummern
+var _st_lists := {}  # Sender -> Pfade (gemischt)
+var _st_idx := {}
+var _cur_path := ""
 var intro: Array = []  # West-Coast-Tracks für den Spielstart
 const CITY_DIR := "res://music/staedte/"
 ## Stadt-Tracks: Stadt -> [Angleich dB, Musik beginnt bei s, endet bei s] (wie TRACKS)
@@ -132,6 +148,18 @@ func _scan() -> void:
 				intro.append(DIR + name)
 	for l in lists:
 		lists[l].shuffle()
+	for l in ["fahrt", "garage"]:
+		for path in lists[l]:
+			var g: String = GENRE.get(_track_id(path), "")
+			if g != "":
+				if not _st_lists.has(g):
+					_st_lists[g] = []
+				if not _st_lists[g].has(path):
+					_st_lists[g].append(path)
+	for g in _st_lists:
+		_st_lists[g].shuffle()
+		_st_idx[g] = -1
+	_load_prefs()
 	# Spielstart: zuerst ein West-Coast-Track (zufällig einer der markierten), danach gemischt
 	if not intro.is_empty():
 		var first: String = intro[randi() % intro.size()]
@@ -148,19 +176,26 @@ func next(fade := FADE_SKIP) -> void:
 	if _theme != "":
 		_play(_theme, fade)  # Stadt-Track läuft in Schleife, solange man in der Stadt ist
 		return
-	var playlist: Array = lists[mode]
+	var use_st := station != "mix" and _st_lists.has(station)
+	var playlist: Array = _st_lists[station] if use_st else lists[mode]
+	var idx: Dictionary = _st_idx if use_st else _idx
+	var key: String = station if use_st else mode
 	if playlist.is_empty():
 		current_title = ""
 		return
-	_idx[mode] += 1
-	if _idx[mode] >= playlist.size():
-		# einmal durch: neu mischen, aber nicht mit dem gerade laufenden Track anfangen
-		var last: String = playlist[playlist.size() - 1]
-		playlist.shuffle()
-		if playlist.size() > 1 and playlist[0] == last:
-			playlist.append(playlist.pop_front())
-		_idx[mode] = 0
-	_play(playlist[_idx[mode]], fade)
+	# aussortierte Tracks überspringen (sind alle aussortiert, läuft die Liste trotzdem)
+	for tries in playlist.size():
+		idx[key] += 1
+		if idx[key] >= playlist.size():
+			# einmal durch: neu mischen, aber nicht mit dem gerade laufenden Track anfangen
+			var last: String = playlist[playlist.size() - 1]
+			playlist.shuffle()
+			if playlist.size() > 1 and playlist[0] == last:
+				playlist.append(playlist.pop_front())
+			idx[key] = 0
+		if not banned.has(_track_id(playlist[idx[key]])):
+			break
+	_play(playlist[idx[key]], fade)
 
 
 func _play(path: String, fade: float) -> void:
@@ -170,6 +205,7 @@ func _play(path: String, fade: float) -> void:
 	var info: Array = TRACKS.get(_track_id(path), [0.0, 0.0, 0.0])
 	if path.begins_with(CITY_DIR):
 		info = CITY_TRACKS.get(path.get_file().get_slice("-", 0), [0.0, 0.0, 0.0])
+	_cur_path = path
 	var nxt := 1 - _cur
 	var p := _players[nxt]
 	p.stream = s
@@ -389,7 +425,62 @@ func _load(path: String) -> AudioStream:
 	return null
 
 
+func _load_prefs() -> void:
+	if not FileAccess.file_exists(PREFS):
+		return
+	var d = JSON.parse_string(FileAccess.get_file_as_string(PREFS))
+	if d is Dictionary:
+		station = str(d.get("station", "mix"))
+		banned = d.get("banned", [])
+		if not STATIONS.any(func(st): return st[0] == station):
+			station = "mix"
+
+
+func _save_prefs() -> void:
+	var f := FileAccess.open(PREFS, FileAccess.WRITE)
+	if f:
+		f.store_string(JSON.stringify({"station": station, "banned": banned}))
+
+
+func station_name() -> String:
+	for st in STATIONS:
+		if st[0] == station:
+			return st[1]
+	return "MIX"
+
+
+## Nächster Sender: Blase mit dem Sendernamen, dann gleich ein Track von dort
+func next_station() -> void:
+	var i := 0
+	for k in STATIONS.size():
+		if STATIONS[k][0] == station:
+			i = k
+	station = STATIONS[(i + 1) % STATIONS.size()][0]
+	_save_prefs()
+	_theme = ""
+	next(FADE_SKIP)
+	_toast_artist = "RADIO  " + station_name() + "  ·  , SENDER  · . WEITER  · - AUSSORTIEREN"
+
+
+## Laufenden Track nie wieder spielen
+func ban_current() -> void:
+	var id := _track_id(_cur_path)
+	if id == "" or _cur_path.begins_with(CITY_DIR):
+		return
+	if not banned.has(id):
+		banned.append(id)
+	_save_prefs()
+	next(FADE_SKIP)
+	_toast_artist = "AUSSORTIERT  ·  JETZT: " + _toast_artist
+
+
 func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("radio"):
+		next_station()
+		return
+	if event.is_action_pressed("ban_track"):
+		ban_current()
+		return
 	if event.is_action_pressed("next_track"):
 		_theme = ""  # in einer Stadt mit eigenem Track: zur normalen Liste, bis man die Stadt verlässt
 		next(FADE_SKIP)

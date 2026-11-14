@@ -156,6 +156,8 @@ func _setup_input() -> void:
 	# Menü mit Esc (im Browser-Vollbild beendet Esc nur das Vollbild: dort P); Enter bestätigt nur
 	_add_action("pause", [KEY_ESCAPE, KEY_P], [JOY_BUTTON_START], [])
 	_add_action("next_track", [KEY_PERIOD], [], [])  # nächster Musiktitel (M ist seit der Open World die Karte)
+	_add_action("radio", [KEY_COMMA], [], [])  # nächster Radiosender
+	_add_action("ban_track", [KEY_SLASH], [], [])  # Track aussortieren (deutsche Tastatur: "-")
 	_add_action("fullscreen", [KEY_F11, KEY_F], [], [])  # F: auf dem Mac ist F11 "Schreibtisch anzeigen"
 	var alt_enter := InputEventKey.new()
 	alt_enter.physical_keycode = KEY_ENTER

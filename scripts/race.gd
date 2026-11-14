@@ -675,7 +675,7 @@ func _build_hud() -> void:
 	hud["help"].set_anchors_preset(Control.PRESET_TOP_RIGHT)
 	hud["help"].position = Vector2(-250, 6)
 	hud["help"].size = Vector2(240, 60)
-	hud["help"].text = tr("W/S Gas/Bremse  A/D Lenken\nLeertaste Handbremse  Shift Nitro\nC Kamera  R Zurücksetzen  . Musik\nF Vollbild  Esc Pause")
+	hud["help"].text = tr("W/S Gas/Bremse  A/D Lenken\nLeertaste Handbremse  Shift Nitro\nC Kamera  R Zurücksetzen\n. Musik  , Sender  - Aussortieren\nF Vollbild  Esc Pause")
 	hud["help"].modulate.a = 0.7
 	if event_type == "drag":
 		hud["help"].text = tr("W Gas  S hoch-, X runterschalten\nA/D Spur wechseln  Shift Nitro\nC Kamera  F Vollbild  Esc Pause")
