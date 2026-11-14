@@ -1424,7 +1424,7 @@ func _plan_traffic(e: Dictionary) -> void:
 		while d < L - 10.0:
 			var lane: float = Track.AB_LANES[_trng.randi() % Track.AB_LANES.size()]
 			var outer := absf(lane) > 10.0
-			var kind: String = ["bus", "van", "van", "sedan"][_trng.randi() % 4] if outer else ["sedan", "sedan", "taxi", "van"][_trng.randi() % 4]
+			var kind: String = ["lkw", "lkw", "bus", "van", "van", "sedan"][_trng.randi() % 6] if outer else ["sedan", "sedan", "taxi", "van"][_trng.randi() % 4]
 			_tq.append([e, {"d": d, "lane": lane, "speed": AB_SPEED[absf(lane)], "kind": kind}])
 			d += _trng.randf_range(60.0, 120.0) * dens
 		return

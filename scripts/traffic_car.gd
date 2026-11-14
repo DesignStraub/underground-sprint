@@ -13,6 +13,10 @@ const EngineAudio := preload("res://scripts/engine_audio.gd")
 ## Motorklang: ruhiger Vierzylinder; der Bus ein rauer Sechszylinder-Diesel
 
 const KINDS := ["sedan", "sedan", "sedan", "taxi", "van", "van", "bus"]
+const LKW_COLORS := [Color(0.75, 0.08, 0.06), Color(0.08, 0.2, 0.55), Color(0.92, 0.92, 0.9), Color(0.1, 0.4, 0.2),
+	Color(0.95, 0.7, 0.1), Color(0.15, 0.15, 0.17)]
+const SPEDITIONEN := ["SCHMITT LOGISTIK", "NORDFRACHT", "BAUER & SÖHNE", "KAIZEN CARGO", "RHEIN-MAIN SPEDITION",
+	"ALPENTRANS", "HANSA KÜHLTRANSPORT", "SCHNELL & SICHER"]
 const COLORS := [Color(0.5, 0.5, 0.52), Color(0.15, 0.15, 0.17), Color(0.25, 0.3, 0.4), Color(0.45, 0.1, 0.1),
 	Color(0.7, 0.7, 0.68), Color(0.2, 0.3, 0.2), Color(0.35, 0.3, 0.25)]
 
@@ -83,9 +87,13 @@ func setup(kind_: String, rng: RandomNumberGenerator) -> void:
 		"bus":
 			size = Vector3(2.5, 3.2, 11.0)
 			col = Color(0.9, 0.85, 0.1) if rng.randf() < 0.5 else Color(0.85, 0.85, 0.85)
+		"lkw":
+			# Sattelzug (seit 2.29, nur Autobahn): Zugmaschine in Farbe, weißer Auflieger mit Spedition
+			size = Vector3(2.55, 3.9, 16.5)
+			col = LKW_COLORS[rng.randi() % LKW_COLORS.size()]
 	length = size.z
 	_half_w = size.x / 2.0
-	mass = {"van": 4.0, "bus": 10.0}.get(kind, 2.5)
+	mass = {"van": 4.0, "bus": 10.0, "lkw": 14.0}.get(kind, 2.5)
 	# Modell je Art und Farbe nur einmal bauen: Bauen und Verschmelzen kostete gut 20 ms je Auto, beim Laden einer
 	# Strecke kamen so ein Dutzend Autos auf einmal und das Bild ruckelte eine Sekunde lang (alle paar Sekunden)
 	_model(col)
@@ -102,6 +110,9 @@ func _model(col: Color) -> void:
 	var key := kind + col.to_html()
 	if _models.has(key):
 		for it in _models[key]:
+			if it[0] is String:
+				_label_from(it)
+				continue
 			var mi := MeshInstance3D.new()
 			mi.mesh = it[0]
 			mi.transform = it[1]
@@ -117,6 +128,43 @@ func _model(col: Color) -> void:
 				Builder._add(self, Builder.box(Vector3(0.7, 0.22, 0.3)), Builder.mat(Color(1, 1, 0.8), 0, 0.4, Color(1, 0.95, 0.6), 2.5), Vector3(0, 1.62, 0.2))
 			"van":
 				_body(Vector2(2.0, 5.2), 1.6, col, Vector2(1.9, 1.0), 0.45, -1.9)
+			"lkw":
+				# Zugmaschine vorn (Fahrerhaus hoch), dahinter der Auflieger
+				var paint := Builder.gloss_mat(col, 0.3, 0.4)
+				var white := Builder.mat(Color(0.9, 0.9, 0.88), 0.1, 0.6)
+				var dark := Builder.mat(Color(0.06, 0.06, 0.07), 0.2, 0.7)
+				var glass := Builder.mat(Color(0.03, 0.04, 0.06), 0.7, 0.1)
+				Builder._add(self, Builder.rtapered_box(Vector2(2.5, 2.4), Vector2(2.4, 2.3), 2.6, 0.0, 0.12), paint, Vector3(0, 0.9, -7.0))
+				Builder._add(self, Builder.box(Vector3(2.3, 0.9, 0.05)), glass, Vector3(0, 2.75, -8.22))
+				Builder._add(self, Builder.box(Vector3(2.5, 0.9, 3.6)), dark, Vector3(0, 0.45, -6.4))
+				Builder._add(self, Builder.box(Vector3(2.55, 3.0, 13.4)), white, Vector3(0, 2.4, 1.5))
+				Builder._add(self, Builder.box(Vector3(2.5, 0.7, 13.0)), dark, Vector3(0, 0.55, 1.5))
+				var head := Builder.mat(Color(1, 1, 0.9), 0, 0.3, Color(1, 0.95, 0.8), 4.0)
+				var tail := Builder.mat(Color(0.6, 0, 0), 0, 0.3, Color(1, 0.05, 0.02), 3.0)
+				for sx in [-1, 1]:
+					Builder._add(self, Builder.box(Vector3(0.4, 0.18, 0.05)), head, Vector3(sx * 0.9, 1.25, -8.22))
+					Builder._add(self, Builder.box(Vector3(0.35, 0.15, 0.05)), tail, Vector3(sx * 1.0, 0.95, 8.21))
+					for wz in [-7.6, -4.6, 4.4, 5.8, 7.2]:
+						var c := CylinderMesh.new()
+						c.top_radius = 0.5
+						c.bottom_radius = 0.5
+						c.height = 0.3
+						c.radial_segments = 14
+						c.rings = 1
+						Builder._add(self, c, Builder.mat(Color(0.05, 0.05, 0.05), 0, 0.9), Vector3(sx * 1.08, 0.5, wz)).rotation_degrees.z = 90
+				# Speditionsname an beiden Seiten des Aufliegers
+				var name: String = SPEDITIONEN[absi(col.to_html().hash()) % SPEDITIONEN.size()]
+				for sx in [-1.0, 1.0]:
+					var l := Label3D.new()
+					l.text = name
+					l.font_size = 64
+					l.pixel_size = 0.016
+					l.modulate = col if col.get_luminance() < 0.8 else Color(0.1, 0.2, 0.5)
+					l.shaded = true
+					l.double_sided = false
+					l.position = Vector3(sx * 1.29, 2.6, 1.5)
+					l.rotation.y = sx * PI / 2.0
+					add_child(l)
 			"bus":
 				_body(Vector2(2.5, 11.0), 2.6, col, Vector2.ZERO, 0.0)
 				var win := Builder.mat(Color(0.1, 0.1, 0.1), 0.5, 0.2, Color(1, 0.9, 0.6), 1.2)
@@ -129,10 +177,25 @@ func _model(col: Color) -> void:
 		for c in get_children():
 			if c is MeshInstance3D and c.get_child_count() == 0:
 				items.append([c.mesh, c.transform, c.material_override, c.cast_shadow])
+			elif c is Label3D:
+				items.append([(c as Label3D).text, c.transform, (c as Label3D).modulate, (c as Label3D).pixel_size])
 			else:
 				cacheable = false  # unerwartete Teile: lieber nicht zwischenspeichern
 		if cacheable:
 			_models[key] = items
+
+
+## Schriftzug (Spedition) aus dem Zwischenspeicher: [Text, Lage, Farbe, Pixelgröße]
+func _label_from(it: Array) -> void:
+	var l := Label3D.new()
+	l.text = it[0]
+	l.transform = it[1]
+	l.modulate = it[2]
+	l.pixel_size = it[3]
+	l.font_size = 64
+	l.shaded = true
+	l.double_sided = false
+	add_child(l)
 
 
 ## Alle Modelle beim Laden der Welt vorbauen (hinter dem Ladebild), damit auch das erste Auto jeder Farbe nicht ruckelt
@@ -143,6 +206,8 @@ static func prewarm() -> void:
 		plan.append(["van", c])
 	plan.append_array([["taxi", Color(0.95, 0.75, 0.05)], ["van", Color(0.85, 0.85, 0.85)], ["bus", Color(0.9, 0.85, 0.1)],
 		["bus", Color(0.85, 0.85, 0.85)]])
+	for c in LKW_COLORS:
+		plan.append(["lkw", c])
 	var Self: GDScript = load("res://scripts/traffic_car.gd")
 	for it in plan:
 		if _models.has(it[0] + (it[1] as Color).to_html()):
@@ -193,7 +258,7 @@ static func prepare_sound() -> void:
 
 
 static func _loop_for(k: String) -> AudioStreamWAV:
-	return EngineAudio.traffic_loop("bus" if k == "bus" else "car")
+	return EngineAudio.traffic_loop("bus" if k == "bus" or k == "lkw" else "car")
 
 
 ## Motor und Abrollen an/aus (race.gd: nur die nächsten paar Autos)
@@ -203,7 +268,7 @@ func sound(on: bool, bus: String) -> void:
 	if _snd == null:
 		if not on:
 			return
-		var bus_k := kind == "bus"
+		var bus_k := kind == "bus" or kind == "lkw"
 		var w := _loop_for(kind)
 		_snd = AudioStreamPlayer3D.new()
 		_snd.stream = w
@@ -390,7 +455,7 @@ func push(dv: Vector3) -> void:
 func launch(dir: Vector3, hit: float) -> void:
 	if not wrecked:
 		push(dir * 0.1)
-	if kind == "bus":
+	if kind == "bus" or kind == "lkw":
 		_wreck_spin += randf_range(-0.6, 0.6)
 		return
 	if _wreck_roll_v == 0.0 and position.y <= _wreck_ground + 0.01:
