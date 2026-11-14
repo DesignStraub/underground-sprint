@@ -391,6 +391,8 @@ static func step(job: Dictionary) -> float:
 				_drag_boards(root, track)
 			if not city.is_empty() or race.has("town"):
 				_build_city_signs(root, track, race)
+			if type == "autobahn":
+				_exit_signs(root, track)
 			if race.get("city", "") == "kreuzberg":
 				_east_side_gallery(root, track)
 			if type == "autobahn" or track["world"]:
@@ -3912,6 +3914,69 @@ static func _east_side_gallery(root: Node3D, track: Dictionary) -> void:
 				Transform3D(bf, base + face * 1.3 + Vector3(0, rng.randf_range(1.2, 2.8), 0)))
 			d += 1.2
 		_bake(root, groups)
+
+
+## Blaue Ausfahrt-Wegweiser auf der Autobahn (seit 2.29): 260 m vor jeder Ausfahrt in beiden Fahrtrichtungen rechts
+## am Bankett, mit Ausfahrtnummer, Stadtname und schrägem Pfeil, nachts angestrahlt
+static func _exit_signs(root: Node3D, track: Dictionary) -> void:
+	var curve: Curve3D = track["curve"]
+	var blue := Builder.mat(Color(0.0, 0.2, 0.52), 0.1, 0.4, Color(0.0, 0.2, 0.52), 0.35)
+	var white := Builder.mat(Color(0.92, 0.92, 0.92), 0.0, 0.4, Color(1, 1, 1), 0.4)
+	var post := Builder.mat(Color(0.5, 0.52, 0.55), 0.6, 0.4)
+	for p in track["paths"]:
+		if p["kind"] != "ramp":
+			continue
+		var name: String = str(p.get("name", "")).to_upper()
+		if name == "":
+			name = "KREUZ MITTE"
+		var num := str(absi(name.hash()) % 47 + 1)
+		for dir in [1.0, -1.0]:
+			var d: float = p["from"] - dir * 260.0
+			if d < 20.0 or d > track["length"] - 20.0 or not tunnel_at(track, d, 10.0).is_empty():
+				continue
+			var f := frame_at(curve, d)
+			var right: Vector3 = f["right"] * dir
+			var fwd: Vector3 = f["fwd"] * dir
+			var base: Vector3 = f["pos"] + right * (hw(track, d) + WALK - 0.8) + Vector3(0, _lift(track, d), 0)
+			var b := Basis.looking_at(fwd, Vector3.UP)  # Schild schaut den Fahrern entgegen (+Z zu ihnen)
+			var w := maxf(_text_w(name, 48, 0.02) + 3.2, 6.0)
+			var g := {}  # je Schild ein eigenes Mesh (ein gemeinsames über 1 km wurde von der Detailstufe ausgeblendet)
+			# Tafel über dem Bankett, rechte Kante an der Wand, hoch genug für Busse (Kragarm-Wegweiser)
+			var post_p := base
+			base = base - b.x * (w / 2.0 - 0.6) + Vector3(0, 2.4, 0)
+			if OS.get_cmdline_user_args().has("--signlog"):
+				print("EXITSIGN ", name, " pos=", base, " fwd=", fwd)
+			_part(g, post, Builder.box(Vector3(0.3, 7.6, 0.3)), Transform3D(b, post_p + Vector3(0, 3.8, -0.15)))
+			_part(g, post, Builder.box(Vector3(w * 0.9, 0.2, 0.2)), Transform3D(b, base + Vector3(0, 3.6 + 1.2, -0.15)))
+			_part(g, post, Builder.box(Vector3(w * 0.9, 0.2, 0.2)), Transform3D(b, base + Vector3(0, 3.6 - 1.0, -0.15)))
+			_part(g, white, Builder.box(Vector3(w + 0.16, 3.16, 0.06)), Transform3D(b, base + Vector3(0, 3.6, 0.0)))
+			_part(g, blue, Builder.box(Vector3(w, 3.0, 0.08)), Transform3D(b, base + Vector3(0, 3.6, 0.02)))
+			# Nummernfeld oben links (weiß umrandet)
+			_part(g, white, Builder.box(Vector3(1.3, 0.8, 0.02)), Transform3D(b, base + Vector3(0, 4.55, 0.07) - b.x * (w / 2.0 - 0.95)))
+			_part(g, blue, Builder.box(Vector3(1.16, 0.66, 0.02)), Transform3D(b, base + Vector3(0, 4.55, 0.085) - b.x * (w / 2.0 - 0.95)))
+			var labels := [[num, 30, base + Vector3(0, 4.55, 0.11) - b.x * (w / 2.0 - 0.95)],
+				["Ausfahrt", 26, base + Vector3(0, 4.55, 0.11) - b.x * (w / 2.0 - 2.9)],
+				[name, 48, base + Vector3(0, 3.35, 0.11) - b.x * 0.6]]
+			for lb in labels:
+				var l := Label3D.new()
+				l.text = lb[0]
+				l.font_size = lb[1]
+				l.pixel_size = 0.02
+				l.modulate = Color(1.5, 1.5, 1.5)
+				l.shaded = false
+				l.double_sided = false
+				l.transform = Transform3D(b, lb[2])
+				root.add_child(l)
+			var aq := QuadMesh.new()
+			aq.size = Vector2(1.6, 1.6)
+			var ai := MeshInstance3D.new()
+			ai.mesh = aq
+			ai.material_override = SignIcons.material("pfeil_rechts", Color(1.5, 1.5, 1.5))
+			ai.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			# Pfeil schräg nach rechts oben (Ausfahrt)
+			ai.transform = Transform3D(b * Basis(Vector3.BACK, deg_to_rad(40.0)), base + Vector3(0, 3.2, 0.11) + b.x * (w / 2.0 - 1.1))
+			root.add_child(ai)
+			_bake(root, g, Transform3D.IDENTITY)
 
 
 ## Gelbes Ortsschild hinter dem Start, Straßenschilder an jedem Straßenwechsel
