@@ -8,7 +8,9 @@ const NAMES := {"en": "English", "de": "Deutsch"}
 
 const EN := {
 	# --- Menü ---
-	"Rennen fahren": "Race", "Losfahren": "Drive", "DRIFT-MODUS": "DRIFT MODE", "FAHR-MODUS": "GRIP MODE", "STARTSTADT": "START CITY", "Zufällige Stadt": "Random city",
+	"Rennen fahren": "Race", "Losfahren": "Drive", "gewonnen": "won", "offen": "open", "gesperrt": "locked", "Rennen hier:": "Races here:",
+	"←/→ Rennen wählen\nEnter: als Ziel setzen (Flagge auf der Minikarte)\nLeertaste: Schnellreise\nM / Esc: zurück": "←/→ Pick race\nEnter: set as target (flag on the minimap)\nSpace: fast travel\nM / Esc: back",
+	"Ziel gesetzt. Enter: Ziel löschen\nLeertaste: Schnellreise\nM / Esc: zurück": "Target set. Enter: clear target\nSpace: fast travel\nM / Esc: back", "DRIFT-MODUS": "DRIFT MODE", "FAHR-MODUS": "GRIP MODE", "STARTSTADT": "START CITY", "Zufällige Stadt": "Random city",
 	"Wähle, in welcher Stadt du in die offene Welt startest.": "Pick the city where you start in the open world.",
 	"Start an der Ausfahrt der Stadt, Blick in die Stadt.": "You start at the city's exit, facing into town.", "Welt wird gebaut …": "Building the world …",
 	"Welt wird gebaut … %d / %d": "Building the world … %d / %d", "Enter: Rennen starten": "Enter: start race",

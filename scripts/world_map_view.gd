@@ -7,6 +7,7 @@ const Catalog := preload("res://scripts/catalog.gd")
 const UI := preload("res://scripts/ui_style.gd")
 
 signal target_chosen(race_index: int)
+signal fast_travel(race_index: int)
 signal closed
 
 var roads: Array = []  # [[Linienzug Welt x, z], Art]
@@ -87,6 +88,10 @@ func _handle(event: InputEvent) -> bool:
 		var ri: int = pins[sel]["race_index"]
 		target = -1 if target == ri else ri
 		target_chosen.emit(target)
+		Sfx.ui("go")
+	elif event.is_action_pressed("handbrake"):
+		# Leertaste: Schnellreise zur Ausfahrt dieser Stadt (seit 2.31)
+		fast_travel.emit(pins[sel]["race_index"])
 		Sfx.ui("go")
 	elif event.is_action_pressed("ui_cancel") or event.is_action_pressed("map") or event.is_action_pressed("pause"):
 		visible = false
@@ -216,10 +221,10 @@ func _draw_info() -> void:
 	y += 22
 	var km := (p["pos"] as Vector3).distance_to(player.global_position) / 1000.0 if player else 0.0
 	draw_string(_cond, Vector2(x + 12, y), tr("Luftlinie: %.1f km") % km, HORIZONTAL_ALIGNMENT_LEFT, w - 24, 13, Color(0.7, 0.75, 0.85))
-	var hint := tr("←/→ Rennen wählen\nEnter: als Ziel setzen (Flagge auf der Minikarte)\nM / Esc: zurück")
+	var hint := tr("←/→ Rennen wählen\nEnter: als Ziel setzen (Flagge auf der Minikarte)\nLeertaste: Schnellreise\nM / Esc: zurück")
 	if target == p["race_index"]:
-		hint = tr("Ziel gesetzt. Enter: Ziel löschen\nM / Esc: zurück")
-	var yy := size.y - 110
+		hint = tr("Ziel gesetzt. Enter: Ziel löschen\nLeertaste: Schnellreise\nM / Esc: zurück")
+	var yy := size.y - 126
 	for line in hint.split("\n"):
 		draw_string(_cond, Vector2(x + 12, yy), line, HORIZONTAL_ALIGNMENT_LEFT, w - 24, 11, Color(0.75, 0.8, 0.9, 0.85))
 		yy += 16

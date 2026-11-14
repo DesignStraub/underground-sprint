@@ -929,6 +929,7 @@ func _build_hud() -> void:
 			and v[0].y > map_view._lo.y and v[0].y < map_view._hi.y)
 	map_view.target = target
 	map_view.target_chosen.connect(_set_target)
+	map_view.fast_travel.connect(_fast_travel)
 	map_view.closed.connect(_close_map)
 
 
@@ -967,6 +968,16 @@ func _open_map() -> void:
 	Music.set_paused(true)
 	hud["prompt"].visible = false
 	map_view.open(target)
+
+
+## Schnellreise (Karte, Leertaste): Welt neu laden, Start an der Ausfahrt dieser Stadt (wie die Startstadt)
+func _fast_travel(ri: int) -> void:
+	GameState.world_start = ri
+	has_return = false
+	get_tree().paused = false
+	Music.set_paused(false)
+	Music.race_loading()  # leiser während des Ladens, world_go macht wieder voll
+	get_tree().change_scene_to_file("res://scenes/world.tscn")
 
 
 func _close_map() -> void:

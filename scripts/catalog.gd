@@ -643,7 +643,7 @@ const TYPE_ORDER := ["sprint", "circuit", "drift"]
 const STAGES := [
 	{"name": "Einstieg", "events": ["Bankenviertel-Sprint", "Tauberbischofsheim Altstadt", "Bad Kissingen Kurmeile", "Innenstadtring"]},
 	{"name": "Szene", "events": ["Prachtallee-Sprint", "Hafen-Drift", "Hammelburg Saaleck", "Altstadt-Hügel"]},
-	{"name": "Hafen und Altstadt", "events": ["Hafenrunde", "Aachen Grabenring", "Hafenring", "Altstadtring"]},
+	{"name": "Hafen und Altstadt", "events": ["Hafenrunde", "Aachen Grabenring", "Hafenring", "Altstadtring", "Freudenstadt Waldpass"]},
 	{"name": "Großstadt", "events": ["Berlin Kreuzberg", "Schnellstraßen-Sprint", "Stadion-Drift"]},
 	{"name": "Finale", "events": ["Hafen-Sprint", "Nachtschicht", "Würzburg Mainufer"]},
 ]
@@ -652,7 +652,7 @@ const STAGE_WINS := 3
 ## Alle Karriere-Events Stufe für Stufe (Reihenfolge der Liste in der Garage)
 const CAREER := ["Bankenviertel-Sprint", "Tauberbischofsheim Altstadt", "Bad Kissingen Kurmeile", "Innenstadtring",
 	"Prachtallee-Sprint", "Hafen-Drift", "Hammelburg Saaleck", "Altstadt-Hügel",
-	"Hafenrunde", "Aachen Grabenring", "Hafenring", "Altstadtring",
+	"Hafenrunde", "Aachen Grabenring", "Hafenring", "Altstadtring", "Freudenstadt Waldpass",
 	"Berlin Kreuzberg", "Schnellstraßen-Sprint", "Stadion-Drift",
 	"Hafen-Sprint", "Nachtschicht", "Würzburg Mainufer"]
 ## Bis 2.15 eine Kette (ein Sieg öffnete das nächste Event): was danach schon offen war, bleibt offen

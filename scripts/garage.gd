@@ -841,6 +841,8 @@ func _show_start_city() -> void:
 	_clear_menu()
 	_back = _show_main
 	_set_section("STARTSTADT")
+	career_map.visible = true  # Deutschland mit allen Rennen: grau gesperrt, grün offen, gold gewonnen
+	career_map.selected = ""
 	var first := _button("Zufällige Stadt", func():
 		var towns := _start_towns()
 		GameState.world_start = towns[randi() % towns.size()][1]
@@ -851,12 +853,25 @@ func _show_start_city() -> void:
 			GameState.world_start = ri
 			_drive_world())
 		b.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
-		b.focus_entered.connect(func(): info.text = str(Catalog.RACES[ri].get("region", "")) + "\n" + tr("Start an der Ausfahrt der Stadt, Blick in die Stadt."))
+		b.focus_entered.connect(func():
+			career_map.selected = Catalog.RACES[ri]["name"] if Catalog.RACES[ri]["name"] in Catalog.CAREER else ""
+			info.text = _town_info(t[0]))
 		if ri == GameState.world_start:
 			first = b
 	info.text = tr("Wähle, in welcher Stadt du in die offene Welt startest.")
 	_focus_first()
 	_grab.call_deferred(first)
+
+
+## Infotext zur Startstadt: Rennen dort mit Stand (offen, gewonnen, gesperrt)
+func _town_info(town: String) -> String:
+	var lines := []
+	for r in Catalog.RACES:
+		if r.get("town", "") != town or r.get("type", "sprint") == "drag":
+			continue
+		var st := tr("gewonnen") if r["name"] in GameState.won_events else (tr("offen") if GameState.career_open(r["name"]) else tr("gesperrt"))
+		lines.append("%s  ·  %s" % [tr(r["name"]), st])
+	return tr("Rennen hier:") + "\n" + "\n".join(lines)
 
 
 ## Städte der Open World: [Ort, Rennen] je Ort einmal (das erste Rennen dort), nach Namen sortiert
