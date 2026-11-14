@@ -39,7 +39,9 @@ var _blade_mat: StandardMaterial3D
 
 var _road := {}  # Rasterzelle -> PackedVector2Array (Punkte alle 20 m auf Autobahnen und Auffahrten)
 var _croad := {}  # dasselbe für die Straßen der Städte
-var _froad := {}  # Waldstrecken: Landstraße ohne Häuser, der Wald reicht bis ans Bankett
+var _froad := {}
+var _center := Vector2.ZERO
+var _has_center := false  # Waldstrecken: Landstraße ohne Häuser, der Wald reicht bis ans Bankett
 var _urban := []
 var _villages := []  # {pos, r, level, seed, name}
 var _parks := []  # {pos, seed, dir}
@@ -102,6 +104,9 @@ func setup(lay: Dictionary) -> void:
 			arr.append(q)
 			_croad[cell] = arr
 	_urban = layout.get("urban", [])
+	if layout.has("center"):
+		_center = Vector2(layout["center"].x, layout["center"].z)
+		_has_center = true
 	_plan_sites()
 	_make_materials()
 	_make_mask()
@@ -146,7 +151,10 @@ func city_dist(p: Vector2) -> float:
 
 ## Wie weit ist p vom Rand der flachen Zone entfernt (unter 0: in der Zone neben einer Straße oder in der Stadt)?
 func free_dist(p: Vector2) -> float:
-	return minf(minf(road_dist(p) - ROAD_FLAT, city_dist(p) - CITY_FLAT), _dist(_froad, p) - FOREST_FLAT)
+	var f := minf(minf(road_dist(p) - ROAD_FLAT, city_dist(p) - CITY_FLAT), _dist(_froad, p) - FOREST_FLAT)
+	if _has_center:
+		f = minf(f, p.distance_to(_center) - Layout.CENTER_R - 80.0)  # Erfurt in der Mitte: flach
+	return f
 
 
 func forest_dist(p: Vector2) -> float:
@@ -373,6 +381,16 @@ func _make_mask() -> void:
 		for q in arr:
 			if Layout.is_urban(Vector3(q.x, 0, q.y), _urban, -150.0):
 				paint.call(q, 70.0)
+	if _has_center:
+		var r := Layout.CENTER_R + 60.0
+		var cc := Vector2i(int((_center.x + ext) * k), int((_center.y + ext) * k))
+		var rr := int(r * k)
+		for y in range(-rr, rr + 1):
+			for x in range(-rr, rr + 1):
+				if x * x + y * y <= rr * rr:
+					var px := cc + Vector2i(x, y)
+					if px.x >= 0 and px.y >= 0 and px.x < S and px.y < S:
+						img.set_pixel(px.x, px.y, Color(1, 0, 0))
 	img.resize(S / 8, S / 8, Image.INTERPOLATE_BILINEAR)
 	img.resize(S, S, Image.INTERPOLATE_CUBIC)
 	land_mat.set_shader_parameter("urban_mask", ImageTexture.create_from_image(img))

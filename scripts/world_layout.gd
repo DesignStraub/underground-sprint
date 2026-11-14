@@ -165,6 +165,9 @@ static func build() -> Dictionary:
 	var oring := _outer_ring(cities, R)
 	var oramps := []
 	_connect_ends(cities, ring, oring, ramps, oramps)
+	# Spangen zwischen innerem und äußerem Ring durch die Lücken zwischen den Städten (seit 2.31): mehr Wege, nicht
+	# nur rundherum
+	var spokes := _plan_spokes(cities, ring, oring, ramps, oramps)
 	for c in cities:
 		if not (c["exit2_local"] as Dictionary).is_empty() and not c.has("exit2_ring"):
 			c["race"]["tail_join"] = true  # Ziel eingeschlossen: die Straße dahinter führt zurück auf die Strecke
@@ -174,6 +177,8 @@ static func build() -> Dictionary:
 	var msegs := _split(mid["rb"], mid["rb_ramps"], 9800, 2, "Kreisel")
 	for i in mid["arms"].size():
 		msegs.append_array(_split_open(mid["arms"][i], 9900 + i * 50, 3 + i, "Querspange"))
+	for i in spokes.size():
+		msegs.append_array(_split_open(spokes[i], 9600 + i * 50, 3 + mid["arms"].size() + i, "Spange"))
 	segments.append_array(msegs)
 	# Autobahn über Land, Stadt nur um die Auffahrten der Städte und am Kreisel (seit 2.29; davor säumten Hochhäuser
 	# die ganze Autobahn, und die Welt sah überall gleich aus). Die Landschaft (landscape.gd) fragt dasselbe ab.
@@ -186,7 +191,7 @@ static func build() -> Dictionary:
 		rbc += q / float(mid["rb"].size())
 	urban.append(rbc)
 	for sg in segments:
-		sg["race"]["district_seq"] = _district_seq(sg["race"]["pts"], urban)
+		sg["race"]["district_seq"] = _district_seq(sg["race"]["pts"], urban, rbc)
 		sg["race"]["no_ground"] = true
 		if sg.get("ring", 0) <= 1:
 			_ring_crests(sg)
@@ -202,7 +207,7 @@ static func build() -> Dictionary:
 		orl.append(Vector2(q.x, q.z))
 	orl.append(orl[0])
 	roads.append([orl, 0])
-	for line in [mid["rb"] + [mid["rb"][0]]] + mid["arms"]:
+	for line in [mid["rb"] + [mid["rb"][0]]] + mid["arms"] + spokes:
 		var ml := PackedVector2Array()
 		for q in line:
 			ml.append(Vector2(q.x, q.z))
@@ -229,7 +234,7 @@ static func build() -> Dictionary:
 	for sg in segments:
 		sg["race"]["world_holes"] = holes
 	_cache = {"cities": cities, "segments": segments, "ring_r": R, "ring": ring, "oring": oring, "roads": roads, "holes": holes,
-		"urban": urban}
+		"urban": urban, "center": rbc}
 	if OS.get_cmdline_user_args().has("--worldlog"):
 		var olen := 0.0
 		for k in oring.size():
@@ -257,11 +262,13 @@ static func _building_points(tr: Dictionary) -> PackedVector2Array:
 	return out
 
 
+const CENTER_R := 750.0  # Stadt in der Kartenmitte (um den Kreisel): Innenstadt statt Schnellstraße
+const CENTER_NAME := "Erfurt"  # Landeshauptstadt nahe dem Mittelpunkt Deutschlands
 const URBAN_R := 420.0  # so weit um eine Auffahrt (und um den Kreisel) ist die Autobahn Stadt
 
 
 ## Viertel je 400 m eines Autobahnstücks: "highway" (Stadt) nahe einer Auffahrt, sonst "land"
-static func _district_seq(pts: Array, urban: Array) -> Array:
+static func _district_seq(pts: Array, urban: Array, center := Vector3(1e9, 0, 1e9)) -> Array:
 	var seq := []
 	var acc := 0.0
 	var next := 200.0  # Mitte des ersten Abschnitts
@@ -271,7 +278,10 @@ static func _district_seq(pts: Array, urban: Array) -> Array:
 		var l := a.distance_to(b)
 		while next <= acc + l:
 			var q := a.lerp(b, (next - acc) / maxf(l, 0.001))
-			seq.append("highway" if is_urban(q, urban) else "land")
+			if Vector2(q.x - center.x, q.z - center.z).length() < CENTER_R:
+				seq.append(["downtown", "shops", "boulevard"][seq.size() % 3])  # Erfurt in der Mitte: Innenstadt
+			else:
+				seq.append("highway" if is_urban(q, urban) else "land")
 			next += 400.0
 		acc += l
 	if seq.is_empty():
@@ -418,6 +428,103 @@ static func _plan_middle(ring: Array, ramps: Array) -> Dictionary:
 		ramps.append({"k": kr, "from": rp, "end": p0, "name": "", "wide": true})
 		rb_ramps.append({"k": krb, "from": bp, "end": p1, "name": "", "wide": true})
 	return {"rb": rb, "rb_ramps": rb_ramps, "arms": arms}
+
+
+const SPOKE_CLEAR := 230.0  # so weit bleibt eine Spange von Straßen und Häusern der Städte weg
+const SPOKE_MAX := 7
+
+
+## Spangen: gerade Autobahnstücke (mit leichtem Schwung) vom inneren zum äußeren Ring, wo zwischen zwei Städten Platz
+## ist: Linie radial nach außen bis zum Außenring, überall mindestens SPOKE_CLEAR von Stadtstraßen und Häusern, nicht
+## an anderen Auffahrten, mindestens 40 Grad zur nächsten Spange. Hängen wie die Diagonalen über breite Auffahrten an
+## beiden Ringen (ramps, oramps).
+static func _plan_spokes(cities: Array, ring: Array, oring: Array, ramps: Array, oramps: Array) -> Array:
+	var m := ring.size()
+	var mo := oring.size()
+	var cell := 200.0
+	var grid := {}
+	for c in cities:
+		var pts := []
+		for rd in c["roads"]:
+			var pl: PackedVector2Array = rd[0]
+			for k in range(0, pl.size(), 2):
+				pts.append(pl[k])
+		for q in c.get("bld_world", PackedVector2Array()):
+			pts.append(q)
+		for q in pts:
+			var key := Vector2i(floori(q.x / cell), floori(q.y / cell))
+			if not grid.has(key):
+				grid[key] = []
+			grid[key].append(q)
+	var clear := func(q: Vector3) -> bool:
+		var p := Vector2(q.x, q.z)
+		var key := Vector2i(floori(p.x / cell), floori(p.y / cell))
+		for dy in range(-2, 3):
+			for dx in range(-2, 3):
+				for o in grid.get(key + Vector2i(dx, dy), []):
+					if p.distance_to(o) < SPOKE_CLEAR:
+						return false
+		return true
+	var near_ramp := func(list: Array, k: int, n: int) -> bool:
+		for r in list:
+			var dk: int = absi(int(r["k"]) - k)
+			if mini(dk, n - dk) < 8:
+				return true
+		return false
+	var out := []
+	var angs := []
+	for step in 240:
+		if out.size() >= SPOKE_MAX:
+			break
+		var a := TAU * step / 240.0
+		var ok := true
+		for b in angs:
+			if absf(wrapf(a - b, -PI, PI)) < deg_to_rad(40.0):
+				ok = false
+		if not ok:
+			continue
+		var kr := posmod(int(round(a / TAU * m)), m)
+		if near_ramp.call(ramps, kr, m):
+			continue
+		var rp: Vector3 = ring[kr]
+		var dir := Vector3(rp.x, 0.0, rp.z).normalized()
+		var ko := 0
+		var best := 1e9
+		for k in mo:
+			var q: Vector3 = oring[k]
+			var dd := absf(wrapf(atan2(q.z, q.x) - atan2(dir.z, dir.x), -PI, PI))
+			if dd < best:
+				best = dd
+				ko = k
+		if near_ramp.call(oramps, ko, mo):
+			continue
+		var op: Vector3 = oring[ko]
+		var p0 := rp + dir * ARM_IN
+		var p1 := op + (rp - op).normalized() * ARM_IN
+		var L := p0.distance_to(p1)
+		if L < 700.0:
+			continue
+		var n := int(ceil(L / RING_STEP))
+		var side := Vector3(-dir.z, 0.0, dir.x) * (1.0 if step % 2 == 0 else -1.0)
+		var pts := []
+		for j in n + 1:
+			var t := float(j) / n
+			pts.append(p0.lerp(p1, t) + side * sin(t * TAU) * sin(t * PI) * minf(120.0, L * 0.08))
+		for j in range(0, 41):
+			var q: Vector3 = rp.lerp(p0, j / 40.0) if j < 5 else Vector3.ZERO
+			if j < 5 and not clear.call(q):
+				ok = false
+		for q in pts + [op]:
+			if not clear.call(q):
+				ok = false
+				break
+		if not ok:
+			continue
+		angs.append(a)
+		out.append(pts)
+		ramps.append({"k": kr, "from": rp, "end": p0, "name": "AUSSENRING", "wide": true})
+		oramps.append({"k": ko, "from": op, "end": p1, "name": "INNENRING", "wide": true})
+	return out
 
 
 ## Offene Straße (Diagonale) in Stücke von gut SEG_LEN teilen; die Enden bekommen im Mittelstreifen eine Lücke

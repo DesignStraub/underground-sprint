@@ -18,6 +18,7 @@ var sel := 0
 
 var relief: Texture2D  # Reliefkarte der Landschaft (Landscape.map_texture)
 var villages: Array = []  # [Lage, Name]
+var center_town: Array = []  # [Lage, Name] der Stadt in der Mitte
 var _lo := Vector2.ZERO
 var _hi := Vector2.ZERO
 var _cond: Font
@@ -116,6 +117,10 @@ func _draw() -> void:
 		var vp := _to_screen(v[0])
 		draw_rect(Rect2(vp - Vector2(2, 2), Vector2(4, 4)), Color(0.75, 0.6, 0.45, 0.8))
 		draw_string(_cond, vp + Vector2(5, 3), v[1], HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color(0.7, 0.72, 0.78, 0.55))
+	if not center_town.is_empty():
+		var cp := _to_screen(center_town[0])
+		draw_circle(cp, 18.0, Color(0.3, 0.35, 0.45, 0.35))
+		draw_string(_cond, cp + Vector2(22, -10), center_town[1], HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(0.85, 0.9, 1.0, 0.85))
 	# Straßen: erst Ränder, dann helle Linien (Ring etwas kräftiger)
 	for pass_i in 2:
 		for r in roads:

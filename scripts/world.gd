@@ -927,6 +927,8 @@ func _build_hud() -> void:
 		map_view.relief = land.map_texture(map_view._lo, map_view._hi)
 		map_view.villages = land.villages().filter(func(v): return v[0].x > map_view._lo.x and v[0].x < map_view._hi.x \
 			and v[0].y > map_view._lo.y and v[0].y < map_view._hi.y)
+		if layout.has("center"):
+			map_view.center_town = [Vector2(layout["center"].x, layout["center"].z), Layout.CENTER_NAME.to_upper()]
 	map_view.target = target
 	map_view.target_chosen.connect(_set_target)
 	map_view.fast_travel.connect(_fast_travel)
@@ -1122,8 +1124,10 @@ func _update_district() -> void:
 		var near := ""
 		if _vill.is_empty():
 			_vill = land.villages()
+			if layout.has("center"):
+				_vill.append([Vector2(layout["center"].x, layout["center"].z), Layout.CENTER_NAME])
 		for v in _vill:
-			if pp.distance_to(v[0]) < 650.0:
+			if pp.distance_to(v[0]) < (Layout.CENTER_R if v[1] == Layout.CENTER_NAME else 650.0):
 				near = v[1]
 		if near != "" and near != _village_shown:
 			hud["area"].text = near.to_upper()

@@ -274,6 +274,17 @@ gesäumt. Seit 2.29:
 - **Echte Städte in der Welt**: Boden um alle OpenStreetMap-Häuser flach und als Stadt gefärbt (davor lagen in Aachen
   zwischen Häusern weit weg von der Strecke Wiesen und Hänge).
 - **Ton (2.30)**: Motor, Reifen, Verkehr und Effekte gut 30 % (3 dB) leiser, die Musik auf eigenem Bus bleibt gleich laut.
+- **Mehr Verbindungen (2.31)**: Spangen vom inneren zum äußeren Ring durch die Lücken zwischen den Städten
+  (`world_layout._plan_spokes`: mindestens 230 m von Stadtstraßen und Häusern, 40 Grad Abstand, bis zu 7), mit Kuppen
+  und breiten Auffahrten an beiden Ringen (Wegweiser „AUSSENRING“ / „INNENRING“).
+- **Erfurt in der Mitte**: um den Kreisel und die ersten 750 m der Diagonalen Innenstadt (Bankenviertel, Markt,
+  Prachtallee) statt Schnellstraße, Boden flach und als Stadt gefärbt, Name auf der Karte und beim Hineinfahren.
+- **Q** schaltet in der Welt zwischen Fahr- und Drift-Modus um (bleibt über Rennen und Garage hinweg).
+- **Schnellreise**: große Karte (M), Rennen wählen, Leertaste: die Welt lädt neu und man steht an der Ausfahrt dieser
+  Stadt. Die Startstadt-Wahl in der Garage zeigt die Deutschlandkarte mit allen Rennen (grau gesperrt, grün offen,
+  gold gewonnen) und im Infofeld die Rennen der Stadt.
+- **Verkehr rammen tut weh (2.31)**: frontal ab gut 65 km/h Aufprall (Bus, Lkw schon früher) überschlägt man sich,
+  sonst prallt man zurück, dreht sich stark und ist über eine Sekunde benommen. Test: `--wspawn=ring:30 --ctest=frontal`.
 - **Startstadt**: Garage → Losfahren fragt, in welcher Stadt man startet (alphabetisch, oben „Zufällige Stadt“); man
   steht 40 m hinter der Ausfahrt mit Blick in die Stadt (`GameState.world_start`, Test: `--wstart=<Rennen>`).
 - Test: `--wcam=zurück:höhe:voraus[:drehung]` (Kamera über dem Auto), `--wmap` (Bild der offenen Karte),
