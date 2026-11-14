@@ -75,6 +75,14 @@ void vertex() {
 	show = show || (opt == 10.0 && mode == 7.0);
 	show = show || (opt == 11.0 && mode == 6.0);
 	show = show || (opt == 12.0 && hair > 0.5 && hair != 2.0);
+	// Zubehör (seit 2.29): Rucksack, Umhängetasche, Brille, Bart (nur ohne lange Haare, Zopf, Dutt, Rock)
+	float h6 = fract(cu.r * 17.3 + cu.g * 0.7 + cu.a * 3.1);
+	float h7 = fract(cu.g * 19.1 + cu.a * 0.37);
+	float h8 = fract(cu.a * 23.7 + cu.r * 0.91);
+	show = show || (opt == 13.0 && h6 < 0.2 && topk != 1.0);
+	show = show || (opt == 14.0 && h6 >= 0.2 && h6 < 0.34);
+	show = show || (opt == 15.0 && h7 < 0.24);
+	show = show || (opt == 16.0 && h8 < 0.22 && hair < 2.5 && hair != 2.0 && bottom < 1.5);
 
 	// Gelenkwinkel: *_z = seitlich heben (Arme), *_x = vor/zurück (positiv = nach vorn), el_* = Ellbogen beugen
 	float al_z = 0.0, ar_z = 0.0, al_x = 0.0, ar_x = 0.0, ll_x = 0.0, lr_x = 0.0;
@@ -298,8 +306,12 @@ void vertex() {
 		glow = 0.5;
 	} else if (grp < 13.5) {
 		col = skirt;
-	} else {
+	} else if (grp < 14.5) {
 		col = bottom > 0.5 ? skin : pants;
+	} else if (grp < 15.5) {
+		col = pick4(fract(cu.r * 4.9 + cu.a * 2.2), vec3(0.04), vec3(0.3, 0.17, 0.08), vec3(0.08, 0.16, 0.38), vec3(0.55, 0.1, 0.08));
+	} else {
+		col = vec3(0.02);
 	}
 	info = vec4(part, grp, topk, h5);
 }

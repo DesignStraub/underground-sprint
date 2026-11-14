@@ -24,10 +24,10 @@ const LIMB := 12
 const TORSO := 14
 ## Farbgruppen (UV.y), siehe people.gdshader
 enum { G_TOP, G_PANTS, G_SKIN, G_HAIR, G_SHOES, G_GLOW, G_ARM, G_SHIN, G_SOLE, G_JACKET, G_CAP, G_PHONE, G_SCREEN,
-	G_SKIRT, G_THIGH }
+	G_SKIRT, G_THIGH, G_BAG, G_FRAME }
 ## Varianten (UV2.x): 0 immer sichtbar
 enum { O_ALL, O_HAIR_TOP, O_HAIR_LONG, O_PONY, O_BUN, O_CAP, O_BEANIE, O_HOOD, O_SKIRT, O_JACKET, O_STICKS, O_PHONE,
-	O_HAIR_NAPE }
+	O_HAIR_NAPE, O_BACKPACK, O_BAG, O_GLASSES, O_BEARD }
 
 ## 0/1: Figur (alle Varianten), 2: Starterin (mit Leuchtstäben), 3: Blockfigur für die Ferne
 static var _meshes := {}
@@ -108,6 +108,20 @@ static func _detail_mesh(sticks: bool) -> ArrayMesh:
 	_box(st, Vector3(0, 1.66, -0.135), Vector3(0.15, 0.014, 0.1), P_HEAD, G_CAP, O_CAP)
 	_ellipsoid(st, Vector3(0, 1.655, 0.01), Vector3(0.106, 0.13, 0.117), 10, 6, P_HEAD, G_CAP, O_BEANIE, 0.0, 0.48)
 	_tube(st, [[Vector3(0, 1.645, 0.01), 0.109, 0.12], [Vector3(0, 1.69, 0.01), 0.106, 0.117]], 10, P_HEAD, G_CAP, O_BEANIE, false, false)
+	# seit 2.29: Rucksack (mit Trägern und Deckel), Umhängetasche, Brille, Bart
+	_box(st, Vector3(0, 1.2, 0.175), Vector3(0.27, 0.34, 0.13), P_BODY, G_BAG, O_BACKPACK)
+	_box(st, Vector3(0, 1.36, 0.19), Vector3(0.25, 0.06, 0.12), P_BODY, G_BAG, O_BACKPACK)
+	_box(st, Vector3(0, 1.12, 0.245), Vector3(0.2, 0.14, 0.03), P_BODY, G_BAG, O_BACKPACK)
+	for s in [-1.0, 1.0]:
+		_box(st, Vector3(s * 0.085, 1.29, -0.117), Vector3(0.035, 0.26, 0.012), P_BODY, G_BAG, O_BACKPACK)
+		_box(st, Vector3(s * 0.085, 1.43, 0.0), Vector3(0.035, 0.012, 0.2), P_BODY, G_BAG, O_BACKPACK)
+	_box(st, Vector3(-0.11, 0.97, 0.12), Vector3(0.24, 0.18, 0.07), P_BODY, G_BAG, O_BAG)
+	_box(st, Vector3(0.02, 1.2, -0.118), Vector3(0.03, 0.46, 0.012), P_BODY, G_BAG, O_BAG)
+	for s in [-1.0, 1.0]:
+		_box(st, Vector3(s * 0.037, 1.632, -0.1), Vector3(0.052, 0.034, 0.012), P_HEAD, G_FRAME, O_GLASSES)
+		_box(st, Vector3(s * 0.08, 1.638, -0.05), Vector3(0.008, 0.008, 0.1), P_HEAD, G_FRAME, O_GLASSES)
+	_box(st, Vector3(0, 1.638, -0.104), Vector3(0.025, 0.008, 0.01), P_HEAD, G_FRAME, O_GLASSES)
+	_ellipsoid(st, Vector3(0, 1.578, -0.018), Vector3(0.09, 0.066, 0.092), 10, 5, P_HEAD, G_HAIR, O_BEARD, 0.45, 1.0, 0.5, 1.0)
 	# gemeinsame Ecken zusammenfassen: der Vertex-Shader läuft dann je Ecke nur einmal statt für jedes Dreieck
 	st.index()
 	return st.commit()

@@ -258,6 +258,11 @@ gesäumt. Seit 2.29:
 - **Passanten** vor den Läden, zwischen Leitwand und Fassade (man fährt nicht durch sie hindurch): tagsüber viele,
   nachts wenige; die Weltuhr schaltet um (`Track.set_daytime`). Nachts weniger Verkehr, über Hafen, Flüssen und
   Waldstraßen ziehen Nebelschichten.
+- **Leute** mit Zubehör: Rucksack mit Trägern, Umhängetasche, (Sonnen-)Brille, Bart (Variante je Figur im Shader).
+- **Verkehr**: Sattelzüge mit Speditionsnamen auf den rechten Autobahnspuren; beim Vorbeifahren an einem Dorf wird
+  sein Name eingeblendet. Wahrzeichen in der Landschaft: Kraftwerk mit dampfenden Kühltürmen, Burgen auf den höchsten
+  Kuppen, Fernsehturm am Kreisel; Kreisstraßen verbinden die Dörfer mit der nächsten Straße; an den Autobahnkreuzen
+  führen breite Brücken mit Erddamm über den Ring.
 - **Himmel**: in der Open World ferne Hügelketten mit Dorflichtern statt Hochhaus-Kulisse rundum, die Skyline nur in
   zwei Richtungen.
 - **Waldstrecke „Freudenstadt Waldpass“** (Schwarzwald, neues Rennen): Landstraße durch dichten Wald mit drei Kuppen,
