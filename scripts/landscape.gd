@@ -651,19 +651,46 @@ func _trees(root: Node3D, o: Vector2, dr: PackedFloat32Array, rng: RandomNumberG
 		var arr: Array = lists[kind]
 		if arr.is_empty():
 			continue
-		var mm := MultiMesh.new()
-		mm.transform_format = MultiMesh.TRANSFORM_3D
-		mm.use_colors = true
-		mm.mesh = _meshes[kind]
-		mm.instance_count = arr.size()
-		for k in arr.size():
-			mm.set_instance_transform(k, arr[k])
-			mm.set_instance_color(k, cols[kind][k])
+		var mm := _multimesh(_meshes[kind], arr, cols[kind])
 		var mi := MultiMeshInstance3D.new()
 		mi.multimesh = mm
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		mi.visibility_range_end = VIEW - 300.0
 		root.add_child(mi)
+
+
+## MultiMesh mit Farben in einem Stück füllen (ein Aufruf an den Renderer statt zwei je Instanz: beim Bauen im
+## Hintergrund-Thread blockierten tausende Einzelaufrufe den Hauptthread)
+func _multimesh(mesh: Mesh, xfs: Array, cols: Array) -> MultiMesh:
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.use_colors = true
+	mm.mesh = mesh
+	mm.instance_count = xfs.size()
+	var buf := PackedFloat32Array()
+	buf.resize(xfs.size() * 16)
+	for k in xfs.size():
+		var t: Transform3D = xfs[k]
+		var c: Color = cols[k]
+		var o := k * 16
+		buf[o] = t.basis.x.x
+		buf[o + 1] = t.basis.y.x
+		buf[o + 2] = t.basis.z.x
+		buf[o + 3] = t.origin.x
+		buf[o + 4] = t.basis.x.y
+		buf[o + 5] = t.basis.y.y
+		buf[o + 6] = t.basis.z.y
+		buf[o + 7] = t.origin.y
+		buf[o + 8] = t.basis.x.z
+		buf[o + 9] = t.basis.y.z
+		buf[o + 10] = t.basis.z.z
+		buf[o + 11] = t.origin.z
+		buf[o + 12] = c.r
+		buf[o + 13] = c.g
+		buf[o + 14] = c.b
+		buf[o + 15] = c.a
+	mm.buffer = buf
+	return mm
 
 
 func _tree_mesh(conifer: bool) -> ArrayMesh:
@@ -801,14 +828,7 @@ func _village(root: Node3D, v: Dictionary) -> void:
 			placed.append([p, maxf(w, dp) * 0.6])
 			break
 	for set in [[walls, wcols, _meshes["box"], house_mat], [roofs, rcols, _meshes["roof"], _roof_mat]]:
-		var mm := MultiMesh.new()
-		mm.transform_format = MultiMesh.TRANSFORM_3D
-		mm.use_colors = true
-		mm.mesh = set[2]
-		mm.instance_count = set[0].size()
-		for k in set[0].size():
-			mm.set_instance_transform(k, set[0][k])
-			mm.set_instance_color(k, set[1][k])
+		var mm := _multimesh(set[2], set[0], set[1])
 		var mi := MultiMeshInstance3D.new()
 		mi.multimesh = mm
 		mi.material_override = set[3]
@@ -1162,14 +1182,7 @@ func _lake(root: Node3D, lk: Dictionary) -> void:
 		var sc := rng.randf_range(0.6, 1.1)
 		reeds.append(Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(sc * 0.5, sc * 0.35, sc * 0.5)), Vector3(q.x, lk["level"] - 0.6, q.y)))
 		cols.append(Color(0.35, 0.4, 0.15) * rng.randf_range(0.8, 1.2))
-	var mm := MultiMesh.new()
-	mm.transform_format = MultiMesh.TRANSFORM_3D
-	mm.use_colors = true
-	mm.mesh = _meshes["leafy"]
-	mm.instance_count = reeds.size()
-	for k in reeds.size():
-		mm.set_instance_transform(k, reeds[k])
-		mm.set_instance_color(k, cols[k])
+	var mm := _multimesh(_meshes["leafy"], reeds, cols)
 	var mi := MultiMeshInstance3D.new()
 	mi.multimesh = mm
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
