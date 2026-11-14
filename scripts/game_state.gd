@@ -77,6 +77,7 @@ var wins := 0  # Rennsiege (Sprint + Rundkurs)
 var drift_wins := 0
 var current_car := "kaizen"
 var race_index := 0
+var world_drift := false  # Open World: Drift-Modus (Q), bleibt über Rennen und Garage hinweg
 var world_start := -1  # Open World: Rennen, an dessen Stadt-Ausfahrt man startet (-1 = Frankfurt, erstes Rennen)
 var world_menu := ""  # Open World > Esc > Tuning/Autohaus: Garage öffnet dort, "Fertig" führt zurück in die Welt
 var in_world := false  # Rennen aus der Open World gestartet: danach zurück in die Welt (nicht gespeichert)
@@ -158,6 +159,7 @@ func _setup_input() -> void:
 	_add_action("pause", [KEY_ESCAPE, KEY_P], [JOY_BUTTON_START], [])
 	_add_action("next_track", [KEY_PERIOD], [], [])  # nächster Musiktitel (M ist seit der Open World die Karte)
 	_add_action("radio", [KEY_COMMA], [], [])  # nächster Radiosender
+	_add_action("drift_toggle", [KEY_Q], [JOY_BUTTON_X], [])  # Open World: Fahr- und Drift-Modus umschalten
 	_add_action("ban_track", [KEY_SLASH], [], [])  # Track aussortieren (deutsche Tastatur: "-")
 	_add_action("fullscreen", [KEY_F11, KEY_F], [], [])  # F: auf dem Mac ist F11 "Schreibtisch anzeigen"
 	var alt_enter := InputEventKey.new()

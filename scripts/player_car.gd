@@ -1475,12 +1475,20 @@ func _hit_traffic(other: Node, pre: Vector3, n: Vector3) -> void:
 		if other.has_method("launch"):
 			other.launch(-n, hit)
 		_crash_fx(global_position - n * 1.6, hit)
-		velocity = after * 0.4 + n * 2.0
+		# seit 2.31 trifft es einen selbst härter (Rammen soll wehtun): frontal ab gut 65 km/h Aufprall überschlägt
+		# man sich, sonst prallt man zurück, dreht sich stark und ist länger benommen; schwere Wagen härter
+		var heavy := clampf(mt / 2.5, 1.0, 2.0)
+		if hit * heavy > 18.0 and head_on > 0.7:
+			velocity = n * clampf(hit * 0.25, 4.0, 9.0)
+			_crash_cooldown = 0.9
+			start_tumble(n, hit * heavy)
+			return
+		velocity = after * 0.2 + n * clampf(hit * 0.22 * heavy, 3.0, 8.0)
 		velocity.y = 0.0
-		_spin = randf_range(1.2, 2.4) * (1.0 if randf() < 0.5 else -1.0) * clampf(hit / 25.0, 0.5, 1.0)
-		stun = 0.8
+		_spin = randf_range(2.2, 3.6) * (1.0 if randf() < 0.5 else -1.0) * clampf(hit / 20.0, 0.6, 1.2)
+		stun = 1.2
 		_shake = 1.0
-		_crash_cooldown = 0.7
+		_crash_cooldown = 0.8
 		crashes += 1
 	else:
 		other.push(-n * j / mt)

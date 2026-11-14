@@ -147,6 +147,7 @@ func _ready() -> void:
 	pc.top_speed *= GameState.pace()
 	pc.accel *= 0.8 + 0.2 * GameState.pace()
 	pc.place(spawn)
+	pc.drift_mode = GameState.world_drift
 	pc.controls_enabled = true
 	player = pc
 	land.target = pc
@@ -1003,6 +1004,14 @@ func _unhandled_input(event: InputEvent) -> void:
 	if map_view and map_view.visible:
 		map_view._handle(event)
 		return
+	if event.is_action_pressed("drift_toggle") and not get_tree().paused and player:
+		# Q: Fahr- und Drift-Modus umschalten (Drift: Heck kommt leicht, wie in den Drift-Events)
+		get_viewport().set_input_as_handled()
+		GameState.world_drift = not GameState.world_drift
+		player.drift_mode = GameState.world_drift
+		_flash(tr("DRIFT-MODUS") if player.drift_mode else tr("FAHR-MODUS"), Color(1.0, 0.55, 0.12) if player.drift_mode else UI.CYAN)
+		Sfx.ui("change")
+		return
 	if _ch_prompt and _duel == 0 and not get_tree().paused and event.is_action_pressed("ui_accept"):
 		get_viewport().set_input_as_handled()
 		_start_duel()
@@ -1629,6 +1638,8 @@ func _ctest_setup(case: String) -> void:
 		"standing": [2.25, 0.0, 0.0, 2.25, -70.0, 36.0, "sedan"],
 		"wrongway": [6.75, -35.0, 180.0, 6.75, -80.0, 30.0, "van"],
 		"bus": [6.75, 42.0, 0.0, 6.75, 30.0, 30.0, "bus"],
+		"frontal": [6.75, -30.0, 180.0, 6.75, -90.0, 30.0, "sedan"],  # Geisterfahrer frontal: Überschlag
+		"frontal_slow": [6.75, -6.0, 180.0, 6.75, -40.0, 8.0, "sedan"],  # langsam frontal: zurückprallen
 		"wall10": [11.25, 42.0, 10.0, 0.0, 0.0, 0.0, ""],
 		"wall30": [11.25, 42.0, 30.0, 0.0, 0.0, 0.0, ""],
 		"wall60": [11.25, 42.0, 60.0, 0.0, 0.0, 0.0, ""],
