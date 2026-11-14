@@ -183,6 +183,8 @@ static func build() -> Dictionary:
 	for sg in segments:
 		sg["race"]["district_seq"] = _district_seq(sg["race"]["pts"], urban)
 		sg["race"]["no_ground"] = true
+		if sg.get("ring", 0) <= 1:
+			_ring_crests(sg)
 	# Straßen für die Karten (Weltkoordinaten x, z): Ring, Auffahrten, alle Wege der Städte
 	var roads := []
 	var rl := PackedVector2Array()
@@ -239,7 +241,7 @@ static func build() -> Dictionary:
 	return _cache
 
 
-const URBAN_R := 750.0  # so weit um eine Auffahrt (und um den Kreisel) ist die Autobahn Stadt
+const URBAN_R := 420.0  # so weit um eine Auffahrt (und um den Kreisel) ist die Autobahn Stadt
 
 
 ## Viertel je 400 m eines Autobahnstücks: "highway" (Stadt) nahe einer Auffahrt, sonst "land"
@@ -259,6 +261,56 @@ static func _district_seq(pts: Array, urban: Array) -> Array:
 	if seq.is_empty():
 		seq.append("land")
 	return seq
+
+
+## Kuppen auf den Ringen (seit 2.29): in Überland-Abschnitten ab 1,2 km ohne Auffahrt hebt sich die Autobahn auf
+## einen Damm (6-10 m, 170 m Anstieg), sonst lief der Ring flach wie ein Brett um die Karte
+static func _ring_crests(sg: Dictionary) -> void:
+	var race: Dictionary = sg["race"]
+	var pts: Array = race["pts"]
+	var cum := [0.0]
+	for k in pts.size() - 1:
+		cum.append(cum[k] + (pts[k] as Vector3).distance_to(pts[k + 1]))
+	var total: float = cum[cum.size() - 1]
+	if total < 1500.0:
+		return
+	# Lage der Auffahrten auf dem Stück (Meter)
+	var ramp_d := []
+	for r in race["ramps"]:
+		var best := 1e9
+		var bd := 0.0
+		for k in pts.size():
+			var dd := Vector2(pts[k].x - r["from"].x, pts[k].z - r["from"].z).length()
+			if dd < best:
+				best = dd
+				bd = cum[k]
+		ramp_d.append(bd)
+	var seq: Array = race["district_seq"]
+	var crests := []
+	var rng := RandomNumberGenerator.new()
+	rng.seed = int(race["seed"]) * 31 + 7
+	var i := 0
+	while i < seq.size():
+		if seq[i] != "land":
+			i += 1
+			continue
+		var j := i
+		while j < seq.size() and seq[j] == "land":
+			j += 1
+		var a := maxf(i * 400.0 + 150.0, 260.0)
+		var e := minf(minf(j * 400.0, total) - 150.0, total - 260.0)
+		for rd in ramp_d:
+			if rd > a - 300.0 and rd < e + 300.0:
+				# Auffahrt im Abschnitt: nur die längere Seite davon nutzen
+				if rd - a > e - rd:
+					e = rd - 300.0
+				else:
+					a = rd + 300.0
+		if e - a >= 900.0 and a > 200.0 and e < total - 200.0:
+			crests.append([a / total, e / total, rng.randf_range(6.0, 10.0)])
+		i = j
+	if not crests.is_empty():
+		race["crests"] = crests
 
 
 static func is_urban(q: Vector3, urban: Array, extra := 0.0) -> bool:
