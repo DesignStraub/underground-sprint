@@ -19,7 +19,7 @@ const VIEW := 3300.0  # so weit werden Kacheln geladen
 const ROAD_CELL := 100.0
 const ROAD_FLAT := 55.0  # bis hier neben einer Straße ist das Gelände flach
 const RISE := 420.0  # dann steigt es auf dieser Strecke an
-const CITY_PAD := 380.0  # um Städte (Mittelpunkt + Radius) flach
+const CITY_FLAT := 150.0  # neben Stadtstraßen flach (dort stehen zwei, drei Häuserreihen)
 const HILL_H := 115.0
 
 var layout: Dictionary
@@ -34,8 +34,8 @@ var _crown_mat: StandardMaterial3D
 var _tower_mat: StandardMaterial3D
 var _blade_mat: StandardMaterial3D
 
-var _road := {}  # Rasterzelle -> PackedVector2Array (Punkte alle 20 m auf allen Straßen)
-var _cities := []  # [Mitte (Vector2), Radius]
+var _road := {}  # Rasterzelle -> PackedVector2Array (Punkte alle 20 m auf Autobahnen und Auffahrten)
+var _croad := {}  # dasselbe für die Straßen der Städte
 var _urban := []
 var _villages := []  # {pos, r, level, seed, name}
 var _parks := []  # {pos, seed, dir}
@@ -65,43 +65,44 @@ func setup(lay: Dictionary) -> void:
 	_forest.seed = 4242
 	_forest.frequency = 1.0 / 750.0
 	_forest.fractal_octaves = 3
+	# Autobahn, Kreisel, Diagonalen und Auffahrten: flach bis ROAD_FLAT; Stadtstraßen (mit Häusern daneben) bis CITY_FLAT
 	for rd in layout["roads"]:
-		var pl: PackedVector2Array = rd[0]
-		for k in pl.size() - 1:
-			var a := pl[k]
-			var b := pl[k + 1]
-			var n := maxi(int(a.distance_to(b) / 20.0), 1)
-			for j in n + 1:
-				_add_road(a.lerp(b, j / float(n)))
+		if rd[1] == 1:
+			_add_line(_road, rd[0])
 	for sg in layout["segments"]:
-		var pts: Array = sg["race"]["pts"]
-		for k in pts.size() - 1:
-			var a := Vector2(pts[k].x, pts[k].z)
-			var b := Vector2(pts[k + 1].x, pts[k + 1].z)
-			var n := maxi(int(a.distance_to(b) / 20.0), 1)
-			for j in n + 1:
-				_add_road(a.lerp(b, j / float(n)))
+		var pl := PackedVector2Array()
+		for q in sg["race"]["pts"]:
+			pl.append(Vector2(q.x, q.z))
+		_add_line(_road, pl)
 	for c in layout["cities"]:
-		_cities.append([Vector2(c["center"].x, c["center"].z), float(c["radius"])])
+		for rd in c["roads"]:
+			_add_line(_croad, rd[0])
 	_urban = layout.get("urban", [])
 	_plan_sites()
 	_make_materials()
+	_make_mask()
 
 
-func _add_road(p: Vector2) -> void:
-	var c := Vector2i(floori(p.x / ROAD_CELL), floori(p.y / ROAD_CELL))
-	var arr: PackedVector2Array = _road.get(c, PackedVector2Array())
-	arr.append(p)
-	_road[c] = arr  # Packed-Arrays kommen als Kopie aus dem Dictionary: zurückschreiben
+func _add_line(grid: Dictionary, pl: PackedVector2Array) -> void:
+	for k in pl.size() - 1:
+		var a := pl[k]
+		var b := pl[k + 1]
+		var n := maxi(int(a.distance_to(b) / 20.0), 1)
+		for j in n + 1:
+			var p := a.lerp(b, j / float(n))
+			var c := Vector2i(floori(p.x / ROAD_CELL), floori(p.y / ROAD_CELL))
+			var arr: PackedVector2Array = grid.get(c, PackedVector2Array())
+			arr.append(p)
+			grid[c] = arr  # Packed-Arrays kommen als Kopie aus dem Dictionary: zurückschreiben
 
 
-## Abstand zur nächsten Straße (bis 400 m genau, sonst 400)
-func road_dist(p: Vector2) -> float:
+## Abstand zur nächsten Straße im Raster grid (bis 400 m genau, sonst 400)
+func _dist(grid: Dictionary, p: Vector2) -> float:
 	var c := Vector2i(floori(p.x / ROAD_CELL), floori(p.y / ROAD_CELL))
 	var best := 160000.0
 	for dy in range(-4, 5):
 		for dx in range(-4, 5):
-			var arr = _road.get(c + Vector2i(dx, dy))
+			var arr = grid.get(c + Vector2i(dx, dy))
 			if arr == null:
 				continue
 			for q in arr:
@@ -109,11 +110,17 @@ func road_dist(p: Vector2) -> float:
 	return sqrt(best)
 
 
+func road_dist(p: Vector2) -> float:
+	return _dist(_road, p)
+
+
 func city_dist(p: Vector2) -> float:
-	var best := 1e9
-	for c in _cities:
-		best = minf(best, p.distance_to(c[0]) - c[1] - CITY_PAD)
-	return best
+	return _dist(_croad, p)
+
+
+## Wie weit ist p vom Rand der flachen Zone entfernt (unter 0: in der Zone neben einer Straße oder in der Stadt)?
+func free_dist(p: Vector2) -> float:
+	return minf(road_dist(p) - ROAD_FLAT, city_dist(p) - CITY_FLAT)
 
 
 ## Geländehöhe ohne Rücksicht auf Straßen (für Dörfer und Windparks)
@@ -123,9 +130,8 @@ func raw_height(p: Vector2) -> float:
 	return pow(n, 1.7) * HILL_H + _detail.get_noise_2d(p.x, p.y) * 12.0 + 6.0
 
 
-## Höhe mit vorberechnetem Straßenabstand dr; unter 0 heißt: unter dem flachen Boden versteckt
-func height_at(p: Vector2, dr: float) -> float:
-	var free := minf(dr - ROAD_FLAT, city_dist(p))
+## Höhe mit vorberechnetem Abstand zur flachen Zone (free_dist); unter 0 heißt: unter dem flachen Boden versteckt
+func height_at(p: Vector2, free: float) -> float:
 	if free <= 0.0:
 		return -0.6
 	var fade := smoothstep(0.0, RISE, free)
@@ -147,7 +153,8 @@ func _plan_sites() -> void:
 		var z := -ext
 		while z < ext:
 			var p := Vector2(x + rng.randf_range(200, 1100), z + rng.randf_range(200, 1100))
-			if road_dist(p) >= 400.0 and city_dist(p) > 450.0 and rng.randf() < 0.55:
+			var rd := road_dist(p)
+			if rd >= 240.0 and city_dist(p) > 330.0 and rng.randf() < (0.85 if rd < 400.0 else 0.4):
 				var ok := true
 				for v in _villages:
 					if p.distance_to(v["pos"]) < 1300.0:
@@ -162,15 +169,15 @@ func _plan_sites() -> void:
 	while x < ext:
 		var z := -ext
 		while z < ext:
-			var p := Vector2(x + rng.randf_range(300, 1900), z + rng.randf_range(300, 1900))
-			var ok := road_dist(p) >= 330.0 and city_dist(p) > 500.0 and rng.randf() < 0.6
+			var p := Vector2(x + rng.randf_range(200, 1500), z + rng.randf_range(200, 1500))
+			var ok := road_dist(p) >= 280.0 and city_dist(p) > 400.0 and rng.randf() < 0.7
 			for v in _villages:
 				if p.distance_to(v["pos"]) < 700.0:
 					ok = false
 			if ok:
 				_parks.append({"pos": p, "seed": rng.randi(), "n": rng.randi_range(3, 6)})
-			z += 2200.0
-		x += 2200.0
+			z += 1700.0
+		x += 1700.0
 
 
 func _make_materials() -> void:
@@ -201,6 +208,31 @@ func _make_materials() -> void:
 	var box := BoxMesh.new()
 	_meshes["box"] = box
 	_meshes["roof"] = _roof_mesh()
+
+
+## Stadtboden als Maske für den Bodenshader (seit 2.29 haben Städte in der Open World keinen eigenen dunklen Boden
+## mehr, sonst endeten sie an einem harten Quadrat mitten in den Feldern): um Stadtstraßen und die Stadtabschnitte
+## der Autobahn dunkler Asphalt- und Pflasterboden, weich in die Felder übergehend.
+func _make_mask() -> void:
+	var S := 1024
+	var ext: float = layout["ring_r"] + 5200.0
+	var img := Image.create(S, S, false, Image.FORMAT_L8)
+	var k := S / (2.0 * ext)
+	var paint := func(p: Vector2, r: float) -> void:
+		var c := Vector2i(int((p.x + ext) * k), int((p.y + ext) * k))
+		var rr := maxi(int(r * k), 1)
+		img.fill_rect(Rect2i(c.x - rr, c.y - rr, rr * 2 + 1, rr * 2 + 1), Color(1, 1, 1))
+	for arr in _croad.values():
+		for q in arr:
+			paint.call(q, 125.0)
+	for arr in _road.values():
+		for q in arr:
+			if Layout.is_urban(Vector3(q.x, 0, q.y), _urban, -150.0):
+				paint.call(q, 70.0)
+	img.resize(S / 8, S / 8, Image.INTERPOLATE_BILINEAR)
+	img.resize(S, S, Image.INTERPOLATE_CUBIC)
+	land_mat.set_shader_parameter("urban_mask", ImageTexture.create_from_image(img))
+	land_mat.set_shader_parameter("mask_rect", Vector3(-ext, -ext, 2.0 * ext))
 
 
 ## Tag/Nacht: day 0..1 (aus der Weltuhr), fog_k 0..1 (Nebelstärke für die Nebelbänke)
@@ -305,7 +337,7 @@ func build_chunk(key: Vector2i) -> Node3D:
 	for j in N + 1:
 		for i in N + 1:
 			var p := o + Vector2(i, j) * STEP
-			var d := road_dist(p)
+			var d := free_dist(p)
 			dr[j * (N + 1) + i] = d
 			var h := height_at(p, d)
 			hs[j * (N + 1) + i] = h
@@ -394,9 +426,9 @@ func _trees(root: Node3D, o: Vector2, dr: PackedFloat32Array, rng: RandomNumberG
 			var i := clampi(int(g.x), 0, N - 1)
 			var j := clampi(int(g.y), 0, N - 1)
 			var d := dr[j * (N + 1) + i]
-			if d < 34.0 or city_dist(p) < 0.0:
-				continue
-			if d < 140.0 and Layout.is_urban(Vector3(p.x, 0, p.y), _urban, 150.0):
+			if d < -20.0:
+				continue  # Autobahn: ab 35 m Bäume; Stadt: erst hinter den Häusern
+			if d < 90.0 and Layout.is_urban(Vector3(p.x, 0, p.y), _urban, 150.0):
 				continue
 			if f < 0.17 and not single and rng.randf() < 0.6:
 				continue  # Waldrand lichter
@@ -607,7 +639,7 @@ func _windpark(root: Node3D, pk: Dictionary) -> void:
 	var rotors := []
 	for k in pk["n"]:
 		var p: Vector2 = c + along * (k - int(pk["n"]) / 2.0) * 280.0 + along.orthogonal() * rng.randf_range(-60, 60)
-		var h := maxf(raw_height(p), 0.0) * smoothstep(0.0, RISE, minf(road_dist(p) - ROAD_FLAT, city_dist(p)))
+		var h := maxf(height_at(p, free_dist(p)), 0.0)
 		var base := Vector3(p.x, h - 1.0, p.y)
 		var tower := MeshInstance3D.new()
 		var cyl := CylinderMesh.new()
@@ -670,7 +702,7 @@ func _fog_banks(root: Node3D, o: Vector2, dr: PackedFloat32Array, hs: PackedFloa
 		var p := o + Vector2(rng.randf_range(100, CHUNK - 100), rng.randf_range(100, CHUNK - 100))
 		var g := (p - o) / STEP
 		var d := dr[clampi(int(g.y), 0, N) * (N + 1) + clampi(int(g.x), 0, N)]
-		if d < 60.0 or d > 600.0 or city_dist(p) < -200.0 or rng.randf() < 0.35:
+		if d < 5.0 or d > 550.0 or rng.randf() < 0.35:
 			continue
 		var h := maxf(_grid_h(o, hs, p), 0.0)
 		var size := rng.randf_range(260.0, 420.0)

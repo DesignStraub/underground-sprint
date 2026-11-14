@@ -6,6 +6,8 @@ shader_type spatial;
 render_mode diffuse_burley, specular_disabled;
 
 uniform float day = 1.0;
+uniform sampler2D urban_mask : hint_default_black, filter_linear, repeat_disable;
+uniform vec3 mask_rect = vec3(-10000.0, -10000.0, 20000.0);  // x0, z0, Kantenlänge
 
 varying vec3 wpos;
 varying vec3 wnrm;
@@ -63,6 +65,10 @@ void fragment() {
 	// Hänge: dunkler und grüner (Wald- und Wiesenhang)
 	float slope = 1.0 - clamp(wnrm.y, 0.0, 1.0);
 	col = mix(col, vec3(0.13, 0.2, 0.08), smoothstep(0.08, 0.3, slope));
+	// Stadt: dunkler Asphalt- und Pflasterboden (Parkplätze, Höfe), weich zu den Feldern
+	float urb = smoothstep(0.25, 0.6, texture(urban_mask, (p - mask_rect.xy) / mask_rect.z).r);
+	vec3 town = vec3(0.055, 0.056, 0.06) * (0.8 + 0.4 * vnoise(p / 9.0)) * (0.85 + 0.3 * h21(floor(p / 14.0)));
+	col = mix(col, town, urb);
 	// etwas satter als gemischt (der Dunst nimmt Farbe weg)
 	float l = dot(col, vec3(0.3, 0.59, 0.11));
 	col = max(mix(vec3(l), col, 1.25), vec3(0.0));

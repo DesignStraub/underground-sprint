@@ -143,6 +143,7 @@ static func build() -> Dictionary:
 		c["center"] = rp + N * (c["gap"] + c["far"] / 2.0)
 		c["radius"] = maxf(c["far"] / 2.0, (c["lat1"] - c["lat0"]) / 2.0) + 200.0
 		c["race"] = world_race(c["race_index"], xf)
+		c["race"]["no_ground"] = true  # Boden kommt von der Landschaft (Stadtmaske), kein hartes Quadrat in den Feldern
 		c["roads"] = []
 		for pl in c["polys_local"]:
 			var w2 := PackedVector2Array()
