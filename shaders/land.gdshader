@@ -65,13 +65,21 @@ void fragment() {
 	// Hänge: dunkler und grüner (Wald- und Wiesenhang)
 	float slope = 1.0 - clamp(wnrm.y, 0.0, 1.0);
 	col = mix(col, vec3(0.13, 0.2, 0.08), smoothstep(0.08, 0.3, slope));
-	// Stadt: dunkler Asphalt- und Pflasterboden (Parkplätze, Höfe), weich zu den Feldern
+	// Stadt: Asphalt- und Pflasterboden (Parkplätze, Höfe), weich zu den Feldern. Seit 2.33 mit ausgefranstem Rand
+	// (Rauschen), damit die Stadtfläche nicht als runde Wolke auf den Feldern liegt
 	vec2 mk = texture(urban_mask, (p - mask_rect.xy) / mask_rect.z).rg;
-	float urb = smoothstep(0.25, 0.6, mk.r);
+	float edge_n = vnoise(p / 61.0) * 0.6 + vnoise(p / 17.0) * 0.4;
+	float urb = smoothstep(0.25, 0.65, mk.r + (edge_n - 0.5) * 0.55);
 	// Waldboden: Nadeln, Moos, dunkle Erde (rund um Waldstrecken)
 	vec3 floor_c = mix(vec3(0.07, 0.1, 0.04), vec3(0.12, 0.09, 0.05), vnoise(p / 7.0)) * (0.8 + 0.4 * vnoise(p / 40.0));
 	col = mix(col, floor_c, smoothstep(0.2, 0.6, mk.g));
-	vec3 town = vec3(0.055, 0.056, 0.06) * (0.8 + 0.4 * vnoise(p / 9.0)) * (0.95 + 0.1 * h21(floor(p / 14.0)));
+	// Stadtboden (seit 2.33 heller, vorher fast schwarz): Pflaster und Asphalt in Flächen, dazwischen Rasenstücke,
+	// zum Rand hin immer mehr Grün (Gärten, Böschungen), so geht er ohne Kante in die Felder über
+	vec3 paved = vec3(0.18, 0.178, 0.172) * (0.85 + 0.25 * vnoise(p / 9.0));
+	vec3 lawn = mix(vec3(0.11, 0.17, 0.07), vec3(0.15, 0.21, 0.085), vnoise(p / 17.0));
+	float patches = smoothstep(0.45, 0.65, vnoise(p / 38.0 + 3.7) * 0.65 + vnoise(p / 12.0) * 0.35);
+	float green = clamp(patches + 1.0 - smoothstep(0.35, 0.9, mk.r + (edge_n - 0.5) * 0.25), 0.0, 1.0);
+	vec3 town = mix(paved, lawn, green * 0.8);
 	col = mix(col, town, urb);
 	// etwas satter als gemischt (der Dunst nimmt Farbe weg)
 	float l = dot(col, vec3(0.3, 0.59, 0.11));

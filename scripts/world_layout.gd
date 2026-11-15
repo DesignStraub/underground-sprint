@@ -142,8 +142,6 @@ static func build() -> Dictionary:
 		c["ring_k"] = k
 		c["exit_world"] = exit_w
 		c["start_world"] = xf * c["start_local"]
-		c["center"] = rp + N * (c["gap"] + c["far"] / 2.0)
-		c["radius"] = maxf(c["far"] / 2.0, (c["lat1"] - c["lat0"]) / 2.0) + 200.0
 		c["race"] = world_race(c["race_index"], xf)
 		c["race"]["no_ground"] = true  # Boden kommt von der Landschaft (Stadtmaske), kein hartes Quadrat in den Feldern
 		c["roads"] = []
@@ -153,13 +151,29 @@ static func build() -> Dictionary:
 				var wq: Vector3 = xf * q
 				w2.append(Vector2(wq.x, wq.z))
 			c["roads"].append([w2, pl[1]])
+		# Umkreis aus allen Wegen der Stadt (seit 2.33): vorher lag die Mitte auf der Achse Ring-Ausfahrt, und die zweite
+		# Ausfahrt langer Sprints (Bad Kissingen, Rostock) lag über 800 m außerhalb; kam man dort an, war die Stadt nicht
+		# geladen (Straße endete im Leeren)
+		var lo := Vector2(1e9, 1e9)
+		var hi := Vector2(-1e9, -1e9)
+		for rd in c["roads"]:
+			for q in rd[0]:
+				lo = lo.min(q)
+				hi = hi.max(q)
+		var mid2 := (lo + hi) / 2.0
+		var reach2 := 0.0
+		for rd in c["roads"]:
+			for q in rd[0]:
+				reach2 = maxf(reach2, (q as Vector2).distance_to(mid2))
+		c["center"] = Vector3(mid2.x, 0.0, mid2.y)
+		c["radius"] = reach2 + 200.0
 		var bw := PackedVector2Array()
 		for q in c["bld_local"]:
 			var wq: Vector3 = xf * Vector3(q.x, 0.0, q.y)
 			bw.append(Vector2(wq.x, wq.z))
 		c["bld_world"] = bw
 		ramps.append({"k": k, "from": rp, "end": exit_w, "name": Catalog.RACES[c["race_index"]].get("town", ""),
-			"forest": Catalog.RACES[c["race_index"]].get("forest", false)})
+			"forest": Catalog.RACES[c["race_index"]].get("forest", false), "zone": ramp_zone(c["race_index"])})
 	# Außenring um alle Städte und zweite Ausfahrten der Sprints (hinter dem Ziel) an einen der beiden Ringe
 	# Mitte: Kreisel mit vier Diagonalen zum inneren Ring (Querverbindungen durch die Mitte), vor den Ziel-Ausfahrten
 	# geplant, damit die ihnen am Ring ausweichen
@@ -188,15 +202,18 @@ static func build() -> Dictionary:
 	# Autobahn über Land, Stadt nur um die Auffahrten der Städte und am Kreisel (seit 2.29; davor säumten Hochhäuser
 	# die ganze Autobahn, und die Welt sah überall gleich aus). Die Landschaft (landscape.gd) fragt dasselbe ab.
 	var urban := []
+	var zones := []  # Viertel am Ring je Auffahrt (ramp_zone)
 	for r in ramps + oramps:
 		if not r.get("wide", false) and not r.get("forest", false):
 			urban.append(r["from"])
+			zones.append(r.get("zone", "highway"))
 	var rbc := Vector3.ZERO
 	for q in mid["rb"]:
 		rbc += q / float(mid["rb"].size())
 	urban.append(rbc)
+	zones.append("highway")
 	for sg in segments:
-		sg["race"]["district_seq"] = _district_seq(sg["race"]["pts"], urban, rbc)
+		sg["race"]["district_seq"] = _district_seq(sg["race"]["pts"], urban, rbc, zones)
 		sg["race"]["no_ground"] = true
 		if sg.get("ring", 0) <= 1:
 			_ring_crests(sg)
@@ -217,11 +234,13 @@ static func build() -> Dictionary:
 		for q in line:
 			ml.append(Vector2(q.x, q.z))
 		roads.append([ml, 0])
+	var ramp_lines := []  # nur die Auffahrten (für die Baumreihen der Landschaft)
 	for r in ramps + oramps + mid["rb_ramps"]:
 		var rp2 := PackedVector2Array()
 		for q in _ramp_pts(r):
 			rp2.append(Vector2(q.x, q.z))
 		roads.append([rp2, 1])
+		ramp_lines.append(rp2)
 	for c in cities:
 		roads.append_array(c["roads"])
 	_add_keepout(cities, ring, ramps + oramps, oring, osegs)
@@ -239,7 +258,7 @@ static func build() -> Dictionary:
 	for sg in segments:
 		sg["race"]["world_holes"] = holes
 	_cache = {"cities": cities, "segments": segments, "ring_r": R, "ring": ring, "oring": oring, "roads": roads, "holes": holes,
-		"urban": urban, "center": rbc}
+		"urban": urban, "center": rbc, "ramp_lines": ramp_lines}
 	if OS.get_cmdline_user_args().has("--worldlog"):
 		var olen := 0.0
 		for k in oring.size():
@@ -272,8 +291,23 @@ const CENTER_NAME := "Erfurt"  # Landeshauptstadt nahe dem Mittelpunkt Deutschla
 const URBAN_R := 420.0  # so weit um eine Auffahrt (und um den Kreisel) ist die Autobahn Stadt
 
 
-## Viertel je 400 m eines Autobahnstücks: "highway" (Stadt) nahe einer Auffahrt, sonst "land"
-static func _district_seq(pts: Array, urban: Array, center := Vector3(1e9, 0, 1e9)) -> Array:
+## Viertel am Ring vor einer Stadt (seit 2.33): Großstädte Hochhäuser ("highway"), Hafenstädte Hallen und Kräne
+## ("hafen_ab"), kleinere und echte Orts-Städte niedrige Häuser mit Ziegeldach ("ortsrand_de"). Vorher stand vor jeder
+## Stadt dieselbe Hochhausschlucht, auch vor Fachwerk und Hafen.
+static func ramp_zone(i: int) -> String:
+	var r: Dictionary = Catalog.RACES[i]
+	var name: String = r.get("name", "")
+	if name.begins_with("Hafen"):
+		return "hafen_ab"
+	if r.has("city") and str(r.get("town", "")) != "Berlin":
+		return "ortsrand_de"
+	if str(r.get("town", "")) in ["Heidelberg"]:
+		return "ortsrand_de"
+	return "highway"
+
+
+## Viertel je 400 m eines Autobahnstücks: das Viertel der nächsten Auffahrt (Stadt) in deren Nähe, sonst "land"
+static func _district_seq(pts: Array, urban: Array, center := Vector3(1e9, 0, 1e9), zones := []) -> Array:
 	var seq := []
 	var acc := 0.0
 	var next := 200.0  # Mitte des ersten Abschnitts
@@ -286,7 +320,14 @@ static func _district_seq(pts: Array, urban: Array, center := Vector3(1e9, 0, 1e
 			if Vector2(q.x - center.x, q.z - center.z).length() < CENTER_R:
 				seq.append(["downtown", "shops", "boulevard"][seq.size() % 3])  # Erfurt in der Mitte: Innenstadt
 			else:
-				seq.append("highway" if is_urban(q, urban) else "land")
+				var zi := -1
+				var zd := URBAN_R
+				for ui in urban.size():
+					var du := Vector2(q.x - urban[ui].x, q.z - urban[ui].z).length()
+					if du < zd:
+						zd = du
+						zi = ui
+				seq.append("land" if zi < 0 else (zones[zi] if zi < zones.size() else "highway"))
 			next += 400.0
 		acc += l
 	if seq.is_empty():
@@ -774,7 +815,8 @@ static func _connect_ends(cities: Array, ring: Array, oring: Array, ramps_in: Ar
 				if ok and length < best_len:
 					best_len = length
 					best = {"k": k, "from": rp, "end": e2, "c1": c1, "c2": c2, "pts": pts, "ring": which,
-						"name": Catalog.RACES[c["race_index"]].get("town", ""), "forest": Catalog.RACES[c["race_index"]].get("forest", false)}
+						"name": Catalog.RACES[c["race_index"]].get("town", ""), "forest": Catalog.RACES[c["race_index"]].get("forest", false),
+						"zone": ramp_zone(c["race_index"])}
 		if not best.is_empty():
 			(ramps_in if best["ring"] == 0 else ramps_out).append(best)
 			c["exit2_ring"] = best["ring"]

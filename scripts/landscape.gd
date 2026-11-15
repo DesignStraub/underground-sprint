@@ -40,6 +40,10 @@ var _blade_mat: StandardMaterial3D
 var _road := {}  # Rasterzelle -> PackedVector2Array (Punkte alle 20 m auf Autobahnen und Auffahrten)
 var _croad := {}  # dasselbe für die Straßen der Städte
 var _froad := {}
+var _ringg := {}  # nur Ringe, Kreisel und Diagonalen (ohne Auffahrten): dort stehen am Rand Häuser
+var _ramp_lines := []  # Auffahrten und Verbindungen zu den Städten (Weltkoordinaten x, z)
+var _holes := {}  # Raster 40 m -> Löcher im Boden (Flussbetten, Tunneltröge der Städte): Vector3(x, z, Radius)
+var _hole_reach := 0
 var _center := Vector2.ZERO
 var _has_center := false  # Waldstrecken: Landstraße ohne Häuser, der Wald reicht bis ans Bankett
 var _urban := []
@@ -89,11 +93,21 @@ func setup(lay: Dictionary) -> void:
 	for rd in layout["roads"]:
 		if rd[1] == 1:
 			_add_line(_road, rd[0])
+	_ramp_lines = layout.get("ramp_lines", [])
 	for sg in layout["segments"]:
 		var pl := PackedVector2Array()
 		for q in sg["race"]["pts"]:
 			pl.append(Vector2(q.x, q.z))
 		_add_line(_road, pl)
+		_add_line(_ringg, pl)
+	var hmax := 0.0
+	for h in layout.get("holes", PackedVector3Array()):
+		var hk := Vector2i(floori(h.x / 40.0), floori(h.y / 40.0))
+		if not _holes.has(hk):
+			_holes[hk] = []
+		_holes[hk].append(h)
+		hmax = maxf(hmax, h.z)
+	_hole_reach = int(ceil((hmax + 8.0) / 40.0))
 	for c in layout["cities"]:
 		var forest: bool = c.get("forest", false) or Catalog.RACES[c["race_index"]].get("forest", false) if c.has("race_index") else c.get("forest", false)
 		for rd in c["roads"]:
@@ -151,10 +165,39 @@ func city_dist(p: Vector2) -> float:
 
 ## Wie weit ist p vom Rand der flachen Zone entfernt (unter 0: in der Zone neben einer Straße oder in der Stadt)?
 func free_dist(p: Vector2) -> float:
-	var f := minf(minf(road_dist(p) - ROAD_FLAT, city_dist(p) - CITY_FLAT), _dist(_froad, p) - FOREST_FLAT)
+	return _free_from(p, road_dist(p), city_dist(p))
+
+
+## free_dist mit schon bekanntem Abstand zu Autobahn (rd) und Stadtstraßen (cd)
+func _free_from(p: Vector2, rd: float, cd: float) -> float:
+	var f := minf(minf(rd - ROAD_FLAT, cd - CITY_FLAT), _dist(_froad, p) - FOREST_FLAT)
 	if _has_center:
 		f = minf(f, p.distance_to(_center) - Layout.CENTER_R - 80.0)  # Erfurt in der Mitte: flach
 	return f
+
+
+## Liegt p in einem Loch im Boden (Flussbett, Trog; margin: Rand dazu)? Dort wachsen keine Bäume.
+func _in_hole(p: Vector2, margin: float) -> bool:
+	if _holes.is_empty():
+		return false
+	var k0 := Vector2i(floori(p.x / 40.0), floori(p.y / 40.0))
+	for dz in range(-_hole_reach, _hole_reach + 1):
+		for dx in range(-_hole_reach, _hole_reach + 1):
+			for h in _holes.get(k0 + Vector2i(dx, dz), []):
+				if Vector2(h.x, h.y).distance_to(p) < h.z + margin:
+					return true
+	return false
+
+
+## Gibt es Löcher in der Nähe der Kachel ab o?
+func _holes_near(o: Vector2) -> bool:
+	var k0 := Vector2i(floori(o.x / 40.0), floori(o.y / 40.0))
+	var n := int(CHUNK / 40.0)
+	for dz in range(-_hole_reach, n + _hole_reach + 1):
+		for dx in range(-_hole_reach, n + _hole_reach + 1):
+			if _holes.has(k0 + Vector2i(dx, dz)):
+				return true
+	return false
 
 
 func forest_dist(p: Vector2) -> float:
@@ -371,27 +414,23 @@ func _make_mask() -> void:
 		var c := Vector2i(int((p.x + ext) * k), int((p.y + ext) * k))
 		var rr := maxi(int(r * k), 1)
 		img.fill_rect(Rect2i(c.x - rr, c.y - rr, rr * 2 + 1, rr * 2 + 1), col)
+	# Seit 2.33 schmaler gemalt und nur leicht geglättet (vorher auf 128 Pixel = 150 m heruntergerechnet und 125 m um
+	# jede Stadtstraße: dunkle, runde Flächen weit über die Häuser hinaus, die wie Wolkenschatten auf den Feldern lagen)
 	for arr in _froad.values():
 		for q in arr:
-			paint.call(q, 380.0, Color(0, 1, 0))  # Waldboden
+			paint.call(q, 330.0, Color(0, 1, 0))  # Waldboden
 	for arr in _croad.values():
 		for q in arr:
-			paint.call(q, 125.0)
+			paint.call(q, 62.0)
 	for arr in _road.values():
 		for q in arr:
 			if Layout.is_urban(Vector3(q.x, 0, q.y), _urban, -150.0):
 				paint.call(q, 70.0)
+			elif _has_center and q.distance_to(_center) < Layout.CENTER_R + 40.0:
+				paint.call(q, 90.0)  # Erfurt: Innenstadt an den Straßen (nicht mehr die ganze Scheibe)
 	if _has_center:
-		var r := Layout.CENTER_R + 60.0
-		var cc := Vector2i(int((_center.x + ext) * k), int((_center.y + ext) * k))
-		var rr := int(r * k)
-		for y in range(-rr, rr + 1):
-			for x in range(-rr, rr + 1):
-				if x * x + y * y <= rr * rr:
-					var px := cc + Vector2i(x, y)
-					if px.x >= 0 and px.y >= 0 and px.x < S and px.y < S:
-						img.set_pixel(px.x, px.y, Color(1, 0, 0))
-	img.resize(S / 8, S / 8, Image.INTERPOLATE_BILINEAR)
+		paint.call(_center, Layout.RB_R + 30.0)  # Platz im Kreisel
+	img.resize(S / 2, S / 2, Image.INTERPOLATE_BILINEAR)
 	img.resize(S, S, Image.INTERPOLATE_CUBIC)
 	land_mat.set_shader_parameter("urban_mask", ImageTexture.create_from_image(img))
 	land_mat.set_shader_parameter("mask_rect", Vector3(-ext, -ext, 2.0 * ext))
@@ -535,20 +574,28 @@ func build_chunk(key: Vector2i) -> Node3D:
 	# Straßenabstand und Höhe auf dem Gitter
 	var dr := PackedFloat32Array()
 	var hs := PackedFloat32Array()
+	var rds := PackedFloat32Array()  # Abstand zu Autobahn und Auffahrten, zu Stadtstraßen (für die Bäume)
+	var cds := PackedFloat32Array()
 	dr.resize((N + 1) * (N + 1))
 	hs.resize((N + 1) * (N + 1))
+	rds.resize((N + 1) * (N + 1))
+	cds.resize((N + 1) * (N + 1))
 	var any := false
 	for j in N + 1:
 		for i in N + 1:
 			var p := o + Vector2(i, j) * STEP
-			var d := free_dist(p)
+			var rdv := road_dist(p)
+			var cdv := city_dist(p)
+			rds[j * (N + 1) + i] = rdv
+			cds[j * (N + 1) + i] = cdv
+			var d := _free_from(p, rdv, cdv)
 			dr[j * (N + 1) + i] = d
 			var h := height_at(p, d)
 			hs[j * (N + 1) + i] = h
 			any = any or h > 0.0
 	if any:
 		_terrain(root, o, hs)
-	_trees(root, o, dr, rng)
+	_trees(root, o, dr, rds, cds, rng)
 	for v in _villages:
 		if _in_chunk(v["pos"], o):
 			_village(root, v)
@@ -618,11 +665,13 @@ func _terrain(root: Node3D, o: Vector2, hs: PackedFloat32Array) -> void:
 
 ## Wälder: dichte Bestände, wo das Waldrauschen hoch ist, Nadel- und Laubbäume gemischt; dazu einzelne Bäume
 ## und Baumreihen auf den Feldern. Nicht nah an Straßen, nicht in Stadtnähe, nicht im Dorf.
-func _trees(root: Node3D, o: Vector2, dr: PackedFloat32Array, rng: RandomNumberGenerator) -> void:
+func _trees(root: Node3D, o: Vector2, dr: PackedFloat32Array, rds: PackedFloat32Array, cds: PackedFloat32Array,
+		rng: RandomNumberGenerator) -> void:
 	var lists := {"conifer": [], "leafy": []}
 	var cols := {"conifer": [], "leafy": []}
 	var step := _tree_step
 	var hs_cache := {}
+	var holes_here := _holes_near(o)
 	var y := 0.0
 	while y < CHUNK:
 		var x := 0.0
@@ -640,9 +689,20 @@ func _trees(root: Node3D, o: Vector2, dr: PackedFloat32Array, rng: RandomNumberG
 			var i := clampi(int(g.x), 0, N - 1)
 			var j := clampi(int(g.y), 0, N - 1)
 			var d := dr[j * (N + 1) + i]
-			if d < -20.0 and not (fd < 60.0 and fd > 16.0 and d > -FOREST_FLAT + 16.0):
-				continue  # Autobahn: ab 35 m Bäume; Stadt: erst hinter den Häusern; Waldstrecke: ab dem Bankett
-			if d < 90.0 and Layout.is_urban(Vector3(p.x, 0, p.y), _urban, 150.0):
+			# Autobahn: ab 35 m Bäume; Stadt: erst hinter den Häusern (seit 2.33 ab 100 m von Stadtstraßen statt 130 m,
+			# an Auffahrten ab 100 m von der Autobahn statt 145 m: vorher lag zwischen den letzten Häusern und dem ersten
+			# Baum ein leerer Streifen); Waldstrecke: ab dem Bankett, auch neben der Auffahrt einer Nachbarstadt
+			if fd < 14.0:
+				continue
+			var gk := clampi(int(round(g.y)), 0, N) * (N + 1) + clampi(int(round(g.x)), 0, N)
+			var rx: float = road_dist(p) if rds[gk] < 140.0 else rds[gk]
+			var cx: float = city_dist(p) if cds[gk] < 140.0 else cds[gk]
+			if rx < 35.0 or cx < 100.0:
+				continue
+			if rx < 100.0 and (Layout.is_urban(Vector3(p.x, 0, p.y), _urban, 150.0)
+					or (_has_center and p.distance_to(_center) < Layout.CENTER_R + 60.0)):
+				continue  # dort stehen Häuser an der Autobahn
+			if holes_here and _in_hole(p, 4.0):
 				continue
 			if f < 0.17 and not single and rng.randf() < 0.6:
 				continue  # Waldrand lichter
@@ -671,6 +731,7 @@ func _trees(root: Node3D, o: Vector2, dr: PackedFloat32Array, rng: RandomNumberG
 			var c := Color(0.09, 0.2, 0.08) if kind == "conifer" else Color(0.16, 0.3, 0.09)
 			(cols[kind] as Array).append(c * rng.randf_range(0.75, 1.2))
 		y += step
+	_alley_trees(o, lists["leafy"], cols["leafy"], holes_here)
 	for kind in lists:
 		var arr: Array = lists[kind]
 		if arr.is_empty():
@@ -681,6 +742,55 @@ func _trees(root: Node3D, o: Vector2, dr: PackedFloat32Array, rng: RandomNumberG
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		mi.visibility_range_end = VIEW - 300.0
 		root.add_child(mi)
+
+
+## Baumreihen an den Auffahrten (seit 2.33): beidseits alle 16 m ein Laubbaum, 15 m neben der Mitte, aber nicht
+## zwischen den Häusern am Ring (100 m), nicht in der Stadt, nicht im Fluss. Vorher führten lange Auffahrten (Würzburg,
+## die Bögen zum Außenring) über kahlen Boden.
+func _alley_trees(o: Vector2, xfs: Array, cols: Array, holes_here: bool) -> void:
+	var lo := o - Vector2(20.0, 20.0)
+	var hi := o + Vector2(CHUNK + 20.0, CHUNK + 20.0)
+	for line in _ramp_lines:
+		var pl: PackedVector2Array = line
+		var acc := 0.0
+		for k in pl.size() - 1:
+			var a: Vector2 = pl[k]
+			var b: Vector2 = pl[k + 1]
+			var l := a.distance_to(b)
+			if l < 0.01:
+				continue
+			if minf(a.x, b.x) > hi.x or maxf(a.x, b.x) < lo.x or minf(a.y, b.y) > hi.y or maxf(a.y, b.y) < lo.y:
+				acc += l
+				continue
+			var dir := (b - a) / l
+			var t := fposmod(-acc, 16.0)
+			while t < l:
+				for s in [-1.0, 1.0]:
+					var q: Vector2 = a + dir * t + dir.orthogonal() * s * 15.0
+					if not _in_chunk(q, o):
+						continue
+					var hq := absi(int(q.x * 7.0) * 31 + int(q.y * 3.0)) % 100
+					if hq < 12:
+						continue  # hier und da eine Lücke
+					if _dist(_ringg, q) < 100.0 or city_dist(q) < 70.0 or road_dist(q) < 12.0:
+						continue
+					if holes_here and _in_hole(q, 4.0):
+						continue
+					var skip := false
+					for v in _villages:
+						if q.distance_to(v["pos"]) < v["r"] + 15.0:
+							skip = true
+					for lk in _lakes:
+						if q.distance_to(lk["pos"]) < lk["r"] + 12.0:
+							skip = true
+					if skip:
+						continue
+					var h := maxf(height_at(q, free_dist(q)), -0.12)
+					var sc := 0.9 + 0.3 * float(hq % 10) / 10.0
+					xfs.append(Transform3D(Basis(Vector3.UP, float(hq) * 0.37).scaled(Vector3(sc, sc, sc)), Vector3(q.x, h - 0.2, q.y)))
+					cols.append(Color(0.16, 0.3, 0.09) * (0.8 + 0.3 * float(hq % 7) / 7.0))
+				t += 16.0
+			acc += l
 
 
 ## MultiMesh mit Farben in einem Stück füllen (ein Aufruf an den Renderer statt zwei je Instanz: beim Bauen im

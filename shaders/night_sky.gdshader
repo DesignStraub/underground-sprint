@@ -85,6 +85,11 @@ void sky() {
 	float city_dir = smoothstep(0.55, 0.75, sin(az * 2.0 + 0.7));
 	if (land > 0.5) {
 		bh *= city_dir;
+		// ohne Skyline in dieser Richtung: unter dem Horizont die vordere Hügelkette im Dunst statt eines dunklen Bands
+		// mit roten Lichtern (sah man von Kuppen und Brücken, wo die Sichtweite vor dem Horizont endet; seit 2.33)
+		if (bh < 0.002) {
+			bh = -1.0;
+		}
 		// Hügelketten in zwei Lagen: hinten heller (Dunst), vorn dunkler
 		float back = 0.016 + 0.012 * sin(az * 4.0 + 1.3) + 0.007 * sin(az * 11.0 + 0.4) + 0.003 * sin(az * 29.0);
 		float front = 0.008 + 0.009 * sin(az * 6.0 + 2.1) + 0.005 * sin(az * 17.0 + 1.1) + 0.002 * sin(az * 41.0 + 3.0);

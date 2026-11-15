@@ -40,6 +40,7 @@ const FAR := ["festung", "kaeppele", "saaleck", "aachen_dom", "kiliansdom", "mar
 
 static var _mats := {}
 static var _far_mats := {}
+static var _far_night := true  # Fernwirkung ohne Nebel gerade an (set_far_daytime)
 
 var n: Node3D
 var g := {}
@@ -213,22 +214,34 @@ func make(kind: String, extra := {}) -> void:
 		"oberbaumbruecke": _oberbaumbruecke(extra.get("hw", 14.0))
 		"fernsehturm": _fernsehturm()
 		"nkz": _nkz()
-	if INFO.get(kind, {}).get("hill", false):
-		# Sockel- und Stützmauern bis hinunter in den Hang
-		var info: Dictionary = INFO[kind]
-		box(Vector3(info["hl"] * 2.0, 16.0, info["hd"] * 2.0), Vector3(0, -8.05, 0), "dimstone")
 	var far := kind in FAR
 	if far:
 		for mt in g.keys():
 			if not _far_mats.has(mt):
 				var fm: StandardMaterial3D = mt.duplicate()
-				fm.disable_fog = true
+				fm.disable_fog = _far_night
 				if fm.emission_enabled and fm.emission_energy_multiplier < 1.0:
 					fm.emission_energy_multiplier = maxf(fm.emission_energy_multiplier * 2.2, 0.55)
 				_far_mats[mt] = fm
 			g[_far_mats[mt]] = g[mt]
 			g.erase(mt)
+	if INFO.get(kind, {}).get("hill", false):
+		# Sockel- und Stützmauern bis hinunter in den Hang; im Nebel wie alles andere (seit 2.33: vorher ohne Nebel,
+		# die Burg schwebte tagsüber auf einer hellen Platte über dem Dunst)
+		var info: Dictionary = INFO[kind]
+		box(Vector3(info["hl"] * 2.0, 16.0, info["hd"] * 2.0), Vector3(0, -8.05, 0), "dimstone")
 	bake()
+
+
+## Nur nachts (angestrahlt) vom Nebel ausgenommen (seit 2.33): tagsüber schwebten Burgen und Türme klar über dem Dunst,
+## während Hang und Häuser darunter im Nebel verschwanden. day: 0 Nacht, 1 Tag (Track.set_daytime).
+static func set_far_daytime(day: float) -> void:
+	var night := day < 0.35
+	if night == _far_night:
+		return
+	_far_night = night
+	for fm in _far_mats.values():
+		(fm as StandardMaterial3D).disable_fog = night
 
 
 # --- Aachen -------------------------------------------------------------------

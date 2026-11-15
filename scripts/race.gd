@@ -173,9 +173,9 @@ func _ready() -> void:
 	var tier: int = race.get("tier", 1)
 	var diff: int = GameState.difficulty
 	var difficulty: float = [0.0, 0.84, 0.88, 0.92][tier] + [-0.11, 0.0, 0.05][diff] + minf(GameState.total_wins(), 10) * 0.004
-	# Level-Autos fahren nicht als Gegner (die bleiben etwas Besonderes)
+	# Exoten fahren nicht als Gegner (die bleiben etwas Besonderes)
 	var pool: Array = Catalog.CAR_ORDER.filter(func(id): return Catalog.CARS[id]["top_speed"] <= [0.0, 61.0, 70.0, 99.0][mini(tier + (1 if diff == 2 else 0), 3)] \
-		and not Catalog.CARS[id]["unlock"].has("level"))
+		and not id in Catalog.EXOTICS)
 	if event_type == "drift":
 		# Drift: allein, Zielpunkte je nach Stufe, Schwierigkeit und Zahl der Kurven
 		drift_targets = Catalog.drift_targets(race, diff)
@@ -1296,22 +1296,16 @@ func _on_player_finished() -> void:
 		_bank_drift()
 		place = _place()
 	var unlocked := []
+	var first_win: bool = place == 1 and not race["name"] in GameState.won_events
 	if place == 1:
-		var stage := Catalog.stage_of(race["name"])
-		var nxt := stage + 1
-		var was_open := nxt < Catalog.STAGES.size() and GameState.stage_open(nxt)
 		GameState.mark_won(race["name"])
-		unlocked = GameState.register_win(event_type)
-		if stage >= 0 and nxt < Catalog.STAGES.size():
-			if not was_open and GameState.stage_open(nxt):
-				unlocked.push_front(tr("STUFE %d: %d neue Events") % [nxt + 1, Catalog.STAGES[nxt]["events"].size()])
-			elif not was_open:
-				var left: int = Catalog.stage_need(stage) - GameState.stage_wins(stage)
-				unlocked.push_front(tr("Noch %d Sieg bis Stufe %d" if left == 1 else "Noch %d Siege bis Stufe %d") % [left, nxt + 1])
-	# Fahrer-Erfahrung (seit 2.32): Stilpunkte des Rennens (im Drift-Event die Driftpunkte) plus Platz, je Stufe mehr
+		GameState.register_win(event_type)
+		if first_win:
+			unlocked.append(tr("Erster Sieg: +50 % Erfahrung"))
+	# Fahrer-Erfahrung (seit 2.32): Stilpunkte des Rennens (im Drift-Event die Driftpunkte) plus Platz, je Stufe mehr.
+	# Seit 2.33 schaltet nur das Level frei (Stufen, Autos, Teile, Vinyls, Titel): die Zeilen dazu stehen in _xp_lines.
 	var tier: int = race.get("tier", 1)
-	var place_xp: int = [200, 1500, 700, 400][place if place <= 3 else 0]
-	_xp_gain = _race_xp + (int(drift_score) if event_type == "drift" else 0) + place_xp * (tier + 1) / 2
+	_xp_gain = _race_xp + (int(drift_score) if event_type == "drift" else 0) + Catalog.race_xp(tier, place, first_win)
 	_xp_lines = GameState.add_xp(_xp_gain, false)
 	var key: String = race["name"]
 	var best: float = GameState.best_times.get(key, 0.0)
@@ -1363,22 +1357,22 @@ func _show_result(place: int, new_best: bool, unlocked: Array, dnf := "") -> voi
 		xl.text = tr("Erfahrung +%d XP   ·   LEVEL %d  (%d / %d)") % [_xp_gain, li["level"], li["into"], li["need"]]
 		xl.modulate = Color(0.55, 0.9, 1.0)
 		if not _xp_lines.is_empty():
-			var lu := _label(vb, 13, HORIZONTAL_ALIGNMENT_CENTER)
-			lu.text = "\n".join(_xp_lines)
+			var lu := _label(vb, 12, HORIZONTAL_ALIGNMENT_CENTER)
+			var shown := _xp_lines.slice(0, 9)
+			if _xp_lines.size() > 9:
+				shown.append(tr("… und %d weitere (Garage > Fahrer)") % (_xp_lines.size() - 9))
+			lu.text = "\n".join(shown)
 			lu.modulate = Color(0.4, 1.0, 0.55)
 	if place == 1:
 		var w := _label(vb, 11, HORIZONTAL_ALIGNMENT_CENTER)
 		w.text = (tr("Driftsiege gesamt: %d") % GameState.drift_wins) if event_type == "drift" else (tr("Rennsiege gesamt: %d") % GameState.wins)
 		if unlocked.size() > 0:
 			var u := _label(vb, 11, HORIZONTAL_ALIGNMENT_CENTER)
-			var lines := unlocked.slice(0, 9)
-			if unlocked.size() > 9:
-				lines.append(tr("… und %d weitere") % (unlocked.size() - 9))
-			u.text = tr("FREIGESCHALTET:\n") + "\n".join(lines)
+			u.text = "\n".join(unlocked)
 			u.modulate = Color(0.4, 1.0, 0.5)
 	else:
 		var w := _label(vb, 11, HORIZONTAL_ALIGNMENT_CENTER)
-		w.text = tr("Nur Platz 1 schaltet neue Teile frei.")
+		w.text = tr("Jeder Platz gibt Erfahrung, der Sieg am meisten.")
 		if GameState.difficulty > 0:
 			var h := _label(vb, 10, HORIZONTAL_ALIGNMENT_CENTER)
 			h.text = tr("Zu schwer? Einstellungen > Schwierigkeit: Leicht")

@@ -1,7 +1,8 @@
 extends Control
 ## Große Karte der Open World (Tab oder Esc-Menü > Karte): Ring, Auffahrten und alle Straßen der Städte, die Rennen
-## als Punkte in der Farbe ihrer Art (gewonnen golden, gesperrt grau), du als Pfeil. Links/rechts wählt ein Rennen,
-## Enter setzt es als Ziel (Flagge auf der Minikarte), Tab/Esc schließt.
+## als Punkte in der Farbe ihrer Art (gewonnen golden, gesperrt grau), du als Pfeil. Links/rechts wählt eine Stadt,
+## Leertaste reist dorthin (an den Stadteingang, nicht an ein Rennen: seit 2.33), Enter setzt das nächste offene Rennen
+## der Stadt als Ziel (Flagge auf der Minikarte), Tab/Esc schließt.
 
 const Catalog := preload("res://scripts/catalog.gd")
 const UI := preload("res://scripts/ui_style.gd")
@@ -12,9 +13,10 @@ signal closed
 
 var roads: Array = []  # [[Linienzug Welt x, z], Art]
 var pins: Array = []  # {race_index, pos (Vector3), town}
+var towns: Array = []  # {name, pins: [Index in pins], pos (Vector3)}; Auswahl und Schnellreise gehen nach Städten
 var player: Node3D
 var target := -1
-var sel := 0
+var sel := 0  # gewählte Stadt (towns)
 
 var relief: Texture2D  # Reliefkarte der Landschaft (Landscape.map_texture)
 var villages: Array = []  # [Lage, Name]
@@ -43,6 +45,39 @@ func setup(roads_: Array, cities: Array, player_: Node3D) -> void:
 		pins.append({"race_index": c["race_index"], "pos": c["start_world"], "town": Catalog.RACES[c["race_index"]].get("town", ""),
 			"phi": c["phi_w"]})
 	pins.sort_custom(func(a, b): return a["phi"] < b["phi"])
+	for i in pins.size():
+		var name: String = pins[i]["town"]
+		var t := -1
+		for k in towns.size():
+			if towns[k]["name"] == name:
+				t = k
+		if t < 0:
+			towns.append({"name": name, "pins": [], "pos": pins[i]["pos"]})
+			t = towns.size() - 1
+		towns[t]["pins"].append(i)
+
+
+## Stadt, in der Rennen ri liegt (-1: keine)
+func town_of(ri: int) -> int:
+	for k in towns.size():
+		for i in towns[k]["pins"]:
+			if pins[i]["race_index"] == ri:
+				return k
+	return -1
+
+
+## Rennen, an dessen Ausfahrt die Schnellreise in Stadt k ankommt (das erste der Stadt)
+func travel_race(k: int) -> int:
+	return pins[towns[k]["pins"][0]]["race_index"]
+
+
+## Nächstes Ziel in Stadt k: das erste offene, noch nicht gewonnene Rennen, sonst das erste
+func target_race(k: int) -> int:
+	for i in towns[k]["pins"]:
+		var name: String = Catalog.RACES[pins[i]["race_index"]]["name"]
+		if GameState.career_open(name) and not name in GameState.won_events:
+			return pins[i]["race_index"]
+	return travel_race(k)
 
 
 ## Welt (x, z) -> Bildschirm: Karte füllt die Fläche links (rechts steht das Infofeld), Norden oben
@@ -56,18 +91,16 @@ func _to_screen(p: Vector2) -> Vector2:
 
 func open(select := -1) -> void:
 	visible = true
-	if select >= 0:
-		for i in pins.size():
-			if pins[i]["race_index"] == select:
-				sel = i
+	if select >= 0 and town_of(select) >= 0:
+		sel = town_of(select)
 	else:
-		# nächstes Rennen vorauswählen
+		# nächste Stadt vorauswählen
 		var best := 1e9
-		for i in pins.size():
-			var d: float = (pins[i]["pos"] as Vector3).distance_to(player.global_position)
+		for k in towns.size():
+			var d: float = (towns[k]["pos"] as Vector3).distance_to(player.global_position)
 			if d < best:
 				best = d
-				sel = i
+				sel = k
 	queue_redraw()
 
 
@@ -79,20 +112,25 @@ func _process(_dt: float) -> void:
 func _handle(event: InputEvent) -> bool:
 	if not visible:
 		return false
+	if towns.is_empty():
+		return false
 	if event.is_action_pressed("ui_right") or event.is_action_pressed("ui_down"):
-		sel = (sel + 1) % pins.size()
+		sel = (sel + 1) % towns.size()
 		Sfx.ui("move")
 	elif event.is_action_pressed("ui_left") or event.is_action_pressed("ui_up"):
-		sel = (sel - 1 + pins.size()) % pins.size()
+		sel = (sel - 1 + towns.size()) % towns.size()
 		Sfx.ui("move")
 	elif event.is_action_pressed("handbrake"):
-		# Leertaste: Schnellreise zur Ausfahrt dieser Stadt (seit 2.31). Muss vor ui_accept stehen: Godots ui_accept
+		# Leertaste: Schnellreise an den Eingang dieser Stadt (seit 2.31). Muss vor ui_accept stehen: Godots ui_accept
 		# enthält die Leertaste auch, bis 2.31 schaltete sie deshalb nur das Ziel um und die Schnellreise kam nie dran.
-		fast_travel.emit(pins[sel]["race_index"])
+		# vor dem Signal: der Szenenwechsel nimmt die Karte sofort aus dem Baum (danach gibt es kein Viewport mehr)
+		get_viewport().set_input_as_handled()
 		Sfx.ui("go")
+		fast_travel.emit(travel_race(sel))
+		return true
 	elif event.is_action_pressed("ui_accept"):
-		var ri: int = pins[sel]["race_index"]
-		target = -1 if target == ri else ri
+		var ri := target_race(sel)
+		target = -1 if town_of(target) == sel else ri
 		target_chosen.emit(target)
 		Sfx.ui("go")
 	elif event.is_action_pressed("ui_cancel") or event.is_action_pressed("map") or event.is_action_pressed("pause"):
@@ -136,23 +174,24 @@ func _draw() -> void:
 			else:
 				var col := Color(0.92, 0.95, 1.0, 0.9) if kind == 0 else (Color(0.78, 0.82, 0.9, 0.75) if kind == 1 else Color(0.6, 0.65, 0.75, 0.4))
 				draw_polyline(pts, col, 1.6 if kind == 0 else 1.2, true)
-	# Rennen (Ortsnamen nur, wo Platz ist; das gewählte zuerst)
+	# Rennen (Ortsnamen je Stadt nur, wo Platz ist; die gewählte zuerst)
 	var taken := []
-	var order := range(pins.size())
+	var order := range(towns.size())
 	order.erase(sel)
 	order.push_front(sel)
 	var labels := {}
-	for i in order:
-		var p0: Dictionary = pins[i]
-		var lp := _to_screen(Vector2(p0["pos"].x, p0["pos"].z)) + Vector2(10, 4)
-		var r := Rect2(lp - Vector2(0, 10), Vector2(_cond.get_string_size(str(p0["town"]), HORIZONTAL_ALIGNMENT_LEFT, -1, 10).x, 12))
+	for k in order:
+		var tp: Vector3 = towns[k]["pos"]
+		var lp := _to_screen(Vector2(tp.x, tp.z)) + Vector2(10, 4)
+		var r := Rect2(lp - Vector2(0, 10), Vector2(_cond.get_string_size(str(towns[k]["name"]), HORIZONTAL_ALIGNMENT_LEFT, -1, 10).x, 12))
 		var free := true
 		for t in taken:
 			if t.intersects(r.grow(2.0)):
 				free = false
 		if free:
 			taken.append(r)
-			labels[i] = true
+			labels[towns[k]["pins"][0]] = true
+	var sel_pins: Array = towns[sel]["pins"] if not towns.is_empty() else []
 	for i in pins.size():
 		var p: Dictionary = pins[i]
 		var race: Dictionary = Catalog.RACES[p["race_index"]]
@@ -172,12 +211,12 @@ func _draw() -> void:
 			draw_circle(sp, 5.2, col)
 		if p["race_index"] == target:
 			draw_arc(sp, 12.0, 0.0, TAU, 24, Color.WHITE, 1.5, true)
-		if i == sel:
+		if i in sel_pins:
 			var a := 0.6 + 0.4 * sin(Time.get_ticks_msec() * 0.008)
-			draw_arc(sp, 15.0, 0.0, TAU, 28, Color(col.r, col.g, col.b, a), 2.5, true)
+			draw_arc(sp, 15.0, 0.0, TAU, 28, Color(1.0, 0.85, 0.2, a), 2.5, true)
 		if labels.has(i):
 			draw_string(_cond, sp + Vector2(10, 4), str(p["town"]).to_upper(), HORIZONTAL_ALIGNMENT_LEFT, -1, 10,
-				Color(0.85, 0.9, 1.0, 0.95 if i == sel else 0.55))
+				Color(0.85, 0.9, 1.0, 0.95 if i in sel_pins else 0.55))
 	# du
 	if player:
 		var pp := _to_screen(Vector2(player.global_position.x, player.global_position.z))
@@ -194,41 +233,39 @@ func _draw_info() -> void:
 	var x := size.x * 0.68
 	var w := size.x - x - 20
 	draw_rect(Rect2(x, 40, w, size.y - 80), Color(0.03, 0.05, 0.1, 0.8))
-	if pins.is_empty():
+	if towns.is_empty():
 		return
-	var p: Dictionary = pins[sel]
-	var race: Dictionary = Catalog.RACES[p["race_index"]]
-	var type: String = race.get("type", "sprint")
-	var col: Color = UI.TYPE_COL.get(type, UI.CYAN)
+	var town: Dictionary = towns[sel]
 	var y := 70.0
-	draw_string(_wide, Vector2(x + 12, y), tr({"sprint": "SPRINT", "circuit": "RUNDKURS", "drift": "DRIFT"}.get(type, "")),
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 12, col)
+	draw_string(_wide, Vector2(x + 12, y), tr("STADT"), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, UI.CYAN)
 	y += 30
-	draw_string(_cond, Vector2(x + 12, y), tr(race["name"]).to_upper(), HORIZONTAL_ALIGNMENT_LEFT, w - 24, 22, Color.WHITE)
+	draw_string(_cond, Vector2(x + 12, y), str(town["name"]).to_upper(), HORIZONTAL_ALIGNMENT_LEFT, w - 24, 22, Color.WHITE)
 	y += 22
-	draw_string(_cond, Vector2(x + 12, y), str(race.get("town", "")), HORIZONTAL_ALIGNMENT_LEFT, w - 24, 14, UI.CYAN)
-	y += 30
-	var name: String = race["name"]
-	var status := ""
-	if name in GameState.won_events:
-		status = tr("GEWONNEN")
-	elif not GameState.career_open(name):
-		var s := Catalog.stage_of(name)
-		status = tr("GESPERRT: %d Siege in Stufe „%s“") % [Catalog.stage_need(s - 1), tr(Catalog.STAGES[s - 1]["name"])] if s > 0 else tr("GESPERRT")
-	else:
-		status = tr("OFFEN")
-	draw_string(_cond, Vector2(x + 12, y), status, HORIZONTAL_ALIGNMENT_LEFT, w - 24, 13,
-		Color(1.0, 0.8, 0.2) if name in GameState.won_events else Color(0.85, 0.9, 1.0))
-	y += 22
-	if GameState.best_times.has(name) and type != "drift":
-		var t: float = GameState.best_times[name]
-		draw_string(_cond, Vector2(x + 12, y), tr("Bestzeit: ") + "%d:%05.2f" % [int(t / 60.0), fmod(t, 60.0)],
-			HORIZONTAL_ALIGNMENT_LEFT, w - 24, 13, Color(0.85, 0.9, 1.0))
-	y += 22
-	var km := (p["pos"] as Vector3).distance_to(player.global_position) / 1000.0 if player else 0.0
+	var km := (town["pos"] as Vector3).distance_to(player.global_position) / 1000.0 if player else 0.0
 	draw_string(_cond, Vector2(x + 12, y), tr("Luftlinie: %.1f km") % km, HORIZONTAL_ALIGNMENT_LEFT, w - 24, 13, Color(0.7, 0.75, 0.85))
-	var hint := tr("←/→ Rennen wählen\nEnter: als Ziel setzen (Flagge auf der Minikarte)\nLeertaste: Schnellreise\nM / Esc: zurück")
-	if target == p["race_index"]:
+	y += 32
+	# Rennen der Stadt: Art, Name, Stand (gewonnen, offen, ab Level n), Bestwert
+	for i in town["pins"]:
+		var race: Dictionary = Catalog.RACES[pins[i]["race_index"]]
+		var type: String = race.get("type", "sprint")
+		var name: String = race["name"]
+		var won: bool = name in GameState.won_events
+		var open_: bool = GameState.career_open(name)
+		var col: Color = UI.TYPE_COL.get(type, UI.CYAN) if open_ else Color(0.45, 0.47, 0.52)
+		draw_circle(Vector2(x + 18, y - 4), 4.0, Color(1.0, 0.8, 0.2) if won else col)
+		draw_string(_cond, Vector2(x + 28, y), tr(name).to_upper(), HORIZONTAL_ALIGNMENT_LEFT, w - 34, 12,
+			Color.WHITE if open_ else Color(0.6, 0.62, 0.68))
+		y += 17
+		var status := tr("GEWONNEN") if won else (tr("OFFEN") if open_ else GameState.lock_text(name).to_upper())
+		status = tr({"sprint": "SPRINT", "circuit": "RUNDKURS", "drift": "DRIFT"}.get(type, "")) + "  ·  " + status
+		if GameState.best_times.has(name):
+			var t: float = GameState.best_times[name]
+			status += "  ·  " + ("%d P" % int(t) if type == "drift" else "%d:%05.2f" % [int(t / 60.0), fmod(t, 60.0)])
+		draw_string(_cond, Vector2(x + 28, y), status, HORIZONTAL_ALIGNMENT_LEFT, w - 34, 9,
+			Color(1.0, 0.8, 0.2) if won else Color(0.75, 0.8, 0.9))
+		y += 26
+	var hint := tr("←/→ Stadt wählen\nLeertaste: Schnellreise\nEnter: Rennen als Ziel\nM / Esc: zurück")
+	if town_of(target) == sel:
 		hint = tr("Ziel gesetzt. Enter: Ziel löschen\nLeertaste: Schnellreise\nM / Esc: zurück")
 	var yy := size.y - 126
 	for line in hint.split("\n"):

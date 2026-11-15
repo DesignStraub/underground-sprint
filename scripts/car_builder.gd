@@ -1242,8 +1242,74 @@ static func paint_mat(car_id: String, cfg: Dictionary) -> Material:
 	m.set_shader_parameter("rim_k", f.get("rim", 0.0))
 	m.set_shader_parameter("rim_tint_k", f.get("rim_tint", 0.5))
 	m.set_meta("lod_color", c)  # Fernansicht (_build_lod) malt den Lack als Vertexfarbe
+	vinyl_params(m, car_id, cfg)
 	light_paint(m)
 	return m
+
+
+## Vinyl mit Motiv (Catalog.PARTS vinyl, "art"): Bild und Maße dieses Autos an den Lack (Shader car_paint). Die Maße
+## sind die der Karosserie (Bug, Länge, Schweller bis Gürtellinie, halbe Breite mit Breitbau), das Motiv streckt sich
+## darauf: so passt jedes Vinyl auf jedes Auto. Einfarbige Motive (tint) nehmen die Folienfarbe, "Kontrast" ist Weiß
+## auf dunklem und Schwarz auf hellem Lack.
+## Welt (world.gd setzt es): Vinyl-Bilder im Hintergrund laden. Herausforderer tauchen mitten in der Fahrt auf, ein
+## Bild synchron zu laden kostete dort einen Ruckler (gut 10 ms); das Motiv erscheint dann ein paar Bilder später.
+static var async_vinyls := false
+static var _vinyl_wait := []  # [ShaderMaterial, Pfad]
+
+
+static func vinyl_params(m: ShaderMaterial, car_id: String, cfg: Dictionary) -> void:
+	var opt: Dictionary = Catalog.part_of(cfg, "vinyl")
+	var path := "res://assets/vinyls/%s.svg" % str(opt.get("art", ""))
+	if not opt.has("art") or not ResourceLoader.exists(path):
+		m.set_shader_parameter("vinyl_on", 0.0)
+		return
+	var spec: Dictionary = Catalog.CARS[car_id]
+	var S: Dictionary = SHAPES.get(car_id, SHAPES["kaizen"])
+	var L: float = spec["length"]
+	if async_vinyls and not ResourceLoader.has_cached(path):
+		if ResourceLoader.load_threaded_get_status(path) == ResourceLoader.THREAD_LOAD_INVALID_RESOURCE:
+			ResourceLoader.load_threaded_request(path)
+		m.set_shader_parameter("vinyl_on", 0.0)
+		_vinyl_wait.append([m, path])
+		var tree := Engine.get_main_loop() as SceneTree
+		if tree and not tree.process_frame.is_connected(_poll_vinyls):
+			tree.process_frame.connect(_poll_vinyls)
+	else:
+		m.set_shader_parameter("vinyl_tex", load(path))
+		m.set_shader_parameter("vinyl_on", 1.0)
+	m.set_shader_parameter("vinyl_box", Vector4(-L / 2.0, L, CLEARANCE + 0.05, float(S["belt"]) + 0.02))
+	m.set_shader_parameter("vinyl_hw", float(spec["width"]) / 2.0 + kit_flare(cfg) + 0.03)
+	m.set_shader_parameter("vinyl_mirror", 1.0 if opt.get("mirror", true) else 0.0)
+	var vc: Dictionary = Catalog.part_of(cfg, "vinylcol")
+	var tint := Color(0.95, 0.95, 0.95) if paint_color(car_id, cfg).get_luminance() < 0.5 else Color(0.05, 0.05, 0.05)
+	if vc.has("color"):
+		tint = vc["color"]
+	tint.a = 1.0 if opt.get("tint", false) else 0.0
+	m.set_shader_parameter("vinyl_tint", tint)
+	m.set_shader_parameter("vinyl_metal", 0.85 if opt.get("tint", false) and vc.get("metal", false) else 0.1)
+
+
+static func _poll_vinyls() -> void:
+	for w in _vinyl_wait.duplicate():
+		var path: String = w[1]
+		var tex: Texture2D = null
+		if ResourceLoader.has_cached(path):
+			tex = load(path)
+		else:
+			var st := ResourceLoader.load_threaded_get_status(path)
+			if st == ResourceLoader.THREAD_LOAD_LOADED:
+				tex = ResourceLoader.load_threaded_get(path)
+			elif st != ResourceLoader.THREAD_LOAD_IN_PROGRESS:
+				_vinyl_wait.erase(w)
+				continue
+		if tex:
+			(w[0] as ShaderMaterial).set_shader_parameter("vinyl_tex", tex)
+			(w[0] as ShaderMaterial).set_shader_parameter("vinyl_on", 1.0)
+			_vinyl_wait.erase(w)
+	if _vinyl_wait.is_empty():
+		var tree := Engine.get_main_loop() as SceneTree
+		if tree and tree.process_frame.is_connected(_poll_vinyls):
+			tree.process_frame.disconnect(_poll_vinyls)
 
 
 ## Lichtkarte der Strecke auf einen Lack (auch für den Lack der Verkehrsautos)

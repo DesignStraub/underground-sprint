@@ -13,7 +13,7 @@ const TIPS := [
 	"Knapp am Verkehr vorbei gibt Punkte und füllt dein Nitro ein Stück.",
 	"Abkürzungen sparen Zeit, aber dort kommt dir Verkehr entgegen.",
 	"Handbremse und Lenken stellen das Auto quer. Drift-Ketten bringen Multiplikator.",
-	"Siege schalten neue Teile und Autos frei.",
+	"Jedes Fahrer-Level schaltet etwas frei: Autos, Teile, Vinyls, Titel. Die Liste steht in der Garage unter Fahrer.",
 	"Spar dir Nitro für die letzte Gerade.",
 	"Bahnübergang: Blinkt es schon, kommst du mit Vollgas noch knapp vor dem Zug drüber.",
 	"Motor-Tuning steigert Beschleunigung und Höchstgeschwindigkeit.",

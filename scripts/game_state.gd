@@ -90,7 +90,12 @@ var won_events: Array = []  # gewonnene Events (Karriere: genug Siege in einer S
 var test_cfg := {}  # --cfg (nur Tests)
 var tuning := {}  # Leistungsteile: category -> option_index, für alle Autos gemeinsam
 var looks := {}  # Optik je Auto: car_id -> {category: option_index}; fehlt ein Wert, gilt 0 (ab Werk)
-var kept_cars: Array = []  # schon mit den alten Schwellen (bis 2.10) freigeschaltete Autos bleiben frei
+var kept_cars: Array = []  # schon mit den alten Schwellen (bis 2.10, Siege bis 2.32) freigeschaltete Autos bleiben frei
+var kept_parts: Array = []  # "cat:index": bis 2.32 mit Siegen freigeschaltete Teile bleiben frei
+var kept_stages: Array = []  # bis 2.32 mit Siegen geöffnete Karriere-Stufen bleiben offen
+var title := 0  # gewählter Fahrer-Titel (Catalog.TITLES), muss frei sein
+var emblem := 0  # gewähltes Emblem (Index in Catalog.TITLES, dessen "emblem")
+const PROG := 2  # Fortschritts-Stand: 2 = alles über das Fahrer-Level (seit 2.33)
 
 
 func _ready() -> void:
@@ -346,11 +351,24 @@ func stage_wins(s: int) -> int:
 	return n
 
 
-## Stufe s ist offen, wenn die vorige offen ist und darin genug Siege stehen
+## Stufe s ist offen ab ihrem Fahrer-Level (seit 2.33), oder sie war mit Siegen schon offen (bis 2.32)
 func stage_open(s: int) -> bool:
+	return s <= 0 or level() >= int(Catalog.STAGES[s]["level"]) or s in kept_stages
+
+
+## Bis 2.32: Stufe offen, wenn die vorige offen ist und darin genug Siege stehen (nur noch für alte Spielstände)
+func _stage_open_wins(s: int) -> bool:
 	if s <= 0:
 		return true
-	return stage_open(s - 1) and stage_wins(s - 1) >= Catalog.stage_need(s - 1)
+	return _stage_open_wins(s - 1) and stage_wins(s - 1) >= Catalog.stage_need(s - 1)
+
+
+## Gesperrtes Karriere-Event: "ab Level 7", sonst ""
+func lock_text(event_name: String) -> String:
+	if career_open(event_name):
+		return ""
+	var s := Catalog.stage_of(event_name)
+	return tr("ab Level %d") % int(Catalog.STAGES[s]["level"]) if s > 0 else tr("gesperrt")
 
 
 ## Karriere-Event frei: seine Stufe ist offen, oder es war nach der alten Kette (bis 2.15) schon offen
@@ -442,10 +460,11 @@ func pace() -> float:
 
 # --- Fahrer-Level (seit 2.32) ------------------------------------------------
 ## Wie in einem Rollenspiel: Stilpunkte (Driften, knapp vorbei, Sprünge, Duelle, Rennen) sind Erfahrung, jedes Level
-## braucht etwas mehr als das vorige: 1000 XP für Level 2, gut 3500 für Level 7, knapp 10 000 für Level 11, gut 27 000
-## für Level 21. Kein oberes Ende (bis 99). Manche Autos gibt es nur über das Level (Catalog.CARS unlock "level").
+## braucht etwas mehr als das vorige. Seit 2.33 schaltet das Level alles frei (Stufen, Autos, Teile, Vinyls, Titel),
+## die Kurve ist dafür flacher: Level 10 nach gut 25 000 XP, Level 20 nach gut 110 000, Level 30 nach knapp 280 000.
+## Kein oberes Ende (bis 99).
 static func xp_need(lvl: int) -> int:
-	return int(round((1000.0 + 450.0 * pow(float(maxi(lvl - 1, 0)), 1.35)) / 50.0)) * 50
+	return int(round((1000.0 + 300.0 * pow(float(maxi(lvl - 1, 0)), 1.25)) / 50.0)) * 50
 
 
 ## {level, into (XP im aktuellen Level), need (XP für das nächste)}
@@ -474,9 +493,10 @@ func add_xp(n: int, save := true) -> Array:
 	var lines := []
 	for l in range(l0 + 1, l1 + 1):
 		lines.append(tr("LEVEL %d") % l)
-		for car_id in Catalog.CAR_ORDER:
-			if int(Catalog.CARS[car_id]["unlock"].get("level", 0)) == l and not car_id in kept_cars:
-				lines.append(tr("Auto: ") + Catalog.CARS[car_id]["name"])
+		for r in Catalog.level_rewards(l):
+			if not (r["kind"] == "car" and r["id"] in kept_cars) and not (r["kind"] == "stage" and r["index"] in kept_stages) \
+					and not (r["kind"] in ["part", "vinyl"] and "%s:%d" % [r["cat"], r["index"]] in kept_parts):
+				lines.append(reward_text(r))
 	if save or l1 > l0:
 		save_game()
 	if l1 > l0:
@@ -484,14 +504,29 @@ func add_xp(n: int, save := true) -> Array:
 	return lines
 
 
-func is_car_unlocked(car_id: String, race_w := -1, drift_w := -1) -> bool:
+## "Auto: Kaido 2000GT", "Stufe 3: Hafen und Altstadt", "Vinyl: Sakura", "Motor: Stufe 1", "Titel: Phantom"
+func reward_text(r: Dictionary) -> String:
+	match r["kind"]:
+		"car":
+			return tr("Auto: ") + str(r["name"])
+		"stage":
+			return tr("STUFE %d: %s") % [int(r["index"]) + 1, tr(str(r["name"]))]
+		"title":
+			return tr("Titel: ") + tr(str(r["name"]))
+		"vinyl":
+			return tr("Vinyl: ") + tr(str(r["name"]))
+	return tr(Catalog.PARTS[r["cat"]]["label"]) + ": " + tr(str(r["name"]))
+
+
+func is_car_unlocked(car_id: String) -> bool:
 	var req: Dictionary = Catalog.CARS[car_id]["unlock"]
-	if req.is_empty() or car_id in kept_cars:
-		return true
-	var rw := wins if race_w < 0 else race_w
-	var dw := drift_wins if drift_w < 0 else drift_w
-	return (req.has("race") and rw >= req["race"]) or (req.has("drift") and dw >= req["drift"]) \
-		or (req.has("level") and level() >= req["level"])
+	return req.is_empty() or car_id in kept_cars or level() >= int(req.get("level", 0))
+
+
+## Bis 2.32: Auto mit Siegen frei (für den Umstieg alter Spielstände)
+static func _car_by_wins(car_id: String, rw: int, dw: int) -> bool:
+	var req: Dictionary = Catalog.WIN_UNLOCK.get(car_id, {})
+	return (req.has("race") and rw >= req["race"]) or (req.has("drift") and dw >= req["drift"])
 
 
 ## Spielstand von vor 2.11: was nach den alten Schwellen schon frei war, bleibt frei
@@ -504,21 +539,32 @@ static func legacy_cars(race_w: int, drift_w: int) -> Array:
 	return out
 
 
-## "2 Rennsiege oder 1 Driftsieg"
+## "Fahrer-Level 12"
 func unlock_text(car_id: String) -> String:
-	var req: Dictionary = Catalog.CARS[car_id]["unlock"]
-	var parts := []
-	if req.has("race"):
-		parts.append(tr("%d Rennsieg" if req["race"] == 1 else "%d Rennsiege") % req["race"])
-	if req.has("drift"):
-		parts.append(tr("%d Driftsieg" if req["drift"] == 1 else "%d Driftsiege") % req["drift"])
-	if req.has("level"):
-		parts.append(tr("Fahrer-Level %d") % req["level"])
-	return tr(" oder ").join(parts)
+	return tr("Fahrer-Level %d") % int(Catalog.CARS[car_id]["unlock"].get("level", 1))
 
 
 func is_part_unlocked(category: String, index: int) -> bool:
-	return total_wins() >= Catalog.PARTS[category]["options"][index]["wins"]
+	return level() >= int(Catalog.PARTS[category]["options"][index].get("level", 0)) or "%s:%d" % [category, index] in kept_parts
+
+
+## Titel t (Catalog.TITLES) ist frei
+func title_unlocked(t: int) -> bool:
+	return t >= 0 and t < Catalog.TITLES.size() and level() >= int(Catalog.TITLES[t]["level"])
+
+
+func title_name() -> String:
+	return tr(Catalog.TITLES[title if title_unlocked(title) else 0]["name"])
+
+
+func emblem_id() -> String:
+	return Catalog.TITLES[emblem if title_unlocked(emblem) else 0]["emblem"]
+
+
+## Emblem als Textur (assets/emblems/<id>.svg)
+func emblem_texture(id := "") -> Texture2D:
+	var path := "res://assets/emblems/%s.svg" % (id if id != "" else emblem_id())
+	return load(path) if ResourceLoader.exists(path) else null
 
 
 ## Eingebautes Tuning eines Autos (neues Dictionary): Leistung für alle gleich, Optik je Auto (fehlt: ab Werk)
@@ -549,30 +595,37 @@ func part(car_id: String, category: String) -> Dictionary:
 	return Catalog.PARTS[category]["options"][get_config(car_id)[category]]
 
 
-## Sieg zählen (Drift-Events als Driftsieg, sonst Rennsieg).
-## Liefert eine Liste von Texten, was dadurch freigeschaltet wurde.
-func register_win(event_type: String) -> Array:
-	var rw0 := wins
-	var dw0 := drift_wins
-	var before := total_wins()
+## Sieg zählen (Drift-Events als Driftsieg, sonst Rennsieg). Freigeschaltet wird seit 2.33 nur noch über das Level
+## (add_xp), die Siege zählen für das Tempo der Gegner (pace) und die Statistik.
+func register_win(event_type: String) -> void:
 	if event_type == "drift":
 		drift_wins += 1
 	else:
 		wins += 1
-	var unlocked := []
-	for car_id in Catalog.CAR_ORDER:
-		if not is_car_unlocked(car_id, rw0, dw0) and is_car_unlocked(car_id):
-			unlocked.append(tr("Auto: ") + Catalog.CARS[car_id]["name"])
-	# je Kategorie eine Zeile ("Felgen: Turbine, Gitter Gold"), sonst wird die Liste nach einem Sieg zu lang
-	for cat in Catalog.PART_ORDER:
-		var names := []
-		for opt in Catalog.PARTS[cat]["options"]:
-			if opt["wins"] > before and opt["wins"] <= total_wins():
-				names.append(tr(opt["name"]))
-		if not names.is_empty():
-			unlocked.append(tr(Catalog.PARTS[cat]["label"]) + ": " + ", ".join(names))
 	save_game()
-	return unlocked
+
+
+## Umstieg auf das Fahrer-Level (Spielstand von vor 2.33): was mit Siegen schon frei war, bleibt frei, und die
+## gewonnenen Events zählen als Erfahrung nach der neuen Rechnung (Catalog.race_xp mit Erstsieg), falls das mehr ist
+func _migrate_prog() -> void:
+	for id in Catalog.CAR_ORDER:
+		if not id in kept_cars and _car_by_wins(id, wins, drift_wins):
+			kept_cars.append(id)
+	for cat in Catalog.PART_ORDER:
+		var opts: Array = Catalog.PARTS[cat]["options"]
+		for i in opts.size():
+			var key := "%s:%d" % [cat, i]
+			if int(opts[i]["wins"]) > 0 and total_wins() >= int(opts[i]["wins"]) and not key in kept_parts:
+				kept_parts.append(key)
+	for s in range(1, Catalog.STAGES.size()):
+		if _stage_open_wins(s) and not s in kept_stages:
+			kept_stages.append(s)
+	var floor_xp := 0
+	for ev in won_events:
+		var ri := Catalog.race_index(str(ev))
+		if ri >= 0:
+			floor_xp += Catalog.race_xp(int(Catalog.RACES[ri].get("tier", 1)), 1, true)
+	xp = maxi(xp, floor_xp)
 
 
 # --- Speichern ------------------------------------------------------------
@@ -592,6 +645,7 @@ func save_game() -> void:
 	var text := JSON.stringify({
 		"wins": wins, "drift_wins": drift_wins, "current_car": current_car, "race_index": race_index,
 		"best_times": best_times, "tuning": tuning, "looks": looks, "won_events": won_events, "kept_cars": kept_cars, "outruns": outruns, "xp": xp,
+		"kept_parts": kept_parts, "kept_stages": kept_stages, "prog": PROG, "title": title, "emblem": emblem,
 		"gfx": {"preset": preset, "opts": gfx, "pixel": pixel_look, "vsync": vsync, "fps": fps_limit, "fullscreen": fullscreen,
 			"touch": touch_mode, "show_fps": show_fps, "jump_cam": jump_cam, "motion_blur": motion_blur,
 			"speed_fov": speed_fov, "cam_shake": cam_shake, "cam": cam_mode},
@@ -660,6 +714,10 @@ func load_game() -> void:
 	outruns = int(data.get("outruns", 0))
 	# Spielstand von vor 2.32 (ohne XP): bisherige Siege und Duelle zählen als Erfahrung, niemand fängt bei Level 1 an
 	xp = int(data.get("xp", (int(data.get("wins", 0)) + int(data.get("drift_wins", 0))) * 1200 + outruns * 600))
+	kept_parts = Array(data.get("kept_parts", [])).map(func(k): return str(k))
+	kept_stages = Array(data.get("kept_stages", [])).map(func(k): return int(k))
+	title = int(data.get("title", 0))
+	emblem = int(data.get("emblem", 0))
 	if data.has("won_events"):
 		won_events = Array(data["won_events"])
 	else:
@@ -677,6 +735,8 @@ func load_game() -> void:
 	cam_shake = bool(g.get("cam_shake", true))
 	cam_mode = clampi(int(g.get("cam", 0)), 0, 3)
 	difficulty = clampi(int(data.get("difficulty", 1)), 0, 2)
+	if int(data.get("prog", 1)) < PROG:
+		_migrate_prog()
 	# Bis 2.12 hatte jedes Auto sein eigenes Tuning: übernommen wird das des zuletzt gefahrenen Autos
 	var src: Dictionary = data.get("tuning", {})
 	if src.is_empty():
@@ -714,6 +774,10 @@ func reset_progress() -> void:
 	looks = {}
 	won_events = []
 	kept_cars = []
+	kept_parts = []
+	kept_stages = []
+	title = 0
+	emblem = 0
 	xp = 0
 	save_game()
 

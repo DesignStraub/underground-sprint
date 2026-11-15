@@ -1,7 +1,9 @@
 extends RefCounted
 ## Alle Inhalte des Spiels: Autos, Tuningteile und Events.
-## Autos: "unlock" = {"race": n} Rennsiege und/oder {"drift": n} Driftsiege (eins von beiden reicht).
-## Teile: "wins" = so viele Siege insgesamt (Rennen + Drift).
+## Seit 2.33 schaltet nur noch das Fahrer-Level frei (GameState.level): Autos "unlock" = {"level": n}, Teile "level",
+## Karriere-Stufen "level", dazu Titel, Embleme und Vinyls. level_rewards(l) sammelt, was Level l bringt (Level-Liste
+## in der Garage, Meldung beim Aufstieg). "wins" an Teilen und WIN_UNLOCK sind die Schwellen bis 2.32: was ein alter
+## Spielstand damit schon hatte, bleibt frei (GameState.kept_*).
 ## "drift" (0..1): wie willig das Auto quer geht und im Drift bleibt.
 
 ## Leistung: Jedes Auto, das du freischaltest, ist ein Stück stärker (Klasse D bis A). Die Autos der Klasse S (auch die
@@ -21,7 +23,7 @@ const CARS := {
 		"sound": {"cyl": 4, "harm": [1.0, 0.45, 0.2, 0.08], "sub": 0.3, "turbo": 0.0, "rough": 0.2},
 	},
 	"hachi": {
-		"drive": "rwd", "name": "Hachi Touge", "style": "hatch", "class": "D", "unlock": {"race": 1, "drift": 1}, "drift": 0.85,
+		"drive": "rwd", "name": "Hachi Touge", "style": "hatch", "class": "D", "unlock": {"level": 2}, "drift": 0.85,
 		"length": 4.2, "width": 1.66,
 		"accel": 10.1, "top_speed": 58.0, "grip": 24.0, "steer": 2.6,
 		"desc": "Leichtes 80er-Fließheck mit Heckantrieb. Wenig Leistung, viel Gefühl.",
@@ -29,7 +31,7 @@ const CARS := {
 		"sound": {"cyl": 4, "harm": [1.0, 0.5, 0.26, 0.12], "sub": 0.22, "turbo": 0.0, "rough": 0.3},
 	},
 	"sakura": {
-		"drive": "rwd", "name": "Sakura D2", "style": "coupe", "class": "C", "unlock": {"race": 2, "drift": 1}, "drift": 0.9,
+		"drive": "rwd", "name": "Sakura D2", "style": "coupe", "class": "C", "unlock": {"level": 4}, "drift": 0.9,
 		"length": 4.3, "width": 1.72,
 		"accel": 10.5, "top_speed": 60.5, "grip": 23.0, "steer": 2.5,
 		"desc": "Leichter Hecktriebler. Gebaut zum Querfahren.",
@@ -37,7 +39,7 @@ const CARS := {
 		"sound": {"cyl": 4, "harm": [1.0, 0.55, 0.28, 0.12], "sub": 0.4, "turbo": 0.5, "rough": 0.28},
 	},
 	"hayate": {
-		"drive": "fwd", "name": "Hayate R8", "style": "coupe", "class": "C", "unlock": {"race": 3}, "drift": 0.3, "paint": Color(0.72, 0.04, 0.05),
+		"drive": "fwd", "name": "Hayate R8", "style": "coupe", "class": "C", "unlock": {"level": 6}, "drift": 0.3, "paint": Color(0.72, 0.04, 0.05),
 		"length": 4.38, "width": 1.7,
 		"accel": 10.2, "top_speed": 61.5, "grip": 28.0, "steer": 2.45,
 		"desc": "Leichtes Coupé, dreht bis 8.000/min. Klebt in Kurven, driftet ungern.",
@@ -45,7 +47,7 @@ const CARS := {
 		"sound": {"cyl": 4, "harm": [1.0, 0.36, 0.34, 0.22], "sub": 0.1, "turbo": 0.0, "rough": 0.1},
 	},
 	"kitsune": {
-		"drive": "rwd", "name": "Kitsune 18S", "style": "hatch", "class": "C", "unlock": {"race": 4, "drift": 1}, "drift": 0.85, "paint": Color(0.95, 0.42, 0.06),
+		"drive": "rwd", "name": "Kitsune 18S", "style": "hatch", "class": "C", "unlock": {"level": 7}, "drift": 0.85, "paint": Color(0.95, 0.42, 0.06),
 		"length": 4.54, "width": 1.69,
 		"accel": 11.2, "top_speed": 62.0, "grip": 23.0, "steer": 2.45,
 		"desc": "Fließheck mit Klappscheinwerfern, Turbo und Heckantrieb. Liebling der Drift-Szene.",
@@ -53,7 +55,7 @@ const CARS := {
 		"sound": {"cyl": 4, "harm": [1.0, 0.58, 0.3, 0.12], "sub": 0.45, "turbo": 0.8, "rough": 0.3},
 	},
 	"tsubame": {
-		"drive": "rwd", "name": "Tsubame Spyder", "style": "roadster", "class": "B", "unlock": {"race": 5}, "drift": 0.6,
+		"drive": "rwd", "name": "Tsubame Spyder", "style": "roadster", "class": "B", "unlock": {"level": 8}, "drift": 0.6,
 		"length": 4.1, "width": 1.75,
 		"accel": 11.0, "top_speed": 64.0, "grip": 27.0, "steer": 2.55,
 		"desc": "Offener Zweisitzer mit langer Haube. Flink und präzise.",
@@ -61,7 +63,7 @@ const CARS := {
 		"sound": {"cyl": 4, "harm": [1.0, 0.38, 0.3, 0.16], "sub": 0.12, "turbo": 0.0, "rough": 0.12},
 	},
 	"mirai": {
-		"drive": "rwd", "name": "Mirai 240R", "style": "coupe", "class": "B", "unlock": {"race": 6, "drift": 2}, "drift": 0.65,
+		"drive": "rwd", "name": "Mirai 240R", "style": "coupe", "class": "B", "unlock": {"level": 10}, "drift": 0.65,
 		"length": 4.35, "width": 1.82,
 		"accel": 11.4, "top_speed": 66.0, "grip": 23.5, "steer": 2.25,
 		"desc": "Heckantrieb-Coupé. Liebt Drifts.",
@@ -69,7 +71,7 @@ const CARS := {
 		"sound": {"cyl": 4, "harm": [1.0, 0.6, 0.3, 0.1], "sub": 0.55, "turbo": 0.7, "rough": 0.35},
 	},
 	"tenshi": {
-		"drive": "mr", "name": "Tenshi MR-T", "style": "coupe", "class": "B", "unlock": {"race": 7}, "drift": 0.5, "paint": Color(0.92, 0.7, 0.06),
+		"drive": "mr", "name": "Tenshi MR-T", "style": "coupe", "class": "B", "unlock": {"level": 12}, "drift": 0.5, "paint": Color(0.92, 0.7, 0.06),
 		"length": 4.17, "width": 1.7,
 		"accel": 11.8, "top_speed": 65.0, "grip": 27.5, "steer": 2.6,
 		"desc": "Mittelmotor mit Turbo. Lenkt messerscharf ein, will aber sauber gefahren werden.",
@@ -77,7 +79,7 @@ const CARS := {
 		"sound": {"cyl": 4, "harm": [1.0, 0.5, 0.32, 0.14], "sub": 0.35, "turbo": 0.85, "rough": 0.25},
 	},
 	"kumo": {
-		"drive": "rwd", "name": "Kumo JX6", "style": "sedan", "class": "A", "unlock": {"race": 8, "drift": 2}, "drift": 0.85, "paint": Color(0.3, 0.32, 0.36), "finish": "metal",
+		"drive": "rwd", "name": "Kumo JX6", "style": "sedan", "class": "A", "unlock": {"level": 13}, "drift": 0.85, "paint": Color(0.3, 0.32, 0.36), "finish": "metal",
 		"length": 4.72, "width": 1.75,
 		"accel": 12.4, "top_speed": 68.0, "grip": 23.5, "steer": 2.3,
 		"desc": "Viertürer mit Turbo-Reihensechser und Heckantrieb. Unauffällig, bis er quer steht.",
@@ -85,7 +87,7 @@ const CARS := {
 		"sound": {"cyl": 6, "harm": [1.0, 0.52, 0.3, 0.14], "sub": 0.18, "turbo": 0.9, "rough": 0.14},
 	},
 	"raijin": {
-		"drive": "awd", "name": "Raijin RS-4", "style": "sedan", "class": "A", "unlock": {"race": 9}, "drift": 0.25,
+		"drive": "awd", "name": "Raijin RS-4", "style": "sedan", "class": "A", "unlock": {"level": 14}, "drift": 0.25,
 		"length": 4.45, "width": 1.8,
 		"accel": 12.6, "top_speed": 67.0, "grip": 29.5, "steer": 2.2,
 		"desc": "Rallye-Limousine mit Allrad-Gefühl. Klebt auf der Straße.",
@@ -93,7 +95,7 @@ const CARS := {
 		"sound": {"cyl": 4, "harm": [1.0, 0.65, 0.4, 0.2], "sub": 0.6, "turbo": 0.9, "rough": 0.5},
 	},
 	"vortex": {
-		"drive": "awd", "name": "Vortex GT-R", "style": "sedan", "class": "S", "unlock": {"race": 10}, "drift": 0.3,
+		"drive": "awd", "name": "Vortex GT-R", "style": "sedan", "class": "S", "unlock": {"level": 15}, "drift": 0.3,
 		"length": 4.6, "width": 1.8,
 		"accel": 12.9, "top_speed": 72.5, "grip": 29.5, "steer": 2.05,
 		"desc": "Schwere Turbo-Limousine. Liegt satt, viel Grip, zieht aus jeder Kurve.",
@@ -101,7 +103,7 @@ const CARS := {
 		"sound": {"cyl": 6, "harm": [1.0, 0.5, 0.3, 0.15], "sub": 0.12, "turbo": 1.0, "rough": 0.12},
 	},
 	"ronin": {
-		"drive": "rwd", "name": "Ronin DR", "style": "coupe", "class": "S", "unlock": {"race": 11, "drift": 3}, "drift": 1.0,
+		"drive": "rwd", "name": "Ronin DR", "style": "coupe", "class": "S", "unlock": {"level": 16}, "drift": 1.0,
 		"length": 4.3, "width": 1.78,
 		"accel": 13.6, "top_speed": 72.0, "grip": 25.0, "steer": 2.5,
 		"desc": "Drift-Monster mit V8-Swap. Steht quer, wann immer du willst.",
@@ -109,7 +111,7 @@ const CARS := {
 		"sound": {"cyl": 8, "harm": [1.0, 0.7, 0.35, 0.15], "sub": 0.6, "turbo": 0.0, "rough": 0.4},
 	},
 	"shiden": {
-		"drive": "mr", "name": "Shiden NX-1", "style": "coupe", "class": "S", "unlock": {"race": 12}, "drift": 0.45, "paint": Color(0.36, 0.1, 0.56), "finish": "pearl",
+		"drive": "mr", "name": "Shiden NX-1", "style": "coupe", "class": "S", "unlock": {"level": 17}, "drift": 0.45, "paint": Color(0.36, 0.1, 0.56), "finish": "pearl",
 		"length": 4.43, "width": 1.81,
 		"accel": 13.2, "top_speed": 71.0, "grip": 31.0, "steer": 2.65,
 		"desc": "Flacher Mittelmotor-Sportwagen. Die präziseste Lenkung und der meiste Grip im Spiel.",
@@ -117,7 +119,7 @@ const CARS := {
 		"sound": {"cyl": 6, "harm": [1.0, 0.42, 0.36, 0.2], "sub": 0.12, "turbo": 0.0, "rough": 0.1},
 	},
 	"ryujin": {
-		"drive": "rwd", "name": "Ryujin 30Z", "style": "coupe", "class": "S", "unlock": {"race": 13}, "drift": 0.4, "paint": Color(0.04, 0.3, 0.3), "finish": "metal",
+		"drive": "rwd", "name": "Ryujin 30Z", "style": "coupe", "class": "S", "unlock": {"level": 18}, "drift": 0.4, "paint": Color(0.04, 0.3, 0.3), "finish": "metal",
 		"length": 4.52, "width": 1.8,
 		"accel": 13.2, "top_speed": 73.0, "grip": 25.5, "steer": 2.05,
 		"desc": "Breites Biturbo-Coupé. Schiebt brutal an und bleibt bei Höchsttempo ruhig.",
@@ -125,7 +127,7 @@ const CARS := {
 		"sound": {"cyl": 6, "harm": [1.0, 0.62, 0.38, 0.16], "sub": 0.35, "turbo": 1.0, "rough": 0.22},
 	},
 	"kaze": {
-		"drive": "rwd", "name": "Kaze TT", "style": "coupe", "class": "S", "unlock": {"race": 14, "drift": 4}, "drift": 0.55,
+		"drive": "rwd", "name": "Kaze TT", "style": "coupe", "class": "S", "unlock": {"level": 19}, "drift": 0.55,
 		"length": 4.5, "width": 1.81,
 		"accel": 12.4, "top_speed": 75.5, "grip": 26.0, "steer": 2.15,
 		"desc": "Langes Biturbo-Coupé mit Bügelflügel. Das schnellste Auto der Stadt.",
@@ -142,7 +144,7 @@ const CARS := {
 		"sound": {"cyl": 3, "harm": [1.0, 0.62, 0.38, 0.2], "sub": 0.5, "turbo": 0.7, "rough": 0.42},
 	},
 	"hotaru": {
-		"drive": "mr", "name": "Hotaru MR-K", "style": "roadster", "class": "D", "unlock": {"race": 2, "drift": 1}, "drift": 0.55, "paint": Color(0.97, 0.82, 0.06),
+		"drive": "mr", "name": "Hotaru MR-K", "style": "roadster", "class": "D", "unlock": {"level": 3}, "drift": 0.55, "paint": Color(0.97, 0.82, 0.06),
 		"length": 3.3, "width": 1.4,
 		"accel": 10.3, "top_speed": 57.5, "grip": 29.5, "steer": 2.85,
 		"desc": "Offener Kei-Roadster mit Mittelmotor. Dreht bis 8.500/min und lenkt wie ein Go-Kart.",
@@ -150,7 +152,7 @@ const CARS := {
 		"sound": {"cyl": 3, "harm": [1.0, 0.42, 0.34, 0.22], "sub": 0.35, "turbo": 0.0, "rough": 0.22},
 	},
 	"tanuki": {
-		"drive": "awd", "name": "Tanuki R4", "style": "hatch", "class": "B", "unlock": {"race": 7}, "drift": 0.4, "paint": Color(0.88, 0.89, 0.9), "finish": "metal",
+		"drive": "awd", "name": "Tanuki R4", "style": "hatch", "class": "B", "unlock": {"level": 11}, "drift": 0.4, "paint": Color(0.88, 0.89, 0.9), "finish": "metal",
 		"length": 3.99, "width": 1.8,
 		"accel": 11.9, "top_speed": 63.5, "grip": 29.0, "steer": 2.6,
 		"desc": "Kleinwagen mit Allrad, Turbo-Dreizylinder und Rallye-Genen. Schießt aus engen Kurven.",
@@ -159,7 +161,7 @@ const CARS := {
 	},
 	# --- JDM-Klassiker ---
 	"kaido": {
-		"drive": "rwd", "name": "Kaido 2000GT", "style": "sedan", "class": "C", "unlock": {"race": 3, "drift": 1}, "drift": 0.75, "paint": Color(0.6, 0.62, 0.64), "finish": "metal",
+		"drive": "rwd", "name": "Kaido 2000GT", "style": "sedan", "class": "C", "unlock": {"level": 5}, "drift": 0.75, "paint": Color(0.6, 0.62, 0.64), "finish": "metal",
 		"length": 4.4, "width": 1.66,
 		"accel": 10.6, "top_speed": 61.0, "grip": 24.0, "steer": 2.35,
 		"desc": "70er-Hardtop mit Reihensechser, Chrom und aufgeschraubten Verbreiterungen. Kantig, laut, gutmütig.",
@@ -167,7 +169,7 @@ const CARS := {
 		"sound": {"cyl": 6, "harm": [1.0, 0.62, 0.42, 0.22], "sub": 0.28, "turbo": 0.0, "rough": 0.38},
 	},
 	"hakone": {
-		"drive": "rwd", "name": "Hakone 240", "style": "coupe", "class": "B", "unlock": {"race": 5, "drift": 2}, "drift": 0.7, "paint": Color(0.55, 0.12, 0.08),
+		"drive": "rwd", "name": "Hakone 240", "style": "coupe", "class": "B", "unlock": {"level": 9}, "drift": 0.7, "paint": Color(0.55, 0.12, 0.08),
 		"length": 4.15, "width": 1.63,
 		"accel": 11.3, "top_speed": 65.0, "grip": 24.5, "steer": 2.4,
 		"desc": "Klassisches Fließheck-Coupé mit endlos langer Haube. Leicht, schmal und herrlich quer.",
@@ -176,7 +178,7 @@ const CARS := {
 	},
 	# --- Exoten ---
 	"kagura": {
-		"drive": "rwd", "name": "Kagura V10", "style": "coupe", "class": "S", "unlock": {"race": 14}, "drift": 0.45, "paint": Color(0.95, 0.95, 0.94), "finish": "pearl",
+		"drive": "rwd", "name": "Kagura V10", "style": "coupe", "class": "S", "unlock": {"level": 20}, "drift": 0.45, "paint": Color(0.95, 0.95, 0.94), "finish": "pearl",
 		"length": 4.5, "width": 1.9,
 		"accel": 13.6, "top_speed": 71.5, "grip": 26.5, "steer": 2.35,
 		"desc": "Japanischer Supersportwagen mit V10 vorn. Der stärkste Antritt im Spiel und ein Schrei bis 9.000/min.",
@@ -184,7 +186,7 @@ const CARS := {
 		"sound": {"cyl": 10, "harm": [1.0, 0.34, 0.4, 0.26], "sub": 0.08, "turbo": 0.0, "rough": 0.08},
 	},
 	"falke": {
-		"drive": "rr", "name": "Falke 9 RS", "style": "coupe", "class": "S", "unlock": {"race": 15}, "drift": 0.5, "paint": Color(0.45, 0.7, 0.85), "finish": "metal",
+		"drive": "rr", "name": "Falke 9 RS", "style": "coupe", "class": "S", "unlock": {"level": 21}, "drift": 0.5, "paint": Color(0.45, 0.7, 0.85), "finish": "metal",
 		"length": 4.55, "width": 1.85,
 		"accel": 13.0, "top_speed": 71.5, "grip": 31.0, "steer": 2.55,
 		"desc": "Sportwagen mit Boxer im Heck. Enorme Traktion, das Heck will aber mit Gefühl gefahren werden.",
@@ -192,7 +194,7 @@ const CARS := {
 		"sound": {"cyl": 6, "harm": [1.0, 0.48, 0.44, 0.26], "sub": 0.3, "turbo": 0.0, "rough": 0.28},
 	},
 	"furia": {
-		"drive": "awd", "name": "Furia V12", "style": "coupe", "class": "S", "unlock": {"race": 16}, "drift": 0.35, "paint": Color(0.55, 0.85, 0.1), "finish": "pearl",
+		"drive": "awd", "name": "Furia V12", "style": "coupe", "class": "S", "unlock": {"level": 22}, "drift": 0.35, "paint": Color(0.55, 0.85, 0.1), "finish": "pearl",
 		"length": 4.8, "width": 2.03,
 		"accel": 12.3, "top_speed": 75.0, "grip": 28.5, "steer": 2.0,
 		"desc": "Flacher V12-Keil mit Allrad, breiter als jeder Gegner. Zieht ewig, lenkt aber träge ein.",
@@ -201,7 +203,7 @@ const CARS := {
 	},
 	# --- Nur über das Fahrer-Level (seit 2.32): schneller als alles, was man mit Siegen bekommt ---
 	"raiden": {
-		"drive": "awd", "name": "Raiden Zero", "style": "coupe", "class": "S", "unlock": {"level": 10}, "drift": 0.4, "paint": Color(0.06, 0.16, 0.5), "finish": "metal",
+		"drive": "awd", "name": "Raiden Zero", "style": "coupe", "class": "S", "unlock": {"level": 24}, "drift": 0.4, "paint": Color(0.06, 0.16, 0.5), "finish": "metal",
 		"length": 4.65, "width": 1.98,
 		"accel": 13.9, "top_speed": 79.0, "grip": 31.0, "steer": 2.2,
 		"desc": "Allrad-GT mit Biturbo-V6, für die Autobahn gebaut. Das höchste Endtempo im Spiel, klebt in jeder Kurve.",
@@ -209,7 +211,7 @@ const CARS := {
 		"sound": {"cyl": 6, "harm": [1.0, 0.44, 0.36, 0.2], "sub": 0.2, "turbo": 0.6, "rough": 0.18},
 	},
 	"tengu": {
-		"drive": "rwd", "name": "Tengu RS", "style": "coupe", "class": "S", "unlock": {"level": 16}, "drift": 0.9, "paint": Color(0.95, 0.42, 0.04), "finish": "pearl",
+		"drive": "rwd", "name": "Tengu RS", "style": "coupe", "class": "S", "unlock": {"level": 26}, "drift": 0.9, "paint": Color(0.95, 0.42, 0.04), "finish": "pearl",
 		"length": 4.45, "width": 1.95,
 		"accel": 14.4, "top_speed": 77.0, "grip": 28.0, "steer": 2.5,
 		"desc": "Drift-Monster mit Heckantrieb und hochgedrehtem Reihensechser. Brutaler Antritt, das Heck kommt auf Ansage.",
@@ -221,6 +223,16 @@ const CARS := {
 ## Reihenfolge in der Garage = Reihenfolge des Freischaltens
 const CAR_ORDER := ["kaizen", "chibi", "hachi", "hotaru", "sakura", "kaido", "hayate", "kitsune", "tsubame", "hakone",
 	"mirai", "tanuki", "tenshi", "kumo", "raijin", "vortex", "ronin", "shiden", "ryujin", "kaze", "kagura", "falke", "furia", "raiden", "tengu"]
+## Exoten nur über hohe Level: fahren nicht als Gegner oder Herausforderer mit (bleiben etwas Besonderes)
+const EXOTICS := ["raiden", "tengu"]
+## Bis 2.32 schalteten Siege die Autos frei (Rennsiege oder Driftsiege, eins reicht): was ein Spielstand damit schon
+## hatte, bleibt beim Umstieg auf das Fahrer-Level frei
+const WIN_UNLOCK := {"hachi": {"race": 1, "drift": 1}, "hotaru": {"race": 2, "drift": 1}, "sakura": {"race": 2, "drift": 1},
+	"kaido": {"race": 3, "drift": 1}, "hayate": {"race": 3}, "kitsune": {"race": 4, "drift": 1}, "tsubame": {"race": 5},
+	"hakone": {"race": 5, "drift": 2}, "mirai": {"race": 6, "drift": 2}, "tanuki": {"race": 7}, "tenshi": {"race": 7},
+	"kumo": {"race": 8, "drift": 2}, "raijin": {"race": 9}, "vortex": {"race": 10}, "ronin": {"race": 11, "drift": 3},
+	"shiden": {"race": 12}, "ryujin": {"race": 13}, "kaze": {"race": 14, "drift": 4}, "kagura": {"race": 14},
+	"falke": {"race": 15}, "furia": {"race": 16}}
 ## Bis Version 2.10 galten andere Schwellen: wer damit schon ein Auto freigeschaltet hatte, behält es
 const LEGACY_UNLOCK := {"hachi": {"race": 1, "drift": 1}, "mirai": {"race": 2, "drift": 1}, "sakura": {"drift": 1},
 	"tsubame": {"race": 3}, "vortex": {"race": 5}, "raijin": {"race": 7}, "ronin": {"drift": 3}, "kaze": {"race": 9, "drift": 4}}
@@ -278,11 +290,11 @@ const PARTS := {
 			{"name": "Lila", "wins": 0, "color": Color(0.33, 0.07, 0.55)},
 			{"name": "Babyblau", "wins": 0, "color": Color(0.42, 0.68, 0.95)},
 			{"name": "Bronze", "wins": 0, "color": Color(0.5, 0.31, 0.13), "finish": "metal"},
-			{"name": "Mattschwarz", "wins": 2, "color": Color(0.035, 0.035, 0.04), "finish": "matt"},
-			{"name": "Mattgrau", "wins": 2, "color": Color(0.28, 0.29, 0.3), "finish": "matt"},
-			{"name": "Perlweiß", "wins": 3, "color": Color(0.93, 0.92, 0.9), "finish": "pearl"},
-			{"name": "Gold", "wins": 4, "color": Color(0.85, 0.62, 0.2), "finish": "metal"},
-			{"name": "Chrom", "wins": 6, "color": Color(0.85, 0.86, 0.88), "finish": "chrome"},
+			{"name": "Mattschwarz", "wins": 2, "level": 4, "color": Color(0.035, 0.035, 0.04), "finish": "matt"},
+			{"name": "Mattgrau", "wins": 2, "level": 4, "color": Color(0.28, 0.29, 0.3), "finish": "matt"},
+			{"name": "Perlweiß", "wins": 3, "level": 6, "color": Color(0.93, 0.92, 0.9), "finish": "pearl"},
+			{"name": "Gold", "wins": 4, "level": 8, "color": Color(0.85, 0.62, 0.2), "finish": "metal"},
+			{"name": "Chrom", "wins": 6, "level": 11, "color": Color(0.85, 0.86, 0.88), "finish": "chrome"},
 		],
 	},
 	# Lackart (car_builder.FINISH): Standard nimmt die der Farbe bzw. den Werkslack des Autos
@@ -293,9 +305,9 @@ const PARTS := {
 		"options": [
 			{"name": "Standard", "wins": 0},
 			{"name": "Glanz", "wins": 0, "finish": "gloss"},
-			{"name": "Metallic", "wins": 1, "finish": "metal"},
-			{"name": "Matt", "wins": 2, "finish": "matt"},
-			{"name": "Perlmutt", "wins": 3, "finish": "pearl"},
+			{"name": "Metallic", "wins": 1, "level": 2, "finish": "metal"},
+			{"name": "Matt", "wins": 2, "level": 3, "finish": "matt"},
+			{"name": "Perlmutt", "wins": 3, "level": 5, "finish": "pearl"},
 		],
 	},
 	# style: Bauart der Felge (car_builder._rim), spokes: Zahl der Speichen (bzw. Löcher, Schlitze), plus: so viel Zoll
@@ -424,6 +436,35 @@ const PARTS := {
 			{"name": "Haube und Heck", "wins": 0},
 			{"name": "Kontrastdach", "wins": 0},
 			{"name": "Rallye", "wins": 0},
+			# Seit 2.33: Vinyls mit Motiv (assets/vinyls/<art>.svg, oben die Flanke, unten die Draufsicht). Sie liegen in
+			# Koordinaten relativ zu Länge, Breite und Gürtellinie des Autos und passen so auf jedes Auto (Shader
+			# car_paint). tint: einfarbige Maske in der Folienfarbe; mirror: rechts gespiegelt, damit das Motiv auf beiden
+			# Seiten nach hinten läuft (aus bei Schrift, die sonst rechts spiegelverkehrt stünde).
+			{"name": "Speedlines", "wins": 0, "level": 2, "art": "speedlines", "tint": true, "mirror": true},
+			{"name": "Tribal", "wins": 0, "level": 3, "art": "tribal", "tint": true, "mirror": true},
+			{"name": "Splitter", "wins": 0, "level": 4, "art": "splitter", "tint": true, "mirror": true},
+			{"name": "Sakura", "wins": 0, "level": 5, "art": "sakura", "mirror": true},
+			{"name": "Tiger", "wins": 0, "level": 6, "art": "tiger", "tint": true, "mirror": true},
+			{"name": "Zielflagge", "wins": 0, "level": 7, "art": "checker", "tint": true, "mirror": true},
+			{"name": "Flammen", "wins": 0, "level": 8, "art": "flames", "mirror": true},
+			{"name": "Pixeltarn", "wins": 0, "level": 9, "art": "camo", "mirror": true},
+			{"name": "Blitze", "wins": 0, "level": 10, "art": "bolts", "mirror": true},
+			{"name": "Welle", "wins": 0, "level": 11, "art": "wave", "mirror": true},
+			{"name": "Graffiti", "wins": 0, "level": 12, "art": "graffiti", "mirror": false},
+			{"name": "Hexgitter", "wins": 0, "level": 13, "art": "hex", "mirror": true},
+			{"name": "Platine", "wins": 0, "level": 14, "art": "circuit", "mirror": true},
+			{"name": "Farbbomben", "wins": 0, "level": 15, "art": "splatter", "mirror": true},
+			{"name": "Koi", "wins": 0, "level": 16, "art": "koi", "mirror": true},
+			{"name": "Rising Sun", "wins": 0, "level": 17, "art": "sunrays", "mirror": true},
+			{"name": "Glitch", "wins": 0, "level": 18, "art": "glitch", "mirror": true},
+			{"name": "Kitsune", "wins": 0, "level": 19, "art": "kitsune", "mirror": true},
+			{"name": "Oni", "wins": 0, "level": 20, "art": "oni", "mirror": true},
+			{"name": "Drache", "wins": 0, "level": 22, "art": "dragon", "mirror": true},
+			{"name": "Engelsflügel", "wins": 0, "level": 24, "art": "wings", "mirror": true},
+			{"name": "Einheit 07", "wins": 0, "level": 26, "art": "unit07", "mirror": false},
+			{"name": "Mecha", "wins": 0, "level": 28, "art": "mecha", "mirror": true},
+			{"name": "Lichtengel", "wins": 0, "level": 30, "art": "angel", "mirror": true},
+			{"name": "Prisma", "wins": 0, "level": 35, "art": "prism", "mirror": true},
 		],
 	},
 	# Folienfarbe: "Kontrast" = Weiß auf dunklem, Schwarz auf hellem Lack
@@ -479,17 +520,17 @@ const PARTS := {
 		"label": "Motor",
 		"options": [
 			{"name": "Serie", "wins": 0, "accel": 1.0, "top": 1.0},
-			{"name": "Stufe 1", "wins": 1, "accel": 1.08, "top": 1.04},
-			{"name": "Stufe 2", "wins": 3, "accel": 1.16, "top": 1.08},
-			{"name": "Stufe 3", "wins": 6, "accel": 1.25, "top": 1.12},
+			{"name": "Stufe 1", "wins": 1, "level": 3, "accel": 1.08, "top": 1.04},
+			{"name": "Stufe 2", "wins": 3, "level": 6, "accel": 1.16, "top": 1.08},
+			{"name": "Stufe 3", "wins": 6, "level": 11, "accel": 1.25, "top": 1.12},
 		],
 	},
 	"nitro": {
 		"label": "Nitro",
 		"options": [
 			{"name": "Serie", "wins": 0, "power": 1.0, "capacity": 1.0},
-			{"name": "Stufe 1", "wins": 2, "power": 1.2, "capacity": 1.25},
-			{"name": "Stufe 2", "wins": 5, "power": 1.4, "capacity": 1.5},
+			{"name": "Stufe 1", "wins": 2, "level": 4, "power": 1.2, "capacity": 1.25},
+			{"name": "Stufe 2", "wins": 5, "level": 10, "power": 1.4, "capacity": 1.5},
 		],
 	},
 	# Turbo: mehr Schub und etwas mehr Endtempo, lauteres Ladedruck-Zischen
@@ -497,9 +538,9 @@ const PARTS := {
 		"label": "Turbo",
 		"options": [
 			{"name": "Serie", "wins": 0, "accel": 1.0, "top": 1.0},
-			{"name": "Stufe 1", "wins": 2, "accel": 1.06, "top": 1.03},
-			{"name": "Stufe 2", "wins": 4, "accel": 1.12, "top": 1.06},
-			{"name": "Stufe 3", "wins": 7, "accel": 1.18, "top": 1.09},
+			{"name": "Stufe 1", "wins": 2, "level": 5, "accel": 1.06, "top": 1.03},
+			{"name": "Stufe 2", "wins": 4, "level": 8, "accel": 1.12, "top": 1.06},
+			{"name": "Stufe 3", "wins": 7, "level": 14, "accel": 1.18, "top": 1.09},
 		],
 	},
 	# Fahrwerk: mehr Grip, direktere Lenkung, Karosserie tiefer (drop in Metern)
@@ -507,9 +548,9 @@ const PARTS := {
 		"label": "Fahrwerk",
 		"options": [
 			{"name": "Serie", "wins": 0, "grip": 0.0, "steer": 0.0, "drop": 0.0},
-			{"name": "Sport", "wins": 1, "grip": 1.5, "steer": 0.06, "drop": 0.025},
-			{"name": "Gewinde", "wins": 3, "grip": 3.0, "steer": 0.12, "drop": 0.045},
-			{"name": "Rennfahrwerk", "wins": 6, "grip": 4.5, "steer": 0.18, "drop": 0.06},
+			{"name": "Sport", "wins": 1, "level": 2, "grip": 1.5, "steer": 0.06, "drop": 0.025},
+			{"name": "Gewinde", "wins": 3, "level": 7, "grip": 3.0, "steer": 0.12, "drop": 0.045},
+			{"name": "Rennfahrwerk", "wins": 6, "level": 12, "grip": 4.5, "steer": 0.18, "drop": 0.06},
 		],
 	},
 	# Reifen: mehr Grip in Kurven, Rennreifen kleben, driften dafür etwas unwilliger
@@ -517,9 +558,9 @@ const PARTS := {
 		"label": "Reifen",
 		"options": [
 			{"name": "Serie", "wins": 0, "grip": 0.0, "drift": 0.0},
-			{"name": "Sport", "wins": 1, "grip": 1.0, "drift": 0.0},
-			{"name": "Semi-Slicks", "wins": 4, "grip": 2.5, "drift": -0.04},
-			{"name": "Rennreifen", "wins": 6, "grip": 4.0, "drift": -0.08},
+			{"name": "Sport", "wins": 1, "level": 2, "grip": 1.0, "drift": 0.0},
+			{"name": "Semi-Slicks", "wins": 4, "level": 9, "grip": 2.5, "drift": -0.04},
+			{"name": "Rennreifen", "wins": 6, "level": 13, "grip": 4.0, "drift": -0.08},
 		],
 	},
 }
@@ -667,14 +708,15 @@ const EVENT_TYPES := {
 ## in der Karriere: Git-Tag drag-2.23.
 const TYPE_ORDER := ["sprint", "circuit", "drift"]
 ## Karriere in Stufen wie in NFSU2: alle Events einer Stufe sind gleichzeitig offen und in beliebiger Reihenfolge
-## fahrbar. STAGE_WINS Siege in einer Stufe öffnen die nächste, ein Event, das einem nicht liegt, kann man also
-## auslassen. Jede Stufe mischt die Arten, die Schwierigkeit steigt von Stufe zu Stufe.
+## fahrbar. Seit 2.33 öffnet das Fahrer-Level eine Stufe ("level"): Erfahrung gibt es für Siege, aber auch fürs Driften,
+## Springen und Duelle in der Welt. Bis 2.32 öffneten STAGE_WINS Siege in einer Stufe die nächste (bleibt für alte
+## Spielstände offen). Jede Stufe mischt die Arten, die Schwierigkeit steigt von Stufe zu Stufe.
 const STAGES := [
-	{"name": "Einstieg", "events": ["Bankenviertel-Sprint", "Tauberbischofsheim Altstadt", "Bad Kissingen Kurmeile", "Innenstadtring"]},
-	{"name": "Szene", "events": ["Prachtallee-Sprint", "Hafen-Drift", "Hammelburg Saaleck", "Altstadt-Hügel"]},
-	{"name": "Hafen und Altstadt", "events": ["Hafenrunde", "Aachen Grabenring", "Hafenring", "Altstadtring", "Freudenstadt Waldpass"]},
-	{"name": "Großstadt", "events": ["Berlin Kreuzberg", "Schnellstraßen-Sprint", "Stadion-Drift"]},
-	{"name": "Finale", "events": ["Hafen-Sprint", "Nachtschicht", "Würzburg Mainufer"]},
+	{"name": "Einstieg", "level": 1, "events": ["Bankenviertel-Sprint", "Tauberbischofsheim Altstadt", "Bad Kissingen Kurmeile", "Innenstadtring"]},
+	{"name": "Szene", "level": 3, "events": ["Prachtallee-Sprint", "Hafen-Drift", "Hammelburg Saaleck", "Altstadt-Hügel"]},
+	{"name": "Hafen und Altstadt", "level": 7, "events": ["Hafenrunde", "Aachen Grabenring", "Hafenring", "Altstadtring", "Freudenstadt Waldpass"]},
+	{"name": "Großstadt", "level": 12, "events": ["Berlin Kreuzberg", "Schnellstraßen-Sprint", "Stadion-Drift"]},
+	{"name": "Finale", "level": 17, "events": ["Hafen-Sprint", "Nachtschicht", "Würzburg Mainufer"]},
 ]
 ## Siege, die eine Stufe öffnen: 3, bei Stufen mit nur drei Events 2 (eins darf man auslassen)
 const STAGE_WINS := 3
@@ -701,6 +743,61 @@ static func drift_targets(r: Dictionary, diff: int) -> Array:
 ## Siege in Stufe s, die die nächste öffnen
 static func stage_need(s: int) -> int:
 	return mini(STAGE_WINS, STAGES[s]["events"].size() - 1)
+
+
+## Fahrer-Titel mit Emblem (assets/emblems/<emblem>.svg): kommen mit dem Level, Titel und Emblem wählt man in der
+## Garage unter "Fahrer" frei aus allen freien. Sie stehen im HUD der Welt, in der Garage und bei Duellen.
+const TITLES := [
+	{"level": 1, "name": "Neuling", "emblem": "key"},
+	{"level": 2, "name": "Ampelstarter", "emblem": "light"},
+	{"level": 4, "name": "Kurvenkratzer", "emblem": "tire"},
+	{"level": 6, "name": "Nachtfahrer", "emblem": "moon"},
+	{"level": 8, "name": "Querfahrer", "emblem": "drift"},
+	{"level": 10, "name": "Lückenfinder", "emblem": "bolt"},
+	{"level": 12, "name": "Schrauber", "emblem": "piston"},
+	{"level": 14, "name": "Ringjäger", "emblem": "ring"},
+	{"level": 16, "name": "Phantom", "emblem": "mask"},
+	{"level": 18, "name": "Drift-Samurai", "emblem": "katana"},
+	{"level": 20, "name": "Asphaltkönig", "emblem": "crown"},
+	{"level": 22, "name": "Fuchsgeist", "emblem": "fox"},
+	{"level": 24, "name": "Autobahn-Engel", "emblem": "wings"},
+	{"level": 26, "name": "Oni", "emblem": "oni"},
+	{"level": 28, "name": "Einheit Null", "emblem": "mecha"},
+	{"level": 30, "name": "Drachenreiter", "emblem": "dragon"},
+	{"level": 35, "name": "Legende", "emblem": "star"},
+	{"level": 40, "name": "Ikone", "emblem": "diamond"},
+	{"level": 50, "name": "Unsterblich", "emblem": "phoenix"},
+]
+const LEVEL_MAX := 99
+
+
+## Erfahrung für einen Platz im Rennen (ohne Stilpunkte): 1. Platz 3000, 2. 1600, 3. 900, sonst 400, je Stufe mehr
+## (Stufe 2 x1,35, Stufe 3 x1,7). Der erste Sieg eines Events gibt die Hälfte dazu.
+static func race_xp(tier: int, place: int, first_win := false) -> int:
+	var base: int = [400, 3000, 1600, 900][place if place >= 1 and place <= 3 else 0]
+	var k: float = [1.0, 1.0, 1.35, 1.7][clampi(tier, 0, 3)]
+	return int(round(base * k * (1.5 if first_win and place == 1 else 1.0) / 50.0)) * 50
+
+
+## Was Level l freischaltet: [{kind, name, ...}] mit kind "stage" (index), "car" (id), "part" (cat, index), "vinyl"
+## (index), "title" (index). Level-Liste in der Garage und Meldung beim Aufstieg.
+static func level_rewards(l: int) -> Array:
+	var out := []
+	for s in STAGES.size():
+		if s > 0 and int(STAGES[s]["level"]) == l:
+			out.append({"kind": "stage", "index": s, "name": STAGES[s]["name"]})
+	for id in CAR_ORDER:
+		if int(CARS[id]["unlock"].get("level", 0)) == l:
+			out.append({"kind": "car", "id": id, "name": CARS[id]["name"]})
+	for t in TITLES.size():
+		if int(TITLES[t]["level"]) == l and l > 1:
+			out.append({"kind": "title", "index": t, "name": TITLES[t]["name"], "emblem": TITLES[t]["emblem"]})
+	for cat in PART_ORDER:
+		var opts: Array = PARTS[cat]["options"]
+		for i in opts.size():
+			if int(opts[i].get("level", 0)) == l:
+				out.append({"kind": "vinyl" if cat == "vinyl" else "part", "cat": cat, "index": i, "name": opts[i]["name"]})
+	return out
 
 
 ## Stufe (0..) eines Karriere-Events, -1 wenn es in keiner steht

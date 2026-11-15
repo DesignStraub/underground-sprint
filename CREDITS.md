@@ -61,3 +61,6 @@ Straßen und Gebäude der Städte-Strecken: © OpenStreetMap-Mitwirkende, ODbL (
 
 ## Alle anderen Klänge
 Synthetisch erzeugt (`tools/make_sfx.py`).
+
+## Vinyls und Embleme
+Eigene Vektorgrafiken, im Code erzeugt (`tools/vinyl_gen.py`), ohne fremde Vorlagen. Schrift darauf aus eigenen Strichen.

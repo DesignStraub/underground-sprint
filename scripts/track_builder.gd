@@ -118,11 +118,27 @@ const DISTRICTS := {
 		"tints": [Color(0.1, 0.11, 0.13), Color(0.15, 0.15, 0.16), Color(0.08, 0.1, 0.12)], "lit": 0.35,
 		"trees": 0.0, "billboard": 0.5, "neon_edge": 0.05, "lamp": Color(1.0, 0.6, 0.28), "lamp_kind": "sodium",
 		"setback": 10.0, "soundwall": true, "gantry": 1.0, "overpass": 1.0, "prop_gap": 3.0, "props": [2, 7, 15], "median": 0.6},
+	# Open World (seit 2.33): Autobahn vor kleineren und echten Orts-Städten (Fachwerk, Altstadt): Lärmschutzwand,
+	# Schilderbrücken, dahinter niedrige Häuser mit Ziegeldach statt Hochhäusern; keine Straßenbrücken (ihre Enden
+	# lagen zwischen niedrigen Häusern offen da)
+	"ortsrand_de": {"name": "VORSTADT", "shop": 0.0, "low": [7.0, 11.0], "tall": [11.0, 16.0], "tall_p": 0.12, "styles": [6, 6, 4, 5],
+		"tints": [Color(0.5, 0.48, 0.44), Color(0.42, 0.4, 0.38), Color(0.5, 0.42, 0.3), Color(0.46, 0.44, 0.36)], "lit": 0.4,
+		"roof": 1.0, "gable": 0.3, "roof_tints": [Color(0.34, 0.13, 0.08), Color(0.16, 0.16, 0.18), Color(0.28, 0.12, 0.08)],
+		"trees": 0.0, "billboard": 0.1, "neon_edge": 0.0, "lamp": Color(1.0, 0.6, 0.28), "lamp_kind": "sodium",
+		"setback": 10.0, "soundwall": true, "gantry": 1.0, "overpass": 0.0, "prop_gap": 3.0, "props": [2, 7, 15], "median": 0.6},
+	# ... und vor Hafenstädten: Hallen, Container und Kräne
+	"hafen_ab": {"name": "HAFEN", "shop": 0.0, "low": [7.0, 12.0], "tall": [12.0, 22.0], "tall_p": 0.25, "styles": [2, 2, 4, 4],
+		"tints": [Color(0.15, 0.17, 0.18), Color(0.32, 0.12, 0.07), Color(0.28, 0.1, 0.06), Color(0.1, 0.16, 0.17), Color(0.2, 0.22, 0.12)], "lit": 0.3,
+		"roof": 0.3, "gable": 0.5, "roof_tints": [Color(0.1, 0.11, 0.12), Color(0.16, 0.2, 0.18)],
+		"trees": 0.0, "billboard": 0.1, "neon_edge": 0.0, "lamp": Color(1.0, 0.62, 0.3), "lamp_kind": "sodium",
+		"containers": true, "cranes": 0.14, "setback": 10.0, "soundwall": true, "gantry": 1.0, "overpass": 0.5,
+		"prop_gap": 3.0, "props": [2, 7, 15], "median": 0.6},
 	# Autobahn über Land (seit 2.29; davor stand an jedem Kilometer Autobahn eine Hochhausstadt): keine Häuser am
 	# Rand (rural), dahinter Felder, Wald, Dörfer und Windräder der Landschaft (scripts/landscape.gd), Laternen nur an
-	# jedem dritten Platz, selten eine Schilderbrücke
+	# jedem dritten Platz, selten eine Schilderbrücke. Keine Straßenbrücken (seit 2.33): ihre Rampen endeten im Feld,
+	# kein Weg führte hin
 	"land": {"name": "AUTOBAHN", "shop": 0.0, "low": [8.0, 12.0], "tall": [12.0, 16.0], "tall_p": 0.0, "styles": [5],
-		"tints": [Color(0.4, 0.38, 0.34)], "lit": 0.3, "rural": true, "lamp_every": 3, "overpass": 0.3,
+		"tints": [Color(0.4, 0.38, 0.34)], "lit": 0.3, "rural": true, "lamp_every": 3, "overpass": 0.0,
 		"trees": 0.0, "billboard": 0.0, "neon_edge": 0.0, "lamp": Color(1.0, 0.62, 0.3), "lamp_kind": "sodium",
 		"gantry": 0.3, "prop_gap": 3.0, "props": [2, 7, 15], "median": 0.6},
 	# Wald (Waldstrecke): Landstraße zwischen Bäumen, Bäume dicht am Bankett, Leitpfosten, kaum Laternen
@@ -176,6 +192,8 @@ static var _box_arrays: Array = []
 static var box_log = null
 static var _box_id := 0
 static var _box_tag := ""
+## Open World: Material des Landschaftsbodens (world.gd setzt es), für Böschungen, die ins Gelände übergehen sollen
+static var land_mat: Material = null
 
 
 ## Ganze Strecke auf einmal bauen (Prüfwerkzeuge). Das Rennen baut sie mit begin()/step() in Stücken, damit der
@@ -363,6 +381,8 @@ static func step(job: Dictionary) -> float:
 				track["crossing"] = rc
 			_build_tunnels(root, track, rng)
 			_build_el(root, track, rng)
+			if track["type"] == "autobahn" and track["world"]:
+				_world_bridges(root, track)
 			if not city.is_empty():
 				_build_rivers(root, track)
 				_build_hills(root, track, rng)
@@ -586,18 +606,20 @@ static func ground_holes(track: Dictionary) -> PackedVector3Array:
 				var q := curve.sample_baked(d)
 				holes.append(Vector3(q.x, q.z, TUN_W + 1.6))
 				d += 1.0
-	# Flussbett: Löcher entlang der Mittellinie, Radius = halbe Wasserbreite an dieser Stelle
+	# Flussbett: Löcher entlang der Mittellinie, Radius = halbe Wasserbreite an dieser Stelle. Seit 2.33 nur, wo auch
+	# Wasser liegt (beide Enden eines Abschnitts breit genug, wie _build_rivers), bis an dessen Ende (dort schließt ein
+	# runder Kopf das Becken); vorher klaffte an Flussenden und Engstellen ein Loch ohne Wasser in den Himmel
 	for rv in track["rivers"]:
 		var pts: PackedVector2Array = rv["pts"]
 		var hws: PackedFloat32Array = rv["hw"]
 		for i in pts.size() - 1:
+			if hws[i] < 1.5 or hws[i + 1] < 1.5:
+				continue
 			var steps := maxi(int(pts[i].distance_to(pts[i + 1]) / 4.0), 1)
-			for k in steps:
+			for k in steps + 1:
 				var t := float(k) / steps
-				var hr := lerpf(hws[i], hws[i + 1], t)
-				if hr > 1.5:
-					var q := pts[i].lerp(pts[i + 1], t)
-					holes.append(Vector3(q.x, q.y, hr))
+				var q := pts[i].lerp(pts[i + 1], t)
+				holes.append(Vector3(q.x, q.y, lerpf(hws[i], hws[i + 1], t)))
 	return holes
 
 
@@ -1729,8 +1751,10 @@ static func _build_road(root: Node3D, track: Dictionary) -> void:
 	var bank := SurfaceTool.new()  # Böschung unter einer Kuppe
 	bank.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var n_bank := 0
-	var bank_m := Builder.mat(Color(0.06, 0.1, 0.05), 0.0, 0.95)
-	bank_m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	var bank_m: Material = Builder.mat(Color(0.06, 0.1, 0.05), 0.0, 0.95)
+	(bank_m as BaseMaterial3D).cull_mode = BaseMaterial3D.CULL_DISABLED
+	if track["world"] and land_mat != null:
+		bank_m = land_mat  # Open World (seit 2.33): Grasböschung wie das Gelände daneben statt dunkler Bänder am Damm
 	var trough_m := Builder.mat(Color(0.33, 0.33, 0.34), 0.0, 0.85)
 	var n_trough := 0
 	var guide := []
@@ -2128,8 +2152,11 @@ static func _build_branch(root: Node3D, track: Dictionary, p: Dictionary, rng: R
 		var f := frame_at(c, d)
 		var cp: Vector3 = f["pos"] + Vector3(0, f["y"], 0)
 		var r: Vector3 = f["right"]
-		var cur := {"l": cp - r * half, "r": cp + r * half, "lw": cp - r * (half + walk_w + 0.3), "rw": cp + r * (half + walk_w + 0.3),
-			"lo": cp - r * (half + walk_w), "ro": cp + r * (half + walk_w), "d": d, "y": f["y"]}
+		# Ausfahrt einer Stadt (Open World, seit 2.33): der Gehweg läuft zum Ende hin schmal aus, die Wände rücken an die
+		# Fahrbahn der Auffahrt (vorher endete beides als Stufe mitten auf der Straße)
+		var ww := walk_w * clampf((len - d) / 14.0, 0.0, 1.0) if tail and not join else walk_w
+		var cur := {"l": cp - r * half, "r": cp + r * half, "lw": cp - r * (half + ww + 0.3), "rw": cp + r * (half + ww + 0.3),
+			"lo": cp - r * (half + ww), "ro": cp + r * (half + ww), "d": d, "y": f["y"]}
 		if not prev.is_empty():
 			if cur["y"] > 0.05 or prev["y"] > 0.05:
 				# Außenseite: Mauer vom Boden bis zur Gehweg- bzw. Fahrbahnkante
@@ -2177,7 +2204,12 @@ static func _build_branch(root: Node3D, track: Dictionary, p: Dictionary, rng: R
 					hm.transform = Transform3D(basis, wm + Vector3(0, 0.25 if near_lake else 0.5, 0))
 					root.add_child(hm)
 		prev = cur
-		d += step
+		# letzter Schritt genau bis ans Ende (seit 2.33): sonst fehlten bis zu 2 m Fahrbahn, und wo Ausfahrt und Auffahrt
+		# aneinanderstoßen, lag ein Streifen Boden quer über der Straße
+		if d < len - 0.01 and d + step > len:
+			d = len
+		else:
+			d += step
 	var lanes := 2.0 if kind == "spur" or kind == "fork" or kind == "ramp" or kind == "lane" else 0.0
 	_road_mesh(root, road, lanes, half * 2.0, 1.0 if kind == "alley" else 0.0, 0.018 if kind == "passage" else 0.012)
 	if n_walk > 0:
@@ -3633,6 +3665,13 @@ static func _build_rivers(root: Node3D, track: Dictionary) -> void:
 			var lb: Vector2 = e[1][0]
 			var rb: Vector2 = e[1][1]
 			_poly(water, [Vector3(la.x, y, la.y), Vector3(lb.x, y, lb.y), Vector3(rb.x, y, rb.y), Vector3(ra.x, y, ra.y)], Vector3.UP)
+			# Anfang und Ende eines Wasserstücks: runder Kopf mit Ufermauer (seit 2.33; vorher offen)
+			for k in [i, i + 1]:
+				var open_end: bool = (k == i and (i == 0 or hws[i - 1] < 1.5)) \
+						or (k == i + 1 and (i + 2 >= pts.size() or hws[i + 2] < 1.5))
+				if open_end:
+					var tdir: Vector2 = (pts[i + 1] - pts[i]).normalized() * (-1.0 if k == i else 1.0)
+					_river_cap(water, wall, top, pts[k], nrm[k], tdir, hws[k], y)
 			for s in [0, 1]:
 				var a: Vector2 = e[0][s]
 				var b: Vector2 = e[1][s]
@@ -3649,6 +3688,29 @@ static func _build_rivers(root: Node3D, track: Dictionary) -> void:
 			root.add_child(mi)
 	for b in track["bridges"]:
 		_road_bridge(root, track, b)
+
+
+## Halbrunder Kopf eines Flussstücks bei c (nv: Querrichtung, tdir: nach außen, r: halbe Breite): Wasser, Ufermauer
+## und Mauerkrone wie an den Seiten
+static func _river_cap(water: SurfaceTool, wall: SurfaceTool, top: SurfaceTool, c: Vector2, nv: Vector2, tdir: Vector2,
+		r: float, y: float) -> void:
+	var ring := []
+	for j in 9:
+		var phi := PI * j / 8.0
+		ring.append(c + nv * r * cos(phi) + tdir * r * sin(phi))
+	var fan := [Vector3(c.x, y, c.y)]
+	for q in ring:
+		fan.append(Vector3(q.x, y, q.y))
+	_poly(water, fan, Vector3.UP)
+	for j in 8:
+		var a: Vector2 = ring[j]
+		var b: Vector2 = ring[j + 1]
+		var oa: Vector2 = (a - c).normalized()
+		var ob: Vector2 = (b - c).normalized()
+		var inward: Vector2 = -(oa + ob).normalized()
+		_poly(wall, [Vector3(a.x, y - 0.5, a.y), Vector3(b.x, y - 0.5, b.y), Vector3(b.x, 0.0, b.y), Vector3(a.x, 0.0, a.y)], Vector3(inward.x, 0, inward.y))
+		_poly(top, [Vector3(a.x, 0.03, a.y), Vector3(b.x, 0.03, b.y), Vector3(b.x + ob.x * 2.2, 0.03, b.y + ob.y * 2.2),
+			Vector3(a.x + oa.x * 2.2, 0.03, a.y + oa.y * 2.2)], Vector3.UP)
 
 
 ## Straßenbrücke: Fahrbahnplatte mit Gesims, Pfeiler im Wasser, Steinbrüstung mit Laternen
@@ -3689,6 +3751,78 @@ static func _road_bridge(root: Node3D, track: Dictionary, b: Dictionary) -> void
 		l.light_energy = 2.0
 		l.omni_range = 26.0
 		root.add_child(l)
+
+
+## Open World (seit 2.33): wo Autobahn oder Auffahrt ein Flussbett einer Stadt quert (Loch im Boden, world_holes), eine
+## schlichte Brücke wie in den Städten: Steinplatte unter der Fahrbahn, Brüstung, Pfeiler im Wasser. Vorher lag die
+## Straße flach über dem Wasser (Würzburg: die Auffahrt quer über den Main).
+static func _world_bridges(root: Node3D, track: Dictionary) -> void:
+	var holes: PackedVector3Array = track["world_holes"]
+	if holes.is_empty():
+		return
+	const CELL := 40.0
+	var grid := {}
+	var rmax := 0.0
+	for h in holes:
+		var k := Vector2i(floori(h.x / CELL), floori(h.y / CELL))
+		if not grid.has(k):
+			grid[k] = []
+		grid[k].append(h)
+		rmax = maxf(rmax, h.z)
+	var reach := int(ceil(rmax / CELL))
+	var wet := func(p: Vector3) -> bool:
+		var k0 := Vector2i(floori(p.x / CELL), floori(p.z / CELL))
+		for dx in range(-reach, reach + 1):
+			for dz in range(-reach, reach + 1):
+				for h in grid.get(k0 + Vector2i(dx, dz), []):
+					if Vector2(h.x - p.x, h.y - p.z).length_squared() < h.z * h.z:
+						return true
+		return false
+	var stone := Builder.mat(Color(0.42, 0.38, 0.32), 0.0, 0.85, Color(0.42, 0.38, 0.32), 0.12)
+	var groups := {}
+	for p in track["paths"]:
+		if p["id"] != 0 and p["kind"] != "ramp":
+			continue
+		var c: Curve3D = p["curve"]
+		var L: float = c.get_baked_length()
+		var spans := []
+		var d := 0.0
+		var s0 := -1.0
+		var s1 := -1.0
+		while d <= L:
+			var f := frame_at(c, d)
+			var half: float = hw(track, d) if p["id"] == 0 else float(p["half_w"])
+			var w: bool = wet.call(f["pos"]) or wet.call(f["pos"] + f["right"] * half) or wet.call(f["pos"] - f["right"] * half)
+			if w:
+				if s0 < 0.0:
+					s0 = d
+				s1 = d
+			elif s0 >= 0.0 and d - s1 > 12.0:
+				spans.append([s0, s1])
+				s0 = -1.0
+			d += 2.0
+		if s0 >= 0.0:
+			spans.append([s0, s1])
+		for sp in spans:
+			var a: float = maxf(sp[0] - 10.0, 0.0)
+			var e: float = minf(sp[1] + 10.0, L)
+			var k := 0
+			d = a
+			while d < e:
+				var f := frame_at(c, d + 1.5)
+				var bf := Basis.looking_at(f["fwd"], Vector3.UP)
+				var ctr: Vector3 = f["pos"] + Vector3(0, f["y"], 0)
+				var edge: float = (hw(track, d) + WALK + 0.5) if p["id"] == 0 else float(p["half_w"]) + 0.8
+				_part(groups, stone, Builder.box(Vector3(edge * 2.0, 1.4, 3.05)), Transform3D(bf, ctr + Vector3(0, -0.75, 0)))
+				for s in [-1.0, 1.0]:
+					var side: Vector3 = ctr + f["right"] * s * (edge - 0.3)
+					_part(groups, stone, Builder.box(Vector3(0.6, 1.1, 3.05)), Transform3D(bf, side + Vector3(0, CURB_H + 0.55, 0)))
+				if k % 8 == 4 and wet.call(f["pos"]):
+					_part(groups, stone, Builder.box(Vector3(edge * 2.0 + 1.0, 4.0, 4.0)), Transform3D(bf, ctr + Vector3(0, RIVER_Y - 0.3, 0)))
+				d += 3.0
+				k += 1
+	if not groups.is_empty():
+		_bake(root, groups)
 
 
 static func _plan_hills(track: Dictionary) -> void:
@@ -5395,6 +5529,7 @@ static func _build_walkers(root: Node3D, track: Dictionary) -> void:
 
 ## Tag oder Nacht für die Passanten (day 0..1 wie in Moods)
 static func set_daytime(track: Dictionary, day: float) -> void:
+	City.set_far_daytime(day)
 	for h in track.get("walker_nodes", []):
 		if is_instance_valid(h):
 			(h as Node3D).visible = (day > 0.3) == (str(h.name) == "PassantenTag")
@@ -6400,7 +6535,7 @@ static func _overpass(root: Node3D, track: Dictionary, d: float, rng: RandomNumb
 		_part(g, head, Builder.box(Vector3(1.5, 0.12, 0.05)), Transform3D(Basis(), Vector3(x, y + 1.9, z - 2.12 * dirz)))
 	if _district_at(track, d).get("rural", false) or wide:
 		# Überland: Erddamm mit Grasböschung an beiden Brückenenden hinunter zum Feld (sonst endete die Brücke in der Luft)
-		var earth := Builder.mat(Color(0.12, 0.2, 0.07), 0.0, 0.95)
+		var earth: Material = land_mat if track["world"] and land_mat != null else Builder.mat(Color(0.12, 0.2, 0.07), 0.0, 0.95)
 		var ramp_len := 70.0
 		var r_ang := atan2(y + 1.4, ramp_len)
 		for s in [-1.0, 1.0]:

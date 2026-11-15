@@ -55,6 +55,9 @@ func _ready() -> void:
 	elif GameState.world_menu == "cars":
 		preview_car = GameState.current_car
 		_show_cars()
+	elif GameState.world_menu == "driver":
+		preview_car = GameState.current_car
+		_show_driver()
 	else:
 		_show_main()
 
@@ -475,7 +478,8 @@ func _process(dt: float) -> void:
 	cam.position = _cam_pos
 	cam.look_at(_cam_look)
 	_work_light.light_energy = lerpf(_work_light.light_energy, 0.0 if _cam_view == "" else 1.4, k)
-	status.text = tr("LEVEL %d   ·   RENNSIEGE %d   ·   DRIFTSIEGE %d   ·   %s") % [GameState.level(), GameState.wins, GameState.drift_wins, Catalog.CARS[GameState.current_car]["name"].to_upper()]
+	status.text = tr("LEVEL %d   ·   %s   ·   SIEGE %d   ·   %s") % [GameState.level(), GameState.title_name().to_upper(), GameState.wins + GameState.drift_wins,
+		Catalog.CARS[GameState.current_car]["name"].to_upper()]
 
 
 func _show_car(car_id: String, cfg: Dictionary) -> void:
@@ -555,6 +559,7 @@ func _show_main() -> void:
 	_button("Losfahren", _show_start_city)
 	_button("Tuning", _show_tuning)
 	_button("Auto wechseln", _show_cars)
+	_button("Fahrer", _show_driver)
 	_button("Einstellungen", _show_settings)
 	if not OS.has_feature("web"):  # im Browser schließt man einfach den Tab
 		_button("Beenden", func(): get_tree().quit())
@@ -684,6 +689,201 @@ func _setting_button(k: String) -> Button:
 ## Karriere wie in NFSU2: Stufen untereinander, alle Events einer offenen Stufe frei wählbar; drei Siege in einer
 ## Stufe öffnen die nächste. Jede Zeile trägt rechts die Art als farbiges Abzeichen (Sprint cyan, Rundkurs grün,
 ## Drag pink, Drift orange) und die Schwierigkeit als Rauten (golden, wenn gewonnen). Rechts die Deutschlandkarte.
+# --- Fahrer: Level, Titel, Emblem, Level-Liste (seit 2.33) ---------------------------------------------------------
+
+## Fahrerkarte oben im Menü: Emblem, Titel, Level, Balken bis zum nächsten Level
+func _driver_card() -> Control:
+	var c := Control.new()
+	c.custom_minimum_size = Vector2(226, 64)
+	c.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var li := GameState.level_info()
+	var tex := GameState.emblem_texture()
+	c.draw.connect(func():
+		var fc := UI.font("cond", 0.2)
+		var fw := UI.font("wide", 0.15)
+		if tex:
+			c.draw_texture_rect(tex, Rect2(2, 4, 56, 56), false)
+		c.draw_string_outline(fw, Vector2(66, 22), tr("LEVEL %d") % li["level"], HORIZONTAL_ALIGNMENT_LEFT, -1, 16, 3, Color(0, 0, 0, 0.9))
+		c.draw_string(fw, Vector2(66, 22), tr("LEVEL %d") % li["level"], HORIZONTAL_ALIGNMENT_LEFT, -1, 16, UI.GREEN)
+		c.draw_string_outline(fc, Vector2(66, 40), GameState.title_name().to_upper(), HORIZONTAL_ALIGNMENT_LEFT, 160, 13, 3, Color(0, 0, 0, 0.9))
+		c.draw_string(fc, Vector2(66, 40), GameState.title_name().to_upper(), HORIZONTAL_ALIGNMENT_LEFT, 160, 13, Color.WHITE)
+		c.draw_rect(Rect2(66, 47, 150, 6), Color(0, 0, 0, 0.6))
+		c.draw_rect(Rect2(66, 47, 150.0 * float(li["into"]) / maxf(float(li["need"]), 1.0), 6), UI.CYAN)
+		var xt := "%d / %d XP" % [li["into"], li["need"]]
+		c.draw_string(fc, Vector2(66, 63), xt, HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color(0.75, 0.82, 0.95)))
+	return c
+
+
+func _show_driver() -> void:
+	_clear_menu()
+	_back = _show_main
+	_set_section("FAHRER")
+	stats.get_parent().visible = false
+	menu.add_child(_driver_card())
+	var bt := _button(tr("Titel: ") + GameState.title_name(), _show_titles)
+	bt.focus_entered.connect(func(): info.text = tr("Dein Titel steht im HUD der Welt und in der Garage. Neue Titel kommen mit dem Level."))
+	var be := _button(tr("Emblem wählen"), _show_emblems)
+	be.focus_entered.connect(func(): info.text = tr("Dein Emblem steht neben dem Level. Jeder Titel bringt ein Emblem mit, du kannst beide frei kombinieren."))
+	var bl := _button(tr("Level-Liste"), _show_levels)
+	bl.focus_entered.connect(func(): info.text = tr("Was du mit welchem Level freischaltest: Stufen der Karriere, Autos, Teile, Vinyls, Titel."))
+	_button("< Zurück", _show_main)
+	info.text = _xp_hint()
+	_focus_first()
+
+
+## Woher Erfahrung kommt (Infotext)
+func _xp_hint() -> String:
+	return tr("Erfahrung gibt es fürs Driften, knapp vorbei, Sprünge und Duelle in der Welt und für jedes Rennen (der erste Sieg zählt anderthalbfach). Mit dem Level öffnen sich Karriere-Stufen, Autos, Teile, Vinyls und Titel.")
+
+
+func _show_titles() -> void:
+	_clear_menu()
+	_back = _show_driver
+	_set_section("TITEL")
+	stats.get_parent().visible = false
+	var focus: Control = null
+	for t in Catalog.TITLES.size():
+		var ti := t
+		var row: Dictionary = Catalog.TITLES[t]
+		var open := GameState.title_unlocked(t)
+		var txt: String = tr(row["name"]) + ("" if open else "   ·   " + tr("AB LEVEL %d") % int(row["level"]))
+		var b := _button(txt, func():
+			if GameState.title_unlocked(ti):
+				GameState.title = ti
+				GameState.save_game()
+				_show_driver()
+			else:
+				Sfx.ui("locked"))
+		b.set_meta("quiet", true)
+		_icon_button(b, row["emblem"])
+		if not open:
+			b.modulate = Color(1, 1, 1, 0.38)
+		if t == GameState.title:
+			focus = b
+			b.text += "   ✓"
+		b.focus_entered.connect(func(): info.text = tr(row["name"]) + "\n" + (tr("Frei. Enter: als Titel tragen.") if GameState.title_unlocked(ti)
+			else tr("Kommt mit Fahrer-Level %d.") % int(row["level"])))
+	_button("< Zurück", _show_driver)
+	_focus_first()
+	if focus:
+		_grab.call_deferred(focus)
+
+
+func _show_emblems() -> void:
+	_clear_menu()
+	_back = _show_driver
+	_set_section("EMBLEM")
+	stats.get_parent().visible = false
+	var focus: Control = null
+	for t in Catalog.TITLES.size():
+		var ti := t
+		var row: Dictionary = Catalog.TITLES[t]
+		var open := GameState.title_unlocked(t)
+		var b := _button(tr(row["name"]) if open else tr("AB LEVEL %d") % int(row["level"]), func():
+			if GameState.title_unlocked(ti):
+				GameState.emblem = ti
+				GameState.save_game()
+				_show_driver()
+			else:
+				Sfx.ui("locked"))
+		b.set_meta("quiet", true)
+		_icon_button(b, row["emblem"], 30)
+		if not open:
+			b.modulate = Color(1, 1, 1, 0.38)
+		if t == GameState.emblem:
+			focus = b
+			b.text += "   ✓"
+		b.focus_entered.connect(func(): info.text = tr("Emblem „%s“") % tr(row["name"]) + "\n" + (tr("Frei. Enter: neben dein Level setzen.")
+			if GameState.title_unlocked(ti) else tr("Kommt mit Fahrer-Level %d.") % int(row["level"])))
+	_button("< Zurück", _show_driver)
+	_focus_first()
+	if focus:
+		_grab.call_deferred(focus)
+
+
+## Emblem als Symbol links im Knopf
+func _icon_button(b: Button, emblem_id: String, size := 22) -> void:
+	var tex := GameState.emblem_texture(emblem_id)
+	if tex:
+		b.icon = tex
+		b.expand_icon = false
+		b.add_theme_constant_override("icon_max_width", size)
+		if size > 22:
+			b.custom_minimum_size.y = size + 6
+
+
+## Level-Liste: je Level ein Eintrag (erreicht grün mit Haken, das nächste cyan, später grau), Details rechts
+func _show_levels() -> void:
+	_clear_menu()
+	_back = _show_driver
+	_set_section("LEVEL-LISTE")
+	stats.get_parent().visible = false
+	var lv := GameState.level()
+	var focus: Control = null
+	var last := 2
+	for l in range(2, Catalog.LEVEL_MAX + 1):
+		if not Catalog.level_rewards(l).is_empty():
+			last = l
+	for l in range(2, last + 1):
+		var rw := Catalog.level_rewards(l)
+		if rw.is_empty():
+			continue
+		var lvl := l
+		var first: String = tr(str(rw[0]["name"]))
+		for r in rw:  # Autos zuerst nennen, dann Stufen
+			if r["kind"] == "car" or r["kind"] == "stage":
+				first = tr(str(r["name"]))
+				break
+		var txt := tr("LEVEL %d") % l + "  ·  " + first + (" +%d" % (rw.size() - 1) if rw.size() > 1 else "")
+		var b := _button(txt, func(): pass)
+		b.set_meta("quiet", true)
+		b.add_theme_font_size_override("font_size", 12)
+		b.clip_text = true
+		b.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		if l <= lv:
+			b.add_theme_color_override("font_color", UI.GREEN)
+			b.text = "✓ " + b.text
+		elif focus == null:
+			focus = b
+			b.add_theme_color_override("font_color", UI.CYAN)
+		else:
+			b.modulate = Color(1, 1, 1, 0.55)
+		b.focus_entered.connect(func(): info.text = _level_info(lvl))
+	_button("< Zurück", _show_driver)
+	_focus_first()
+	if focus:
+		_grab.call_deferred(focus)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	if is_instance_valid(focus) and focus.is_inside_tree():
+		menu_scroll.ensure_control_visible(focus)
+
+
+func _level_info(l: int) -> String:
+	var lines := []
+	for r in Catalog.level_rewards(l):
+		lines.append("·  " + GameState.reward_text(r))
+	var head := tr("LEVEL %d") % l
+	var cur := GameState.level()
+	if l <= cur:
+		head += "   ·   " + tr("erreicht")
+	else:
+		var total := 0
+		for k in range(1, l):
+			total += GameState.xp_need(k)
+		head += "   ·   " + tr("noch %s XP") % _thousands(total - GameState.xp)
+	return head + "\n" + "\n".join(lines)
+
+
+static func _thousands(n: int) -> String:
+	var s := str(maxi(n, 0))
+	var out := ""
+	while s.length() > 3:
+		out = "." + s.substr(s.length() - 3) + out
+		s = s.substr(0, s.length() - 3)
+	return s + out
+
+
 func _show_races() -> void:
 	_clear_menu()
 	_back = _show_main
@@ -737,10 +937,11 @@ func _stage_header(s: int) -> Control:
 	c.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var open := GameState.stage_open(s)
 	var w := GameState.stage_wins(s)
-	var done := w >= Catalog.stage_need(s)
+	var n: int = Catalog.STAGES[s]["events"].size()
+	var done := w >= n
 	var col: Color = UI.GOLD if open and done else (UI.CYAN if open else Color(0.5, 0.53, 0.58))
 	var left := tr("STUFE %d · %s") % [s + 1, tr(Catalog.STAGES[s]["name"]).to_upper()]
-	var right := tr("GESPERRT") if not open else (tr("FERTIG") if done else tr("%d/%d SIEGE") % [w, Catalog.stage_need(s)])
+	var right := tr("AB LEVEL %d") % int(Catalog.STAGES[s]["level"]) if not open else (tr("FERTIG") if done else tr("%d/%d SIEGE") % [w, n])
 	c.draw.connect(func():
 		var f := UI.font("cond", 0.2)
 		var y := c.size.y - 4.0
@@ -787,9 +988,8 @@ func _career_info(ev: String) -> String:
 	var t := head + "\n" + tr("Ziel: ") + goal + "\n" + tr(r.get("desc", Catalog.EVENT_TYPES[rt]["desc"]))
 	var s := Catalog.stage_of(ev)
 	if not GameState.career_open(ev):
-		var left: int = Catalog.stage_need(s - 1) - GameState.stage_wins(s - 1)
-		t = head + "\n" + tr("Ziel: ") + goal + "\n" + (tr("Gesperrt: gewinne noch %d Event in Stufe %d." if left == 1 else
-			"Gesperrt: gewinne noch %d Events in Stufe %d.") % [left, s])
+		t = head + "\n" + tr("Ziel: ") + goal + "\n" + tr("Gesperrt: Stufe %d öffnet mit Fahrer-Level %d (du bist Level %d).") \
+			% [s + 1, int(Catalog.STAGES[s]["level"]), GameState.level()]
 	elif GameState.best_times.has(ev):
 		var best: float = GameState.best_times[ev]
 		var bt := ("%d P" % int(best)) if rt == "drift" else "%d:%05.2f" % [int(best) / 60, fmod(best, 60.0)]
@@ -1103,7 +1303,7 @@ func _color_title(cat: String, idx: int) -> String:
 	if idx == GameState.get_config(preview_car).get(cat, 0):
 		t += "   ·   " + tr("EINGEBAUT")
 	elif not GameState.is_part_unlocked(cat, idx):
-		t += "   ·   " + (tr("1 SIEG") if opt["wins"] == 1 else tr("%d SIEGE") % opt["wins"])
+		t += "   ·   " + tr("AB LEVEL %d") % int(opt.get("level", 1))
 	return t
 
 
@@ -1119,7 +1319,7 @@ func _refresh_parts(cat: String) -> void:
 		if i == installed:
 			sub = tr("EINGEBAUT")
 		elif locked:
-			sub = tr("1 SIEG") if opt["wins"] == 1 else tr("%d SIEGE") % opt["wins"]
+			sub = tr("AB LEVEL %d") % int(opt.get("level", 1))
 		var c2 := GameState.get_config(preview_car).duplicate()
 		c2[cat] = i
 		_tile_text(b, tr(opt["name"]) + _inch_suffix(cat, c2), sub)
@@ -1388,6 +1588,11 @@ func _part_info(cat: String, idx: int) -> void:
 	var opt: Dictionary = Catalog.PARTS[cat]["options"][idx]
 	var t := tr(Catalog.PARTS[cat]["label"]) + ": " + tr(opt["name"])
 	match cat:
+		"vinyl":
+			if opt.has("art"):
+				t += "\n" + tr("Passt auf jedes Auto: das Motiv legt sich an Länge und Linie der Karosserie an.")
+				if opt.get("tint", false):
+					t += "\n" + tr("Einfarbig: die Farbe stellst du unter Folienfarbe ein.")
 		"engine", "turbo":
 			t += "\n" + tr("Beschleunigung +%d %%   ·   Topspeed +%d %%") % [roundi((opt["accel"] - 1.0) * 100.0), roundi((opt["top"] - 1.0) * 100.0)]
 		"nitro":
@@ -1420,8 +1625,7 @@ func _part_info(cat: String, idx: int) -> void:
 			elif cat == "rimsize":
 				t += "\n" + tr("Nur Optik: der Reifen behält seinen Durchmesser, die Flanke wird flacher.")
 	if not GameState.is_part_unlocked(cat, idx):
-		var missing: int = opt["wins"] - GameState.total_wins()
-		t += "\n" + (tr("Gesperrt: noch 1 Sieg nötig.") if missing == 1 else tr("Gesperrt: noch %d Siege nötig.") % missing)
+		t += "\n" + tr("Gesperrt: kommt mit Fahrer-Level %d (du bist Level %d).") % [int(opt.get("level", 1)), GameState.level()]
 	elif idx != GameState.get_config(preview_car).get(cat, 0):
 		t += "\n" + tr("ENTER: einbauen")
 	info.text = t

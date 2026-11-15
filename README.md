@@ -232,6 +232,52 @@ Außenring → nächste Stadt → Autobahn. Rundkurse und Drift-Kurse sind Schle
 - Browser: der Web-Export startet, die Welt baut sich ohne Skriptfehler auf (gut 25 s). Noch offen: eine Testfahrt mit
   Bildrate im sichtbaren Browserfenster (Herausforderer, Nachladen, Verkehr).
 
+## Alles über das Fahrer-Level, Vinyls, Titel und Embleme (2.33)
+- **Freischalten nur noch über das Level** (`Catalog.level_rewards`, `GameState.is_*_unlocked`): Karriere-Stufen
+  (`STAGES[...]["level"]`: Szene 3, Hafen und Altstadt 7, Großstadt 12, Finale 17), alle Autos (Level 2 bis 22, die
+  Exoten Raiden Zero 24 und Tengu RS 26), Leistungsteile und edle Lacke (`"level"` an den Optionen), Vinyls und Titel.
+  Erfahrung gibt es für alles, was in der Welt Punkte bringt, und für jedes Rennen (`Catalog.race_xp`: Sieg 3000, Zweiter
+  1600, Dritter 900, sonst 400, Stufe 2 x1,35, Stufe 3 x1,7, der erste Sieg eines Events x1,5, dazu die Stilpunkte).
+  Die Kurve ist flacher als in 2.32 (`xp_need`: 1000 + 300·(L−1)^1,25): Level 10 nach gut 25 000 XP, Level 20 nach gut
+  110 000. Siege zählen weiter für das Tempo der Gegner (`pace`) und die Statistik.
+- **Alte Spielstände** (`GameState._migrate_prog`, Spielstand ohne `"prog": 2`): was mit Siegen schon frei war, bleibt
+  frei (`kept_cars`, `kept_parts`, `kept_stages`), und die gewonnenen Events zählen als Erfahrung nach der neuen
+  Rechnung, falls das mehr ist als die bisherige.
+- **Garage > Fahrer:** Fahrerkarte (Emblem, Titel, Level, Balken), Titel wählen, Emblem wählen, Level-Liste (je Level,
+  was es bringt; rechts die Details und wie viel XP noch fehlen). In der Welt auch über Esc > Fahrer. 19 Titel von
+  „Neuling“ bis „Unsterblich“ (`Catalog.TITLES`), jeder mit Emblem (`assets/emblems/*.svg`); Titel und Emblem lassen
+  sich frei kombinieren. Oben links in der Welt: Emblem, Level, Balken, XP, Titel. Beim Aufstieg nennt das Spiel alles,
+  was neu frei ist.
+- **25 Vinyls mit Motiv** (Folierung, ab Option 9): Speedlines, Tribal, Splitter, Sakura, Tiger, Zielflagge, Flammen,
+  Pixeltarn, Blitze, Welle, Graffiti, Hexgitter, Platine, Farbbomben, Koi, Rising Sun, Glitch-Split, Kitsune, Oni,
+  Drache, Engelsflügel, Einheit 07 (Mecha-Lackierung), Mecha, Lichtengel, Prisma. Jedes Motiv ist ein SVG
+  (`assets/vinyls`, erzeugt von `tools/vinyl_gen.py`, reines Python): oben die Flanke (Bug links, Heck rechts,
+  Gürtellinie oben), unten die Draufsicht. Der Lack-Shader (`car_paint.gdshader`, `car_builder.vinyl_params`)
+  projiziert beides in Koordinaten relativ zu Länge, Breite und Gürtellinie des Autos, so passt jedes Vinyl auf jedes
+  Auto. Einfarbige Motive (`tint`) nehmen die Folienfarbe; Motive mit Schrift (`mirror: false`) stehen auf der rechten
+  Seite nicht spiegelverkehrt und sind deshalb vorn und hinten gleich aufgebaut. Gegner im Rennen bekommen wie bisher
+  zufällige Teile, also oft auch ein Vinyl. Import: verlustbehaftet (WebP) mit Mipmaps, gut 100 KB je Vinyl.
+- **Karte nach Städten:** ←/→ wählt eine Stadt, Leertaste reist an ihren Eingang (nicht an ein Rennen), Enter setzt
+  das nächste offene Rennen der Stadt als Ziel. Rechts stehen alle Rennen der Stadt mit Stand (gewonnen, offen, ab
+  Level …). Test: `world.tscn -- --wtravel=<Rennen>[:pause]` öffnet die Karte (mit `:pause` über das Esc-Menü) und
+  drückt echt die Leertaste.
+- **Übergänge zwischen den Städten aufgeräumt:**
+  - **Keine Löcher mehr:** Flussbetten und Tröge sind nur dort aus dem Boden geschnitten, wo auch Wasser liegt, und bis
+    die Stadt geladen ist, füllt ein Bodenstück das Loch (`world._plug_cell`). Flüsse enden mit runden Kaimauern
+    (`_river_cap`).
+  - **Laden an der zweiten Ausfahrt:** Mitte und Radius einer Stadt umfassen alle ihre Straßen samt zweiter Ausfahrt,
+    sie lädt also auch, wenn man dort ankommt.
+  - **Brücken über Flüsse:** Autobahn-Stücke, die einen Fluss kreuzen, bekommen eine Brücke (`_world_bridges`, z. B.
+    Würzburg über den Main).
+  - **Heller Stadtboden:** Er ist schmaler, feiner aufgelöst (Maske 1024 px) und heller mit Rasenflecken, statt dunkler
+    Kleckse.
+  - **Bäume und Baumreihen:** Bäume wachsen näher an Städte und Auffahrten heran, lange Verbindungsstraßen haben
+    Baumreihen.
+  - **Auffahrten passend zur Stadt:** Fachwerk- und Altstädte haben Ortsrand mit Ziegeldächern, Häfen haben
+    Lagerhallen und Kräne, nur Großstädte haben Hochhäuser (`world_layout.ramp_zone`).
+  - **Weitere Korrekturen:** keine Brücken ins Feld mehr, Wahrzeichen nur nachts ohne Dunst, hellere Böschungen,
+    Dunst statt dunklem Band unter dem Horizont, die Stadtausfahrt geht ohne dunkle Kante in die Verbindung über.
+
 ## Fahrer-Level, Driften in der Welt, Driftberg (2.32)
 - **Fahrer-Level wie im Rollenspiel** (`GameState.add_xp`, `level_info`): Stilpunkte sind Erfahrung. In der Welt zählt
   alles, was Punkte gibt (`world._flash`): knapp vorbei, Drift-Ketten, Sprünge, gewonnene Duelle. Im Rennen werden die
@@ -532,10 +578,10 @@ Skript), schreibt `scripts/city_data.gd`.
   seitlich abprallen, frontal oder beim Auffahren Dreher und kurz keine Kontrolle. Mittelstreifen laufen spitz aus.
 
 ## Fortschritt
-Kein Geld: Jeder 1. Platz zählt als Sieg. 3 Siege in einer Karriere-Stufe öffnen die nächste (`Catalog.STAGES`), Siege
-insgesamt schalten Autos und Tuningteile frei (Werte in `scripts/catalog.gd`). Die Grundteile der Optik sind von
-Anfang an frei, Besonderes (Chrom, Perlweiß, Kreuzspeichen, Monster-Flügel, Breitbau …) kommt mit Siegen. Gesperrte Teile kann man in der Garage
-als Vorschau ansehen. Alte Spielstände übernehmen ihre bisherigen Siege in die Karriere.
+Kein Geld: Seit 2.33 schaltet das Fahrer-Level alles frei (Karriere-Stufen, Autos, Teile, Vinyls, Titel; siehe oben,
+Werte in `scripts/catalog.gd`). Erfahrung gibt es für jedes Rennen und für Stilpunkte in der Welt. Die Grundteile der
+Optik sind von Anfang an frei. Gesperrte Teile kann man in der Garage als Vorschau ansehen. Alte Spielstände behalten,
+was sie mit Siegen schon hatten.
 
 **Spielstand** (`user://save.json`): wird nach jedem Sieg, jedem Einbau und jeder Einstellung geschrieben. Seit 2.23
 schreiben Testläufe (Start mit Argumenten nach `--`) in `user://save_test.json`; bis 2.22 landeten sie im echten

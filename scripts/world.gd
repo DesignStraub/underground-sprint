@@ -19,6 +19,7 @@ const WorldMinimap := preload("res://scripts/world_minimap.gd")
 const MapView := preload("res://scripts/world_map_view.gd")
 const Traffic := preload("res://scripts/traffic_car.gd")
 const Challenger := preload("res://scripts/challenger_car.gd")
+const Builder := preload("res://scripts/car_builder.gd")
 const WorldTour := preload("res://scripts/world_tour.gd")
 const DUEL_GAP := 300.0  # so viel Vorsprung entscheidet ein Duell
 
@@ -34,6 +35,8 @@ const AB_SPEED := {2.25: 36.0, 6.75: 30.0, 11.25: 24.0}
 ## Rückkehr nach einem Rennen: dort wieder einsetzen (gilt für diese Sitzung)
 static var return_xf := Transform3D.IDENTITY
 static var has_return := false
+static var _tt_stage := 0  # Test --wtravel: 0 Karte öffnen, 1 Leertaste drücken, 2 gereist
+var _tt_t := 0.0
 static var target := -1  # auf der Karte gewähltes Ziel (Rennen), gilt für diese Sitzung
 
 var world: SubViewport
@@ -171,6 +174,8 @@ func _ready() -> void:
 	while not _tq.is_empty() and traffic.size() < TRAFFIC_MAX:
 		_spawn_queued(100)
 	_build_hud()
+	# ab jetzt Vinyl-Bilder (Herausforderer mitten in der Fahrt) im Hintergrund laden, nicht im Bild
+	Builder.async_vinyls = true
 	world.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 	Music.world_go("" if active.is_empty() or active["kind"] == "seg" else str(Catalog.RACES[active["race_index"]].get("town", "")))
 	await get_tree().process_frame
@@ -187,6 +192,7 @@ func _ready() -> void:
 
 
 func _exit_tree() -> void:
+	Builder.async_vinyls = false
 	if GameState.xp_dirty:
 		GameState.save_game()
 	if _task >= 0:
@@ -377,6 +383,8 @@ func _finish(e: Dictionary, job: Dictionary) -> void:
 	_event("fertig " + str(e["race"].get("name", "?")))
 	var tr: Dictionary = job["track"]
 	var root: Node3D = tr["node"]
+	if _plugs.has(e["race_index"]) and e["kind"] == "city":
+		(_plugs[e["race_index"]] as Node3D).visible = false  # Flussbett und Trog der Stadt sind jetzt da
 	root.transform = e["xf"]
 	Track.apply_lod(root, GameState.lod_ranges())
 	root.process_mode = Node.PROCESS_MODE_PAUSABLE
@@ -406,6 +414,8 @@ func _drop(e: Dictionary) -> void:
 	root.queue_free()
 	e["track"] = {}
 	e["state"] = "none"
+	if _plugs.has(e["race_index"]) and e["kind"] == "city":
+		(_plugs[e["race_index"]] as Node3D).visible = true
 	if _markers.has(e["race_index"]):
 		_markers[e["race_index"]].queue_free()
 		_markers.erase(e["race_index"])
@@ -609,9 +619,7 @@ func _update_markers() -> void:
 			var race: Dictionary = Catalog.RACES[near]
 			var line := tr("Enter: Rennen starten")
 			if not GameState.career_open(race["name"]):
-				var st := Catalog.stage_of(race["name"])
-				line = tr("Gesperrt: erst %d Siege in Stufe „%s“") % [Catalog.stage_need(st - 1), tr(Catalog.STAGES[st - 1]["name"])] \
-					if st > 0 else tr("Gesperrt")
+				line = tr("Gesperrt: %s (du bist Level %d)") % [GameState.lock_text(race["name"]), GameState.level()]
 			hud["prompt"].text = "%s\n%s" % [tr(race["name"]).to_upper(), line]
 		hud["prompt"].visible = near >= 0
 
@@ -636,6 +644,7 @@ const DAY_MINUTES := 24.0
 var tod := 20.0  # Uhrzeit (Stunden)
 var _sky_mat: ShaderMaterial
 var _ground_mat: ShaderMaterial
+var _plugs := {}  # Rennen -> Pfropfen in den Löchern des Bodens (sichtbar, solange die Stadt nicht geladen ist)
 var land: Landscape
 var _wcam: Camera3D
 var _tod_t := 0.0
@@ -747,6 +756,29 @@ func _setup_environment() -> void:
 	world.add_child(land)
 	ground.material_override = land.land_mat
 	_ground_mat = land.land_mat
+	Track.land_mat = land.land_mat  # Böschungen der Autobahn tragen dieselben Felder wie das Gelände
+	# Pfropfen (seit 2.33): die Löcher einer Stadt (Flussbett, Tunneltrog) sind nur offen, solange sie geladen ist.
+	# Wasser und Ufermauern gehören zur Stadt; war sie nicht geladen, sah man durch die Löcher in den Himmel.
+	for c in layout["cities"]:
+		var ch := PackedVector3Array()
+		var cx: Transform3D = c["xf"]
+		for h in c["holes_local"]:
+			var w: Vector3 = cx * Vector3(h.x, 0.0, h.y)
+			ch.append(Vector3(w.x, w.z, h.z))
+		if ch.is_empty():
+			continue
+		var pst := SurfaceTool.new()
+		pst.begin(Mesh.PRIMITIVE_TRIANGLES)
+		pst.set_normal(Vector3.UP)
+		if _plug_cell(pst, Vector2(-ext / 2.0, -ext / 2.0), ext, ch) == 0:
+			continue
+		var plug := MeshInstance3D.new()
+		plug.name = "Pfropfen_%d" % c["race_index"]
+		plug.mesh = pst.commit()
+		plug.material_override = land.land_mat
+		plug.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		ground.add_child(plug)
+		_plugs[c["race_index"]] = plug
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--tod="):  # Test: Uhrzeit beim Start (Stunden), z.B. --tod=13
 			tod = float(a.substr(6))
@@ -754,6 +786,41 @@ func _setup_environment() -> void:
 	ground.position.y = -0.12
 	if not OS.get_cmdline_user_args().has("--noground"):  # Test: ohne den großen Boden (was deckt was zu?)
 		world.add_child(ground)
+
+
+## Gegenstück zu Track.ground_cell: genau die Zellen, die dort wegen der Löcher holes fehlen (dasselbe Raster, daher
+## ohne Fuge). Liegt eine Zelle ganz in einem Loch, kommt sie am Stück. Gibt die Zahl der Zellen zurück.
+func _plug_cell(st: SurfaceTool, o: Vector2, s: float, holes: PackedVector3Array) -> int:
+	var c := o + Vector2(s, s) * 0.5
+	var near := PackedVector3Array()
+	for h in holes:
+		var reach := s * 0.7072 + h.z
+		if Vector2(h.x, h.y).distance_squared_to(c) < reach * reach:
+			near.append(h)
+	if near.is_empty():
+		return 0
+	var inside := false
+	for h in near:
+		if Vector2(h.x, h.y).distance_to(c) + s * 0.7072 < h.z:
+			inside = true
+			break
+	if not inside:
+		if s > 2.0:
+			var hs := s * 0.5
+			var n := 0
+			for k in 4:
+				n += _plug_cell(st, o + Vector2(k % 2, k / 2) * hs, hs, near)
+			return n
+		inside = false
+		for h in near:
+			if Vector2(h.x, h.y).distance_squared_to(c) < h.z * h.z:
+				inside = true
+				break
+		if not inside:
+			return 0
+	for v in [Vector2(0, 0), Vector2(s, 0), Vector2(s, s), Vector2(0, 0), Vector2(s, s), Vector2(0, s)]:
+		st.add_vertex(Vector3(o.x + v.x, 0.0, o.y + v.y))
+	return 1
 
 
 func _cover() -> CanvasLayer:
@@ -849,33 +916,46 @@ func _build_hud() -> void:
 	help.text = tr("Frei fahren: Marker anfahren startet ein Rennen\nM Karte  C Kamera  R Zurücksetzen  Esc Menü")
 	help.modulate.a = 0.7
 	hud["help"] = help
-	# Fahrer-Level oben links (seit 2.32): Level, Balken bis zum nächsten, XP
+	# Fahrer-Level oben links (seit 2.32): Emblem (2.33), Level, Balken bis zum nächsten, XP, Titel
 	var lv := Control.new()
 	lv.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	lv.position = Vector2(10, 8)
-	lv.size = Vector2(180, 40)
+	lv.size = Vector2(220, 48)
 	root.add_child(lv)
+	var em := TextureRect.new()
+	em.texture = GameState.emblem_texture()
+	em.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	em.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	em.position = Vector2(0, 0)
+	em.size = Vector2(38, 38)
+	em.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	lv.add_child(em)
 	var ll := _label(lv, 16)
 	ll.add_theme_font_override("font", UI.font("wide", 0.15))
-	ll.position = Vector2(0, -3)
+	ll.position = Vector2(44, -3)
 	var lbg := ColorRect.new()
 	lbg.color = Color(0, 0, 0, 0.55)
-	lbg.position = Vector2(0, 22)
+	lbg.position = Vector2(44, 22)
 	lbg.size = Vector2(150, 5)
 	lbg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	lv.add_child(lbg)
 	var lfill := ColorRect.new()
 	lfill.color = UI.CYAN
-	lfill.position = Vector2(0, 22)
+	lfill.position = Vector2(44, 22)
 	lfill.size = Vector2(0, 5)
 	lfill.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	lv.add_child(lfill)
 	var lx := _label(lv, 8)
-	lx.position = Vector2(0, 27)
+	lx.position = Vector2(44, 27)
 	lx.modulate.a = 0.8
+	var lt := _label(lv, 9)
+	lt.position = Vector2(44, 37)
+	lt.add_theme_color_override("font_color", Color(1.0, 0.82, 0.3))
 	hud["lvl"] = ll
 	hud["lvl_fill"] = lfill
 	hud["lvl_xp"] = lx
+	hud["lvl_title"] = lt
+	hud["lvl_emblem"] = em
 	# laufender Drift unten in der Mitte: Punkte und Multiplikator, solange die Kette läuft
 	var dm := _label(root, 18, HORIZONTAL_ALIGNMENT_CENTER)
 	dm.anchor_left = 0.5
@@ -1012,7 +1092,7 @@ func _build_pause(root: Control) -> void:
 	var title := _label(pause_panel, 28, HORIZONTAL_ALIGNMENT_CENTER)
 	title.text = tr("PAUSE")
 	for entry in [["Weiter", _toggle_pause], ["Karte", func(): _toggle_pause(); _open_map()],
-			["Tuning", _to_garage.bind("tuning")], ["Auto wechseln", _to_garage.bind("cars")],
+			["Tuning", _to_garage.bind("tuning")], ["Auto wechseln", _to_garage.bind("cars")], ["Fahrer", _to_garage.bind("driver")],
 			["Vollbild", GameState.toggle_fullscreen],
 			["Garage", func(): _unpause(); GameState.in_world = false; get_tree().change_scene_to_file("res://scenes/garage.tscn")]]:
 		var b := Button.new()
@@ -1045,6 +1125,55 @@ func _fast_travel(ri: int) -> void:
 	Music.set_paused(false)
 	Music.race_loading()  # leiser während des Ladens, world_go macht wieder voll
 	get_tree().change_scene_to_file("res://scenes/world.tscn")
+
+
+## Test --wtravel=<Rennen>[:pause]: Karte öffnen (mit :pause über das Esc-Menü), die Stadt dieses Rennens wählen und
+## echt die Leertaste drücken (Input.parse_input_event, wie eine Taste); nach dem Neuladen meldet die Welt, wo man steht
+func _travel_test(dt: float) -> void:
+	var arg := ""
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--wtravel="):
+			arg = a.substr(10)
+	if arg == "" or player == null:
+		return
+	var ri := int(arg.split(":")[0])
+	_tt_t += dt
+	if _tt_stage == 0 and _tt_t > 1.5:
+		if arg.ends_with(":pause"):
+			_toggle_pause()
+			var kb := pause_panel.get_child(2) as Button  # "Karte" im Esc-Menü: Fokus darauf, dann Enter wie echt
+			kb.grab_focus()
+			kb.emit_signal("pressed")
+		else:
+			var m := InputEventKey.new()
+			m.physical_keycode = KEY_M
+			m.keycode = KEY_M
+			m.pressed = true
+			Input.parse_input_event(m)
+		_tt_stage = 1
+		_tt_t = 0.0
+	elif _tt_stage == 1 and _tt_t > 0.8 and map_view.visible:
+		map_view.sel = map_view.town_of(ri)
+		print("TRAVEL map open, town ", map_view.towns[map_view.sel]["name"], ", focus ", get_viewport().gui_get_focus_owner())
+		for pressed in [true, false]:
+			var e := InputEventKey.new()
+			e.physical_keycode = KEY_SPACE
+			e.keycode = KEY_SPACE
+			e.pressed = pressed
+			Input.parse_input_event(e)
+		_tt_stage = 2
+		_tt_t = 0.0
+	elif _tt_stage == 1 and _tt_t > 3.0:
+		print("TRAVEL FAIL: Karte nicht offen")
+		get_tree().quit()
+	elif _tt_stage == 2 and _tt_t > 4.0:
+		var want := Vector3.ZERO
+		for c in layout["cities"]:
+			if c["race_index"] == ri:
+				want = c["exit_world"]
+		var d := Vector2(player.global_position.x - want.x, player.global_position.z - want.z).length()
+		print("TRAVEL %s: %.0f m vom Stadteingang (Rennen %d), paused=%s" % ["OK" if d < 120.0 else "FAIL", d, ri, get_tree().paused])
+		get_tree().quit()
 
 
 func _close_map() -> void:
@@ -1123,7 +1252,9 @@ func _process(dt: float) -> void:
 	if get_tree().paused:
 		if OS.get_cmdline_user_args().has("--wmap"):
 			_shot_check(dt)  # Test: Bild der offenen Karte
+		_travel_test(dt)
 		return
+	_travel_test(dt)
 	if OS.get_cmdline_user_args().has("--wmap") and _shot_t < 0.0 and map_view and not map_view.visible:
 		_open_map()
 	if OS.get_cmdline_user_args().has("--wdrive"):
@@ -1299,6 +1430,8 @@ func _update_level_hud() -> void:
 	hud["lvl"].text = tr("LEVEL %d") % li["level"]
 	hud["lvl_fill"].size.x = 150.0 * clampf(float(li["into"]) / float(li["need"]), 0.0, 1.0)
 	hud["lvl_xp"].text = "%d / %d XP" % [li["into"], li["need"]]
+	hud["lvl_title"].text = GameState.title_name().to_upper()
+	hud["lvl_emblem"].texture = GameState.emblem_texture()
 
 
 func _show_level_up(lines: Array) -> void:
@@ -1306,7 +1439,7 @@ func _show_level_up(lines: Array) -> void:
 	hud["levelup"].visible = true
 	_lu_t = 4.0
 	Sfx.ui("go")
-	for l in lines.slice(1):
+	for l in lines.slice(1, 6):
 		_flash(l, Color(0.4, 1.0, 0.55))
 
 
@@ -1463,7 +1596,7 @@ func _spawn_challenger() -> void:
 	# Auto: ungefähr so schnell wie deins, nicht dasselbe
 	var mine: float = Catalog.CARS[GameState.current_car]["top_speed"]
 	var pool: Array = Catalog.CAR_ORDER.filter(func(id): return id != GameState.current_car \
-		and absf(float(Catalog.CARS[id]["top_speed"]) / mine - 1.0) < 0.1 and not Catalog.CARS[id]["unlock"].has("level"))
+		and absf(float(Catalog.CARS[id]["top_speed"]) / mine - 1.0) < 0.1 and not id in Catalog.EXOTICS)
 	if pool.is_empty():
 		pool = Catalog.CAR_ORDER.filter(func(id): return id != GameState.current_car)
 	var id: String = pool[_trng.randi() % pool.size()]
