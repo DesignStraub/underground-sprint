@@ -62,5 +62,7 @@ Straßen und Gebäude der Städte-Strecken: © OpenStreetMap-Mitwirkende, ODbL (
 ## Alle anderen Klänge
 Synthetisch erzeugt (`tools/make_sfx.py`).
 
-## Vinyls und Embleme
-Eigene Vektorgrafiken, im Code erzeugt (`tools/vinyl_gen.py`), ohne fremde Vorlagen. Schrift darauf aus eigenen Strichen.
+## Vinyls, Embleme, Werbeplakate
+Eigene Vektorgrafiken, im Code erzeugt (`tools/vinyl_gen.py`, `tools/poster_gen.py`), ohne fremde Vorlagen. Schrift
+auf den Vinyls aus eigenen Strichen, auf den Plakaten Saira, D-DIN, Chakra Petch und Inter (OFL). Alle Marken und
+Sprüche auf den Plakaten sind ausgedacht.

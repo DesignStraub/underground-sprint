@@ -164,6 +164,10 @@ func _ready() -> void:
 	player = pc
 	land.target = pc
 	player.cam.make_current()
+	var pw := Track.poster_warm()  # Plakat-Stoff gleich übersetzen, nicht erst an der ersten Plakatwand (seit 2.34)
+	if pw:
+		player.cam.add_child(pw)
+		get_tree().create_timer(2.0).timeout.connect(pw.queue_free)
 	for n in get_tree().get_nodes_in_group("ambient"):
 		n.target = player
 	for e in entries:

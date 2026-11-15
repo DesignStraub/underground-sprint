@@ -11,6 +11,7 @@ extends RefCounted
 
 const Builder := preload("res://scripts/car_builder.gd")
 const Knockable := preload("res://scripts/knockable.gd")
+const Posters := preload("res://scripts/poster_atlas.gd")
 const RailCrossing := preload("res://scripts/rail_crossing.gd")
 const ROAD_SHADER := preload("res://shaders/road.gdshader")
 const PAVEMENT_SHADER := preload("res://shaders/pavement.gdshader")
@@ -410,6 +411,7 @@ static func step(job: Dictionary) -> float:
 				_build_barriers(root, track, rng)
 			else:
 				_build_props(root, track, rng)
+			_build_posters(root, track)
 			_build_steam(root, track, rng)
 			_build_mist(root, track)
 			if type != "autobahn":
@@ -5197,6 +5199,128 @@ static func _lamp(root: Node3D, dist: Dictionary, f: Dictionary, side: float, ba
 ## Gehweg-Möblierung: leichte Sachen fliegen weg, schwere (Hydrant, Poller, Kübel, Haltestelle, Bäume) sind hart.
 ## 0/1 Mülltonne, 2 Leitkegel, 3 Briefkasten, 4 Parkscheinautomat, 5 Bank, 6 Hydrant, 7 Poller, 8 Pflanzkübel,
 ## 9 Haltestelle, 10 Telefonzelle, 11 Zeitungsboxen, 12 Parkuhr, 13 Verkehrsschild, 14 Müllcontainer, 15 Betonleitwand
+# --- Fake-Werbeplakate (seit 2.34) -------------------------------------------------------------------------------------
+## Ausgedachte, trockene Werbung (scripts/poster_atlas.gd, tools/posters.gd): in der Stadt Großflächen auf zwei Pfosten
+## an der Hauskante des Gehwegs, an der Autobahn über Land große Tafeln auf Masten hinter der Leitplanke, schräg zum
+## Verkehr. Eigener Zufall (die übrige Strecke bleibt, wie sie war). Alle Plakate einer Strecke teilen sich ein Bild
+## und einen Stoff.
+static func _build_posters(root: Node3D, track: Dictionary) -> void:
+	if Posters.material() == null or OS.get_cmdline_user_args().has("--noposters"):  # Test: Bildrate ohne Plakate
+		return
+	var curve: Curve3D = track["curve"]
+	var length: float = track["length"]
+	var rng := RandomNumberGenerator.new()
+	rng.seed = int(length * 13.0) + 4242
+	var auto: bool = track["type"] == "autobahn"
+	var frame_m := Builder.mat(Color(0.2, 0.24, 0.22), 0.5, 0.5)
+	var post_m := Builder.mat(Color(0.32, 0.33, 0.35), 0.6, 0.45)
+	var big := SurfaceTool.new()
+	big.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var n_big := 0
+	for side in [-1.0, 1.0]:
+		var d := rng.randf_range(60.0, 160.0) if not auto else rng.randf_range(200.0, 700.0) + (450.0 if side > 0.0 else 0.0)
+		while d < length - 30.0:
+			var f := frame_at(curve, d)
+			var hwd := hw(track, d)
+			var dist: Dictionary = _district_at(track, d)
+			var step := rng.randf_range(160.0, 280.0)
+			var ok: bool = not _in_zone(track, d, 12.0) and _el_side(track, d, 10.0) != side and not _near_post(track, d, 6.0)
+			if auto:
+				step = rng.randf_range(900.0, 1500.0)
+				# nur über Land, nicht auf Brücken und Rampen, nicht an Ausfahrten
+				ok = ok and dist.get("rural", false) and not dist.get("forest", false) and float(f["y"]) < 0.3
+				if ok:
+					var off := hwd + 10.0
+					var pos: Vector3 = f["pos"] + f["right"] * side * off
+					if _branch_clearance(track, pos) < 16.0:
+						ok = false
+					else:
+						# zum Verkehr gedreht, der auf dieser Seite herankommt (Rechtsverkehr: rechts von hinten, links von
+						# vorn); beides ist dieselbe Drehung um +28°
+						var face: Vector3 = (-f["right"] * side).rotated(Vector3.UP, deg_to_rad(28.0))
+						var xf := Transform3D(Basis.looking_at(face, Vector3.UP), pos)
+						var n := Node3D.new()
+						n.transform = xf
+						root.add_child(n)
+						for px in [-2.4, 2.4]:
+							Builder._add(n, Builder.box(Vector3(0.35, 7.6, 0.35)), post_m, Vector3(px, 3.8, 0.3))
+						Builder._add(n, Builder.box(Vector3(7.7, 5.2, 0.3)), frame_m, Vector3(0, 7.6, 0.15))
+						Builder._add(n, Builder.box(Vector3(7.7, 0.25, 0.9)), post_m, Vector3(0, 4.9, -0.2))
+						_poster_quad(big, xf * Vector3(0, 7.6, -0.02), face, 7.3, 4.78,
+							Posters.uv(_poster_pick(pos), false))
+						n_big += 1
+						if OS.get_cmdline_user_args().has("--posterlog"):
+							print("PLAKAT autobahn d=%.0f seite=%d welt=%s" % [d, int(side), str(track["xf"] * pos)])
+			elif ok and not dist.get("rural", false):
+				var off := hwd + WALK - 0.3
+				var pos: Vector3 = f["pos"] + f["right"] * side * off + Vector3(0, _lift(track, d), 0)
+				if _branch_clearance(track, pos) >= 6.0 and absf(fmod(d - 20.0 + LAMP_STEP * 2.0, LAMP_STEP) - LAMP_STEP / 2.0) < LAMP_STEP / 2.0 - 4.0:
+					# Großfläche (wie 18/1) auf zwei Pfosten, Unterkante 1 m über dem Gehweg; fliegt weg wie die Haltestelle
+					var s := Knockable.new()
+					s.transform = Transform3D(Basis.looking_at(-f["right"] * side, Vector3.UP), Vector3(pos.x, CURB_H + pos.y, pos.z))
+					s.mass = 260.0
+					s.slowdown = 0.55
+					root.add_child(s)
+					for px in [-1.5, 1.5]:
+						Builder._add(s, Builder.box(Vector3(0.12, 1.1, 0.12)), post_m, Vector3(px, 0.55, 0.0))
+					Builder._add(s, Builder.box(Vector3(3.9, 2.62, 0.16)), frame_m, Vector3(0, 2.4, 0.0))
+					var pst := SurfaceTool.new()
+					pst.begin(Mesh.PRIMITIVE_TRIANGLES)
+					_poster_quad(pst, Vector3(0, 2.4, -0.085), Vector3(0, 0, -1), 3.64, 2.38, Posters.uv(_poster_pick(pos), false))
+					_poster_node(s, pst)
+					_knock_shape(s, Vector3(3.9, 3.7, 0.4), Vector3(0, 1.85, 0))
+					if OS.get_cmdline_user_args().has("--posterlog"):
+						print("PLAKAT stadt d=%.0f seite=%d" % [d, int(side)])
+			d += step
+	if n_big > 0:
+		_poster_node(root, big)
+
+
+## Winzige Plakatfläche vor eine Kamera hängen, solange geladen wird: der Stoff wird dann hinter dem Ladebild übersetzt,
+## nicht erst, wenn die erste Plakatwand ins Bild kommt (das hakte einmal gut 100 ms)
+static func poster_warm() -> MeshInstance3D:
+	if Posters.material() == null:
+		return null
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	_poster_quad(st, Vector3(0, 0, -1.0), Vector3(0, 0, 1), 0.002, 0.002, Posters.uv(0, true))
+	var mi := MeshInstance3D.new()
+	mi.mesh = st.commit()
+	mi.material_override = Posters.material()
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	return mi
+
+
+## Plakat Nummer für einen Ort (ohne Zufallszahl: die übrige Strecke bleibt, wie sie war)
+static func _poster_pick(pos: Vector3) -> int:
+	return posmod(int(floor(pos.x * 0.37)) * 31 + int(floor(pos.z * 0.29)) * 17, Posters.N)
+
+
+## Plakatfläche (Bildausschnitt uv), Vorderseite zeigt nach n, aufrecht
+static func _poster_quad(st: SurfaceTool, c: Vector3, n: Vector3, w: float, h: float, uv: Rect2) -> void:
+	var up := Vector3.UP
+	var r := (-n).cross(up).normalized()
+	var p := [c - r * w / 2.0 + up * h / 2.0, c + r * w / 2.0 + up * h / 2.0, c + r * w / 2.0 - up * h / 2.0, c - r * w / 2.0 - up * h / 2.0]
+	var t := [uv.position, Vector2(uv.end.x, uv.position.y), uv.end, Vector2(uv.position.x, uv.end.y)]
+	for tri in [[0, 1, 2], [0, 2, 3]]:
+		var o: Array = tri
+		if ((p[o[2]] as Vector3) - p[o[0]]).cross((p[o[1]] as Vector3) - p[o[0]]).dot(n) < 0.0:
+			o = [tri[0], tri[2], tri[1]]
+		for k in o:
+			st.set_normal(n)
+			st.set_uv(t[k])
+			st.add_vertex(p[k])
+
+
+static func _poster_node(parent: Node3D, st: SurfaceTool) -> void:
+	var mi := MeshInstance3D.new()
+	mi.name = "Plakat"
+	mi.mesh = st.commit()
+	mi.material_override = Posters.material()
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	parent.add_child(mi)
+
+
 static func _build_props(root: Node3D, track: Dictionary, rng: RandomNumberGenerator) -> void:
 	var curve: Curve3D = track["curve"]
 	var length: float = track["length"]
@@ -5372,7 +5496,20 @@ static func _build_props(root: Node3D, track: Dictionary, rng: RandomNumberGener
 						s.transform.origin = Vector3(pos.x, CURB_H, pos.z) + f["right"] * side * (hwd + WALK - 1.1 - off)
 						Builder._add(s, Builder.box(Vector3(3.6, 0.12, 1.5)), dark, Vector3(0, 2.5, 0))
 						Builder._add(s, Builder.box(Vector3(3.6, 2.4, 0.06)), glass, Vector3(0, 1.25, 0.7))
-						Builder._add(s, Builder.box(Vector3(0.06, 2.4, 1.4)), ad, Vector3(1.75, 1.25, 0))
+						# Werbefläche an der Stirnseite: seit 2.34 mit Fake-Plakat auf beiden Seiten (City-Light)
+						if Posters.material():
+							Builder._add(s, Builder.box(Vector3(0.08, 2.4, 1.4)), dark, Vector3(1.75, 1.25, 0))
+							var pi := _poster_pick(pos)
+							var pst := SurfaceTool.new()
+							pst.begin(Mesh.PRIMITIVE_TRIANGLES)
+							for nx in [1.0, -1.0]:
+								_poster_quad(pst, Vector3(1.75 + nx * 0.045, 1.25, 0), Vector3(nx, 0, 0), 1.28, 1.93,
+									Posters.uv((pi + (0 if nx > 0.0 else 5)) % Posters.N, true))
+							_poster_node(s, pst)
+							if OS.get_cmdline_user_args().has("--posterlog"):
+								print("PLAKAT haltestelle d=%.0f seite=%d" % [d, int(side)])
+						else:
+							Builder._add(s, Builder.box(Vector3(0.06, 2.4, 1.4)), ad, Vector3(1.75, 1.25, 0))
 						Builder._add(s, Builder.box(Vector3(2.4, 0.08, 0.4)), wood, Vector3(-0.3, 0.45, 0.45))
 						_knock_shape(s, Vector3(3.6, 2.5, 1.5), Vector3(0, 1.25, 0))
 					10:

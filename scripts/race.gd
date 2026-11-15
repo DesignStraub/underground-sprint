@@ -315,6 +315,9 @@ func _warmup() -> void:
 	fxm.set_shader_parameter("speed", 0.5)
 	fxw.material = fxm
 	cams[0].get_parent().add_child(fxw)
+	var pw := Track.poster_warm()  # Plakat-Stoff ebenso (seit 2.34)
+	if pw:
+		cams[0].add_child(pw)
 	var i := 0
 	while i < views.size():
 		for cam in cams:

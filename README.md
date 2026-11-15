@@ -232,6 +232,20 @@ Außenring → nächste Stadt → Autobahn. Rundkurse und Drift-Kurse sind Schle
 - Browser: der Web-Export startet, die Welt baut sich ohne Skriptfehler auf (gut 25 s). Noch offen: eine Testfahrt mit
   Bildrate im sichtbaren Browserfenster (Herausforderer, Nachladen, Verkehr).
 
+## Fake-Werbeplakate (2.34)
+- **12 ausgedachte Plakate**, trocken und kurz, keine echten Marken: Funkloch+ („Jetzt noch weniger Empfang“),
+  Glasfaser kommt („Versprochen. Seit 2009“), Döner für 3,50 € („Unvergessen“), Socken in Sandalen („Jetzt auch in
+  Carbon“), Antrag auf Antragstellung, Sonntag ist Ruhetag, Tempo 30 Grand Prix, 15:00 Uhr Kaffee und Kuchen, Zug
+  fällt aus, Spoiler („Du wirst Zweiter“), Mülltrennung, Nur Bargeld.
+- **Wo:** an jeder Bushaltestelle als City-Light (beide Seiten, verschiedene Motive), in der Stadt als Großfläche auf
+  zwei Pfosten an der Hauskante des Gehwegs (alle 160–280 m je Seite, fliegt weg wie die Haltestelle), an der Autobahn
+  über Land als große Tafel auf Masten hinter der Leitplanke, schräg zum Verkehr (alle 0,9–1,5 km je Seite, 68 in der
+  Welt). Eigener Zufall, die übrige Strecke bleibt, wie sie war (`track_builder._build_posters`).
+- **Ein Bild für alle** (`assets/posters/posters.png`, 2048 x 2048, verlustbehaftet mit Mipmaps, gut 350 KB): oben
+  Hochformat, unten Querformat (`scripts/poster_atlas.gd`). Gesetzt mit den Schriften des Spiels von
+  `tools/posters.gd` (braucht ein Fenster), Bildmotive als SVG von `tools/poster_gen.py`. Stoff: leicht hinterleuchtet
+  (Leuchtbild multipliziert, nicht addiert: sonst lag ein weißer Schleier darauf), kaum Glanz.
+
 ## Alles über das Fahrer-Level, Vinyls, Titel und Embleme (2.33)
 - **Freischalten nur noch über das Level** (`Catalog.level_rewards`, `GameState.is_*_unlocked`): Karriere-Stufen
   (`STAGES[...]["level"]`: Szene 3, Hafen und Altstadt 7, Großstadt 12, Finale 17), alle Autos (Level 2 bis 22, die
