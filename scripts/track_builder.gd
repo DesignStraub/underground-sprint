@@ -46,6 +46,9 @@ const WATER_DROP := 1.8  # Seen: so tief fällt man (Physik), gespritzt wird bei
 ## Bahnübergang auf einem Bahndamm (seit 2.24 statt einer 3,7 m hohen Rampe auf der rechten Spur): die Straße steigt
 ## über gut 25 m sanft an, liegt über den Gleisen flach und fällt wieder ab. Bei Renntempo hebt das Auto kurz ab.
 const RAIL_DAM_H := 0.85
+## Rampe am Bahnübergang (seit 2.32 wieder, je Fahrtrichtung eine auf der rechten Außenspur): wer zu spät kommt,
+## springt über den Zug statt hinter der Schranke zu warten. 3,7 m auf 13,5 m, vor dem Damm (der ist 0,85 m hoch).
+const RAIL_RAMP_H := 3.7
 const SC_HALF := 5.0
 const ALLEY_HALF := 5.0
 const SPUR_HALF := 6.0
@@ -237,7 +240,7 @@ static func begin(race: Dictionary) -> Dictionary:
 		"extra": 2.5 if type == "drift" else (AB_EXTRA if type == "autobahn" else 0.0),  # Drift breiter, Autobahn 3 Spuren je Richtung
 		"paths": [{"id": 0, "kind": "main", "curve": curve, "half_w": HALF_W, "length": length, "from": 0.0, "to": length}],
 		# Open World: Lage der Strecke in der Welt (die Strecke selbst bleibt in ihren eigenen Koordinaten)
-		"xf": race.get("xf", Transform3D.IDENTITY), "world_exit": {}, "world_exit2": {}, "tail_join": race.get("tail_join", false), "keepout": race.get("keepout", []), "world_holes": race.get("world_holes", PackedVector3Array()), "world": race.get("world", false) or type == "autobahn", "no_ground": race.get("no_ground", false),
+		"xf": race.get("xf", Transform3D.IDENTITY), "world_exit": {}, "world_exit2": {}, "tail_join": race.get("tail_join", false), "no_exit2": race.get("no_exit2", false), "keepout": race.get("keepout", []), "world_holes": race.get("world_holes", PackedVector3Array()), "world": race.get("world", false) or type == "autobahn", "no_ground": race.get("no_ground", false),
 	}
 	var weights: Dictionary = race.get("districts", {"downtown": 1.0})
 	var dd := 0.0
@@ -293,6 +296,10 @@ static func begin(race: Dictionary) -> Dictionary:
 		# Drag: vier freie Spuren geradeaus (kein Bahnübergang, keine Hochbahnstützen, kein Mittelstreifen)
 		_plan_tunnels(track, rng)
 		_plan_spurs(track, rng)
+	elif race.has("mountain"):
+		# Driftberg (seit 2.32): nur das Höhenprofil des Bergs, abgesperrt wie jeder Drift-Kurs
+		for m in race["mountain"]:
+			track["elev0"].append({"a": m[0] * length, "b": m[1] * length, "c": m[2] * length, "e": m[3] * length, "h": m[4]})
 	elif race.get("forest", false):
 		# Waldstrecke (seit 2.29): Landstraße mit Bahnübergang und Tunnel, ohne Hochbahn, Mittelstreifen und
 		# Seitenstraßen; dafür Kuppen ([Anfang, Ende als Anteil der Länge, Höhe], 170 m Anstieg)
@@ -388,6 +395,8 @@ static func step(job: Dictionary) -> float:
 			if type != "autobahn":
 				_build_spectators(root, track, rng)
 				_build_walkers(root, track)
+				if track["world"] and town_won(race.get("town", "")):
+					_build_celebration(root, track)
 			if type == "drag":
 				_drag_boards(root, track)
 			if not city.is_empty() or race.has("town"):
@@ -923,7 +932,8 @@ static func ground_path(track: Dictionary, path_id: int, d: float, lat: float, s
 		h = CURB_H  # Gehweg oder Mittelstreifen
 	for r in track["ramps"]:
 		if r["path"] == path_id and d >= r["d0"] and d <= r["d1"] and lat >= r["lat0"] and lat <= r["lat1"]:
-			var rh: float = r["h"] * (d - r["d0"]) / (r["d1"] - r["d0"])
+			var k: float = (d - r["d0"]) / (r["d1"] - r["d0"])
+			var rh: float = r["h"] * (1.0 - k if r.get("rev", false) else k)  # rev: steigt gegen die Streckenrichtung
 			if rh > h:
 				h = rh
 				on_ramp = true
@@ -1321,12 +1331,52 @@ static func _plan_world_exit(track: Dictionary) -> void:
 	for q in pts:
 		centroid += q
 	centroid /= maxf(pts.size(), 1)
+	var pick := _loop_exit_pick(track, centroid, {})
+	if pick.is_empty():
+		pick = _apex_exit(track, centroid)
+	if pick.is_empty():
+		return
+	_add_loop_exit(track, pick, "world_exit")
+	# Zweite Ausfahrt (seit 2.32): Rundkurse und Drift-Kurse waren Sackgassen mit einer Ausfahrt, man musste denselben
+	# Weg zurück. Jetzt eine zweite auf der anderen Seite der Stadt; world_layout._connect_ends verbindet sie mit dem
+	# inneren oder äußeren Ring, findet es keinen Weg, plant die Stadt ohne sie neu (race["no_exit2"]).
+	if not track["no_exit2"]:
+		var pick2 := _loop_exit_pick(track, centroid, pick)
+		if pick2.is_empty():
+			pick2 = _loop_exit_pick(track, centroid, pick, true)  # enge Kurse (Drift): mit kleinerem Abstand
+		if pick2.is_empty():
+			pick2 = _apex_exit(track, centroid, pick)  # ohne gerades Stück: an der äußersten Kurve
+		if not pick2.is_empty():
+			_add_loop_exit(track, pick2, "world_exit2")
+
+
+static func _add_loop_exit(track: Dictionary, pick: Dictionary, key: String) -> void:
+	var sc2 := Curve3D.new()
+	sc2.bake_interval = 1.0
+	sc2.add_point(pick["f"]["pos"])
+	sc2.add_point(pick["tip"])
+	track["paths"].append({"id": track["paths"].size(), "kind": "ramp", "curve": sc2, "half_w": RAMP_HALF,
+		"length": sc2.get_baked_length(), "from": pick["d"], "to": pick["d"], "closed": false, "side": 0.0})
+	track["zones"].append({"from": pick["d"] - 30.0, "to": pick["d"] + 30.0})
+	track[key] = {"end": pick["tip"], "dir": pick["out"], "d": pick["d"]}
+
+
+## Ausfahrt eines Rundkurses: gerades Stück möglichst weit außen, Seitenstraße nach außen. avoid: schon gewählte
+## Ausfahrt; dann nur Stellen ein gutes Stück weiter auf der Runde, in eine andere Richtung und weit weg davon.
+static func _loop_exit_pick(track: Dictionary, centroid: Vector3, avoid: Dictionary, loose := false) -> Dictionary:
+	var curve: Curve3D = track["curve"]
+	var L: float = track["length"]
 	var best := -1e9
 	var pick := {}
 	var d := 40.0
 	while d < L - 40.0:
+		if not avoid.is_empty() and _loop_dist(track, d, avoid["d"]) < (L * 0.15 if loose else maxf(L * 0.2, 220.0)):
+			d += 10.0
+			continue
+		# nur wo die Straße am Boden liegt (Driftberg: eine Ausfahrt am Gipfel fiel 12 m tief auf die Seitenstraße)
 		if not _in_zone(track, d, 60.0) and not _near_median(track, d - 50.0, d + 50.0) and tunnel_at(track, d, 40.0).is_empty() \
-				and (track["crossing_d"] < 0.0 or absf(d - track["crossing_d"]) > 80.0):
+				and (track["crossing_d"] < 0.0 or absf(d - track["crossing_d"]) > 80.0) \
+				and absf(elev_at(curve, d - 30.0)) + absf(elev_at(curve, d)) + absf(elev_at(curve, d + 30.0)) < 0.5:
 			var fa := frame_at(curve, d - 25.0)
 			var fb := frame_at(curve, d + 25.0)
 			if (fa["fwd"] as Vector3).angle_to(fb["fwd"]) < 0.15:
@@ -1340,22 +1390,16 @@ static func _plan_world_exit(track: Dictionary) -> void:
 					# nicht wieder auf die eigene Strecke zu (enge Rundkurse)
 					if curve.get_closest_point(tip).distance_to(tip) < hw(track, d) + WALK + EXIT_LEN - 5.0:
 						continue
+					if not avoid.is_empty():
+						# andere Seite der Stadt: Richtung deutlich anders, Ende weit von der ersten Ausfahrt
+						if out.dot(avoid["out"]) > (0.6 if loose else 0.35) or tip.distance_to(avoid["tip"]) < (140.0 if loose else 260.0):
+							continue
+						score += tip.distance_to(avoid["tip"]) * 0.03
 					if score > best:
 						best = score
 						pick = {"d": d, "f": f, "out": out, "tip": tip}
 		d += 10.0
-	if pick.is_empty():
-		pick = _apex_exit(track, centroid)
-	if pick.is_empty():
-		return
-	var sc2 := Curve3D.new()
-	sc2.bake_interval = 1.0
-	sc2.add_point(pick["f"]["pos"])
-	sc2.add_point(pick["tip"])
-	track["paths"].append({"id": track["paths"].size(), "kind": "ramp", "curve": sc2, "half_w": RAMP_HALF,
-		"length": sc2.get_baked_length(), "from": pick["d"], "to": pick["d"], "closed": false, "side": 0.0})
-	track["zones"].append({"from": pick["d"] - 30.0, "to": pick["d"] + 30.0})
-	track["world_exit"] = {"end": pick["tip"], "dir": pick["out"], "d": pick["d"]}
+	return pick
 
 
 ## Ziel liegt eingeschlossen von der eigenen Strecke (Würzburg: U-förmig, das Ende zeigt ins Innere), keine Verbindung
@@ -1434,13 +1478,13 @@ static func _plan_tail_join(track: Dictionary, f1: Dictionary) -> bool:
 ## Ausweich-Ausfahrt für verwinkelte Kurse (Stadion-Drift: Zickzack-Stern, keine Gerade hat seitlich Platz): an der
 ## äußersten Kurve gerade nach außen, weg von der Mitte. Der Strahl der Ausfahrt (samt Auffahrt dahinter) darf der
 ## übrigen Strecke nicht nahe kommen.
-static func _apex_exit(track: Dictionary, centroid: Vector3) -> Dictionary:
+static func _apex_exit(track: Dictionary, centroid: Vector3, avoid := {}) -> Dictionary:
 	var curve: Curve3D = track["curve"]
 	var L: float = track["length"]
 	var cands := []
 	var d := 0.0
 	while d < L:
-		if not _in_zone(track, d, 40.0) and tunnel_at(track, d, 40.0).is_empty():
+		if not _in_zone(track, d, 40.0) and tunnel_at(track, d, 40.0).is_empty() and absf(elev_at(curve, d)) < 0.3:
 			var p: Vector3 = frame_at(curve, d)["pos"]
 			cands.append([Vector2(p.x - centroid.x, p.z - centroid.z).length(), d])
 		d += 5.0
@@ -1455,6 +1499,9 @@ static func _apex_exit(track: Dictionary, centroid: Vector3) -> Dictionary:
 		var tip: Vector3 = f["pos"] + out * (h + WALK + EXIT_LEN)
 		if _in_river(track, tip, 10.0):
 			continue
+		if not avoid.is_empty() and (_loop_dist(track, dd, avoid["d"]) < L * 0.15 or out.dot(avoid["out"]) > 0.6 \
+				or tip.distance_to(avoid["tip"]) < 140.0):
+			continue  # zweite Ausfahrt: nicht neben der ersten
 		var clear := true
 		var s := h + WALK
 		while s < h + WALK + EXIT_LEN + 200.0 and clear:
@@ -1490,6 +1537,13 @@ static func _set_crossing(track: Dictionary, d: float) -> void:
 	track["crossing_d"] = d
 	track["zones"].append({"from": d - 80.0, "to": d + 45.0})
 	track["elev0"].append({"a": d - 32.0, "b": d - 6.0, "c": d + 6.0, "e": d + 32.0, "h": RAIL_DAM_H})
+	# 2.24 kam die Rampe raus (die Sprünge wirkten unnatürlich); ohne sie war der Zug aber eine harte Strafe für alle
+	# hinter dem Ersten. Jetzt wieder, und in beiden Richtungen (in der Welt fährt man die Straßen auch rückwärts).
+	# Rückseite ist eine Wand (_build_ramps), Verkehr meidet die Rampenspur.
+	track["ramps"].append({"path": 0, "d0": d - 23.0, "d1": d - 9.5, "lat0": 4.6, "lat1": HALF_W - 0.1, "h": RAIL_RAMP_H})
+	track["ramps"].append({"path": 0, "d0": d + 9.5, "d1": d + 23.0, "lat0": -HALF_W + 0.1, "lat1": -4.6, "h": RAIL_RAMP_H, "rev": true})
+	track["blocks"].append({"from": d - 70.0, "to": d + 5.0, "lane": LANES[3]})
+	track["blocks"].append({"from": d - 5.0, "to": d + 70.0, "lane": LANES[0]})
 
 
 ## Kreuzungen: kurze Seitenstraßen nach links und rechts (Sackgassen) mit Ampeln und Zebrastreifen
@@ -1869,23 +1923,28 @@ static func _build_barriers(root: Node3D, track: Dictionary, rng: RandomNumberGe
 	var caps := {"r": [], "w": []}
 	var tires := []
 	var bh := 1.1
-	var gap_side := ""
-	var gap_d := -1e9
-	var ex: Dictionary = track["world_exit"]
-	if not ex.is_empty():
-		gap_d = ex["d"]
-		gap_side = "r" if (frame_at(curve, gap_d)["right"] as Vector3).dot(ex["dir"]) > 0.0 else "l"
+	var gaps := []  # Lücken für die Ausfahrten in die Welt: [d, Seite]
+	for key in ["world_exit", "world_exit2"]:
+		var ex: Dictionary = track[key]
+		if not ex.is_empty():
+			gaps.append([ex["d"], "r" if (frame_at(curve, ex["d"])["right"] as Vector3).dot(ex["dir"]) > 0.0 else "l"])
 	var d := 0.0
 	var prev := {}
 	var k := 0
 	while d <= length:
 		var f := frame_at(curve, d)
 		var b := hw(track, d) + 0.4
-		var cur := {"l": f["pos"] - f["right"] * b, "r": f["pos"] + f["right"] * b, "d": d}
+		# auf Fahrbahnhöhe (Driftberg seit 2.32: bis dahin war kein Drift-Kurs erhöht, die Banden standen unten)
+		var up := Vector3(0.0, float(f["y"]), 0.0)
+		var cur := {"l": f["pos"] - f["right"] * b + up, "r": f["pos"] + f["right"] * b + up, "d": d}
 		if not prev.is_empty():
 			for sd in ["l", "r"]:
-				if sd == gap_side and _loop_dist(track, d - 1.5, gap_d) < RAMP_HALF + WALK + 2.0:
-					continue  # Lücke für die Ausfahrt in die Welt
+				var in_gap := false
+				for g in gaps:
+					if sd == g[1] and _loop_dist(track, d - 1.5, g[0]) < RAMP_HALF + WALK + 2.0:
+						in_gap = true  # Lücke für eine Ausfahrt in die Welt
+				if in_gap:
+					continue
 				_wall_uv(st, prev[sd], cur[sd], bh, 0.0, 0.0, sd == "l")
 				_wall_shape(walls, prev[sd], cur[sd])
 				var mid: Vector3 = (prev[sd] + cur[sd]) / 2.0
@@ -1894,10 +1953,14 @@ static func _build_barriers(root: Node3D, track: Dictionary, rng: RandomNumberGe
 		# Kurvenaußenseite: Reifenstapel
 		var f2 := frame_at(curve, d + 12.0)
 		var bend := (f["fwd"] as Vector3).signed_angle_to(f2["fwd"], Vector3.UP)
-		if absf(bend) > 0.12 and _loop_dist(track, d, gap_d) > RAMP_HALF + WALK + 4.0:
+		var near_gap := false
+		for g in gaps:
+			if _loop_dist(track, d, g[0]) <= RAMP_HALF + WALK + 4.0:
+				near_gap = true
+		if absf(bend) > 0.12 and not near_gap:
 			var out := -1.0 if bend > 0.0 else 1.0  # Linkskurve: außen ist rechts
 			for j in 3:
-				tires.append(Transform3D(Basis(), f["pos"] + f["right"] * out * (b - 0.6) + Vector3(0, 0.2 + j * 0.38, 0)))
+				tires.append(Transform3D(Basis(), f["pos"] + up + f["right"] * out * (b - 0.6) + Vector3(0, 0.2 + j * 0.38, 0)))
 		prev = cur
 		k += 1
 		d += 3.0
@@ -2746,19 +2809,42 @@ static func _build_ramps(root: Node3D, track: Dictionary) -> void:
 		var lat: float = (r["lat0"] + r["lat1"]) / 2.0
 		var w: float = r["lat1"] - r["lat0"]
 		var l: float = r["d1"] - r["d0"]
-		var x := xform_at(c, r["d0"], lat)
-		x.origin.y = 0.0 if r["path"] == 0 else 0.012
+		var rev: bool = r.get("rev", false)
+		# Fuß am niedrigen Ende, auf der Höhe der Straße dort (Bahndamm); der Keil steigt um den Damm mit
+		var d_lo: float = r["d1"] if rev else r["d0"]
+		var d_hi: float = r["d0"] if rev else r["d1"]
+		var x := xform_at(c, d_lo, lat)
+		if rev:
+			x.basis = x.basis.rotated(Vector3.UP, PI)
+		x.origin.y = elev_at(c, d_lo) + (0.0 if r["path"] == 0 else 0.012)
+		var top: float = r["h"] + elev_at(c, d_hi) - elev_at(c, d_lo)
 		var n := Node3D.new()
 		n.transform = x
 		root.add_child(n)
-		Builder._add(n, _wedge(w, l, r["h"]), rm, Vector3.ZERO)
+		Builder._add(n, _wedge(w, l, top), rm, Vector3.ZERO)
+		# Rückseite als Wand: wer verkehrt herum kommt, fährt nicht 3,7 m hoch, sondern prallt ab. Gut 1 m unter der
+		# Kante und knapp dahinter: das Auto ragt auf der Rampe vorn über den Fahrpunkt hinaus, eine Wand bis kurz unter
+		# die Kante hielt es noch auf der Rampe an (Nase gegen die Wand, Stillstand in der Luft).
+		var back := StaticBody3D.new()
+		back.name = "WallsRamp"
+		var sh := ConcavePolygonShape3D.new()
+		sh.backface_collision = true
+		var y0 := -0.6
+		var y1 := top - 1.2
+		var zb := -l - 0.4
+		sh.set_faces(PackedVector3Array([Vector3(-w / 2.0, y0, zb), Vector3(w / 2.0, y0, zb), Vector3(w / 2.0, y1, zb),
+			Vector3(-w / 2.0, y0, zb), Vector3(w / 2.0, y1, zb), Vector3(-w / 2.0, y1, zb)]))
+		var cs := CollisionShape3D.new()
+		cs.shape = sh
+		back.add_child(cs)
+		n.add_child(back)
 		for s in [-1.0, 1.0]:
-			Builder._add(n, Builder.box(Vector3(0.15, 0.15, 0.15)), lamp, Vector3(s * w / 2.0, r["h"] + 0.08, -l))
+			Builder._add(n, Builder.box(Vector3(0.15, 0.15, 0.15)), lamp, Vector3(s * w / 2.0, top + 0.08, -l))
 		# Stützen unter der Abrisskante; ohne Kollision, ihre Box reichte bis an die Kante und stoppte jeden, der
 		# am Rand der Rampe absprang
 		for s in [-1.0, 1.0]:
-			Builder._add(n, Builder.box(Vector3(0.12, r["h"], 0.12)), Builder.mat(Color(0.1, 0.1, 0.1), 0.6, 0.4),
-				Vector3(s * (w / 2.0 - 0.2), r["h"] / 2.0, -l - 0.1)).set_meta("no_collide", true)
+			Builder._add(n, Builder.box(Vector3(0.12, top, 0.12)), Builder.mat(Color(0.1, 0.1, 0.1), 0.6, 0.4),
+				Vector3(s * (w / 2.0 - 0.2), top / 2.0, -l - 0.1)).set_meta("no_collide", true)
 
 
 # --- Wahrzeichen -------------------------------------------------------------
@@ -5179,6 +5265,75 @@ static func _build_props(root: Node3D, track: Dictionary, rng: RandomNumberGener
 
 ## Zuschauer (Figuren aus people.gd, im Shader bewegt): jubeln, winken, filmen mit dem Handy. people.gd teilt sie in
 ## kleine Zellen (nah detailliert, fern als Blockfigur); ab ~220 m ausgeblendet.
+## Alle Rennen einer Stadt gewonnen (seit 2.32): in der Welt jubelt die Stadt. Am Ziel (Rundkurs: an der Start-Ziel-
+## Linie) stehen auf beiden Gehwegen dichte Reihen jubelnder Leute, dazu entlang der Hauptstraße alle 140 m eine kleine
+## Gruppe. Leute sind ein MultiMesh je Gruppe (People.crowd), das kostet kaum Bildrate.
+static func town_won(town: String) -> bool:
+	if town == "":
+		return false
+	var any := false
+	for r in load("res://scripts/catalog.gd").RACES:  # zur Laufzeit geladen: kein Vorladen im Kreis
+		if r.get("town", "") == town and r.get("type", "sprint") != "drag":
+			any = true
+			if not r["name"] in GameState.won_events:
+				return false
+	return any
+
+
+static func _build_celebration(root: Node3D, track: Dictionary) -> void:
+	var c: Curve3D = track["curve"]
+	var L: float = track["length"]
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7171
+	var d_fin: float = track["start"] if track["loop"] else clampf(track["finish"], 30.0, L - 30.0)
+	var spots := []
+	var ok := func(d: float, pos: Vector3) -> bool:
+		return tunnel_at(track, d, 3.0).is_empty() and bridge_at(track, d).is_empty() and _branch_clearance(track, pos) > 2.0
+	# am Ziel: zwei Reihen je Seite, gut 45 m lang
+	var d := d_fin - 22.0
+	while d < d_fin + 22.0:
+		if d > 2.0 and d < L - 2.0:
+			var f := frame_at(c, d)
+			for side in [-1.0, 1.0]:
+				for row in [1.0, 2.3]:
+					var q: Vector3 = f["pos"] + f["right"] * side * (hw(track, d) + row + rng.randf_range(-0.25, 0.25))
+					if ok.call(d, q):
+						q.y = CURB_H + _lift(track, d)
+						var face := Basis.looking_at(-f["right"] * side, Vector3.UP).rotated(Vector3.UP, rng.randf_range(-0.6, 0.6))
+						spots.append(Transform3D(face, q))
+		d += rng.randf_range(1.1, 1.7)
+	# entlang der Hauptstraße: kleine Gruppen, abwechselnd links und rechts
+	var k := 0
+	d = 60.0
+	while d < L - 60.0:
+		if absf(d - d_fin) > 40.0:
+			var side := 1.0 if k % 2 == 0 else -1.0
+			for i in rng.randi_range(4, 7):
+				var dd := d + rng.randf_range(-3.0, 3.0)
+				var f2 := frame_at(c, dd)
+				var q2: Vector3 = f2["pos"] + f2["right"] * side * (hw(track, dd) + rng.randf_range(0.9, 2.4))
+				if ok.call(dd, q2):
+					q2.y = CURB_H + _lift(track, dd)
+					spots.append(Transform3D(Basis.looking_at(-f2["right"] * side, Vector3.UP).rotated(Vector3.UP, rng.randf_range(-0.7, 0.7)), q2))
+			k += 1
+		d += 140.0
+	if OS.get_cmdline_user_args().has("--worldlog"):
+		var fw: Dictionary = frame_at(c, d_fin - 45.0)
+		var wp: Vector3 = (track["xf"] as Transform3D) * (fw["pos"] as Vector3)
+		var wf: Vector3 = (track["xf"] as Transform3D).basis * (fw["fwd"] as Vector3)
+		print("JUBEL %d Leute, Ziel bei d=%.0f von %.0f; 45 m davor: xy:%.0f:%.0f:%.0f" % [spots.size(), d_fin, L, wp.x, wp.z,
+			rad_to_deg(atan2(wf.x, -wf.z))])
+	if spots.is_empty():
+		return
+	People.crowd(root, spots, [People.CHEER, People.CHEER, People.WAVE, People.CLAP, People.DANCE, People.CHEER], rng, 260.0)
+	var snd := AmbientSound.new()
+	snd.sound = "crowd"
+	snd.radius = 220.0
+	snd.base_db = -10.0
+	snd.position = frame_at(c, d_fin)["pos"]
+	root.add_child(snd)
+
+
 static func _build_spectators(root: Node3D, track: Dictionary, rng: RandomNumberGenerator) -> void:
 	var chunks := {}
 	for e in track["spectators"]:

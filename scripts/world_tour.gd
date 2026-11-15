@@ -85,6 +85,11 @@ func _plan() -> void:
 			legs.append({"e": e, "find": func(tr): return _city_path(tr, "exit"), "rev": true, "name": nm + ": Ausfahrt"})
 			legs.append({"e": e, "find": func(_tr): return 0, "rev": false, "name": nm + ": Runde", "loop": true})
 			legs.append({"e": e, "find": func(tr): return _city_path(tr, "exit"), "rev": false, "name": nm + ": hinaus"})
+			# zweite Ausfahrt (seit 2.32) und ihre Verbindung zum Ring
+			legs.append({"e": e, "find": func(tr): return _city_path(tr, "exit2"), "rev": false, "name": nm + ": zweite Ausfahrt", "optional": true})
+			var seg3 := _seg_with_ramp(town, true)
+			if not seg3.is_empty():
+				legs.append({"e": seg3, "find": _ramp_finder(town, true), "rev": true, "name": nm + ": Verbindung"})
 		for k in 24:  # Abkürzungen, Gabelungen, Nebenstraßen und Durchfahrten (Kreuzberg hat gut 20)
 			legs.append({"e": e, "find": func(tr): return _city_path(tr, "branch%d" % k), "rev": false, "name": nm + ": Abzweig %d" % k,
 				"optional": true})
@@ -122,6 +127,7 @@ func _ramp_finder(town: String, conn: bool) -> Callable:
 func _city_path(tr: Dictionary, what: String) -> int:
 	var L: float = tr["length"]
 	var bi := 0
+	var found_exit := false
 	for p in tr["paths"]:
 		if p["id"] == 0:
 			continue
@@ -132,6 +138,10 @@ func _city_path(tr: Dictionary, what: String) -> int:
 			return p["id"]
 		if what == "exit" and k == "ramp" and not p.get("tail", false):
 			return p["id"]
+		if what == "exit2" and k == "ramp" and not p.get("tail", false):
+			if found_exit:
+				return p["id"]  # zweite Ausfahrt eines Rundkurses
+			found_exit = true
 		if what.begins_with("branch") and k != "ramp" and k != "spur":
 			if what == "branch%d" % bi:
 				return p["id"]

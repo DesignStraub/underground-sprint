@@ -475,7 +475,7 @@ func _process(dt: float) -> void:
 	cam.position = _cam_pos
 	cam.look_at(_cam_look)
 	_work_light.light_energy = lerpf(_work_light.light_energy, 0.0 if _cam_view == "" else 1.4, k)
-	status.text = tr("RENNSIEGE %d   ·   DRIFTSIEGE %d   ·   %s") % [GameState.wins, GameState.drift_wins, Catalog.CARS[GameState.current_car]["name"].to_upper()]
+	status.text = tr("LEVEL %d   ·   RENNSIEGE %d   ·   DRIFTSIEGE %d   ·   %s") % [GameState.level(), GameState.wins, GameState.drift_wins, Catalog.CARS[GameState.current_car]["name"].to_upper()]
 
 
 func _show_car(car_id: String, cfg: Dictionary) -> void:

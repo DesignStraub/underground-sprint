@@ -7,6 +7,13 @@ const LANGS := ["en", "de"]
 const NAMES := {"en": "English", "de": "Deutsch"}
 
 const EN := {
+	# --- Fahrer-Level, Driften in der Welt, neue Autos (2.32) ---
+	"Drift-Berg im Harz: Kehre um Kehre den Berg hinauf und wieder hinunter, zwischen Tannen und Leitplanken. Ketten über den Gipfel geben am meisten.": "Drift mountain in the Harz: hairpin after hairpin up the mountain and back down, between pines and guard rails. Chains over the summit score the most.",
+	"LEVEL %d": "LEVEL %d", "Fahrer-Level %d": "driver level %d", "KETTE VERLOREN": "CHAIN LOST", "DRIFT  %d": "DRIFT  %d",
+	"Erfahrung +%d XP   ·   LEVEL %d  (%d / %d)": "Experience +%d XP   ·   LEVEL %d  (%d / %d)",
+	"LEVEL %d   ·   RENNSIEGE %d   ·   DRIFTSIEGE %d   ·   %s": "LEVEL %d   ·   RACE WINS %d   ·   DRIFT WINS %d   ·   %s",
+	"Allrad-GT mit Biturbo-V6, für die Autobahn gebaut. Das höchste Endtempo im Spiel, klebt in jeder Kurve.": "All-wheel-drive GT with a twin-turbo V6, built for the autobahn. Highest top speed in the game, glued to every corner.",
+	"Drift-Monster mit Heckantrieb und hochgedrehtem Reihensechser. Brutaler Antritt, das Heck kommt auf Ansage.": "Rear-wheel-drive drift monster with a high-revving straight six. Brutal launch, the tail steps out on command.",
 	# --- Menü ---
 	"Rennen fahren": "Race", "Losfahren": "Drive", "gewonnen": "won", "offen": "open", "gesperrt": "locked", "Rennen hier:": "Races here:",
 	"←/→ Rennen wählen\nEnter: als Ziel setzen (Flagge auf der Minikarte)\nLeertaste: Schnellreise\nM / Esc: zurück": "←/→ Pick race\nEnter: set as target (flag on the minimap)\nSpace: fast travel\nM / Esc: back",

@@ -30,7 +30,7 @@ const CAR_BANK := {
 	"raijin": ["boxer", 1.0],
 	"kumo": ["i6", 1.0], "vortex": ["f6", 0.96], "kaze": ["f6", 1.04], "kaido": ["i6", 0.94], "hakone": ["i6", 1.05],
 	"ryujin": ["f6", 0.9], "shiden": ["f6", 0.86], "falke": ["f6", 1.0],
-	"ronin": ["wankel", 1.0], "kagura": ["v10", 1.0], "furia": ["v12", 1.0],
+	"ronin": ["wankel", 1.0], "kagura": ["v10", 1.0], "furia": ["v12", 1.0], "raiden": ["f6", 1.12], "tengu": ["i6", 1.14],
 }
 
 var bus := "Master":

@@ -64,6 +64,9 @@ var _last_rollovers := 0
 ## Nitro ein wenig auf. Jede Zeile blendet nach ein paar Sekunden aus.
 var _feed: VBoxContainer
 var _style_chain := 0.0  # laufender Drift im Rennen (Punkte, noch nicht gutgeschrieben)
+var _race_xp := 0  # Stilpunkte dieses Rennens (seit 2.32: werden am Ziel zu Fahrer-Erfahrung)
+var _xp_gain := 0
+var _xp_lines := []
 var _style_idle := 0.0
 var _style_crashes := 0
 var _style_walls := 0
@@ -170,7 +173,9 @@ func _ready() -> void:
 	var tier: int = race.get("tier", 1)
 	var diff: int = GameState.difficulty
 	var difficulty: float = [0.0, 0.84, 0.88, 0.92][tier] + [-0.11, 0.0, 0.05][diff] + minf(GameState.total_wins(), 10) * 0.004
-	var pool: Array = Catalog.CAR_ORDER.filter(func(id): return Catalog.CARS[id]["top_speed"] <= [0.0, 61.0, 70.0, 99.0][mini(tier + (1 if diff == 2 else 0), 3)])
+	# Level-Autos fahren nicht als Gegner (die bleiben etwas Besonderes)
+	var pool: Array = Catalog.CAR_ORDER.filter(func(id): return Catalog.CARS[id]["top_speed"] <= [0.0, 61.0, 70.0, 99.0][mini(tier + (1 if diff == 2 else 0), 3)] \
+		and not Catalog.CARS[id]["unlock"].has("level"))
 	if event_type == "drift":
 		# Drift: allein, Zielpunkte je nach Stufe, Schwierigkeit und Zahl der Kurven
 		drift_targets = Catalog.drift_targets(race, diff)
@@ -1303,6 +1308,11 @@ func _on_player_finished() -> void:
 			elif not was_open:
 				var left: int = Catalog.stage_need(stage) - GameState.stage_wins(stage)
 				unlocked.push_front(tr("Noch %d Sieg bis Stufe %d" if left == 1 else "Noch %d Siege bis Stufe %d") % [left, nxt + 1])
+	# Fahrer-Erfahrung (seit 2.32): Stilpunkte des Rennens (im Drift-Event die Driftpunkte) plus Platz, je Stufe mehr
+	var tier: int = race.get("tier", 1)
+	var place_xp: int = [200, 1500, 700, 400][place if place <= 3 else 0]
+	_xp_gain = _race_xp + (int(drift_score) if event_type == "drift" else 0) + place_xp * (tier + 1) / 2
+	_xp_lines = GameState.add_xp(_xp_gain, false)
 	var key: String = race["name"]
 	var best: float = GameState.best_times.get(key, 0.0)
 	var new_best: bool
@@ -1347,6 +1357,15 @@ func _show_result(place: int, new_best: bool, unlocked: Array, dnf := "") -> voi
 		t.text = tr("Punkte  %d%s") % [int(drift_score), tr("   NEUER REKORD") if new_best else ""]
 		var tg := _label(vb, 10, HORIZONTAL_ALIGNMENT_CENTER)
 		tg.text = tr("Platz 3: %d   Platz 2: %d   Platz 1: %d") % drift_targets
+	if _xp_gain > 0 and dnf == "":
+		var li := GameState.level_info()
+		var xl := _label(vb, 11, HORIZONTAL_ALIGNMENT_CENTER)
+		xl.text = tr("Erfahrung +%d XP   ·   LEVEL %d  (%d / %d)") % [_xp_gain, li["level"], li["into"], li["need"]]
+		xl.modulate = Color(0.55, 0.9, 1.0)
+		if not _xp_lines.is_empty():
+			var lu := _label(vb, 13, HORIZONTAL_ALIGNMENT_CENTER)
+			lu.text = "\n".join(_xp_lines)
+			lu.modulate = Color(0.4, 1.0, 0.55)
 	if place == 1:
 		var w := _label(vb, 11, HORIZONTAL_ALIGNMENT_CENTER)
 		w.text = (tr("Driftsiege gesamt: %d") % GameState.drift_wins) if event_type == "drift" else (tr("Rennsiege gesamt: %d") % GameState.wins)
@@ -1485,6 +1504,8 @@ func _flash(text: String, col: Color, pts := 0) -> void:
 		var old := _feed.get_child(0)
 		_feed.remove_child(old)
 		old.queue_free()
+	if pts > 0:
+		_race_xp += pts
 	if pts > 0 and event_type != "drift":
 		player.nitro = minf(player.nitro + minf(pts / 4000.0, 0.12) / player.nitro_cap, 1.0)
 

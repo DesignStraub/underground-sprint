@@ -194,6 +194,20 @@ const SHAPES := {
 		"doors": [0.33, 0.6], "intake": Vector2(0.74, 0.12), "pipes": [-0.075, 0.075], "pipe_r": 0.058, "mid": true,
 		"wheel_r": 0.345, "axle": 1.0, "tire_w": 0.3,
 	},
+	"raiden": {  # Allrad-GT (seit 2.32, Level 10): langes, flaches Coupé, Kabine in der Mitte, breite Hüften, vier Endrohre
+		"nose": 0.53, "hood": 0.77, "cowl": 0.39, "rf": 0.52, "rr": 0.6, "ge": 0.8, "cp": 0.71,
+		"roof": 1.18, "deck": 0.99, "tail": 0.98, "belt": 0.82, "fender": 0.055, "hips": 0.1,
+		"round_f": 0.12, "round_r": 0.06, "tumble": 0.27, "hl": {6: 0.1}, "tl": {},
+		"doors": [0.38, 0.64], "intake": Vector2(0.66, 0.12), "pipes": [-0.12, -0.075, 0.075, 0.12], "pipe_r": 0.04,
+		"wheel_r": 0.34, "axle": 0.95, "tire_w": 0.29,
+	},
+	"tengu": {  # Drift-Monster (seit 2.32, Level 16): kurzer Überhang hinten, breite Backen, großes Mittelrohr
+		"nose": 0.55, "hood": 0.79, "cowl": 0.41, "rf": 0.53, "rr": 0.62, "ge": 0.84, "cp": 0.72,
+		"roof": 1.2, "deck": 0.97, "tail": 0.96, "belt": 0.83, "fender": 0.075, "hips": 0.115,
+		"round_f": 0.15, "round_r": 0.08, "tumble": 0.24, "hl": {6: 0.1}, "tl": {},
+		"doors": [0.4, 0.66], "intake": Vector2(0.6, 0.13), "pipes": [0.0], "pipe_r": 0.065,
+		"wheel_r": 0.335, "axle": 0.9, "tire_w": 0.3,
+	},
 }
 
 

@@ -199,11 +199,28 @@ const CARS := {
 		# V12-Sauger: dicht, seidig, laut
 		"sound": {"cyl": 12, "harm": [1.0, 0.4, 0.3, 0.2], "sub": 0.06, "turbo": 0.0, "rough": 0.06},
 	},
+	# --- Nur über das Fahrer-Level (seit 2.32): schneller als alles, was man mit Siegen bekommt ---
+	"raiden": {
+		"drive": "awd", "name": "Raiden Zero", "style": "coupe", "class": "S", "unlock": {"level": 10}, "drift": 0.4, "paint": Color(0.06, 0.16, 0.5), "finish": "metal",
+		"length": 4.65, "width": 1.98,
+		"accel": 13.9, "top_speed": 79.0, "grip": 31.0, "steer": 2.2,
+		"desc": "Allrad-GT mit Biturbo-V6, für die Autobahn gebaut. Das höchste Endtempo im Spiel, klebt in jeder Kurve.",
+		# Biturbo-V6: rau, mit viel Turbo
+		"sound": {"cyl": 6, "harm": [1.0, 0.44, 0.36, 0.2], "sub": 0.2, "turbo": 0.6, "rough": 0.18},
+	},
+	"tengu": {
+		"drive": "rwd", "name": "Tengu RS", "style": "coupe", "class": "S", "unlock": {"level": 16}, "drift": 0.9, "paint": Color(0.95, 0.42, 0.04), "finish": "pearl",
+		"length": 4.45, "width": 1.95,
+		"accel": 14.4, "top_speed": 77.0, "grip": 28.0, "steer": 2.5,
+		"desc": "Drift-Monster mit Heckantrieb und hochgedrehtem Reihensechser. Brutaler Antritt, das Heck kommt auf Ansage.",
+		# hochdrehender Reihensechser mit großem Lader
+		"sound": {"cyl": 6, "harm": [1.0, 0.55, 0.42, 0.24], "sub": 0.2, "turbo": 0.5, "rough": 0.22},
+	},
 }
 
 ## Reihenfolge in der Garage = Reihenfolge des Freischaltens
 const CAR_ORDER := ["kaizen", "chibi", "hachi", "hotaru", "sakura", "kaido", "hayate", "kitsune", "tsubame", "hakone",
-	"mirai", "tanuki", "tenshi", "kumo", "raijin", "vortex", "ronin", "shiden", "ryujin", "kaze", "kagura", "falke", "furia"]
+	"mirai", "tanuki", "tenshi", "kumo", "raijin", "vortex", "ronin", "shiden", "ryujin", "kaze", "kagura", "falke", "furia", "raiden", "tengu"]
 ## Bis Version 2.10 galten andere Schwellen: wer damit schon ein Auto freigeschaltet hatte, behält es
 const LEGACY_UNLOCK := {"hachi": {"race": 1, "drift": 1}, "mirai": {"race": 2, "drift": 1}, "sakura": {"drift": 1},
 	"tsubame": {"race": 3}, "vortex": {"race": 5}, "raijin": {"race": 7}, "ronin": {"drift": 3}, "kaze": {"race": 9, "drift": 4}}
@@ -234,6 +251,8 @@ const FACTORY_RIMS := {
 	"kagura": ["ten", 10, Color(0.24, 0.25, 0.27), 20, 5],
 	"falke": ["clover", 5, Color(0.84, 0.85, 0.87), 18, 5],
 	"furia": ["holes", 5, Color(0.72, 0.6, 0.32), 19, 5],
+	"raiden": ["te", 6, Color(0.1, 0.1, 0.11), 20, 5],
+	"tengu": ["concave", 5, Color(0.86, 0.68, 0.2), 19, 5],
 }
 
 ## Jede Kategorie: Liste von Optionen {name, wins, ...}. Neue Optionen kommen hinten dazu, damit die Nummern im
@@ -625,6 +644,16 @@ const RACES := [
 		"crests": [[0.12, 0.3, 8.0], [0.42, 0.58, 6.0], [0.68, 0.88, 10.0]],
 		"districts": {"wald": 1.0},
 		"desc": "Landstraße durch den Schwarzwald: enge Kurven zwischen Tannen, Kuppen mit Sprung, ein Bahnübergang. Nachts nur Scheinwerfer und Leitpfosten."},
+	# Driftberg (seit 2.32): Drift-Kurs im Wald über zwei Gipfel (je gut 12 m), viele Kehren. Dazwischen und am Start
+	# liegt die Straße am Boden: nur dort gehen die beiden Ausfahrten ab.
+	# Außerhalb der Karriere, immer offen ("free"); in der Welt mit zwei Ausfahrten zum Durchfahren.
+	# mountain: Höhenprofil [Anfang, oben ab, oben bis, Ende (Anteile der Länge), Höhe], aufeinander gestapelt
+	{"name": "Driftberg", "town": "Harz", "region": "Landkreis Goslar", "geo": Vector2(51.80, 10.62),
+		"mood": "nebel", "type": "drift", "tier": 2, "laps": 2, "seed": 1207, "corners": 16, "radius": 200.0, "free": true,
+		"forest": true, "mountain": [[0.05, 0.15, 0.28, 0.4, 7.0], [0.09, 0.18, 0.25, 0.36, 5.0],
+			[0.56, 0.66, 0.79, 0.91, 7.0], [0.6, 0.69, 0.76, 0.87, 5.0]],
+		"bulges": {}, "districts": {"wald": 1.0},
+		"desc": "Drift-Berg im Harz: Kehre um Kehre den Berg hinauf und wieder hinunter, zwischen Tannen und Leitplanken. Ketten über den Gipfel geben am meisten."},
 ]
 
 const EVENT_TYPES := {

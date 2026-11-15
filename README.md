@@ -232,6 +232,40 @@ Außenring → nächste Stadt → Autobahn. Rundkurse und Drift-Kurse sind Schle
 - Browser: der Web-Export startet, die Welt baut sich ohne Skriptfehler auf (gut 25 s). Noch offen: eine Testfahrt mit
   Bildrate im sichtbaren Browserfenster (Herausforderer, Nachladen, Verkehr).
 
+## Fahrer-Level, Driften in der Welt, Driftberg (2.32)
+- **Fahrer-Level wie im Rollenspiel** (`GameState.add_xp`, `level_info`): Stilpunkte sind Erfahrung. In der Welt zählt
+  alles, was Punkte gibt (`world._flash`): knapp vorbei, Drift-Ketten, Sprünge, gewonnene Duelle. Im Rennen werden die
+  Stilpunkte des Rennens (im Drift-Event die Driftpunkte) am Ziel gutgeschrieben, dazu der Platz (Sieg 1500, Zweiter
+  700, Dritter 400, sonst 200, je Stufe mehr). Jedes Level braucht etwas mehr: 1000 XP für Level 2, gut 3500 für
+  Level 7, knapp 10 000 für Level 11 (`xp_need`: 1000 + 450·(L−1)^1,35). Oben links in der Welt: Level, Balken, XP;
+  beim Aufstieg groß in der Mitte, was es freischaltet. Ergebnis im Rennen: „Erfahrung +… XP · LEVEL …“; Garage oben:
+  Level vor den Siegen. Alte Spielstände bekommen 1200 XP je Sieg und 600 je Duell als Start. Gespeichert wird in der
+  Welt gesammelt (alle 15 s und beim Verlassen), nicht bei jedem Punkt.
+- **Zwei Autos nur über das Level:** Raiden Zero (Level 10, Allrad-GT mit Biturbo-V6, 79 m/s Endtempo, das höchste im
+  Spiel) und Tengu RS (Level 16, Drift-Monster mit Heckantrieb, stärkster Antritt). Sie fahren nicht als Gegner oder
+  Herausforderer mit (`unlock: {"level": …}`).
+- **Driften in der freien Fahrt** (`world._update_world_drift`): Punkte wie im Rennen (Winkel × Tempo), gutgeschrieben,
+  wenn der Drift sauber zu Ende ist. Drifts mit weniger als knapp 1 s Pause bilden eine Kette, je 3 s Driftzeit +1 auf
+  den Multiplikator (bis x5); unten in der Mitte läuft die Kette mit. Wand oder Crash: „KETTE VERLOREN“. Sprünge ab
+  0,6 s Flugzeit geben Punkte. Q schaltet weiter zwischen Fahr- und Drift-Modus.
+- **Keine Sackgassen mehr:** auch Rundkurse und Drift-Kurse haben jetzt eine zweite Ausfahrt auf der anderen Seite der
+  Stadt (`track_builder._loop_exit_pick` mit Abstand zur ersten, bei engen Kursen lockerer, sonst an der äußersten
+  Kurve), die `_connect_ends` mit dem inneren oder äußeren Ring verbindet; findet es keinen Weg, entfällt sie
+  (`race["no_exit2"]`). Alle 19 Städte haben damit zwei Wege hinein und hinaus (Würzburg wie bisher zurück auf die
+  eigene Strecke). Drift-Banden haben an beiden Ausfahrten eine Lücke.
+- **Driftberg** (Harz, Drift-Event außerhalb der Karriere, immer offen, `"free": true`): Wald-Kurs mit 16 Kehren, der
+  auf einen Berg hinauf und wieder hinunter führt (`"mountain"`: gestapeltes Höhenprofil, Gipfel gut 12 m). Banden
+  stehen auf Fahrbahnhöhe (bis 2.31 war kein Drift-Kurs erhöht). In der Welt mit zwei Ausfahrten.
+- **Jubel nach der Stadt:** sind alle Rennen einer Stadt gewonnen, stehen am Ziel (Rundkurs: Start-Ziel-Linie) auf
+  beiden Gehwegen dichte Reihen jubelnder Leute, entlang der Hauptstraße alle 140 m eine Gruppe, dazu Jubel als
+  Geräusch (`Track._build_celebration`, People.crowd: ein MultiMesh je Gruppe, kostet kaum Bildrate).
+- **Bahnübergang:** wieder Rampen (3,7 m auf 13,5 m), je Fahrtrichtung eine auf der rechten Außenspur; man fliegt in
+  gut 6 m Höhe über die Gleise, der Zug passt darunter. Die Rückseite ist eine Wand (wer verkehrt kommt, prallt ab,
+  statt 3,7 m hochgesetzt zu werden), Verkehr meidet die Rampenspur. Leiser: Horn nur bis 420 m und −3 dB statt
+  +5 dB, Rollen und Glocke quadratisch abfallend und leiser.
+- **Schnellreise** auf der großen Karte geht: Leertaste steckt in Godots `ui_accept` mit drin und schaltete vorher nur das
+  Ziel um. Beim Fahren startet die Leertaste (Handbremse) auch kein Rennen und kein Duell mehr, das macht nur Enter.
+
 ## Landschaft und Deutschland-Gefühl (2.29)
 Zwischen Städten und Autobahnen lag bis 2.28 eine leere graue Fläche, jeder Kilometer Autobahn war von Hochhäusern
 gesäumt. Seit 2.29:

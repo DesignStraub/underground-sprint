@@ -46,6 +46,8 @@ static func build() -> Dictionary:
 		var job := Track.begin(world_race(i))
 		var tr: Dictionary = job["track"]
 		(job["root"] as Node).free()
+		if OS.get_cmdline_user_args().has("--crosslog"):
+			print("CROSS %-28s crossing_d=%.0f L=%.0f" % [Catalog.RACES[i]["name"], tr["crossing_d"], tr["length"]])
 		var ex: Dictionary = tr["world_exit"]
 		if ex.is_empty():
 			push_warning("Welt: Strecke %d ohne Ausfahrt" % i)
@@ -170,7 +172,10 @@ static func build() -> Dictionary:
 	var spokes := _plan_spokes(cities, ring, oring, ramps, oramps)
 	for c in cities:
 		if not (c["exit2_local"] as Dictionary).is_empty() and not c.has("exit2_ring"):
-			c["race"]["tail_join"] = true  # Ziel eingeschlossen: die Straße dahinter führt zurück auf die Strecke
+			if Catalog.RACES[c["race_index"]]["type"] in ["circuit", "drift"]:
+				c["race"]["no_exit2"] = true  # Rundkurs: zweite Ausfahrt ohne Weg zum Ring, dann gibt es sie nicht
+			else:
+				c["race"]["tail_join"] = true  # Ziel eingeschlossen: die Straße dahinter führt zurück auf die Strecke
 	var segments := _split(ring, ramps, 9000, 0)
 	var osegs := _split(oring, oramps, 9500, 1)
 	segments.append_array(osegs)
@@ -243,8 +248,8 @@ static func build() -> Dictionary:
 			olen / 1000.0, cities.size(), segments.size(), Time.get_ticks_msec() - t0])
 		for c in cities:
 			if not c["exit2_local"].is_empty():
-				print("  Ziel-Ausfahrt %-26s -> %s" % [Catalog.RACES[c["race_index"]]["name"],
-					["innerer Ring", "Außenring"][c["exit2_ring"]] if c.has("exit2_ring") else "zurück auf die eigene Strecke"])
+				print("  zweite Ausfahrt %-24s -> %s" % [Catalog.RACES[c["race_index"]]["name"],
+					["innerer Ring", "Außenring"][c["exit2_ring"]] if c.has("exit2_ring") else ("entfällt (kein Weg)" if c["race"].get("no_exit2", false) else "zurück auf die eigene Strecke")])
 		for c in cities:
 			print("  %-28s phi=%.2f gap=%.0f breite=%.0f tiefe=%.0f" % [Catalog.RACES[c["race_index"]]["name"], c["phi_w"], c["gap"],
 				c["lat1"] - c["lat0"], c["far"]])
@@ -799,7 +804,7 @@ static func _near_ramp(ramp_k: Dictionary, k: int, m: int, w: int) -> bool:
 ## Nachbarstädte) als Kreise in ihren eigenen Koordinaten (race["keepout"]); der Streckenbau stellt dort keine Häuser
 ## hin (track_builder Schritt 2: wie belegte Flächen). Sonst ragen Häuser aus echten Stadtplänen auf die Autobahn.
 static func _add_keepout(cities: Array, ring: Array, ramps: Array, oring: Array, osegs: Array) -> void:
-	var ring_r: float = Track.HALF_W + Track.AB_EXTRA + Track.MED + Track.WALK + 3.0
+	var ring_r: float = Track.HALF_W + Track.AB_EXTRA + Track.MED + Track.WALK + 5.0  # 2.32: +2 m (Bad Kissingen stand knapp drauf)
 	var lines := []  # [Weltpunkte, Radius, Stadt (eigene Straßen auslassen) oder -1]
 	var rl := []
 	for q in ring:

@@ -83,6 +83,9 @@ var world_menu := ""  # Open World > Esc > Tuning/Autohaus: Garage öffnet dort,
 var in_world := false  # Rennen aus der Open World gestartet: danach zurück in die Welt (nicht gespeichert)
 var best_times := {}  # Rennname -> Sekunden
 var outruns := 0  # Open World: abgehängte Herausforderer (Duelle auf der Autobahn)
+var xp := 0  # Fahrer-Erfahrung (seit 2.32): Stilpunkte aus Driften, knapp vorbei, Sprüngen, Duellen und Rennen
+var xp_dirty := false  # XP seit dem letzten Speichern (die Welt speichert gesammelt, nicht bei jedem Punkt)
+signal level_up(lvl: int, lines: Array)
 var won_events: Array = []  # gewonnene Events (Karriere: genug Siege in einer Stufe öffnen die nächste)
 var test_cfg := {}  # --cfg (nur Tests)
 var tuning := {}  # Leistungsteile: category -> option_index, für alle Autos gemeinsam
@@ -352,6 +355,9 @@ func stage_open(s: int) -> bool:
 
 ## Karriere-Event frei: seine Stufe ist offen, oder es war nach der alten Kette (bis 2.15) schon offen
 func career_open(event_name: String) -> bool:
+	var ri := Catalog.race_index(event_name)
+	if ri >= 0 and Catalog.RACES[ri].get("free", false):
+		return true  # außerhalb der Karriere, immer offen (Driftberg)
 	var s := Catalog.stage_of(event_name)
 	if s >= 0 and stage_open(s):
 		return true
@@ -434,13 +440,58 @@ func pace() -> float:
 	return 0.72 + 0.28 * clampf(total_wins() / 20.0, 0.0, 1.0)
 
 
+# --- Fahrer-Level (seit 2.32) ------------------------------------------------
+## Wie in einem Rollenspiel: Stilpunkte (Driften, knapp vorbei, Sprünge, Duelle, Rennen) sind Erfahrung, jedes Level
+## braucht etwas mehr als das vorige: 1000 XP für Level 2, gut 3500 für Level 7, knapp 10 000 für Level 11, gut 27 000
+## für Level 21. Kein oberes Ende (bis 99). Manche Autos gibt es nur über das Level (Catalog.CARS unlock "level").
+static func xp_need(lvl: int) -> int:
+	return int(round((1000.0 + 450.0 * pow(float(maxi(lvl - 1, 0)), 1.35)) / 50.0)) * 50
+
+
+## {level, into (XP im aktuellen Level), need (XP für das nächste)}
+func level_info(total := -1) -> Dictionary:
+	var rest := xp if total < 0 else total
+	var lvl := 1
+	while lvl < 99 and rest >= xp_need(lvl):
+		rest -= xp_need(lvl)
+		lvl += 1
+	return {"level": lvl, "into": rest, "need": xp_need(lvl)}
+
+
+func level() -> int:
+	return level_info()["level"]
+
+
+## XP gutschreiben. Liefert für jedes neue Level eine Zeile und was es freischaltet; meldet es auch über level_up.
+## save: sofort speichern (Rennen); die Welt sammelt (xp_dirty) und speichert alle paar Sekunden.
+func add_xp(n: int, save := true) -> Array:
+	if n <= 0:
+		return []
+	var l0 := level()
+	xp += n
+	xp_dirty = true
+	var l1 := level()
+	var lines := []
+	for l in range(l0 + 1, l1 + 1):
+		lines.append(tr("LEVEL %d") % l)
+		for car_id in Catalog.CAR_ORDER:
+			if int(Catalog.CARS[car_id]["unlock"].get("level", 0)) == l and not car_id in kept_cars:
+				lines.append(tr("Auto: ") + Catalog.CARS[car_id]["name"])
+	if save or l1 > l0:
+		save_game()
+	if l1 > l0:
+		level_up.emit(l1, lines)
+	return lines
+
+
 func is_car_unlocked(car_id: String, race_w := -1, drift_w := -1) -> bool:
 	var req: Dictionary = Catalog.CARS[car_id]["unlock"]
 	if req.is_empty() or car_id in kept_cars:
 		return true
 	var rw := wins if race_w < 0 else race_w
 	var dw := drift_wins if drift_w < 0 else drift_w
-	return (req.has("race") and rw >= req["race"]) or (req.has("drift") and dw >= req["drift"])
+	return (req.has("race") and rw >= req["race"]) or (req.has("drift") and dw >= req["drift"]) \
+		or (req.has("level") and level() >= req["level"])
 
 
 ## Spielstand von vor 2.11: was nach den alten Schwellen schon frei war, bleibt frei
@@ -461,6 +512,8 @@ func unlock_text(car_id: String) -> String:
 		parts.append(tr("%d Rennsieg" if req["race"] == 1 else "%d Rennsiege") % req["race"])
 	if req.has("drift"):
 		parts.append(tr("%d Driftsieg" if req["drift"] == 1 else "%d Driftsiege") % req["drift"])
+	if req.has("level"):
+		parts.append(tr("Fahrer-Level %d") % req["level"])
 	return tr(" oder ").join(parts)
 
 
@@ -535,9 +588,10 @@ func _migrate_save() -> void:
 
 
 func save_game() -> void:
+	xp_dirty = false
 	var text := JSON.stringify({
 		"wins": wins, "drift_wins": drift_wins, "current_car": current_car, "race_index": race_index,
-		"best_times": best_times, "tuning": tuning, "looks": looks, "won_events": won_events, "kept_cars": kept_cars, "outruns": outruns,
+		"best_times": best_times, "tuning": tuning, "looks": looks, "won_events": won_events, "kept_cars": kept_cars, "outruns": outruns, "xp": xp,
 		"gfx": {"preset": preset, "opts": gfx, "pixel": pixel_look, "vsync": vsync, "fps": fps_limit, "fullscreen": fullscreen,
 			"touch": touch_mode, "show_fps": show_fps, "jump_cam": jump_cam, "motion_blur": motion_blur,
 			"speed_fov": speed_fov, "cam_shake": cam_shake, "cam": cam_mode},
@@ -604,6 +658,8 @@ func load_game() -> void:
 	pixel_look = bool(g.get("pixel", int(data.get("pixel_mode_v2", 2)) <= 1))
 	language = str(data.get("language", ""))
 	outruns = int(data.get("outruns", 0))
+	# Spielstand von vor 2.32 (ohne XP): bisherige Siege und Duelle zählen als Erfahrung, niemand fängt bei Level 1 an
+	xp = int(data.get("xp", (int(data.get("wins", 0)) + int(data.get("drift_wins", 0))) * 1200 + outruns * 600))
 	if data.has("won_events"):
 		won_events = Array(data["won_events"])
 	else:
@@ -658,6 +714,7 @@ func reset_progress() -> void:
 	looks = {}
 	won_events = []
 	kept_cars = []
+	xp = 0
 	save_game()
 
 

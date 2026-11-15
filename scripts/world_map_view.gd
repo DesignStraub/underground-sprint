@@ -85,14 +85,15 @@ func _handle(event: InputEvent) -> bool:
 	elif event.is_action_pressed("ui_left") or event.is_action_pressed("ui_up"):
 		sel = (sel - 1 + pins.size()) % pins.size()
 		Sfx.ui("move")
+	elif event.is_action_pressed("handbrake"):
+		# Leertaste: Schnellreise zur Ausfahrt dieser Stadt (seit 2.31). Muss vor ui_accept stehen: Godots ui_accept
+		# enthält die Leertaste auch, bis 2.31 schaltete sie deshalb nur das Ziel um und die Schnellreise kam nie dran.
+		fast_travel.emit(pins[sel]["race_index"])
+		Sfx.ui("go")
 	elif event.is_action_pressed("ui_accept"):
 		var ri: int = pins[sel]["race_index"]
 		target = -1 if target == ri else ri
 		target_chosen.emit(target)
-		Sfx.ui("go")
-	elif event.is_action_pressed("handbrake"):
-		# Leertaste: Schnellreise zur Ausfahrt dieser Stadt (seit 2.31)
-		fast_travel.emit(pins[sel]["race_index"])
 		Sfx.ui("go")
 	elif event.is_action_pressed("ui_cancel") or event.is_action_pressed("map") or event.is_action_pressed("pause"):
 		visible = false

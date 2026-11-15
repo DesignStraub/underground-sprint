@@ -481,19 +481,25 @@ func _physics_process(dt: float) -> void:
 		if train.visible:
 			_sweep_player(lp)
 		var td := lp.distance_to(train.position)
-		_set_volume(_rumble, clampf(1.0 - td / 380.0, 0.0, 1.0), 2.0)
+		# leiser und quadratisch abfallend wie die Hochbahn (seit 2.32; vorher +2 dB und linear über 380 m, der Zug
+		# dröhnte über die halbe Stadt)
+		var kr := clampf(1.0 - td / 300.0, 0.0, 1.0)
+		_set_volume(_rumble, kr * kr, -4.0)
 		if not approaching and front > RAIL_HALF:
 			_t_arrive = -1.0
 			train.visible = false
 			train.position = origin + Vector3(0, -50, 0)
 			_rumble.stop()
 	if blocked and not was_blocked:
-		var dist := lp.distance_to(origin)
-		Sfx.play("horn", linear_to_db(clampf(1.0 - dist / 600.0, 0.15, 1.0)) + 5.0)  # echte Aufnahme: leiser gemischt als die alte
+		# Signalhorn nur in der Nähe und leiser (seit 2.32: vorher +5 dB und selbst 500 m weit noch -11 dB)
+		var kh := clampf(1.0 - lp.distance_to(origin) / 420.0, 0.0, 1.0)
+		if kh > 0.05:
+			Sfx.play("horn", -3.0 + linear_to_db(kh * kh))
 	for l in _lights:
 		l.material_override.set_shader_parameter("active", 1.0 if blocked else 0.0)
 	var cd := lp.distance_to(origin)
-	_set_volume(_bell, clampf(1.0 - cd / 220.0, 0.0, 1.0) if blocked else 0.0, -4.0)
+	var kb := clampf(1.0 - cd / 200.0, 0.0, 1.0)
+	_set_volume(_bell, kb * kb if blocked else 0.0, -8.0)
 	# Schranken: erst Blinken und Läuten, dann runter in knapp 2 s, rauf etwas langsamer
 	var target := 0.0 if gates_down else deg_to_rad(-85.0)
 	_gate_angle = move_toward(_gate_angle, target, dt * (0.8 if gates_down else 0.6))

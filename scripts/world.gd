@@ -69,6 +69,15 @@ var traffic: Array = []
 var _near := {}  # Verkehrsautos, für die es schon „knapp vorbei“ gab
 var _near_chain := 0  # Knapp-vorbei-Kette (je höchstens 4 s Abstand)
 var _near_chain_t := 0.0
+# Drift in der freien Fahrt (seit 2.32, _update_world_drift): laufende Kette, Driftzeit (Multiplikator), Pause
+var _dr_chain := 0.0
+var _dr_time := 0.0
+var _dr_idle := 0.0
+var _dr_walls := 0
+var _dr_crashes := 0
+var _dr_landings := 0
+var _xp_save_t := 0.0
+var _lu_t := 0.0  # Level-Einblendung
 var _feed: VBoxContainer  # Einblendungen über der Minikarte (knapp vorbei)
 var _tq: Array = []  # [Eintrag, Plan] wartet aufs Einsetzen (ein paar pro Bild, sonst ruckelt es beim Nachladen)
 var _trng := RandomNumberGenerator.new()
@@ -178,6 +187,8 @@ func _ready() -> void:
 
 
 func _exit_tree() -> void:
+	if GameState.xp_dirty:
+		GameState.save_game()
 	if _task >= 0:
 		WorkerThreadPool.wait_for_task_completion(_task)
 		_task = -1
@@ -838,6 +849,60 @@ func _build_hud() -> void:
 	help.text = tr("Frei fahren: Marker anfahren startet ein Rennen\nM Karte  C Kamera  R Zurücksetzen  Esc Menü")
 	help.modulate.a = 0.7
 	hud["help"] = help
+	# Fahrer-Level oben links (seit 2.32): Level, Balken bis zum nächsten, XP
+	var lv := Control.new()
+	lv.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	lv.position = Vector2(10, 8)
+	lv.size = Vector2(180, 40)
+	root.add_child(lv)
+	var ll := _label(lv, 16)
+	ll.add_theme_font_override("font", UI.font("wide", 0.15))
+	ll.position = Vector2(0, -3)
+	var lbg := ColorRect.new()
+	lbg.color = Color(0, 0, 0, 0.55)
+	lbg.position = Vector2(0, 22)
+	lbg.size = Vector2(150, 5)
+	lbg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	lv.add_child(lbg)
+	var lfill := ColorRect.new()
+	lfill.color = UI.CYAN
+	lfill.position = Vector2(0, 22)
+	lfill.size = Vector2(0, 5)
+	lfill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	lv.add_child(lfill)
+	var lx := _label(lv, 8)
+	lx.position = Vector2(0, 27)
+	lx.modulate.a = 0.8
+	hud["lvl"] = ll
+	hud["lvl_fill"] = lfill
+	hud["lvl_xp"] = lx
+	# laufender Drift unten in der Mitte: Punkte und Multiplikator, solange die Kette läuft
+	var dm := _label(root, 18, HORIZONTAL_ALIGNMENT_CENTER)
+	dm.anchor_left = 0.5
+	dm.anchor_right = 0.5
+	dm.anchor_top = 1.0
+	dm.anchor_bottom = 1.0
+	dm.offset_left = -200.0
+	dm.offset_right = 200.0
+	dm.offset_top = -66.0
+	dm.offset_bottom = -42.0
+	dm.add_theme_font_override("font", UI.font("wide", 0.15))
+	dm.add_theme_color_override("font_color", Color(1.0, 0.85, 0.2))
+	dm.visible = false
+	hud["drift"] = dm
+	# Level aufgestiegen: groß in der Mitte, darunter was es freischaltet
+	var lu := _label(root, 30, HORIZONTAL_ALIGNMENT_CENTER)
+	lu.anchor_left = 0.5
+	lu.anchor_right = 0.5
+	lu.anchor_top = 0.28
+	lu.anchor_bottom = 0.28
+	lu.offset_left = -300.0
+	lu.offset_right = 300.0
+	lu.add_theme_font_override("font", UI.font("wide", 0.15))
+	lu.add_theme_color_override("font_color", Color(0.4, 1.0, 0.55))
+	lu.visible = false
+	hud["levelup"] = lu
+	_update_level_hud()
 	# Minikarte unten links: alle Straßen der Welt, Rennen in Sicht, gewähltes Ziel als Flagge
 	for c in layout["cities"]:
 		var pin := Node3D.new()
@@ -1025,11 +1090,14 @@ func _unhandled_input(event: InputEvent) -> void:
 		_flash(tr("DRIFT-MODUS") if player.drift_mode else tr("FAHR-MODUS"), Color(1.0, 0.55, 0.12) if player.drift_mode else UI.CYAN)
 		Sfx.ui("change")
 		return
-	if _ch_prompt and _duel == 0 and not get_tree().paused and event.is_action_pressed("ui_accept"):
+	# Enter bestätigt; die Leertaste ist Handbremse (steckt in Godots ui_accept mit drin, startete sonst beim Driften
+	# am Marker ein Rennen oder ein Duell)
+	var accept := event.is_action_pressed("ui_accept") and not event.is_action_pressed("handbrake")
+	if _ch_prompt and _duel == 0 and not get_tree().paused and accept:
 		get_viewport().set_input_as_handled()
 		_start_duel()
 		return
-	if _near_marker >= 0 and not get_tree().paused and event.is_action_pressed("ui_accept") \
+	if _near_marker >= 0 and not get_tree().paused and accept \
 			and GameState.career_open(Catalog.RACES[_near_marker]["name"]):
 		get_viewport().set_input_as_handled()
 		_start_race(_near_marker)
@@ -1092,8 +1160,10 @@ func _process(dt: float) -> void:
 	_update_traffic_sound(dt)
 	_update_markers()
 	_check_near_miss()
+	_update_world_drift(dt)
 	_update_challenger(dt)
 	_update_feed(dt)
+	_update_level_banner(dt)
 	_prof_mark("rest")
 	var tacho = hud["tacho"]
 	tacho.rpm = player.rpm
@@ -1213,6 +1283,83 @@ func _flash(text: String, col: Color, pts := 0) -> void:
 		old.queue_free()
 	if pts > 0:
 		player.nitro = minf(player.nitro + minf(pts / 4000.0, 0.12) / player.nitro_cap, 1.0)
+		# Stilpunkte sind Erfahrung (seit 2.32); gespeichert wird gesammelt (_update_level_banner)
+		var lines := GameState.add_xp(pts, false)
+		if not lines.is_empty():
+			_show_level_up(lines)
+		_update_level_hud()
+
+
+# --- Fahrer-Level und Drift in der freien Fahrt (seit 2.32) ------------------------------------------------------
+
+func _update_level_hud() -> void:
+	if not hud.has("lvl"):
+		return
+	var li := GameState.level_info()
+	hud["lvl"].text = tr("LEVEL %d") % li["level"]
+	hud["lvl_fill"].size.x = 150.0 * clampf(float(li["into"]) / float(li["need"]), 0.0, 1.0)
+	hud["lvl_xp"].text = "%d / %d XP" % [li["into"], li["need"]]
+
+
+func _show_level_up(lines: Array) -> void:
+	hud["levelup"].text = "\n".join(lines.slice(0, 3))
+	hud["levelup"].visible = true
+	_lu_t = 4.0
+	Sfx.ui("go")
+	for l in lines.slice(1):
+		_flash(l, Color(0.4, 1.0, 0.55))
+
+
+func _update_level_banner(dt: float) -> void:
+	if _lu_t > 0.0:
+		_lu_t -= dt
+		hud["levelup"].modulate.a = clampf(_lu_t / 0.6, 0.0, 1.0)
+		if _lu_t <= 0.0:
+			hud["levelup"].visible = false
+	# XP gesammelt speichern (nicht bei jedem knapp vorbei die Datei schreiben)
+	_xp_save_t += dt
+	if GameState.xp_dirty and _xp_save_t > 15.0:
+		_xp_save_t = 0.0
+		GameState.save_game()
+
+
+## Driften in der offenen Welt gibt Punkte wie im Rennen (Winkel x Tempo), gutgeschrieben, wenn der Drift sauber zu
+## Ende ist. Lange Ketten zählen mehr: Drifts, die mit weniger als knapp 1 s Pause ineinander übergehen, bilden eine
+## Kette, je 3 s Driftzeit +1 auf den Multiplikator (bis x5). Wand oder Crash: Kette weg. Sprünge geben Punkte nach
+## Flugzeit. Alles läuft über _flash: Nitro, XP, Zeile über der Minikarte.
+func _update_world_drift(dt: float) -> void:
+	if player == null or not player.controls_enabled:
+		return
+	if player.landings != _dr_landings:
+		_dr_landings = player.landings
+		if player.last_air > 0.6:
+			_flash(tr("SPRUNG  %.1f s") % player.last_air, Color(0.4, 0.85, 1.0), int(player.last_air * 300.0 / 10.0) * 10)
+	if player.crashes != _dr_crashes or player.wall_hits != _dr_walls:
+		_dr_crashes = player.crashes
+		_dr_walls = player.wall_hits
+		if _dr_chain >= 150.0:
+			_flash(tr("KETTE VERLOREN"), Color(1.0, 0.35, 0.3))
+		_dr_chain = 0.0
+		_dr_time = 0.0
+	var kmh := player.velocity.length() * 3.6
+	var mult := clampi(1 + int(_dr_time / 3.0), 1, 5)
+	if player.drifting and player.drift_angle >= 12.0 and kmh > 35.0 and not player.airborne:
+		_dr_chain += (clampf(player.drift_angle, 0.0, 60.0) - 10.0) * kmh / 100.0 * dt * 10.0
+		_dr_time += dt
+		_dr_idle = 0.0
+	else:
+		_dr_idle += dt
+		if _dr_chain > 0.0 and _dr_idle > 0.9:
+			var pts := int(_dr_chain * mult / 10.0) * 10
+			if pts >= 50:
+				_flash(tr("DRIFT") + ("  x%d" % mult if mult > 1 else ""), Color(1.0, 0.85, 0.2), pts)
+			_dr_chain = 0.0
+			_dr_time = 0.0
+	var dm: Label = hud["drift"]
+	dm.visible = _dr_chain >= 30.0
+	if dm.visible:
+		dm.text = tr("DRIFT  %d") % (int(_dr_chain * mult / 10.0) * 10) + ("  x%d" % mult if mult > 1 else "")
+		dm.modulate.a = 1.0 if _dr_idle < 0.05 else 0.6
 
 
 func _update_feed(dt: float) -> void:
@@ -1316,7 +1463,7 @@ func _spawn_challenger() -> void:
 	# Auto: ungefähr so schnell wie deins, nicht dasselbe
 	var mine: float = Catalog.CARS[GameState.current_car]["top_speed"]
 	var pool: Array = Catalog.CAR_ORDER.filter(func(id): return id != GameState.current_car \
-		and absf(float(Catalog.CARS[id]["top_speed"]) / mine - 1.0) < 0.1)
+		and absf(float(Catalog.CARS[id]["top_speed"]) / mine - 1.0) < 0.1 and not Catalog.CARS[id]["unlock"].has("level"))
 	if pool.is_empty():
 		pool = Catalog.CAR_ORDER.filter(func(id): return id != GameState.current_car)
 	var id: String = pool[_trng.randi() % pool.size()]
