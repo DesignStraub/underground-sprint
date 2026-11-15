@@ -1,7 +1,10 @@
 extends CharacterBody3D
 ## Ziviler Verkehr: fährt langsam auf seiner Spur (rechts mit, links Gegenverkehr),
-## weicht gesperrten Spuren aus, bremst für den Spieler und hält am Bahnübergang. Bei einem Crash wird er weggeschleudert,
-## bei einem harten Treffer hebt er ab, überschlägt sich und bleibt auf Seite oder Dach liegen.
+## weicht gesperrten Spuren aus, bremst für den Spieler und hält am Bahnübergang. Bei einem Crash wird er weggeschleudert
+## und dreht sich, bei einem harten Treffer hebt er ab und überschlägt sich. Seit 2.35 (crash): das Wrack rutscht auf
+## der Fahrbahn (Höhe der Straße an seiner Stelle, nie in den Boden; nicht durch die Randwand), aus Seitenlage kippt es
+## auf Räder oder Dach. Auf den Rädern steht es kurz, dreht dann zurück in seine Spur und fährt weiter. Nur auf dem Dach
+## bleibt es ein paar Sekunden liegen, blendet aus und wird außer Sicht neu eingesetzt.
 ## Fährt auf der Hauptstraße (mit Mittelstreifen-Versatz) oder in einer Gabelung (path_id).
 ## Bremst rechtzeitig für Spieler, Wracks und den Vordermann (leader, link_leaders), wechselt vor Wracks die Spur.
 ## Masse je Art: der Spieler stößt nach Impuls (player_car._hit_traffic), schwere Wagen geben weniger nach.
@@ -38,13 +41,30 @@ var player_path := 0
 var player_pos := Vector3.ZERO  # Spieler in der Welt (race.gd): weit Entferntes wird ausgedünnt
 var crossing: Node
 var _lane_cur := 2.25
-var _wreck_vel := Vector3.ZERO
+var _wreck_vel := Vector3.ZERO  # Wrack: Rutschen (waagerecht, Eltern-Koordinaten)
 var _wreck_spin := 0.0
 var velocity_vec := Vector3.ZERO
-var _wreck_vy := 0.0
-var _wreck_roll := 0.0
-var _wreck_roll_v := 0.0
-var _wreck_ground := 0.0
+## Unfall: NONE fährt, WRECK rutscht/fliegt, RECOVER fährt zurück in die Spur, ROOF liegt auf dem Dach
+enum Crash { NONE, WRECK, RECOVER, ROOF }
+const W_FRICTION := 9.0  # m/s²: so bremst ein rutschendes Wrack auf dem Asphalt
+const W_REST := 1.0  # s steht das Wrack still, bevor es wieder anfährt
+const ROOF_WAIT := 3.0  # s auf dem Dach, dann ausblenden
+const FADE_T := 0.8
+var crash := Crash.NONE
+var _size := Vector3(1.8, 1.5, 4.5)
+var _w_p := Vector3.ZERO  # Wrack: Fußpunkt unter der Wagenmitte (x, z)
+var _w_yaw := 0.0  # Wrack: Drehung um die Hochachse
+var _w_pitch := 0.0
+var _w_roll := 0.0  # um die Längsachse: 0 auf den Rädern, ±PI auf dem Dach
+var _w_roll_v := 0.0
+var _w_roll_goal := 0.0  # Ruhelage nach der Landung (Räder 0/2π, Dach ±π)
+var _w_air := 0.0  # Flughöhe über der Ruhelage
+var _w_vy := 0.0
+var _w_t := 0.0  # s im Zustand
+var _w_rest := 0.0  # s fast still
+var _w_side := 1.0  # Straßenseite beim Unfall (der Mittelstreifen wird nicht überquert)
+var _yaw_off := 0.0  # zurück in die Spur: Abweichung von der Fahrtrichtung (rad), baut sich ab
+var _fade := -1.0
 var _far_d2 := 0.0
 var kind := ""
 var _snd: AudioStreamPlayer3D
@@ -93,6 +113,7 @@ func setup(kind_: String, rng: RandomNumberGenerator) -> void:
 			col = LKW_COLORS[rng.randi() % LKW_COLORS.size()]
 	length = size.z
 	_half_w = size.x / 2.0
+	_size = size
 	mass = {"van": 4.0, "bus": 10.0, "lkw": 14.0}.get(kind, 2.5)
 	# Modell je Art und Farbe nur einmal bauen: Bauen und Verschmelzen kostete gut 20 ms je Auto, beim Laden einer
 	# Strecke kamen so ein Dutzend Autos auf einmal und das Bild ruckelte eine Sekunde lang (alle paar Sekunden)
@@ -291,48 +312,36 @@ func sound(on: bool, bus: String) -> void:
 func _physics_process(dt: float) -> void:
 	if _snd and _snd.playing:
 		_snd.pitch_scale = clampf(0.8 + 0.4 * speed / maxf(base_speed, 1.0), 0.6, 1.4)
-	if wrecked:
-		position += _wreck_vel * dt
-		_wreck_vel = _wreck_vel.move_toward(Vector3.ZERO, 9.0 * dt)
-		rotate_y(_wreck_spin * dt)
-		_wreck_spin = move_toward(_wreck_spin, 0.0, 2.5 * dt)
-		velocity_vec = parent_basis * _wreck_vel
-		_clear_player()
-		if _wreck_vel.length_squared() > 0.01:
-			# Lage für KI und Verkehr nachführen, damit sie um das Wrack herumfahren, wo es wirklich liegt
-			progress = curve.get_closest_offset(position)
-			var f := Track.frame_at(curve, progress)
-			var lat: float = (position - f["pos"]).dot(f["right"])
-			_lane_cur = Track.logical_lat(track, progress, lat) if path_id == 0 else lat
-		if _wreck_roll_v != 0.0 or position.y > _wreck_ground + 0.01:
-			_wreck_vy -= 18.0 * dt
-			position.y += _wreck_vy * dt
-			rotate_object_local(Vector3.BACK, _wreck_roll_v * dt)
-			_wreck_roll += _wreck_roll_v * dt
-			if position.y <= _wreck_ground and _wreck_vy < 0.0:
-				position.y = _wreck_ground
-				if _wreck_vy < -3.0:
-					_wreck_vy *= -0.3  # schlägt auf und springt noch einmal
-					_wreck_roll_v *= 0.5
-				else:
-					# liegen bleiben: auf Rädern, Seite oder Dach
-					var flat := roundf(_wreck_roll / (PI / 2.0)) * (PI / 2.0)
-					rotate_object_local(Vector3.BACK, flat - _wreck_roll)
-					_wreck_roll = flat
-					_wreck_roll_v = 0.0
-					_wreck_vy = 0.0
+	if crash == Crash.WRECK or crash == Crash.ROOF:
+		_wreck_step(dt)
 		return
+	var recovering := crash == Crash.RECOVER
 
 	# Gesperrte Spur (Rampe am Bahnübergang)? Dann eine Spur weiter nach innen.
 	var target_lane := lane
 	for b in blocks:
 		if absf(b["lane"] - lane) < 1.0 and progress > b["from"] - 25.0 and progress < b["to"] + 10.0:
 			target_lane = lane - signf(lane) * 4.5
-	_lane_cur = move_toward(_lane_cur, target_lane, dt * lane_rate)
+	# nach einem Unfall zurück in die Spur: quer nur, solange er rollt; dabei dreht er sich wieder in Fahrtrichtung
+	var lr := lane_rate
+	if recovering:
+		lr *= clampf(speed / 6.0, 0.3, 1.0)
+	_lane_cur = move_toward(_lane_cur, target_lane, dt * lr)
+	if recovering:
+		_yaw_off = move_toward(_yaw_off, 0.0, (0.5 + speed * 0.15) * dt)
+		# kommt er nicht los (Spieler oder Gegner stehen davor, festgefahren) oder dauert es zu lange: ausblenden und
+		# außer Sicht neu einsetzen, statt dass sich zwei Autos gegenseitig blockieren
+		_w_t += dt
+		_w_rest = _w_rest + dt if speed < 1.0 else 0.0
+		if _w_rest > 2.0 or _w_t > 9.0:
+			_vanish()
+			return
 
 	# Spieler oder Wagen vor mir auf der Spur: rechtzeitig bremsen (der Bremsweg wächst mit dem Tempo) und
 	# hinterherfahren; vor einem Wrack nach kurzem Warten die Spur wechseln
 	var target := base_speed
+	if recovering:
+		target = minf(target, lerpf(base_speed, 3.0, clampf(absf(_yaw_off) / 1.2, 0.0, 1.0)))  # erst ausrichten
 	var ahead := (player_progress - progress) * dir
 	if player_path == path_id and absf(player_lateral - _lane_cur) < 2.6 and ahead > 0.0:
 		target = minf(target, _follow(ahead - length / 2.0 - 2.3, maxf(player_speed * dir, 0.0)))
@@ -376,6 +385,9 @@ func _physics_process(dt: float) -> void:
 	elif progress < 40.0:
 		progress = track_length - 10.0
 	_clear_player()
+	if recovering and absf(_yaw_off) < 0.01 and absf(_lane_cur - target_lane) < 0.05:
+		crash = Crash.NONE
+		_yaw_off = 0.0
 	# Außer Sichtweite: unsichtbar und Lage nur zweimal pro Sekunde neu (spart im Browser viel Rechenzeit)
 	var far := position.distance_squared_to(player_pos) > _far_d2
 	visible = not far
@@ -395,6 +407,8 @@ func place() -> void:
 		xf.basis = xf.basis * Basis(Vector3.UP, PI)  # um die eigene Hochachse: bergab bleibt bergab
 	var fwd := -xf.basis.z
 	velocity_vec = parent_basis * fwd * speed
+	if _yaw_off != 0.0:
+		xf.basis = xf.basis * Basis(Vector3.UP, _yaw_off)  # nach einem Unfall noch schräg zur Spur
 	transform = xf  # Eltern: Welt (Rennen) oder Strecke (Open World), beides ohne Verschiebung im Rennen
 
 
@@ -407,21 +421,24 @@ func _follow(gap: float, lv: float) -> float:
 ## Steckt der Spieler in mir (Wrack rutscht in ihn, oder ich fahre auf)? Dann bleibe ich an seiner Kante stehen,
 ## statt durch ihn hindurchzufahren.
 func _clear_player() -> void:
-	var rel := player_pos - position
+	var w := crash == Crash.WRECK or crash == Crash.ROOF
+	var c := Vector3(_w_p.x, position.y, _w_p.z) if w else position
+	var rel := player_pos - c
 	if rel.x * rel.x + rel.z * rel.z > 100.0:
 		return
-	var q: Vector3 = transform.basis.inverse() * rel
+	var yb := Basis(Vector3.UP, _w_yaw) if w else transform.basis
+	var q: Vector3 = yb.inverse() * rel
 	var hx := _half_w + 1.0
 	var hz := length / 2.0 + 2.2
 	if absf(q.x) >= hx or absf(q.z) >= hz:
 		return
 	var px := hx - absf(q.x)
 	var pz := hz - absf(q.z)
-	var away := transform.basis * (Vector3(-signf(q.x), 0, 0) if px < pz else Vector3(0, 0, -signf(q.z)))
+	var away := yb * (Vector3(-signf(q.x), 0, 0) if px < pz else Vector3(0, 0, -signf(q.z)))
 	away.y = 0.0
 	away = away.normalized()
-	if wrecked:
-		position += away * minf(px, pz)
+	if w:
+		_w_p += away * minf(px, pz)
 		var into := -_wreck_vel.dot(away)
 		if into > 0.0:
 			_wreck_vel += away * into
@@ -439,31 +456,256 @@ func knock(v: Vector3) -> void:
 ## Stoß als Tempoänderung (Weltkoordinaten): aus dem Verkehr geworfen, rutscht, dreht sich, kleine Wagen kippen
 func push(dv: Vector3) -> void:
 	dv = parent_basis.inverse() * dv  # Stoß kommt in Weltkoordinaten
-	if not wrecked:
-		wrecked = true
-		_wreck_vel = parent_basis.inverse() * velocity_vec
-		_wreck_ground = position.y
+	if _fade >= 0.0:
+		return  # liegt auf dem Dach und blendet schon aus
+	if crash == Crash.NONE or crash == Crash.RECOVER:
+		_begin_wreck()
+	elif crash == Crash.ROOF:
+		crash = Crash.WRECK  # angestoßen: rutscht noch ein Stück
+		_w_t = 0.0
+		_w_rest = 0.0
 	_wreck_vel += Vector3(dv.x, 0, dv.z)
 	_wreck_spin += randf_range(-1.0, 1.0) * clampf(dv.length() / 6.0, 0.5, 3.0) / sqrt(mass)
-	if dv.length() > 9.0 and mass < 3.0 and _wreck_roll_v == 0.0 and position.y <= _wreck_ground + 0.01:
-		_wreck_vy = clampf(dv.length() * 0.3, 3.5, 7.0)
-		_wreck_roll_v = randf_range(4.0, 7.0) * (1.0 if randf() < 0.5 else -1.0)
+	if dv.length() > 9.0 and mass < 3.0 and _w_roll_v == 0.0 and _w_air <= 0.0:
+		_w_vy = clampf(dv.length() * 0.3, 3.5, 7.0)
+		_w_air = 0.001
+		_w_roll_v = randf_range(4.0, 7.0) * (1.0 if randf() < 0.5 else -1.0)
 
 
 ## Schwerer Crash mit dem Spieler: der Wagen hebt ab und überschlägt sich (Busse nur ein Ruck), egal wie schwer
-## der Stoß rechnerisch war. dir: Richtung vom Spieler weg (Welt), hit: Aufpralltempo (m/s)
-func launch(dir: Vector3, hit: float) -> void:
-	if not wrecked:
-		push(dir * 0.1)
+## der Stoß rechnerisch war. away: Richtung vom Spieler weg (Welt), hit: Aufpralltempo (m/s)
+func launch(away: Vector3, hit: float) -> void:
+	if crash == Crash.NONE or crash == Crash.RECOVER:
+		push(away * 0.1)
+	if crash != Crash.WRECK:
+		return
 	if kind == "bus" or kind == "lkw":
 		_wreck_spin += randf_range(-0.6, 0.6)
 		return
-	if _wreck_roll_v == 0.0 and position.y <= _wreck_ground + 0.01:
-		_wreck_vy = clampf(hit * 0.35, 4.5, 9.0)
-		_wreck_roll_v = randf_range(5.0, 8.0) * (1.0 if randf() < 0.5 else -1.0)
-	var d := parent_basis.inverse() * dir
+	if _w_roll_v == 0.0 and _w_air <= 0.0:
+		_w_vy = clampf(hit * 0.35, 4.5, 9.0)
+		_w_air = 0.001
+		_w_roll_v = randf_range(5.0, 8.0) * (1.0 if randf() < 0.5 else -1.0)
+	var d := parent_basis.inverse() * away
 	_wreck_vel += Vector3(d.x, 0, d.z) * clampf(hit * 0.25, 2.0, 8.0)
 	_wreck_spin += randf_range(-2.5, 2.5)
+
+
+## Aus dem Verkehr geworfen: ab jetzt rutscht der Wagen frei (Lage, Drehung und Tempo von eben, nur waagerecht; bis
+## 2.34 auch mit der Steigung der Straße, an Kuppen sank das Wrack so in die Fahrbahn ein)
+func _begin_wreck() -> void:
+	var v := parent_basis.inverse() * velocity_vec
+	_wreck_vel = Vector3(v.x, 0.0, v.z)
+	var fw := -transform.basis.z
+	_w_yaw = atan2(-fw.x, -fw.z)
+	_w_pitch = 0.0
+	_w_p = Vector3(position.x, 0.0, position.z)
+	_w_roll = 0.0
+	_w_roll_v = 0.0
+	_w_roll_goal = 0.0
+	_w_air = 0.0
+	_w_vy = 0.0
+	_w_t = 0.0
+	_w_rest = 0.0
+	_w_side = signf(_lane_cur) if absf(_lane_cur) > 0.1 else dir
+	_yaw_off = 0.0
+	_stuck_t = 0.0
+	crash = Crash.WRECK
+	wrecked = true
+
+
+## Wrack: rutschen, drehen, fliegen und landen, immer auf der Höhe der Fahrbahn an seiner Stelle; danach zurück in die
+## Spur (auf den Rädern) oder auf dem Dach liegen bleiben, ausblenden und neu einsetzen
+func _wreck_step(dt: float) -> void:
+	_w_t += dt
+	_clear_player()
+	var on_ground := _w_air <= 0.0 and _w_vy <= 0.0
+	_w_p += _wreck_vel * dt
+	_wreck_vel = _wreck_vel.move_toward(Vector3.ZERO, (W_FRICTION if on_ground else 1.0) * dt)
+	_w_yaw += _wreck_spin * dt
+	_wreck_spin = move_toward(_wreck_spin, 0.0, (2.5 if on_ground else 0.4) * dt)
+	# Lage auf der Straße (für KI und Verkehr, die um das Wrack herumfahren): nicht durch die Randwand, nicht über
+	# den Mittelstreifen
+	progress = curve.get_closest_offset(Vector3(_w_p.x, 0.0, _w_p.z))
+	var f := Track.frame_at(curve, progress)
+	var fp: Vector3 = f["pos"]
+	var right: Vector3 = f["right"]
+	var lat: float = Vector3(_w_p.x - fp.x, 0.0, _w_p.z - fp.z).dot(right)
+	var lim := _lat_limit(progress)
+	var lo := -lim
+	var hi := lim
+	if path_id == 0:
+		var m := Track.median_at(track, progress)
+		if m > 0.4:
+			if _w_side > 0.0:
+				lo = minf(m + _half_w + 0.1, hi)
+			else:
+				hi = maxf(-(m + _half_w + 0.1), lo)
+	if lat < lo or lat > hi:
+		var nl := clampf(lat, lo, hi)
+		_w_p += right * (nl - lat)
+		var vout := _wreck_vel.dot(right)
+		if (lat > hi and vout > 0.0) or (lat < lo and vout < 0.0):
+			_wreck_vel -= right * vout * 1.25  # prallt etwas zurück
+			_wreck_spin *= 0.7
+		lat = nl
+	_lane_cur = Track.logical_lat(track, progress, lat) if path_id == 0 else lat
+	velocity_vec = parent_basis * _wreck_vel
+	if not on_ground:
+		_w_vy -= 18.0 * dt
+		_w_air += _w_vy * dt
+		_w_roll += _w_roll_v * dt
+		if _w_air <= 0.0:
+			_w_air = 0.0
+			if _w_vy < -3.0:
+				_w_vy *= -0.3  # schlägt auf und springt noch einmal
+				_w_roll_v *= 0.5
+				_wreck_spin *= 0.7
+			else:
+				_w_vy = 0.0
+				# rollt er noch kräftig, rollt er sich auf der Straße weiter bis auf die Räder; sonst kippt er in die
+				# nächste stabile Lage (Räder, oder Dach, wenn er schon fast darauf liegt)
+				if absf(_w_roll_v) > 2.5:
+					_w_roll_goal = (ceilf(_w_roll / TAU) if _w_roll_v > 0.0 else floorf(_w_roll / TAU)) * TAU
+				else:
+					_w_roll_goal = _roll_rest()
+				_w_roll_v = 0.0
+	else:
+		_w_roll = move_toward(_w_roll, _w_roll_goal, 4.0 * dt)
+	_wreck_place(f, lat)
+	if crash == Crash.WRECK:
+		var still := on_ground and _wreck_vel.length() < 0.6 and absf(_wreck_spin) < 0.4 and is_equal_approx(_w_roll, _w_roll_goal)
+		_w_rest = _w_rest + dt if still else 0.0
+		if base_speed < 0.5:
+			_w_rest = 0.0  # Panne (stand schon vorher, Test --ctest=wreck): bleibt als Hindernis liegen
+		elif _w_rest > W_REST or _w_t > 10.0:
+			if cos(_w_roll) < 0.0:
+				crash = Crash.ROOF
+				_w_t = 0.0
+			else:
+				_start_recover(f)
+	elif _w_t > ROOF_WAIT:
+		if _fade < 0.0:
+			_fade = 0.0
+			collision_layer = 0  # niemand stößt mehr dagegen, während er verschwindet
+		_fade += dt
+		_set_fade(clampf(_fade / FADE_T, 0.0, 1.0))
+		if _fade >= FADE_T:
+			_respawn()
+
+
+## Ruhelage für die aktuelle Drehung um die Längsachse: auf die Räder (rollt sich aus Seiten- und Schräglage zurück),
+## außer er liegt schon fast auf dem Dach (gut 30° davon); so bleibt nur ein kleiner Teil der Überschläge auf dem Dach
+## liegen, die übrigen fahren weiter
+func _roll_rest() -> float:
+	var wheels := floorf(_w_roll / TAU + 0.5) * TAU
+	var dev := _w_roll - wheels
+	return wheels + signf(dev) * PI if absf(dev) > PI - 0.6 else wheels
+
+
+## Wrack auf die Straße setzen: Mitte über dem Fußpunkt, so hoch, dass die Karosserie in jeder Lage (Räder, Seite,
+## Dach) auf der Fahrbahn aufliegt, plus Flughöhe; geneigt wie die Straße in Blickrichtung
+func _wreck_place(f: Dictionary, lat: float) -> void:
+	var half: float = Track.hw(track, progress) if path_id == 0 else float(track["paths"][path_id]["half_w"])
+	var g: float = Track.ground_path(track, path_id, progress, lat, absf(lat) - half)["h"]
+	if _w_air <= 0.0:
+		var hdg := Vector3(-sin(_w_yaw), 0.0, -cos(_w_yaw))
+		_w_pitch = atan(Track.slope_at(curve, progress) * hdg.dot(f["fwd"]))
+	var b := Basis(Vector3.UP, _w_yaw) * Basis(Vector3.RIGHT, _w_pitch) * Basis(Vector3.BACK, _w_roll)
+	var rest := absf(_half_w * sin(_w_roll)) + absf(_size.y / 2.0 * cos(_w_roll)) + 0.1 * maxf(cos(_w_roll), 0.0)
+	var center := Vector3(_w_p.x, g + rest + _w_air, _w_p.z)
+	transform = Transform3D(b, center - b * Vector3(0.0, _size.y / 2.0 + 0.1, 0.0))
+
+
+## Wie weit ein Wrack quer rutschen darf: bis zur Randwand (im Trog bis zur Trogwand, im Drift-Kurs bis zur Bande),
+## abzüglich der halben Wagenbreite
+func _lat_limit(d: float) -> float:
+	if path_id != 0:
+		var p: Dictionary = track["paths"][path_id]
+		return maxf(float(p["half_w"]) + (3.0 if p["kind"] == "fork" else 0.0) - _half_w - 0.1, 1.0)
+	var wall := Track.hw(track, d) + Track.WALK + 0.3
+	if track.get("type", "") == "drift":
+		wall = Track.hw(track, d) + 0.4
+	elif Track._trough_at(track, d) > 0:
+		wall = Track.TUN_W
+	return maxf(wall - _half_w - 0.2, 1.0)
+
+
+## Wieder auf den Rädern: aus dem Stand zurück in die Spur (drehen, anfahren, einscheren), dann normal weiter
+func _start_recover(f: Dictionary) -> void:
+	if absf(_lane_cur - lane) > 7.0:
+		_vanish()  # quer über die ganze Straße zurück (durch den Gegenverkehr): lieber außer Sicht neu einsetzen
+		return
+	crash = Crash.RECOVER
+	wrecked = false
+	_w_t = 0.0
+	_w_rest = 0.0
+	var lf: Vector3 = (f["fwd"] as Vector3) * dir
+	_yaw_off = wrapf(_w_yaw - atan2(-lf.x, -lf.z), -PI, PI)
+	if absf(_yaw_off) < 0.001:
+		_yaw_off = 0.001
+	_w_roll = 0.0
+	_w_roll_v = 0.0
+	_w_air = 0.0
+	_w_vy = 0.0
+	_wreck_vel = Vector3.ZERO
+	_wreck_spin = 0.0
+	speed = 0.0
+	_stuck_t = 0.0
+	place()
+
+
+## Sofort ausblenden (ohne Kollision) und danach außer Sicht neu einsetzen (_respawn): für Wagen, die nach einem
+## Unfall nicht von selbst zurück in den Verkehr finden
+func _vanish() -> void:
+	if crash == Crash.NONE or crash == Crash.RECOVER:
+		_begin_wreck()
+	_wreck_vel = Vector3.ZERO
+	_wreck_spin = 0.0
+	_w_roll_v = 0.0
+	_w_roll_goal = _w_roll
+	crash = Crash.ROOF
+	_w_t = ROOF_WAIT
+
+
+## Wagenteile ein- (0) oder ausgeblendet (1)
+func _set_fade(a: float) -> void:
+	for c in get_children():
+		if c is GeometryInstance3D:
+			(c as GeometryInstance3D).transparency = a
+
+
+## Vom Dach ausgeblendet: außer Sicht des Spielers auf demselben Weg neu einsetzen, wie der übrige Verkehr
+func _respawn() -> void:
+	crash = Crash.NONE
+	wrecked = false
+	_fade = -1.0
+	_set_fade(0.0)
+	collision_layer = 2
+	_w_roll = 0.0
+	_w_roll_v = 0.0
+	_w_air = 0.0
+	_w_vy = 0.0
+	_wreck_vel = Vector3.ZERO
+	_wreck_spin = 0.0
+	_yaw_off = 0.0
+	_lane_cur = lane
+	speed = base_speed
+	_handing = false
+	var far := maxf(GameState.view_distance() + 60.0, 300.0)
+	var best := -1.0
+	var best_d := progress
+	for i in 16:
+		var d := randf_range(30.0, maxf(track_length - 30.0, 31.0))
+		var q := curve.sample_baked(d)
+		var dist := Vector2(q.x - player_pos.x, q.z - player_pos.z).length()
+		if dist > best:
+			best = dist
+			best_d = d
+		if dist > far:
+			break
+	progress = best_d
+	place()
 
 
 ## Open World: auf einen anderen Weg (nächstes Autobahnstück) oder an eine andere Stelle desselben Wegs setzen

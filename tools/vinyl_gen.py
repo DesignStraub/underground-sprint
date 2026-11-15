@@ -10,7 +10,6 @@ Seite. Der Shader car_paint legt beides relativ zu Länge, Breite und Gürtellin
 jedes Auto. Grob, wo was sitzt (4,4-m-Auto): Radläufe bei x 200..580 und 1470..1850 (dort bleibt von der Flanke nur
 der obere Streifen bis y ~100), Türen dazwischen; Haube x 0..~750, Dach ~1000..1350, Heckdeckel ab ~1800.
 
-Embleme (assets/emblems/<id>.svg, 256 x 256): runde Plakette mit Motiv, für Fahrer-Titel.
 """
 import math
 import os
@@ -19,7 +18,6 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 VDIR = os.path.join(ROOT, "assets", "vinyls")
-EDIR = os.path.join(ROOT, "assets", "emblems")
 W, H = 2048, 1024
 SY0, SY1 = 4, 508  # Flanke (Rand frei lassen: Mipmaps bluten sonst in die andere Hälfte)
 TY0, TY1 = 516, 1020  # Draufsicht
@@ -1375,157 +1373,6 @@ def v_angel():
     return vinyl(side, top, defs)
 
 
-# --- Embleme ------------------------------------------------------------------------------------------------------------
-
-def badge(accent, items, defs=""):
-    return ('<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256"><defs>%s'
-            '<clipPath id="bc"><circle cx="128" cy="128" r="112"/></clipPath></defs>'
-            '<circle cx="128" cy="128" r="122" fill="#0d0f14"/>'
-            '<circle cx="128" cy="128" r="114" fill="#1a1d26" stroke="%s" stroke-width="10"/>'
-            '<circle cx="128" cy="128" r="100" fill="none" stroke="#ffffff" stroke-opacity="0.12" stroke-width="2"/>'
-            '<g clip-path="url(#bc)">%s</g></svg>\n') % (defs, accent, "".join(items))
-
-
-def e_key():
-    return badge("#3ff0ff", [rect(78, 70, 64, 96, "#e9edf2", 'rx="22" stroke="#141414" stroke-width="5"'),
-                             circ(110, 98, 12, "#3ff0ff"), rect(96, 124, 28, 10, "#4a515e", 'rx="4"'),
-                             rect(140, 108, 70, 20, "#c9ced6", 'stroke="#141414" stroke-width="4"'),
-                             poly([(170, 128), (178, 140), (186, 128), (194, 140), (202, 128)], "#c9ced6", 'stroke="#141414" stroke-width="3"')])
-
-
-def e_light():
-    return badge("#3dff7a", [rect(96, 46, 64, 166, "#22252e", 'rx="14" stroke="#0a0a0a" stroke-width="5"'),
-                             circ(128, 82, 20, "#5a1414"), circ(128, 129, 20, "#5a4a10"), circ(128, 176, 20, "#3dff7a"),
-                             circ(128, 176, 30, "#3dff7a", 'fill-opacity="0.25"')])
-
-
-def e_tire():
-    out = [circ(128, 128, 86, "#141414"), circ(128, 128, 50, "#c9ced6"), circ(128, 128, 14, "#4a515e")]
-    for k in range(20):
-        a = k * math.tau / 20
-        out.append(rect(128 + math.cos(a) * 80 - 6, 128 + math.sin(a) * 80 - 9, 12, 18, "#2e3038",
-                        'transform="rotate(%s %s %s)"' % (f(math.degrees(a) + 90), f(128 + math.cos(a) * 80), f(128 + math.sin(a) * 80))))
-    for k in range(5):
-        a = k * math.tau / 5
-        out.append(pl([(128 + math.cos(a) * 16, 128 + math.sin(a) * 16), (128 + math.cos(a) * 46, 128 + math.sin(a) * 46)], "#4a515e", 10))
-    return badge("#ff7a00", out)
-
-
-def e_moon():
-    return badge("#9a6bff", [circ(118, 128, 70, "#f3ecc8"), circ(146, 110, 62, "#1a1d26"),
-                             poly([(176, 70), (182, 86), (198, 88), (185, 98), (190, 114), (176, 104), (162, 114), (167, 98), (154, 88), (170, 86)], "#f3ecc8"),
-                             circ(196, 150, 5, "#f3ecc8")])
-
-
-def e_drift():
-    car = [(-22, -44), (22, -44), (28, -20), (28, 40), (20, 48), (-20, 48), (-28, 40), (-28, -20)]
-    return badge("#ff7a00", [path(catmull([(40, 190), (90, 200), (150, 170), (190, 110)], False), "none", "#3a3d47", 14),
-                             path(catmull([(60, 220), (110, 228), (170, 195), (214, 132)], False), "none", "#3a3d47", 14),
-                             poly(T(car, 150, 120, 1.1, rot=-55), "#ff7a00", 'stroke="#141414" stroke-width="5"'),
-                             poly(T([(-20, -20), (20, -20), (16, 4), (-16, 4)], 150, 120, 1.1, rot=-55), "#1a1d26")])
-
-
-def e_bolt():
-    return badge("#ffd000", [poly([(146, 34), (78, 140), (122, 140), (100, 222), (184, 104), (136, 104), (166, 34)], "#ffd000", 'stroke="#141414" stroke-width="5"')])
-
-
-def e_piston():
-    return badge("#c9ced6", [rect(92, 52, 72, 64, "#c9ced6", 'rx="8" stroke="#141414" stroke-width="5"'),
-                             rect(92, 66, 72, 6, "#4a515e"), rect(92, 80, 72, 6, "#4a515e"),
-                             pl([(128, 116), (128, 190)], "#8b919c", 22), circ(128, 196, 24, "#8b919c", 'stroke="#141414" stroke-width="5"'),
-                             circ(128, 196, 9, "#1a1d26"),
-                             pl([(60, 200), (196, 64)], "#ff7a00", 14), circ(56, 204, 16, "none", 'stroke="#ff7a00" stroke-width="10"')])
-
-
-def e_ring():
-    return badge("#3ff0ff", [circ(128, 128, 70, "none", 'stroke="#c9ced6" stroke-width="22"'),
-                             circ(128, 128, 70, "none", 'stroke="#ffffff" stroke-width="3" stroke-dasharray="12 12"'),
-                             poly([(198, 104), (220, 140), (176, 140)], "#3ff0ff"), circ(128, 128, 14, "#3ff0ff")])
-
-
-def e_mask():
-    half = [(0, -30), (40, -46), (86, -40), (100, -10), (80, 30), (40, 40), (12, 22), (0, 18)]
-    out = [path(catmull(T(sym(half), 128, 128, 0.95), True, 0.8), "#f2f2f2", "#141414", 5)]
-    for sgn in (1, -1):
-        out.append(ell(128 + sgn * 42, 120, 22, 12, "#141414", -sgn * 12))
-    return badge("#e9edf2", out)
-
-
-def e_katana():
-    out = []
-    for sgn in (1, -1):
-        out.append(pl([(128 - sgn * 80, 210), (128 + sgn * 70, 50)], "#e9edf2", 10))
-        out.append(pl([(128 - sgn * 80, 210), (128 - sgn * 52, 172)], "#d31f2a", 16))
-        out.append(pl([(128 - sgn * 64, 178), (128 - sgn * 40, 196)], "#e3b448", 10))
-    return badge("#d31f2a", out)
-
-
-def e_crown():
-    return badge("#e3b448", [poly([(56, 176), (56, 90), (92, 130), (128, 70), (164, 130), (200, 90), (200, 176)], "#e3b448", 'stroke="#141414" stroke-width="5"'),
-                             rect(56, 176, 144, 22, "#c99a2e", 'stroke="#141414" stroke-width="5"'),
-                             circ(128, 150, 12, "#d31f2a"), circ(90, 156, 8, "#3ff0ff"), circ(166, 156, 8, "#3ff0ff")])
-
-
-def e_fox():
-    return badge("#ff7a00", kitsune_mask(128, 138, 0.52))
-
-
-def e_wings():
-    out = []
-    for sgn in (1, -1):
-        for k in range(5):
-            out += feather(128 + sgn * 20, 120 + k * 8, 180 + sgn * -170 + (-sgn * 18 + 4) * k if sgn > 0 else 190 + k * 14 - 0, 90 - k * 8, 26, "#f7f9ff", "#9aaccc") \
-                if False else feather(128 + sgn * 18, 118 + k * 10, (-20 + k * 14) if sgn > 0 else (200 - k * 14), 92 - k * 9, 26, "#f7f9ff", "#9aaccc")
-    out.append(ell(128, 70, 40, 12, "none", 0, 'stroke="#e3b448" stroke-width="7"'))
-    return badge("#f7f9ff", out)
-
-
-def e_oni():
-    return badge("#d31f2a", oni_mask(128, 150, 0.44))
-
-
-def e_mecha():
-    return badge("#3ff0ff", mecha_head(128, 142, 0.5))
-
-
-def e_dragon():
-    return badge("#1aa36a", dragon_head(146, 140, 0.55))
-
-
-def e_star():
-    st = []
-    for k in range(10):
-        a = -math.pi / 2 + k * math.pi / 5
-        q = 64 if k % 2 == 0 else 26
-        st.append((128 + math.cos(a) * q, 122 + math.sin(a) * q))
-    out = [poly(st, "#e3b448", 'stroke="#141414" stroke-width="5"')]
-    for sgn in (1, -1):
-        for k in range(5):
-            a = math.radians(110 + k * 22) if sgn < 0 else math.radians(70 - k * 22)
-            x, y = 128 + math.cos(a) * 92, 130 + math.sin(a) * 92
-            out.append(ell(x, y, 15, 7, "#1aa36a", math.degrees(a) + 90))
-    return badge("#e3b448", out)
-
-
-def e_diamond():
-    out = []
-    octa(128, 128, 64, 90, out)
-    return badge("#56c8ff", out)
-
-
-def e_phoenix():
-    out = []
-    for col, k, grow in [("#d31f2a", 1.0, 0), ("#ff7a00", 0.8, 0), ("#ffd000", 0.55, 0)]:
-        for sgn in (1, -1):
-            wing = [(128, 120), (128 + sgn * 40 * k, 70), (128 + sgn * 100 * k, 40), (128 + sgn * 80 * k, 100), (128 + sgn * 108 * k, 108),
-                    (128 + sgn * 70 * k, 136)]
-            out.append(path(catmull(wing, True, 0.8), col))
-        out.append(path(catmull([(128, 120), (150, 170), (138, 230), (128, 200), (118, 230), (106, 170)], True, 0.8), col))
-    out.append(circ(128, 104, 14, "#ffd000"))
-    out.append(poly([(128, 92), (134, 76), (140, 92)], "#ffd000"))
-    return badge("#ff7a00", out)
-
-
 VINYLS = {
     "speedlines": v_speedlines,
     "tribal": v_tribal,
@@ -1553,27 +1400,18 @@ VINYLS = {
     "mecha": v_mecha,
     "angel": v_angel,
 }
-EMBLEMS = {"key": e_key, "light": e_light, "tire": e_tire, "moon": e_moon, "drift": e_drift, "bolt": e_bolt, "piston": e_piston,
-           "ring": e_ring, "mask": e_mask, "katana": e_katana, "crown": e_crown, "fox": e_fox, "wings": e_wings, "oni": e_oni,
-           "mecha": e_mecha, "dragon": e_dragon, "star": e_star, "diamond": e_diamond, "phoenix": e_phoenix}
 
 
 def main():
     only = sys.argv[1:]
     os.makedirs(VDIR, exist_ok=True)
-    os.makedirs(EDIR, exist_ok=True)
     for name, fn in VINYLS.items():
         if only and name not in only:
             continue
         with open(os.path.join(VDIR, name + ".svg"), "w", encoding="utf-8") as fh:
             fh.write(fn())
         print("vinyl", name)
-    for name, fn in EMBLEMS.items():
-        if only and name not in only:
-            continue
-        with open(os.path.join(EDIR, name + ".svg"), "w", encoding="utf-8") as fh:
-            fh.write(fn())
-        print("emblem", name)
+
 
 
 if __name__ == "__main__":

@@ -4,7 +4,10 @@ extends Node3D
 ## Hügel, die abseits der Straßen sanft ansteigen, Felder (shaders/land.gdshader), Wälder, Dörfer mit Kirchturm,
 ## Windparks mit Gefahrenfeuer und nachts Nebelbänke über den Wiesen. Gebaut in Kacheln zu 1 km rund um den Spieler,
 ## im Hintergrund-Thread; nah an Straßen und in Städten bleibt alles flach (dort liegen Strecken und Häuser).
-## Alles hier ist Kulisse ohne Kollision: Straßen sind ummauert, man kommt nicht hin.
+## Kulisse ohne Kollision, Straßen sind ummauert; nur Bäume nahe der Straße haben seit 2.35 einen festen Stamm (wo eine
+## Mauer fehlt, fährt man nicht hindurch). Bäume halten Abstand zum befahrbaren Streifen (Fahrbahn bis zur Randwand,
+## _plan_corridors) und stehen neben Dämmen auf der Böschung: vorher standen an der Waldstraße Bäume auf dem Bankett,
+## und auf Kuppen ragten sie neben und durch die Fahrbahn.
 
 const LAND_SHADER := preload("res://shaders/land.gdshader")
 const HOUSE_SHADER := preload("res://shaders/house.gdshader")
@@ -13,6 +16,9 @@ const BEACON_SHADER := preload("res://shaders/beacon.gdshader")
 const WATER_SHADER := preload("res://shaders/water.gdshader")
 const Layout := preload("res://scripts/world_layout.gd")
 const Catalog := preload("res://scripts/catalog.gd")
+const Track := preload("res://scripts/track_builder.gd")
+const CORR_CELL := 50.0
+const TRUNK_REACH := 6.0  # Bäume bis so weit hinter der Randwand bekommen einen festen Stamm
 
 const CHUNK := 1000.0
 const STEP := 25.0  # Gitterweite des Geländes
@@ -69,6 +75,10 @@ var _tree_step := 9.0
 var last_event := ""  # für --hitch: was die Landschaft in diesem Bild getan hat
 var hold := Callable()  # true = gerade nicht bauen (die Welt baut eine Strecke: beide zugleich ruckelten)
 var _meshes := {}
+## Befahrbare Streifen in Zellen zu CORR_CELL: je Abschnitt 8 Werte (ax, az, bx, bz, halbe Breite bis zur Randwand
+## bei a und b, Höhe der Fahrbahn bei a und b), _plan_corridors
+var _corr := {}
+var _trunk_shapes := {}
 
 const VILLAGE_NAMES := ["Oberweiler", "Kirchheim", "Lindenau", "Birkenfeld", "Hohenstein", "Mühlbach", "Eichstetten", "Wiesental", "Rotenburg", "Sonnenberg", "Tannhausen", "Grünwald", "Steinach", "Haselbach", "Altdorf", "Buchholz", "Unterried", "Waldhausen", "Kleinfeld", "Bergrheinfeld", "Erlenbach", "Hirschau", "Fischbach", "Ahornhof", "Weidenstetten", "Lerchenau", "Rabenstein", "Moosbrunn", "Hagenau", "Kesselbach", "Ulmenhof", "Dornstetten", "Falkenried", "Brunnthal", "Eschenau", "Hüttenbach", "Kranichfeld", "Lauterbach", "Mittelweiler", "Neuhaus", "Ochsenfurt-Au", "Pfaffenhofen", "Quellbach", "Reichenau", "Schönwald", "Talheim", "Uhlenhorst", "Vogelsang", "Wolfsried", "Zellerau", "Amselfeld", "Bärental", "Dachsberg", "Eulenbach", "Fuchsstadt", "Gänsewies", "Hasenmühle", "Igelsbach", "Krähenwinkel", "Lindenhof", "Marderau", "Nesselried", "Otterbach", "Rehweiler"]
 
@@ -121,6 +131,7 @@ func setup(lay: Dictionary) -> void:
 	if layout.has("center"):
 		_center = Vector2(layout["center"].x, layout["center"].z)
 		_has_center = true
+	_plan_corridors()
 	_plan_sites()
 	_make_materials()
 	_make_mask()
@@ -137,6 +148,153 @@ func _add_line(grid: Dictionary, pl: PackedVector2Array) -> void:
 			var arr: PackedVector2Array = grid.get(c, PackedVector2Array())
 			arr.append(p)
 			grid[c] = arr  # Packed-Arrays kommen als Kopie aus dem Dictionary: zurückschreiben
+
+
+## Befahrbare Streifen für die Bäume (seit 2.35): Fahrbahn samt Gehweg/Bankett bis zur Randwand, mit der Höhe der
+## Fahrbahn (Kuppen, Dämme). Autobahn und Auffahrten aus ihren Mittellinien (gebaut wie track_builder.begin, ohne die
+## übrige Planung), Waldstrecken genau aus ihrer geplanten Strecke (dort steht der Wald bis ans Bankett). Stadtstraßen
+## fehlen: dort bleiben Bäume ohnehin über 60 m weg.
+func _plan_corridors() -> void:
+	var cells := {}
+	var ab_half := Track.HALF_W + Track.AB_EXTRA + Track.MED + Track.WALK + 0.3
+	for sg in layout["segments"]:
+		var race: Dictionary = sg["race"]
+		var pts: Array = race["pts"]
+		var c := Curve3D.new()
+		c.bake_interval = 1.0
+		var n := pts.size()
+		for i in n:
+			var t: Vector3 = ((pts[mini(i + 1, n - 1)] as Vector3) - (pts[maxi(i - 1, 0)] as Vector3)) * 0.22
+			c.add_point(pts[i], -t, t)
+		var L := c.get_baked_length()
+		var elev := []
+		for cr in race.get("crests", []):
+			elev.append({"a": cr[0] * L, "b": cr[0] * L + 170.0, "c": cr[1] * L - 170.0, "e": cr[1] * L, "h": cr[2]})
+		if not elev.is_empty():
+			c.set_meta("elev", elev)
+		_corr_curve(cells, c, Transform3D.IDENTITY, func(_d: float) -> float: return ab_half)
+		for r in race.get("ramps", []):
+			var rp: Array = r["pts"] if r.has("pts") else [r["from"], r["end"]]
+			var rh: float = Track.RAMP_HALF + (Track.AB_EXTRA if r.get("wide", false) else 0.0) + 0.3
+			for k in rp.size() - 1:
+				var a: Vector3 = rp[k]
+				var b: Vector3 = rp[k + 1]
+				_corr_add(cells, Vector3(a.x, 0.0, a.z), Vector3(b.x, 0.0, b.z), rh, rh)
+	for city in layout["cities"]:
+		var tr: Dictionary = city.get("track", {})
+		if tr.is_empty() and city.has("race") and city["race"].get("forest", false):
+			var job := Track.begin(city["race"])  # nur die Planung (schnell), Bauen kommt später
+			(job["root"] as Node).free()
+			tr = job["track"]
+		if tr.is_empty():
+			continue
+		var xf: Transform3D = tr.get("xf", Transform3D.IDENTITY)
+		for p in tr["paths"]:
+			if p["id"] == 0:
+				_corr_curve(cells, p["curve"], xf, func(d: float) -> float: return Track.hw(tr, d) + Track.WALK + 0.3)
+			else:
+				var walk: float = 3.0 if p["kind"] == "fork" else (Track.WALK if p.get("tail", false) else 0.0)
+				var ph: float = p["half_w"] + walk + 0.3
+				_corr_curve(cells, p["curve"], xf, func(_d: float) -> float: return ph)
+	for k in cells:
+		_corr[k] = PackedFloat32Array(cells[k])
+
+
+## Weg (Kurve in Streckenkoordinaten, Lage xf) alle 6 m in Abschnitte zerlegen; half(d): halbe Breite bis zur Randwand
+func _corr_curve(cells: Dictionary, c: Curve3D, xf: Transform3D, half: Callable) -> void:
+	var L := c.get_baked_length()
+	var d := 0.0
+	var prev := Vector3.INF
+	var ph := 0.0
+	while true:
+		var f := Track.frame_at(c, d)
+		var q: Vector3 = f["pos"]
+		var w: Vector3 = xf * Vector3(q.x, float(f["y"]), q.z)
+		var hh: float = half.call(d)
+		if prev.is_finite():
+			_corr_add(cells, prev, w, ph, hh)
+		prev = w
+		ph = hh
+		if d >= L:
+			break
+		d = minf(d + 6.0, L)
+
+
+## a, b: Weltlage (y = Höhe der Fahrbahn), ha/hb: halbe Breite bis zur Randwand. Im Tunnel (tief unter dem Boden) nichts:
+## darüber wächst der Wald weiter.
+func _corr_add(cells: Dictionary, a: Vector3, b: Vector3, ha: float, hb: float) -> void:
+	if a.y < -5.0 and b.y < -5.0:
+		return
+	var m := maxf(ha, hb) + maxf(TRUNK_REACH, maxf(maxf(a.y, b.y), 0.0) * 1.6) + 1.0
+	var c0 := Vector2i(floori((minf(a.x, b.x) - m) / CORR_CELL), floori((minf(a.z, b.z) - m) / CORR_CELL))
+	var c1 := Vector2i(floori((maxf(a.x, b.x) + m) / CORR_CELL), floori((maxf(a.z, b.z) + m) / CORR_CELL))
+	for cz in range(c0.y, c1.y + 1):
+		for cx in range(c0.x, c1.x + 1):
+			var key := Vector2i(cx, cz)
+			if not cells.has(key):
+				cells[key] = []
+			(cells[key] as Array).append_array([a.x, a.z, b.x, b.z, ha, hb, a.y, b.y])
+
+
+## Abstand von p zum Rand des nächsten befahrbaren Streifens (x, unter 0: darin) und Höhe der Fahrbahn dort (y);
+## nichts in der Nähe: x sehr groß
+func _corr_at(p: Vector2) -> Vector2:
+	var arr = _corr.get(Vector2i(floori(p.x / CORR_CELL), floori(p.y / CORR_CELL)))
+	if arr == null:
+		return Vector2(1e9, 0.0)
+	var s: PackedFloat32Array = arr
+	var best := 1e9
+	var be := 0.0
+	for i in range(0, s.size(), 8):
+		var ax := s[i]
+		var az := s[i + 1]
+		var abx := s[i + 2] - ax
+		var abz := s[i + 3] - az
+		var l2 := abx * abx + abz * abz
+		var u := 0.0
+		if l2 > 1e-6:
+			u = clampf(((p.x - ax) * abx + (p.y - az) * abz) / l2, 0.0, 1.0)
+		var dx := p.x - ax - abx * u
+		var dz := p.y - az - abz * u
+		var cl := sqrt(dx * dx + dz * dz) - lerpf(s[i + 4], s[i + 5], u)
+		if cl < best:
+			best = cl
+			be = lerpf(s[i + 6], s[i + 7], u)
+	return Vector2(best, be)
+
+
+## Baum bei p (Stammradius r) neben der Straße: null = steht im befahrbaren Streifen oder direkt an der Randwand
+## (weglassen), sonst [Höhe des Fußes (am Damm auf der Böschung), fester Stamm?]
+func _tree_clear(p: Vector2, r: float, h: float) -> Variant:
+	var cr := _corr_at(p)
+	if cr.x < r + 0.5:
+		return null
+	if cr.y > 0.3 and cr.x < cr.y * 1.6:
+		h = maxf(h, cr.y - cr.x / 1.6 - 0.05)  # Böschung 1:1,6 vom Rand der Fahrbahn (track_builder._build_road)
+	return [h, cr.x < TRUNK_REACH]
+
+
+## Feste Stämme der Bäume nahe der Straße (der Bau-Thread sammelt nur: x, Fuß-y, z, Radius, Höhe; Physik-Körper
+## entstehen hier im Hauptthread, bevor die Kachel in den Baum kommt)
+func _add_trunks(n: Node3D) -> void:
+	var tl: PackedFloat32Array = n.get_meta("trunks", PackedFloat32Array())
+	if tl.is_empty():
+		return
+	var body := StaticBody3D.new()
+	body.name = "Staemme"
+	body.collision_mask = 0
+	for i in range(0, tl.size(), 5):
+		var key := snappedf(tl[i + 3], 0.05)
+		if not _trunk_shapes.has(key):
+			var cy := CylinderShape3D.new()
+			cy.radius = key
+			cy.height = 3.0
+			_trunk_shapes[key] = cy
+		var cs := CollisionShape3D.new()
+		cs.shape = _trunk_shapes[key]
+		cs.position = Vector3(tl[i], tl[i + 1] + 1.5, tl[i + 2])
+		body.add_child(cs)
+	n.add_child(body)
 
 
 ## Abstand zur nächsten Straße im Raster grid (bis 500 m genau; nichts gefunden: 10 km). Flachzone plus Anstieg
@@ -486,6 +644,7 @@ func build_near(p: Vector3, radius := 1600.0) -> void:
 	for key in _wanted(p, radius):
 		var n := build_chunk(key)
 		_chunks[key] = n
+		_add_trunks(n)
 		add_child(n)
 
 
@@ -514,6 +673,7 @@ func _process(dt: float) -> void:
 		if _chunks.has(_task_key):
 			_chunks[_task_key] = _task_out
 			var t0 := Time.get_ticks_usec()
+			_add_trunks(_task_out)
 			add_child(_task_out)
 			last_event = "land+%.1fms" % ((Time.get_ticks_usec() - t0) / 1000.0)
 			for r in _task_out.get_meta("rotors", []):
@@ -543,6 +703,7 @@ func _process(dt: float) -> void:
 			if DisplayServer.get_name() == "headless":
 				_task_out = build_chunk(key)
 				_chunks[key] = _task_out
+				_add_trunks(_task_out)
 				add_child(_task_out)
 				for r in _task_out.get_meta("rotors", []):
 					_rotors.append(r)
@@ -669,6 +830,7 @@ func _trees(root: Node3D, o: Vector2, dr: PackedFloat32Array, rds: PackedFloat32
 		rng: RandomNumberGenerator) -> void:
 	var lists := {"conifer": [], "leafy": []}
 	var cols := {"conifer": [], "leafy": []}
+	var trunks := []  # feste Stämme nahe der Straße: je x, Fuß-y, z, Radius, Höhe (_add_trunks)
 	var step := _tree_step
 	var hs_cache := {}
 	var holes_here := _holes_near(o)
@@ -727,11 +889,22 @@ func _trees(root: Node3D, o: Vector2, dr: PackedFloat32Array, rds: PackedFloat32
 			var kind := "conifer" if _detail.get_noise_2d(p.x * 3.0, p.y * 3.0) > -0.05 else "leafy"
 			var s := rng.randf_range(0.75, 1.35)
 			var b := Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(s, s * rng.randf_range(0.85, 1.2), s))
-			(lists[kind] as Array).append(Transform3D(b, Vector3(p.x, h - 0.2, p.y)))
 			var c := Color(0.09, 0.2, 0.08) if kind == "conifer" else Color(0.16, 0.3, 0.09)
-			(cols[kind] as Array).append(c * rng.randf_range(0.75, 1.2))
+			c *= rng.randf_range(0.75, 1.2)
+			if fd < 45.0 or rx < 60.0:
+				# nah an der Straße: nicht auf Fahrbahn und Bankett, am Damm auf der Böschung, mit festem Stamm
+				var tc = _tree_clear(p, 0.35 * s, h)
+				if tc == null:
+					continue
+				h = tc[0]
+				if tc[1]:
+					trunks.append_array([p.x, h - 0.2, p.y, 0.32 * s, 3.0])
+			(lists[kind] as Array).append(Transform3D(b, Vector3(p.x, h - 0.2, p.y)))
+			(cols[kind] as Array).append(c)
 		y += step
-	_alley_trees(o, lists["leafy"], cols["leafy"], holes_here)
+	_alley_trees(o, lists["leafy"], cols["leafy"], holes_here, trunks)
+	if not trunks.is_empty():
+		root.set_meta("trunks", PackedFloat32Array(trunks))
 	for kind in lists:
 		var arr: Array = lists[kind]
 		if arr.is_empty():
@@ -747,7 +920,7 @@ func _trees(root: Node3D, o: Vector2, dr: PackedFloat32Array, rds: PackedFloat32
 ## Baumreihen an den Auffahrten (seit 2.33): beidseits alle 16 m ein Laubbaum, 15 m neben der Mitte, aber nicht
 ## zwischen den Häusern am Ring (100 m), nicht in der Stadt, nicht im Fluss. Vorher führten lange Auffahrten (Würzburg,
 ## die Bögen zum Außenring) über kahlen Boden.
-func _alley_trees(o: Vector2, xfs: Array, cols: Array, holes_here: bool) -> void:
+func _alley_trees(o: Vector2, xfs: Array, cols: Array, holes_here: bool, trunks: Array) -> void:
 	var lo := o - Vector2(20.0, 20.0)
 	var hi := o + Vector2(CHUNK + 20.0, CHUNK + 20.0)
 	for line in _ramp_lines:
@@ -787,6 +960,13 @@ func _alley_trees(o: Vector2, xfs: Array, cols: Array, holes_here: bool) -> void
 						continue
 					var h := maxf(height_at(q, free_dist(q)), -0.12)
 					var sc := 0.9 + 0.3 * float(hq % 10) / 10.0
+					# nicht auf einer anderen Straße oder ihrem Bankett (Kreuzungen, Spangen), Stamm fest
+					var tc = _tree_clear(q, 0.35 * sc, h)
+					if tc == null:
+						continue
+					h = tc[0]
+					if tc[1]:
+						trunks.append_array([q.x, h - 0.2, q.y, 0.32 * sc, 3.0])
 					xfs.append(Transform3D(Basis(Vector3.UP, float(hq) * 0.37).scaled(Vector3(sc, sc, sc)), Vector3(q.x, h - 0.2, q.y)))
 					cols.append(Color(0.16, 0.3, 0.09) * (0.8 + 0.3 * float(hq % 7) / 7.0))
 				t += 16.0

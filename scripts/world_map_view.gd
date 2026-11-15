@@ -25,13 +25,21 @@ var _lo := Vector2.ZERO
 var _hi := Vector2.ZERO
 var _cond: Font
 var _wide: Font
+var _title_font: Font
+var _small: Font
+var _small_spaced: Font
+var _body: Font
 
 
 func setup(roads_: Array, cities: Array, player_: Node3D) -> void:
 	roads = roads_
 	player = player_
-	_cond = UI.font("cond", 0.2)
-	_wide = UI.font("wide", 0.15)
+	_cond = UI.font("cond", 0.0, 1)
+	_wide = UI.font("wide", 0.0, 1)
+	_title_font = UI.font("cond", 0.0, 1)
+	_small = UI.font("bold", 0.0)
+	_small_spaced = UI.font("wide", 0.0, 1)
+	_body = UI.font("bold", 0.0)
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -82,7 +90,7 @@ func target_race(k: int) -> int:
 
 ## Welt (x, z) -> Bildschirm: Karte füllt die Fläche links (rechts steht das Infofeld), Norden oben
 func _to_screen(p: Vector2) -> Vector2:
-	var area := Rect2(Vector2(20, 40), Vector2(size.x * 0.68 - 40, size.y - 80))
+	var area := Rect2(Vector2(28, 54), Vector2(size.x * 0.68 - 56, size.y - 102))
 	var ext := _hi - _lo
 	var k := minf(area.size.x / ext.x, area.size.y / ext.y)
 	var off := area.position + (area.size - ext * k) / 2.0
@@ -144,23 +152,28 @@ func _handle(event: InputEvent) -> bool:
 
 
 func _draw() -> void:
-	draw_rect(Rect2(Vector2.ZERO, size), Color(0.01, 0.015, 0.03, 0.94))
-	draw_rect(Rect2(0, 0, size.x, 2), Color(UI.CYAN.r, UI.CYAN.g, UI.CYAN.b, 0.8))
-	draw_string(_wide, Vector2(20, 28), tr("KARTE"), HORIZONTAL_ALIGNMENT_LEFT, -1, 16, UI.CYAN)
+	# seit 2.35 im Menü-Look: deckender dunkler Grund (das HUD schimmert nicht durch), Titel mit Akzentstrich,
+	# Karte und Infofeld als Glasflächen mit Haarlinie
+	draw_rect(Rect2(Vector2.ZERO, size), UI.INK)
+	draw_string(_title_font, Vector2(20, 30), tr("KARTE"), HORIZONTAL_ALIGNMENT_LEFT, -1, 18, UI.TEXT)
+	draw_rect(Rect2(21, 37, 14, 2), UI.ACCENT)
+	draw_rect(Rect2(38, 37.5, size.x * 0.68 - 58.0, 1), UI.LINE)
+	var area := Rect2(Vector2(20, 46), Vector2(size.x * 0.68 - 40, size.y - 86))
+	draw_style_box(UI.panel_box(0.6), area)
 	if relief:
 		var a := _to_screen(_lo)
 		var b := _to_screen(_hi)
-		draw_texture_rect(relief, Rect2(a, b - a), false, Color(1, 1, 1, 0.85))
+		draw_texture_rect(relief, Rect2(a, b - a), false, Color(0.72, 0.75, 0.82, 0.7))
 	# Dörfer: kleine Punkte mit Namen (klein, grau)
 	for v in villages:
 		var vp := _to_screen(v[0])
-		draw_rect(Rect2(vp - Vector2(2, 2), Vector2(4, 4)), Color(0.75, 0.6, 0.45, 0.8))
-		draw_string(_cond, vp + Vector2(5, 3), v[1], HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color(0.7, 0.72, 0.78, 0.55))
+		draw_rect(Rect2(vp - Vector2(1.5, 1.5), Vector2(3, 3)), Color(UI.DIM.r, UI.DIM.g, UI.DIM.b, 0.6))
+		draw_string(_small, vp + Vector2(5, 3), v[1], HORIZONTAL_ALIGNMENT_LEFT, -1, 7, Color(UI.DIM.r, UI.DIM.g, UI.DIM.b, 0.55))
 	if not center_town.is_empty():
 		var cp := _to_screen(center_town[0])
-		draw_circle(cp, 18.0, Color(0.3, 0.35, 0.45, 0.35))
-		draw_string(_cond, cp + Vector2(22, -10), center_town[1], HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(0.85, 0.9, 1.0, 0.85))
-	# Straßen: erst Ränder, dann helle Linien (Ring etwas kräftiger)
+		draw_circle(cp, 18.0, Color(1, 1, 1, 0.05))
+		draw_string(_wide, cp + Vector2(22, -10), center_town[1], HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color(UI.TEXT.r, UI.TEXT.g, UI.TEXT.b, 0.75))
+	# Straßen: erst dunkle Ränder, dann helle Linien (Ring etwas kräftiger)
 	for pass_i in 2:
 		for r in roads:
 			var pts := PackedVector2Array()
@@ -170,10 +183,10 @@ func _draw() -> void:
 				continue
 			var kind: int = r[1]
 			if pass_i == 0:
-				draw_polyline(pts, Color(0.35, 0.5, 0.7, 0.35), 4.0 if kind == 0 else 3.0, true)
+				draw_polyline(pts, Color(0, 0, 0, 0.45), 4.0 if kind == 0 else 3.0, true)
 			else:
-				var col := Color(0.92, 0.95, 1.0, 0.9) if kind == 0 else (Color(0.78, 0.82, 0.9, 0.75) if kind == 1 else Color(0.6, 0.65, 0.75, 0.4))
-				draw_polyline(pts, col, 1.6 if kind == 0 else 1.2, true)
+				var col := Color(0.9, 0.92, 0.96, 0.9) if kind == 0 else (Color(0.78, 0.81, 0.87, 0.7) if kind == 1 else Color(0.62, 0.66, 0.73, 0.4))
+				draw_polyline(pts, col, 1.5 if kind == 0 else 1.1, true)
 	# Rennen (Ortsnamen je Stadt nur, wo Platz ist; die gewählte zuerst)
 	var taken := []
 	var order := range(towns.size())
@@ -183,7 +196,7 @@ func _draw() -> void:
 	for k in order:
 		var tp: Vector3 = towns[k]["pos"]
 		var lp := _to_screen(Vector2(tp.x, tp.z)) + Vector2(10, 4)
-		var r := Rect2(lp - Vector2(0, 10), Vector2(_cond.get_string_size(str(towns[k]["name"]), HORIZONTAL_ALIGNMENT_LEFT, -1, 10).x, 12))
+		var r := Rect2(lp - Vector2(0, 9), Vector2(_wide.get_string_size(str(towns[k]["name"]).to_upper(), HORIZONTAL_ALIGNMENT_LEFT, -1, 7).x, 11))
 		var free := true
 		for t in taken:
 			if t.intersects(r.grow(2.0)):
@@ -192,6 +205,7 @@ func _draw() -> void:
 			taken.append(r)
 			labels[towns[k]["pins"][0]] = true
 	var sel_pins: Array = towns[sel]["pins"] if not towns.is_empty() else []
+	var breathe := 0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.0022)
 	for i in pins.size():
 		var p: Dictionary = pins[i]
 		var race: Dictionary = Catalog.RACES[p["race_index"]]
@@ -200,23 +214,22 @@ func _draw() -> void:
 		var open_: bool = GameState.career_open(race["name"])
 		var col: Color = UI.TYPE_COL.get(race.get("type", "sprint"), UI.CYAN)
 		if not open_:
-			col = Color(0.4, 0.42, 0.48)
+			col = UI.FAINT
 		if won:
 			# erledigt: kleiner goldener Haken statt Punkt (in der Welt gibt es dort keinen Marker mehr)
-			draw_circle(sp, 5.0, Color(0, 0, 0, 0.85))
-			draw_polyline(PackedVector2Array([sp + Vector2(-3, 0), sp + Vector2(-1, 2.5), sp + Vector2(3.5, -3)]),
-				Color(1.0, 0.8, 0.2), 1.8, true)
+			draw_circle(sp, 4.5, Color(0, 0, 0, 0.8))
+			draw_polyline(PackedVector2Array([sp + Vector2(-2.6, 0), sp + Vector2(-0.8, 2.2), sp + Vector2(3, -2.6)]),
+				UI.GOLD, 1.5, true)
 		else:
-			draw_circle(sp, 7.0, Color(0, 0, 0, 0.9))
-			draw_circle(sp, 5.2, col)
+			draw_circle(sp, 5.2, Color(0, 0, 0, 0.85))
+			draw_circle(sp, 3.8, col)
 		if p["race_index"] == target:
-			draw_arc(sp, 12.0, 0.0, TAU, 24, Color.WHITE, 1.5, true)
+			draw_arc(sp, 10.0, 0.0, TAU, 24, UI.TEXT, 1.2, true)
 		if i in sel_pins:
-			var a := 0.6 + 0.4 * sin(Time.get_ticks_msec() * 0.008)
-			draw_arc(sp, 15.0, 0.0, TAU, 28, Color(1.0, 0.85, 0.2, a), 2.5, true)
+			draw_arc(sp, 13.0 + breathe, 0.0, TAU, 28, Color(UI.ACCENT.r, UI.ACCENT.g, UI.ACCENT.b, 0.6 + 0.35 * breathe), 1.5, true)
 		if labels.has(i):
-			draw_string(_cond, sp + Vector2(10, 4), str(p["town"]).to_upper(), HORIZONTAL_ALIGNMENT_LEFT, -1, 10,
-				Color(0.85, 0.9, 1.0, 0.95 if i in sel_pins else 0.55))
+			draw_string(_wide, sp + Vector2(10, 4), str(p["town"]).to_upper(), HORIZONTAL_ALIGNMENT_LEFT, -1, 7,
+				Color(UI.TEXT.r, UI.TEXT.g, UI.TEXT.b, 0.95 if i in sel_pins else 0.5))
 	# du
 	if player:
 		var pp := _to_screen(Vector2(player.global_position.x, player.global_position.z))
@@ -232,42 +245,75 @@ func _draw() -> void:
 func _draw_info() -> void:
 	var x := size.x * 0.68
 	var w := size.x - x - 20
-	draw_rect(Rect2(x, 40, w, size.y - 80), Color(0.03, 0.05, 0.1, 0.8))
+	draw_style_box(UI.panel_box(0.9), Rect2(x, 46, w, size.y - 86))
 	if towns.is_empty():
 		return
 	var town: Dictionary = towns[sel]
-	var y := 70.0
-	draw_string(_wide, Vector2(x + 12, y), tr("STADT"), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, UI.CYAN)
-	y += 30
-	draw_string(_cond, Vector2(x + 12, y), str(town["name"]).to_upper(), HORIZONTAL_ALIGNMENT_LEFT, w - 24, 22, Color.WHITE)
+	var y := 66.0
+	var ix := x + 14.0
+	var iw := w - 28.0
+	draw_string(_small_spaced, Vector2(ix, y), tr("STADT"), HORIZONTAL_ALIGNMENT_LEFT, -1, 6, UI.FAINT)
+	y += 20
+	# Name passt immer: erst kleiner, sonst zweizeilig (bis 2.34 wurde "FRANKFURT AM MAIN" abgeschnitten)
+	var name := str(town["name"]).to_upper()
+	var fs := 18
+	while fs > 12 and _title_font.get_string_size(name, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x > iw:
+		fs -= 1
+	if _title_font.get_string_size(name, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x > iw:
+		draw_multiline_string(_title_font, Vector2(ix, y), name, HORIZONTAL_ALIGNMENT_LEFT, iw, fs, 2, UI.TEXT)
+		y += fs + 2
+	else:
+		draw_string(_title_font, Vector2(ix, y), name, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, UI.TEXT)
+	draw_rect(Rect2(ix, y + 7, 14, 2), UI.ACCENT)
 	y += 22
 	var km := (town["pos"] as Vector3).distance_to(player.global_position) / 1000.0 if player else 0.0
-	draw_string(_cond, Vector2(x + 12, y), tr("Luftlinie: %.1f km") % km, HORIZONTAL_ALIGNMENT_LEFT, w - 24, 13, Color(0.7, 0.75, 0.85))
-	y += 32
+	draw_string(_body, Vector2(ix, y), tr("Luftlinie: %.1f km") % km, HORIZONTAL_ALIGNMENT_LEFT, iw, 8, UI.DIM)
+	y += 26
 	# Rennen der Stadt: Art, Name, Stand (gewonnen, offen, ab Level n), Bestwert
 	for i in town["pins"]:
 		var race: Dictionary = Catalog.RACES[pins[i]["race_index"]]
 		var type: String = race.get("type", "sprint")
-		var name: String = race["name"]
-		var won: bool = name in GameState.won_events
-		var open_: bool = GameState.career_open(name)
-		var col: Color = UI.TYPE_COL.get(type, UI.CYAN) if open_ else Color(0.45, 0.47, 0.52)
-		draw_circle(Vector2(x + 18, y - 4), 4.0, Color(1.0, 0.8, 0.2) if won else col)
-		draw_string(_cond, Vector2(x + 28, y), tr(name).to_upper(), HORIZONTAL_ALIGNMENT_LEFT, w - 34, 12,
-			Color.WHITE if open_ else Color(0.6, 0.62, 0.68))
-		y += 17
-		var status := tr("GEWONNEN") if won else (tr("OFFEN") if open_ else GameState.lock_text(name).to_upper())
+		var name_r: String = race["name"]
+		var won: bool = name_r in GameState.won_events
+		var open_: bool = GameState.career_open(name_r)
+		var col: Color = UI.TYPE_COL.get(type, UI.CYAN) if open_ else UI.FAINT
+		draw_circle(Vector2(ix + 3, y - 3.5), 2.6, UI.GOLD if won else col)
+		draw_string(_cond, Vector2(ix + 12, y), tr(name_r).to_upper(), HORIZONTAL_ALIGNMENT_LEFT, iw - 12, 10,
+			UI.TEXT if open_ else UI.DIM)
+		y += 13
+		var status := tr("GEWONNEN") if won else (tr("OFFEN") if open_ else GameState.lock_text(name_r).to_upper())
 		status = tr({"sprint": "SPRINT", "circuit": "RUNDKURS", "drift": "DRIFT"}.get(type, "")) + "  ·  " + status
-		if GameState.best_times.has(name):
-			var t: float = GameState.best_times[name]
+		if GameState.best_times.has(name_r):
+			var t: float = GameState.best_times[name_r]
 			status += "  ·  " + ("%d P" % int(t) if type == "drift" else "%d:%05.2f" % [int(t / 60.0), fmod(t, 60.0)])
-		draw_string(_cond, Vector2(x + 28, y), status, HORIZONTAL_ALIGNMENT_LEFT, w - 34, 9,
-			Color(1.0, 0.8, 0.2) if won else Color(0.75, 0.8, 0.9))
-		y += 26
+		draw_string(_small_spaced, Vector2(ix + 12, y), status, HORIZONTAL_ALIGNMENT_LEFT, iw - 12, 6,
+			UI.GOLD if won else UI.DIM)
+		y += 20
+	# Tasten als Kappen (aus dem übersetzten Hinweistext: "Taste: Wort" bzw. "←/→ Wort")
 	var hint := tr("←/→ Stadt wählen\nLeertaste: Schnellreise\nEnter: Rennen als Ziel\nM / Esc: zurück")
 	if town_of(target) == sel:
 		hint = tr("Ziel gesetzt. Enter: Ziel löschen\nLeertaste: Schnellreise\nM / Esc: zurück")
-	var yy := size.y - 126
-	for line in hint.split("\n"):
-		draw_string(_cond, Vector2(x + 12, yy), line, HORIZONTAL_ALIGNMENT_LEFT, w - 24, 11, Color(0.75, 0.8, 0.9, 0.85))
-		yy += 16
+	var lines := hint.split("\n")
+	var yy := size.y - 46.0 - lines.size() * 15.0
+	draw_rect(Rect2(ix, yy - 9, iw, 1), UI.LINE)
+	for line in lines:
+		var key := ""
+		var word := line
+		var c := line.find(": ")
+		if c >= 0:
+			key = line.substr(0, c)
+			word = line.substr(c + 2)
+		elif line.begins_with("←/→ "):
+			key = "←/→"
+			word = line.substr(4)
+		if key.contains(". "):
+			# "Ziel gesetzt. Enter" -> Satz vorn als Text, Taste dahinter
+			var dot := key.rfind(". ")
+			draw_string(_body, Vector2(ix, yy + 9), key.substr(0, dot + 1), HORIZONTAL_ALIGNMENT_LEFT, -1, 8, UI.TEXT)
+			var pre := _body.get_string_size(key.substr(0, dot + 2), HORIZONTAL_ALIGNMENT_LEFT, -1, 8).x
+			UI.draw_hint(self, Vector2(ix + pre + 2.0, yy), key.substr(dot + 2).to_upper(), word, 6)
+		elif key != "":
+			UI.draw_hint(self, Vector2(ix, yy), key.to_upper().replace(" / ", " "), word, 6)
+		else:
+			draw_string(_body, Vector2(ix, yy + 9), line, HORIZONTAL_ALIGNMENT_LEFT, iw, 8, UI.DIM)
+		yy += 15.0

@@ -26,9 +26,11 @@ var strip_box: HBoxContainer
 var _strip_mode := false
 var _fade_left: TextureRect
 var _info_panel: PanelContainer
-var _keys: Label
+var _keys: HBoxContainer
+var _xp_line: Control
+var _status_text := ""
 var title: Label
-var info: Label
+var info: InfoText
 var status: Label
 var section: Label
 var stats: VBoxContainer
@@ -73,15 +75,15 @@ func _build_scene() -> void:
 	world = pv.world
 	var env := Environment.new()
 	env.background_mode = Environment.BG_COLOR
-	env.background_color = Color(0.01, 0.01, 0.02)
+	env.background_color = Color(0.008, 0.009, 0.012)
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color(0.3, 0.3, 0.45)
-	env.ambient_light_energy = 0.3
+	env.ambient_light_color = Color(0.32, 0.34, 0.4)
+	env.ambient_light_energy = 0.26
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
-	env.glow_intensity = 1.0
-	env.glow_hdr_threshold = 0.9
+	env.glow_intensity = 0.6  # nur Scheinwerfer und Rückleuchten strahlen leicht über
+	env.glow_hdr_threshold = 1.0
 	# Spiegelungen: ohne sie spiegelt der Lack nur das Schwarz der Halle, Glanz und Matt sähen gleich aus.
-	# Ein unsichtbarer Studio-Himmel (Lichtbänder an der Decke, Neonröhren) steht nur im Lack und im Boden.
+	# Ein unsichtbarer Studio-Himmel (Lichtbänder an der Decke, Softboxen) steht nur im Lack und im Boden.
 	var sky_m := ShaderMaterial.new()
 	sky_m.shader = preload("res://shaders/studio_sky.gdshader")
 	env.sky = Sky.new()
@@ -97,7 +99,10 @@ func _build_scene() -> void:
 	we.environment = env
 	world.add_child(we)
 
-	var floor_m := Builder.mat(Color(0.05, 0.05, 0.06), 0.4, 0.12)
+	# Seit 2.35 ein ruhiges Fotostudio statt Neonröhren und leuchtendem Bodenring: dunkler, matt glänzender Boden,
+	# ein Lichtkegel von oben auf das Auto, ein Wandstrahler malt ein weiches Lichtfeld auf die Rückwand, ein kühles
+	# Kantenlicht von hinten zeichnet Dach und Flanken nach. Das Auto ist der hellste Punkt im Bild.
+	var floor_m := Builder.mat(Color(0.05, 0.051, 0.056), 0.0, 0.34)
 	var floor_mi := MeshInstance3D.new()
 	var pm := PlaneMesh.new()
 	pm.size = Vector2(40, 40)
@@ -105,7 +110,7 @@ func _build_scene() -> void:
 	floor_mi.material_override = floor_m
 	world.add_child(floor_mi)
 
-	var wall_m := Builder.mat(Color(0.08, 0.08, 0.1), 0.1, 0.8)
+	var wall_m := Builder.mat(Color(0.13, 0.135, 0.145), 0.0, 0.92)
 	for w in [[Vector3(0, 4, -7), Vector3(30, 8, 0.4)], [Vector3(-8, 4, 0), Vector3(0.4, 8, 30)]]:
 		var mi := MeshInstance3D.new()
 		mi.mesh = Builder.box(w[1])
@@ -113,34 +118,40 @@ func _build_scene() -> void:
 		mi.position = w[0]
 		world.add_child(mi)
 
-	# Neonröhren an den Wänden
-	var tubes := [[Vector3(0, 2.2, -6.75), Vector3(14, 0.08, 0.08), Color(1, 0.1, 0.6)],
-		[Vector3(0, 3.0, -6.75), Vector3(14, 0.08, 0.08), Color(0.1, 0.7, 1)],
-		[Vector3(-7.75, 2.6, 0), Vector3(0.08, 0.08, 12), Color(0.1, 0.7, 1)]]
-	for t in tubes:
-		var mi := MeshInstance3D.new()
-		mi.mesh = Builder.box(t[1])
-		mi.material_override = Builder.mat(t[2], 0, 0.5, t[2], 6.0)
-		mi.position = t[0]
-		world.add_child(mi)
-		var l := OmniLight3D.new()
-		l.light_color = t[2]
-		l.light_energy = 2.0
-		l.omni_range = 9.0
-		l.position = t[0] + Vector3(0.6 if t[0].x < -7 else 0.0, 0, 0.6 if t[0].z < -6 else 0.0)
-		world.add_child(l)
-
 	var top := SpotLight3D.new()
 	top.position = Vector3(0, 6, 1)
 	top.rotation_degrees.x = -80
 	top.spot_range = 10
-	top.spot_angle = 40
-	top.light_energy = 3.0
+	top.spot_angle = 38
+	top.spot_angle_attenuation = 0.6
+	top.light_energy = 3.2
+	top.light_color = Color(1.0, 0.97, 0.93)
 	top.shadow_enabled = true
 	world.add_child(top)
+	# Wandstrahler: weiches Lichtfeld auf der Rückwand, genau dort, wo man sie hinter dem Auto sieht (statt Neonröhren)
+	var wash := SpotLight3D.new()
+	wash.position = Vector3(-4.6, 6.8, -3.2)
+	world.add_child(wash)
+	wash.look_at_from_position(wash.position, Vector3(-5.6, 1.6, -6.8), Vector3.UP)
+	wash.spot_range = 12
+	wash.spot_angle = 44
+	wash.spot_angle_attenuation = 1.4
+	wash.spot_attenuation = 0.35  # kaum Abfall über die Entfernung: das Feld auf der Wand bleibt weich und gleichmäßig
+	wash.light_energy = 1.1
+	wash.light_color = Color(0.9, 0.93, 1.0)
+	# Kantenlicht von hinten links: Silhouette, Dachlinie, Glanz auf dem Lack, während das Auto sich dreht
+	var rim := SpotLight3D.new()
+	rim.position = Vector3(-4.5, 3.4, -4.8)
+	world.add_child(rim)
+	rim.look_at_from_position(rim.position, Vector3(0, 0.7, 0), Vector3.UP)
+	rim.spot_range = 13
+	rim.spot_angle = 26
+	rim.light_energy = 3.5
+	rim.light_color = Color(0.82, 0.88, 1.0)
 	var fill := OmniLight3D.new()
 	fill.position = Vector3(4, 2, 4)
-	fill.light_energy = 0.8
+	fill.light_energy = 0.7
+	fill.light_color = Color(1.0, 0.96, 0.9)
 	fill.omni_range = 10
 	world.add_child(fill)
 
@@ -151,17 +162,19 @@ func _build_scene() -> void:
 	cm.top_radius = 3.2
 	cm.bottom_radius = 3.2
 	cm.height = 0.06
-	cm.radial_segments = 48
+	cm.radial_segments = 64
 	disc.mesh = cm
-	disc.material_override = Builder.mat(Color(0.12, 0.12, 0.14), 0.7, 0.3)
+	disc.material_override = Builder.mat(Color(0.06, 0.062, 0.068), 0.55, 0.38)
 	disc.position.y = 0.03
 	turntable.add_child(disc)
+	# feine Metallkante statt des Leuchtrings: fängt nur Licht, leuchtet nicht selbst
 	var ring := MeshInstance3D.new()
 	var tm := TorusMesh.new()
-	tm.inner_radius = 3.15
-	tm.outer_radius = 3.25
+	tm.inner_radius = 3.17
+	tm.outer_radius = 3.23
+	tm.rings = 96
 	ring.mesh = tm
-	ring.material_override = Builder.mat(Color(0.1, 0.7, 1), 0, 0.5, Color(0.1, 0.7, 1), 4.0)
+	ring.material_override = Builder.mat(Color(0.32, 0.33, 0.36), 0.9, 0.22)
 	ring.position.y = 0.06
 	world.add_child(ring)
 
@@ -185,95 +198,107 @@ func _build_ui() -> void:
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.theme = UI.theme()
 	layer.add_child(root)
-	# Abdunklung links (Menü) und unten (Tastenleiste), das Auto bleibt frei
-	var fade := UI.fade_rect(root, Color(0, 0, 0, 0.8))
-	fade.size = Vector2(330, 2000)
+	# Vignette und weiche Abdunklung links (Menü), oben (Kopf) und unten (Hinweise); das Auto bleibt frei und hell
+	UI.vignette(root, 0.62)
+	var fade := UI.fade_rect(root, Color(0, 0, 0, 0.74))
+	fade.anchor_bottom = 1.0
+	fade.offset_right = 310.0
 	_fade_left = fade
-	var bar := ColorRect.new()
-	bar.color = Color(0, 0, 0, 0.7)
-	bar.anchor_top = 1.0
-	bar.anchor_bottom = 1.0
-	bar.anchor_right = 1.0
-	bar.offset_top = -18.0
-	root.add_child(bar)
-	var bar_line := ColorRect.new()
-	bar_line.color = Color(UI.GREEN.r, UI.GREEN.g, UI.GREEN.b, 0.8)
-	bar_line.anchor_top = 1.0
-	bar_line.anchor_bottom = 1.0
-	bar_line.anchor_right = 1.0
-	bar_line.offset_top = -19.0
-	bar_line.offset_bottom = -18.0
-	root.add_child(bar_line)
+	var top_fade := UI.fade_rect(root, Color(0, 0, 0, 0.5), false)
+	top_fade.anchor_right = 1.0
+	top_fade.offset_bottom = 60.0
+	var bottom_fade := UI.fade_rect(root, Color(0, 0, 0, 0.78), false)
+	bottom_fade.flip_v = true
+	bottom_fade.anchor_top = 1.0
+	bottom_fade.anchor_bottom = 1.0
+	bottom_fade.anchor_right = 1.0
+	bottom_fade.offset_top = -46.0
+	var hair := ColorRect.new()
+	hair.color = UI.LINE
+	hair.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hair.anchor_top = 1.0
+	hair.anchor_bottom = 1.0
+	hair.anchor_right = 1.0
+	hair.offset_left = 14.0
+	hair.offset_right = -14.0
+	hair.offset_top = -21.0
+	hair.offset_bottom = -20.0
+	root.add_child(hair)
 
-	# Logo oben links
-	var small := _label(root, 9)
-	small.label_settings.font = UI.font("wide", 0.15)
+	# Wortmarke oben links: klein und ruhig, der Abschnittstitel darunter trägt die Seite
+	var small := UI.label(root, 6, "wide", UI.DIM, 2)
 	small.text = "NEED FOR"
-	small.position = Vector2(14, 6)
-	title = _label(root, 17)
-	title.label_settings.font = UI.font("cond", 0.2)
+	small.position = Vector2(14.5, 9)
+	title = UI.label(root, 12, "cond", UI.TEXT, 1)
 	title.text = "GESCHWINDIGKEIT"
-	title.label_settings.font_color = UI.CYAN
-	title.label_settings.shadow_color = Color(UI.PINK.r, UI.PINK.g, UI.PINK.b, 0.25)
-	title.label_settings.shadow_size = 4
-	title.label_settings.shadow_offset = Vector2.ZERO
-	title.position = Vector2(13, 15)
-	section = UI.section(root, Vector2(14, 38))
+	title.position = Vector2(14, 16)
+	section = UI.section(root, Vector2(14, 40))
 
 	menu_scroll = ScrollContainer.new()
 	menu_scroll.anchor_bottom = 1.0
 	menu_scroll.offset_left = 14.0
 	menu_scroll.offset_right = 262.0
-	menu_scroll.offset_top = 86.0
-	menu_scroll.offset_bottom = -24.0
+	menu_scroll.offset_top = 80.0
+	menu_scroll.offset_bottom = -26.0
 	menu_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	menu_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER
 	menu_scroll.follow_focus = true
 	root.add_child(menu_scroll)
 	menu = VBoxContainer.new()
 	menu.custom_minimum_size = Vector2(226, 0)
-	menu.add_theme_constant_override("separation", 3)
+	menu.add_theme_constant_override("separation", 1)
 	menu_scroll.add_child(menu)
 
-	# Streckenkarte rechts (nur in der Karriere-Liste)
+	# Deutschlandkarte rechts (Startstadt, Karriere-Liste)
 	career_map = CareerMap.new()
 	career_map.anchor_left = 1.0
 	career_map.anchor_right = 1.0
 	career_map.anchor_bottom = 1.0
 	career_map.offset_left = -196.0
 	career_map.offset_right = -14.0
-	career_map.offset_top = 46.0
-	career_map.offset_bottom = -100.0
+	career_map.offset_top = 54.0
+	career_map.offset_bottom = -104.0
 	career_map.visible = false
 	root.add_child(career_map)
 
-	# oben rechts: Stand, Tipp, Leistung des Autos
-	status = _label(root, 10, HORIZONTAL_ALIGNMENT_RIGHT)
-	status.label_settings.font = UI.font("bold", 0.12)
+	# oben rechts: Stand mit Erfahrungs-Haarlinie, Tipp, Werte des Autos
+	status = UI.label(root, 7, "wide", UI.DIM, 1, HORIZONTAL_ALIGNMENT_RIGHT)
 	status.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	status.offset_left = -330.0
-	status.offset_right = -12.0
-	status.offset_top = 8.0
-	tip = _label(root, 9, HORIZONTAL_ALIGNMENT_RIGHT)
-	tip.label_settings.font = UI.font("bold", 0.12)
-	tip.label_settings.font_color = UI.CYAN
+	status.offset_left = -420.0
+	status.offset_right = -14.0
+	status.offset_top = 9.0
+	_xp_line = Control.new()
+	_xp_line.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_xp_line.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	_xp_line.offset_left = -134.0
+	_xp_line.offset_right = -14.0
+	_xp_line.offset_top = 22.0
+	_xp_line.offset_bottom = 23.0
+	_xp_line.draw.connect(func():
+		var li := GameState.level_info()
+		var w := _xp_line.size.x
+		var k := clampf(float(li["into"]) / maxf(float(li["need"]), 1.0), 0.0, 1.0)
+		_xp_line.draw_rect(Rect2(0, 0, w, 1), UI.LINE_HI)
+		_xp_line.draw_rect(Rect2(w * (1.0 - k), 0, w * k, 1), UI.ACCENT))
+	root.add_child(_xp_line)
+	tip = UI.label(root, 7, "bold", UI.FAINT, 0, HORIZONTAL_ALIGNMENT_RIGHT)
 	tip.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	tip.offset_left = -330.0
-	tip.offset_right = -12.0
-	tip.offset_top = 22.0
+	tip.offset_left = -300.0
+	tip.offset_right = -14.0
+	tip.offset_top = 27.0
 	tip.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	var sp := PanelContainer.new()
 	sp.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	sp.offset_left = -232.0
-	sp.offset_right = -12.0
-	sp.offset_top = 50.0
+	sp.offset_left = -226.0
+	sp.offset_right = -14.0
+	sp.offset_top = 54.0
 	sp.grow_horizontal = Control.GROW_DIRECTION_BEGIN
 	root.add_child(sp)
 	stats = VBoxContainer.new()
-	stats.add_theme_constant_override("separation", 1)
+	stats.add_theme_constant_override("separation", 2)
 	sp.add_child(stats)
 
-	# Infotext in einer Glasfläche unten rechts
+	# Infotext in einer Glasfläche unten rechts (erste Zeile als Kopf)
 	var panel := PanelContainer.new()
 	_info_panel = panel
 	panel.anchor_left = 1.0
@@ -282,15 +307,12 @@ func _build_ui() -> void:
 	panel.anchor_bottom = 1.0
 	panel.offset_left = -300.0
 	panel.offset_right = -14.0
-	panel.offset_top = -92.0
-	panel.offset_bottom = -26.0
+	panel.offset_top = -82.0
+	panel.offset_bottom = -28.0
 	panel.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	root.add_child(panel)
-	info = _label(panel, 10)
-	info.label_settings.font = UI.font("bold", 0.0)
-	info.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
-	info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	info.custom_minimum_size = Vector2(250, 0)
+	info = InfoText.new()
+	panel.add_child(info)
 
 	# Tuning-Leiste unten (Kacheln, die gewählte steht in der Mitte); Verlauf dahinter, damit sie vor dem Auto lesbar ist
 	strip = Control.new()
@@ -303,87 +325,168 @@ func _build_ui() -> void:
 	strip.visible = false
 	strip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(strip)
-	var sfade := UI.fade_rect(strip, Color(0, 0, 0, 0.75), false)
-	sfade.set_anchors_preset(Control.PRESET_FULL_RECT)
+	var sfade := UI.fade_rect(strip, Color(0, 0, 0, 0.6), false)
+	sfade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	sfade.flip_v = true
 	strip_box = HBoxContainer.new()
-	strip_box.add_theme_constant_override("separation", 8)
+	strip_box.add_theme_constant_override("separation", 6)
 	strip_box.position = Vector2(0, 8)
 	strip.add_child(strip_box)
 	for side in [-1, 1]:
-		var arrow := _label(strip, 16, HORIZONTAL_ALIGNMENT_CENTER)
-		arrow.text = "◀" if side < 0 else "▶"
-		arrow.label_settings.font_color = UI.GREEN
+		# Kacheln laufen an den Rändern weich aus, darauf der Pfeil (nur wenn dort noch Kacheln sind)
+		var ef := UI.fade_rect(strip, Color(0, 0, 0, 0.88))
+		ef.anchor_bottom = 1.0
+		if side > 0:
+			ef.anchor_left = 1.0
+			ef.anchor_right = 1.0
+			ef.offset_left = -48.0
+			ef.flip_h = true
+		else:
+			ef.offset_right = 48.0
+		ef.set_meta("arrow", side)
+		var arrow := UI.label(strip, 14, "cond", UI.DIM, 0, HORIZONTAL_ALIGNMENT_CENTER)
+		arrow.text = "‹" if side < 0 else "›"
 		arrow.anchor_left = 0.0 if side < 0 else 1.0
 		arrow.anchor_right = arrow.anchor_left
-		arrow.offset_left = 2.0 if side < 0 else -20.0
-		arrow.offset_right = 20.0 if side < 0 else -2.0
-		arrow.offset_top = 20.0
+		arrow.offset_left = 3.0 if side < 0 else -19.0
+		arrow.offset_right = 19.0 if side < 0 else -3.0
+		arrow.offset_top = 19.0
 		arrow.set_meta("arrow", side)
 
-	var keys := _label(root, 9)
-	_keys = keys
-	keys.label_settings.font = UI.font("bold", 0.12)
-	keys.text = tr("ENTER  Auswählen      ESC  Zurück      ←/→ A/D  Ändern      F11  Vollbild") + "      " + tr(",  Radio")
-	keys.anchor_top = 1.0
-	keys.anchor_bottom = 1.0
-	keys.offset_left = 14.0
-	keys.offset_top = -16.0
-	keys.offset_right = 400.0
+	# Tastenhinweise als Kappen (auf Handy und Tablet ohne Tastatur nicht nötig)
+	_keys = HBoxContainer.new()
+	_keys.add_theme_constant_override("separation", 12)
+	_keys.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_keys.anchor_top = 1.0
+	_keys.anchor_bottom = 1.0
+	_keys.offset_left = 14.0
+	_keys.offset_top = -16.0
+	_keys.offset_bottom = -4.0
+	_keys.visible = not GameState.is_mobile()
+	root.add_child(_keys)
+	_set_keys(KEYS_MENU)
 	_tip_i = randi() % TIPS.size()
 	tip.text = tr("TIPP: ") + tr(TIPS[_tip_i])
 
 
-## Leistungsbalken wie im Autohaus (10 Segmente), Motor-Tuning eingerechnet
+## Tastenhinweise (übersetzter Text "TASTE  Wort      TASTE  Wort", siehe UI.parse_hints)
+const KEYS_MENU := "ENTER  Auswählen      ESC  Zurück      ←/→ A/D  Ändern      F11  Vollbild"
+const KEYS_STRIP := "←/→  Auswählen      ENTER  Einbauen/Öffnen      ESC  Zurück      F11  Vollbild"
+const KEYS_GRID := "PFEILE  Farbe wählen      ENTER  Einbauen      ESC  Zurück      F11  Vollbild"
+var _keys_text := ""
+
+
+func _set_keys(key_text: String) -> void:
+	if key_text == _keys_text:
+		return
+	_keys_text = key_text
+	var t := tr(key_text)
+	if key_text == KEYS_MENU:
+		t += "      " + tr(",  Radio")
+	UI.hint_bar(_keys, t)
+
+
+## Infofeld: die erste Zeile als Kopf (weiß), der Rest leiser darunter; ohne Zeilenumbruch nur der leise Text.
+## Neuer Text blendet kurz ein. Garage setzt info.text wie bei einem Label.
+class InfoText extends VBoxContainer:
+	var head: Label
+	var body: Label
+	var _text := ""
+	var _tw: Tween
+	var text: String:
+		get:
+			return _text
+		set(v):
+			if v == _text:
+				return
+			_text = v
+			var i := v.find("\n")
+			head.text = "" if i < 0 else v.substr(0, i)
+			body.text = v if i < 0 else v.substr(i + 1).strip_edges(true, false)
+			head.visible = head.text != ""
+			body.visible = body.text != ""
+			if is_inside_tree():
+				if _tw:
+					_tw.kill()
+				modulate.a = 0.3
+				_tw = create_tween()
+				_tw.tween_property(self, "modulate:a", 1.0, 0.16)
+
+	func _init() -> void:
+		add_theme_constant_override("separation", 3)
+		alignment = BoxContainer.ALIGNMENT_CENTER  # feste Mindesthöhe der Fläche, Text mittig darin
+		custom_minimum_size = Vector2(258, 0)
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		head = UI.label(self, 9, "wide", UI.TEXT)
+		head.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		body = UI.label(self, 8, "bold", Color(0.72, 0.75, 0.8))
+		body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		body.label_settings.line_spacing = 1.0
+
+
+## Wertekarte wie im Autohaus: Name, Klasse und Leistungsindex, vier Balken (10 Segmente), Motor-Tuning eingerechnet.
+## Segmente hell, in der Tuning-Vorschau der Zuwachs im Akzent und der Verlust rot.
 func _show_stats(car_id: String, cfg: Dictionary, base := {}) -> void:
 	for c in stats.get_children():
+		stats.remove_child(c)
 		c.queue_free()
 	var st := Catalog.stats(car_id, cfg)
 	var bs := Catalog.stats(car_id, base if not base.is_empty() else cfg)
-	var head := _label(stats, 10, HORIZONTAL_ALIGNMENT_RIGHT)
-	head.label_settings.font = UI.font("cond", 0.2)
-	head.label_settings.font_color = UI.GREEN
+	var name_l := UI.label(stats, 12, "cond", UI.TEXT, 1)
+	name_l.text = str(Catalog.CARS[car_id]["name"]).to_upper()
+	var head := UI.label(stats, 7, "wide", UI.DIM, 1)
 	# Klasse und Leistungsindex: zeigt, dass die Autos der Klasse S gleich stark sind; Tuning-Vorschau mit Zuwachs
 	var pi := Catalog.rating(car_id, cfg)
 	var pi0 := Catalog.rating(car_id, base if not base.is_empty() else cfg)
 	head.text = tr("KLASSE %s  ·  LEISTUNG %d") % [Catalog.CARS[car_id].get("class", "-"), pi]
 	if pi != pi0:
 		head.text += "  (%+d)" % (pi - pi0)
+		head.label_settings.font_color = UI.ACCENT if pi > pi0 else UI.LOSS
+	var gap := Control.new()
+	gap.custom_minimum_size = Vector2(0, 3)
+	stats.add_child(gap)
 	for row in [["BESCHLEUNIGUNG", "accel", 9.0, 17.0], ["TOPSPEED", "top", 54.0, 90.0], ["GRIP", "grip", 19.0, 38.0],
 			["DRIFT", "drift", 0.0, 1.0]]:
 		var hb := HBoxContainer.new()
 		hb.add_theme_constant_override("separation", 2)
 		stats.add_child(hb)
-		var l := _label(hb, 8)
-		l.label_settings.font = UI.font("bold", 0.12)
+		var l := UI.label(hb, 7, "wide", UI.DIM, 1)
 		l.text = tr(row[0])
-		l.custom_minimum_size = Vector2(76, 0)
+		l.custom_minimum_size = Vector2(80, 0)
 		var n := int(round(clampf((st[row[1]] - row[2]) / (row[3] - row[2]), 0.05, 1.0) * 10.0))
 		var n0 := int(round(clampf((bs[row[1]] - row[2]) / (row[3] - row[2]), 0.05, 1.0) * 10.0))
 		for k in 10:
 			var seg := ColorRect.new()
-			seg.custom_minimum_size = Vector2(11, 6)
+			seg.custom_minimum_size = Vector2(9, 3)
 			seg.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+			seg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			if k < mini(n, n0):
-				seg.color = UI.GREEN
+				seg.color = Color(0.86, 0.88, 0.92)
 			elif k < n:
-				seg.color = UI.CYAN  # Gewinn durch das Teil in der Vorschau
+				seg.color = UI.ACCENT  # Gewinn durch das Teil in der Vorschau
 			elif k < n0:
-				seg.color = Color(1.0, 0.25, 0.2, 0.8)  # Verlust
+				seg.color = UI.LOSS  # Verlust
 			else:
-				seg.color = Color(1, 1, 1, 0.12)
+				seg.color = Color(1, 1, 1, 0.1)
 			hb.add_child(seg)
-	var top := _label(stats, 8, HORIZONTAL_ALIGNMENT_RIGHT)
-	top.label_settings.font = UI.font("bold", 0.12)
-	top.label_settings.font_color = UI.CYAN
+	var top := UI.label(stats, 7, "wide", UI.DIM, 1, HORIZONTAL_ALIGNMENT_RIGHT)
 	top.text = "%d KM/H" % int(st["top"] * 3.6)
 
 
 func _set_section(text: String, with_stats := false) -> void:
 	section.text = tr(text)
-	stats.get_parent().visible = with_stats
+	var card: Control = stats.get_parent()
+	if with_stats and not card.visible:
+		_fade_in(card)
+	card.visible = with_stats
 	if with_stats:
 		_show_stats(preview_car, preview_cfg)
+
+
+## Fläche weich einblenden (Wertekarte, Karte), statt sie hart erscheinen zu lassen
+func _fade_in(c: CanvasItem) -> void:
+	c.modulate.a = 0.0
+	create_tween().tween_property(c, "modulate:a", 1.0, 0.22).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 
 
 var _cam_view := ""  # "" = Drehteller kreist, sonst Kategorie, deren Teil die Kamera zeigt
@@ -434,25 +537,21 @@ func _view_for(cat: String) -> Array:
 
 
 func _label(parent: Node, size: int, align := HORIZONTAL_ALIGNMENT_LEFT) -> Label:
-	var l := Label.new()
-	var ls := LabelSettings.new()
-	ls.font_size = size
-	ls.outline_size = 3
-	ls.outline_color = Color(0, 0, 0, 0.9)
-	l.label_settings = ls
-	l.horizontal_alignment = align
-	parent.add_child(l)
-	return l
+	return UI.label(parent, size, "bold", UI.TEXT, 0, align)
 
 
 func _process(dt: float) -> void:
 	_t += dt
 	_update_preview(dt)
 	_tip_t += dt
-	if _tip_t > 6.0:
+	if _tip_t > 8.0:
+		# Tipp wechselt mit kurzer Blende statt zu springen
 		_tip_t = 0.0
 		_tip_i = (_tip_i + 1) % TIPS.size()
-		tip.text = tr("TIPP: ") + tr(TIPS[_tip_i])
+		var tw := create_tween()
+		tw.tween_property(tip, "modulate:a", 0.0, 0.25)
+		tw.tween_callback(func(): tip.text = tr("TIPP: ") + tr(TIPS[_tip_i]))
+		tw.tween_property(tip, "modulate:a", 1.0, 0.35)
 	var goal_pos := Vector3(4.6 + sin(_t * 0.2) * 0.2, 1.7 + sin(_t * 0.3) * 0.08, 5.6)
 	var goal_look := Vector3(-1.6, 0.55, 0)
 	var goal_off := 0.0
@@ -477,9 +576,13 @@ func _process(dt: float) -> void:
 	cam.v_offset = lerpf(cam.v_offset, goal_v, k)
 	cam.position = _cam_pos
 	cam.look_at(_cam_look)
-	_work_light.light_energy = lerpf(_work_light.light_energy, 0.0 if _cam_view == "" else 1.4, k)
-	status.text = tr("LEVEL %d   ·   %s   ·   SIEGE %d   ·   %s") % [GameState.level(), GameState.title_name().to_upper(), GameState.wins + GameState.drift_wins,
+	_work_light.light_energy = lerpf(_work_light.light_energy, 0.0 if _cam_view == "" else 1.0, k)
+	var st := tr("LEVEL %d   ·   %s   ·   SIEGE %d   ·   %s") % [GameState.level(), GameState.title_name().to_upper(), GameState.wins + GameState.drift_wins,
 		Catalog.CARS[GameState.current_car]["name"].to_upper()]
+	if st != _status_text:
+		_status_text = st
+		status.text = st
+		_xp_line.queue_redraw()
 
 
 func _show_car(car_id: String, cfg: Dictionary) -> void:
@@ -503,22 +606,108 @@ func _clear_menu() -> void:
 	_strip_on(false)
 	career_map.visible = false
 	menu_scroll.scroll_vertical = 0
+	_menu_width(226.0)
 	for c in menu.get_children():
 		menu.remove_child(c)
 		c.queue_free()
 
 
+## Breite der Liste: 226, Einstellungen mit Wert rechts breiter (sonst würden lange Namen gekürzt)
+func _menu_width(w: float) -> void:
+	menu.custom_minimum_size.x = w
+	menu_scroll.offset_right = 14.0 + w + 22.0
+
+
+## Listeneintrag: Text links, "< Zurück" mit Abstand darüber und leiser, "Grafik  >" mit Pfeil rechts statt im Text
 func _button(text: String, cb: Callable, disabled := false) -> Button:
 	var b := Button.new()
-	b.text = tr(text).to_upper()
+	b.theme_type_variation = "MenuItem"
+	var t := tr(text)
+	var back := t.begins_with("< ")
+	var more := t.ends_with(" >")
+	if back:
+		t = "‹  " + t.substr(2)
+	if more:
+		t = t.trim_suffix(">").strip_edges()
+	b.text = t.to_upper()
 	b.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
 	b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	b.disabled = disabled
 	b.focus_entered.connect(func(): Sfx.ui("move"))
 	b.pressed.connect(func(): _press_sound(b))
 	b.pressed.connect(cb)
+	if back and menu.get_child_count() > 0:
+		_gap(6.0)
 	menu.add_child(b)
+	_item_fx(b)
+	if back:
+		b.add_theme_color_override("font_color", UI.DIM)
+	if more:
+		_row_value(b, "›")
 	return b
+
+
+## Abstand in der Liste (vor "Zurück", zwischen Gruppen)
+func _gap(h: float) -> void:
+	var g := Control.new()
+	g.custom_minimum_size = Vector2(0, h)
+	g.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	menu.add_child(g)
+
+
+## Auswahl-Effekt eines Listeneintrags: Strich und Verlauf wachsen ein (UI.menu_fx), der Text rückt dabei ein paar
+## Pixel nach rechts; Maus darüber = Fokus. Jeder Eintrag hat eine eigene (leere) Fläche, deren Rand sich bewegt.
+func _item_fx(b: Button) -> void:
+	var box := StyleBoxEmpty.new()
+	box.content_margin_left = 12.0
+	box.content_margin_right = 12.0
+	var pad := 5.0 if GameState.is_mobile() else 3.0  # Touch: etwas höhere Einträge zum Tippen
+	box.content_margin_top = pad
+	box.content_margin_bottom = pad
+	for st in ["normal", "hover", "pressed", "hover_pressed", "disabled"]:
+		b.add_theme_stylebox_override(st, box)
+	b.set_meta("box", box)
+	UI.menu_fx(b, "left")
+	var nudge := func(on: bool):
+		if b.has_meta("nudge"):
+			(b.get_meta("nudge") as Tween).kill()
+		var tw := b.create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+		tw.tween_property(box, "content_margin_left", 15.0 if on else 12.0, 0.2 if on else 0.14)
+		b.set_meta("nudge", tw)
+	b.focus_entered.connect(nudge.bind(true))
+	b.focus_exited.connect(nudge.bind(false))
+
+
+## Wert rechts im Eintrag (Einstellungen, Titel, Autohaus): eigenes Label am rechten Rand; der Text links wird davor
+## gekürzt. Mit Fokus hell, sonst leise; arrows: im Fokus "‹ WERT ›" (Links/Rechts ändert)
+func _row_value(b: Button, text: String, col := UI.DIM, arrows := false) -> Label:
+	var v: Label = b.get_node_or_null("V")
+	if v == null:
+		v = UI.label(b, 8, "wide", col, 1, HORIZONTAL_ALIGNMENT_RIGHT)
+		v.name = "V"
+		v.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		v.offset_right = -10.0
+		v.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		v.label_settings.shadow_color = Color(0, 0, 0, 0)
+		var paint := func():
+			var on := b.has_focus()
+			var base: String = v.get_meta("text", "")
+			var c: Color = v.get_meta("col", UI.DIM)
+			v.text = ("‹  " + base + "  ›") if on and v.get_meta("arrows", false) else base
+			v.label_settings.font_color = UI.TEXT if on and c == UI.DIM else c
+		v.set_meta("paint", paint)
+		b.focus_entered.connect(paint)
+		b.focus_exited.connect(paint)
+	v.set_meta("text", text)
+	v.set_meta("col", col)
+	v.set_meta("arrows", arrows)
+	(v.get_meta("paint") as Callable).call()
+	var f := UI.font("wide", 0.0, 1)
+	var w := f.get_string_size(("‹  " + text + "  ›") if arrows else text, HORIZONTAL_ALIGNMENT_LEFT, -1, 8).x
+	(b.get_meta("box") as StyleBox).content_margin_right = w + 18.0
+	b.clip_text = true
+	b.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	return v
 
 
 ## Fokus setzen, falls der Knopf noch da ist (Menüs wechseln manchmal im selben Bild)
@@ -527,18 +716,28 @@ func _grab(c: Control) -> void:
 		c.grab_focus()
 
 
+## Menüwechsel: Liste und Titel blenden in ~0,2 s ein, die Liste rückt dabei ein kleines Stück von links nach
 func _focus_first() -> void:
-	menu.modulate.a = 0.0
-	menu_scroll.position.x = -24.0
-	section.modulate.a = 0.0
-	var tw := create_tween().set_parallel().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-	tw.tween_property(menu_scroll, "position:x", 14.0, 0.18)
-	tw.tween_property(menu, "modulate:a", 1.0, 0.18)
-	tw.tween_property(section, "modulate:a", 1.0, 0.25)
+	_menu_in()
 	for c in menu.get_children():
 		if c is Button and not c.disabled:
 			_grab.call_deferred(c)
 			return
+
+
+var _menu_tw: Tween
+
+
+func _menu_in() -> void:
+	if _menu_tw:
+		_menu_tw.kill()
+	menu.modulate.a = 0.0
+	menu_scroll.position.x = 4.0
+	section.modulate.a = 0.0
+	_menu_tw = create_tween().set_parallel().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	_menu_tw.tween_property(menu_scroll, "position:x", 14.0, 0.22)
+	_menu_tw.tween_property(menu, "modulate:a", 1.0, 0.2)
+	_menu_tw.tween_property(section, "modulate:a", 1.0, 0.24)
 
 
 func _show_main() -> void:
@@ -605,6 +804,7 @@ const SETTING_HINTS := {
 ## Grafik, Vollbild, Spielstand: nicht auf der Startseite, sondern gesammelt hier
 func _show_settings(focus := "") -> void:
 	_clear_menu()
+	_menu_width(280.0)
 	_back = _show_main
 	_set_section("EINSTELLUNGEN")
 	var g := _button("Grafik  >", _show_graphics)
@@ -641,6 +841,7 @@ func _focus_key(key: String) -> void:
 ## Optionen, die der Browser-Renderer nicht kann (Spiegelungen, Umgebungsverdeckung), fehlen dort.
 func _show_graphics() -> void:
 	_clear_menu()
+	_menu_width(280.0)
 	_back = _show_settings.bind("graphics")
 	_set_section("GRAFIK")
 	for key in ["preset"] + GameState.GFX_ORDER.filter(GameState.gfx_available) + ["pixel"]:
@@ -653,6 +854,7 @@ func _show_graphics() -> void:
 ## Tempogefühl: Bewegungsunschärfe, Tempo-Zoom, Kamerawackeln, Sprungkamera (gegen Übelkeit alles abschaltbar)
 func _show_motion() -> void:
 	_clear_menu()
+	_menu_width(280.0)
 	_back = _show_settings.bind("motion")
 	_set_section("KAMERA & TEMPO")
 	for key in ["motion_blur", "speed_fov", "cam_shake", "jumpcam"]:
@@ -663,9 +865,10 @@ func _show_motion() -> void:
 
 
 func _setting_button(k: String) -> Button:
-	var b := _button(GameState.setting_text(k), func(): pass)
+	var b := _button("", func(): pass)
 	b.set_meta("setting", k)
 	b.set_meta("quiet", true)  # Umschalten hat seinen eigenen Ton
+	_setting_text(b)
 	var change := func(dir: int):
 		if k == "language":
 			_show_language(false)
@@ -678,7 +881,7 @@ func _setting_button(k: String) -> Button:
 		# Voreinstellung ändert alle Optionen, eine Option ggf. die Voreinstellung: alle Texte neu
 		for c in menu.get_children():
 			if c.has_meta("setting"):
-				c.text = GameState.setting_text(c.get_meta("setting")).to_upper()
+				_setting_text(c)
 	b.pressed.connect(change.bind(1))
 	if k != "language":
 		b.gui_input.connect(func(ev): _lr_input(ev, change))
@@ -686,31 +889,46 @@ func _setting_button(k: String) -> Button:
 	return b
 
 
+## "Schwierigkeit: Normal" -> links SCHWIERIGKEIT, rechts NORMAL (im Fokus mit ‹ ›, Links/Rechts ändert);
+## die Sprache öffnet ein eigenes Menü (Pfeil)
+func _setting_text(b: Button) -> void:
+	var k: String = b.get_meta("setting")
+	var full := GameState.setting_text(k)
+	var i := full.rfind(": ")
+	if i < 0:
+		b.text = full.to_upper()
+		return
+	b.text = full.substr(0, i).to_upper()
+	var val := full.substr(i + 2).to_upper()
+	if k == "language":
+		_row_value(b, val + "  ›")
+	else:
+		_row_value(b, val, UI.DIM, true)
+
+
 ## Karriere wie in NFSU2: Stufen untereinander, alle Events einer offenen Stufe frei wählbar; drei Siege in einer
 ## Stufe öffnen die nächste. Jede Zeile trägt rechts die Art als farbiges Abzeichen (Sprint cyan, Rundkurs grün,
 ## Drag pink, Drift orange) und die Schwierigkeit als Rauten (golden, wenn gewonnen). Rechts die Deutschlandkarte.
-# --- Fahrer: Level, Titel, Emblem, Level-Liste (seit 2.33) ---------------------------------------------------------
+# --- Fahrer: Level, Titel, Level-Liste (seit 2.33; Embleme seit 2.35 nicht mehr in der Garage) --------------------
 
-## Fahrerkarte oben im Menü: Emblem, Titel, Level, Balken bis zum nächsten Level
+## Fahrerkarte oben im Menü: Level groß, darunter der Titel, eine Haarlinie bis zum nächsten Level und die XP
 func _driver_card() -> Control:
 	var c := Control.new()
-	c.custom_minimum_size = Vector2(226, 64)
+	c.custom_minimum_size = Vector2(226, 58)
 	c.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var li := GameState.level_info()
-	var tex := GameState.emblem_texture()
 	c.draw.connect(func():
-		var fc := UI.font("cond", 0.2)
-		var fw := UI.font("wide", 0.15)
-		if tex:
-			c.draw_texture_rect(tex, Rect2(2, 4, 56, 56), false)
-		c.draw_string_outline(fw, Vector2(66, 22), tr("LEVEL %d") % li["level"], HORIZONTAL_ALIGNMENT_LEFT, -1, 16, 3, Color(0, 0, 0, 0.9))
-		c.draw_string(fw, Vector2(66, 22), tr("LEVEL %d") % li["level"], HORIZONTAL_ALIGNMENT_LEFT, -1, 16, UI.GREEN)
-		c.draw_string_outline(fc, Vector2(66, 40), GameState.title_name().to_upper(), HORIZONTAL_ALIGNMENT_LEFT, 160, 13, 3, Color(0, 0, 0, 0.9))
-		c.draw_string(fc, Vector2(66, 40), GameState.title_name().to_upper(), HORIZONTAL_ALIGNMENT_LEFT, 160, 13, Color.WHITE)
-		c.draw_rect(Rect2(66, 47, 150, 6), Color(0, 0, 0, 0.6))
-		c.draw_rect(Rect2(66, 47, 150.0 * float(li["into"]) / maxf(float(li["need"]), 1.0), 6), UI.CYAN)
+		var fc := UI.font("cond", 0.0, 1)
+		var fw := UI.font("wide", 0.0, 1)
+		var x := 12.0
+		c.draw_string(fc, Vector2(x, 20), tr("LEVEL %d") % li["level"], HORIZONTAL_ALIGNMENT_LEFT, -1, 18, UI.TEXT)
+		c.draw_string(fw, Vector2(x, 33), GameState.title_name().to_upper(), HORIZONTAL_ALIGNMENT_LEFT, 200, 8, UI.ACCENT)
+		var w := 200.0
+		var k := clampf(float(li["into"]) / maxf(float(li["need"]), 1.0), 0.0, 1.0)
+		c.draw_rect(Rect2(x, 40, w, 2), Color(1, 1, 1, 0.1))
+		c.draw_rect(Rect2(x, 40, w * k, 2), UI.ACCENT)
 		var xt := "%d / %d XP" % [li["into"], li["need"]]
-		c.draw_string(fc, Vector2(66, 63), xt, HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color(0.75, 0.82, 0.95)))
+		c.draw_string(fw, Vector2(x, 52), xt, HORIZONTAL_ALIGNMENT_LEFT, -1, 7, UI.DIM))
 	return c
 
 
@@ -720,11 +938,11 @@ func _show_driver() -> void:
 	_set_section("FAHRER")
 	stats.get_parent().visible = false
 	menu.add_child(_driver_card())
-	var bt := _button(tr("Titel: ") + GameState.title_name(), _show_titles)
+	_gap(4.0)
+	var bt := _button(tr("Titel: ").strip_edges().trim_suffix(":"), _show_titles)
+	_row_value(bt, GameState.title_name().to_upper() + "  ›")
 	bt.focus_entered.connect(func(): info.text = tr("Dein Titel steht im HUD der Welt und in der Garage. Neue Titel kommen mit dem Level."))
-	var be := _button(tr("Emblem wählen"), _show_emblems)
-	be.focus_entered.connect(func(): info.text = tr("Dein Emblem steht neben dem Level. Jeder Titel bringt ein Emblem mit, du kannst beide frei kombinieren."))
-	var bl := _button(tr("Level-Liste"), _show_levels)
+	var bl := _button(tr("Level-Liste") + "  >", _show_levels)
 	bl.focus_entered.connect(func(): info.text = tr("Was du mit welchem Level freischaltest: Stufen der Karriere, Autos, Teile, Vinyls, Titel."))
 	_button("< Zurück", _show_main)
 	info.text = _xp_hint()
@@ -746,8 +964,7 @@ func _show_titles() -> void:
 		var ti := t
 		var row: Dictionary = Catalog.TITLES[t]
 		var open := GameState.title_unlocked(t)
-		var txt: String = tr(row["name"]) + ("" if open else "   ·   " + tr("AB LEVEL %d") % int(row["level"]))
-		var b := _button(txt, func():
+		var b := _button(tr(row["name"]), func():
 			if GameState.title_unlocked(ti):
 				GameState.title = ti
 				GameState.save_game()
@@ -755,12 +972,12 @@ func _show_titles() -> void:
 			else:
 				Sfx.ui("locked"))
 		b.set_meta("quiet", true)
-		_icon_button(b, row["emblem"])
-		if not open:
-			b.modulate = Color(1, 1, 1, 0.38)
 		if t == GameState.title:
 			focus = b
-			b.text += "   ✓"
+			_row_value(b, "✓", UI.ACCENT)
+		elif not open:
+			_locked_row(b)
+			_row_value(b, tr("AB LEVEL %d") % int(row["level"]), UI.FAINT)
 		b.focus_entered.connect(func(): info.text = tr(row["name"]) + "\n" + (tr("Frei. Enter: als Titel tragen.") if GameState.title_unlocked(ti)
 			else tr("Kommt mit Fahrer-Level %d.") % int(row["level"])))
 	_button("< Zurück", _show_driver)
@@ -769,50 +986,14 @@ func _show_titles() -> void:
 		_grab.call_deferred(focus)
 
 
-func _show_emblems() -> void:
-	_clear_menu()
-	_back = _show_driver
-	_set_section("EMBLEM")
-	stats.get_parent().visible = false
-	var focus: Control = null
-	for t in Catalog.TITLES.size():
-		var ti := t
-		var row: Dictionary = Catalog.TITLES[t]
-		var open := GameState.title_unlocked(t)
-		var b := _button(tr(row["name"]) if open else tr("AB LEVEL %d") % int(row["level"]), func():
-			if GameState.title_unlocked(ti):
-				GameState.emblem = ti
-				GameState.save_game()
-				_show_driver()
-			else:
-				Sfx.ui("locked"))
-		b.set_meta("quiet", true)
-		_icon_button(b, row["emblem"], 30)
-		if not open:
-			b.modulate = Color(1, 1, 1, 0.38)
-		if t == GameState.emblem:
-			focus = b
-			b.text += "   ✓"
-		b.focus_entered.connect(func(): info.text = tr("Emblem „%s“") % tr(row["name"]) + "\n" + (tr("Frei. Enter: neben dein Level setzen.")
-			if GameState.title_unlocked(ti) else tr("Kommt mit Fahrer-Level %d.") % int(row["level"])))
-	_button("< Zurück", _show_driver)
-	_focus_first()
-	if focus:
-		_grab.call_deferred(focus)
+## Gesperrter Eintrag: Text grau (im Fokus etwas heller), Fläche und Strich bleiben wie bei allen
+func _locked_row(b: Button) -> void:
+	b.add_theme_color_override("font_color", UI.FAINT)
+	b.add_theme_color_override("font_focus_color", UI.DIM)
+	b.add_theme_color_override("font_hover_color", UI.DIM)
 
 
-## Emblem als Symbol links im Knopf
-func _icon_button(b: Button, emblem_id: String, size := 22) -> void:
-	var tex := GameState.emblem_texture(emblem_id)
-	if tex:
-		b.icon = tex
-		b.expand_icon = false
-		b.add_theme_constant_override("icon_max_width", size)
-		if size > 22:
-			b.custom_minimum_size.y = size + 6
-
-
-## Level-Liste: je Level ein Eintrag (erreicht grün mit Haken, das nächste cyan, später grau), Details rechts
+## Level-Liste: je Level ein Eintrag (erreicht mit Haken, das nächste hell, spätere grau), Details im Infofeld
 func _show_levels() -> void:
 	_clear_menu()
 	_back = _show_driver
@@ -837,17 +1018,16 @@ func _show_levels() -> void:
 		var txt := tr("LEVEL %d") % l + "  ·  " + first + (" +%d" % (rw.size() - 1) if rw.size() > 1 else "")
 		var b := _button(txt, func(): pass)
 		b.set_meta("quiet", true)
-		b.add_theme_font_size_override("font_size", 12)
-		b.clip_text = true
-		b.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		b.add_theme_font_size_override("font_size", 11)
 		if l <= lv:
-			b.add_theme_color_override("font_color", UI.GREEN)
-			b.text = "✓ " + b.text
+			b.add_theme_color_override("font_color", UI.DIM)
+			_row_value(b, "✓", UI.ACCENT)
 		elif focus == null:
 			focus = b
-			b.add_theme_color_override("font_color", UI.CYAN)
+			b.add_theme_color_override("font_color", UI.TEXT)
+			_row_value(b, "›", UI.ACCENT)
 		else:
-			b.modulate = Color(1, 1, 1, 0.55)
+			_locked_row(b)
 		b.focus_entered.connect(func(): info.text = _level_info(lvl))
 	_button("< Zurück", _show_driver)
 	_focus_first()
@@ -905,12 +1085,12 @@ func _show_races() -> void:
 				else:
 					Sfx.ui("locked"))
 			b.set_meta("quiet", true)
-			b.add_theme_font_size_override("font_size", 12)
+			b.add_theme_font_size_override("font_size", 11)
 			b.clip_text = true
 			b.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-			_event_badge(b, r, won)
+			_event_badge(b, r, won, open)
 			if not open:
-				b.modulate = Color(1, 1, 1, 0.38)
+				_locked_row(b)
 			elif target == null or (not won and s > target_stage):
 				target = b
 				target_stage = s if not won else -1
@@ -929,47 +1109,43 @@ func _show_races() -> void:
 		menu_scroll.ensure_control_visible(target)
 
 
-## Überschrift einer Stufe: "STUFE 2 · SZENE" links, rechts "1/3 SIEGE" (offen, cyan), "FERTIG" (gold) oder
-## "GESPERRT" (grau)
+## Überschrift einer Stufe: "STUFE 2 · SZENE" links, rechts "1/3 SIEGE" (offen), "FERTIG" (gold) oder
+## "AB LEVEL n" (grau); darunter eine Haarlinie
 func _stage_header(s: int) -> Control:
 	var c := Control.new()
-	c.custom_minimum_size = Vector2(226, 22 if s > 0 else 16)
+	c.custom_minimum_size = Vector2(226, 24 if s > 0 else 16)
 	c.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var open := GameState.stage_open(s)
 	var w := GameState.stage_wins(s)
 	var n: int = Catalog.STAGES[s]["events"].size()
 	var done := w >= n
-	var col: Color = UI.GOLD if open and done else (UI.CYAN if open else Color(0.5, 0.53, 0.58))
+	var col: Color = UI.GOLD if open and done else (UI.DIM if open else UI.FAINT)
 	var left := tr("STUFE %d · %s") % [s + 1, tr(Catalog.STAGES[s]["name"]).to_upper()]
 	var right := tr("AB LEVEL %d") % int(Catalog.STAGES[s]["level"]) if not open else (tr("FERTIG") if done else tr("%d/%d SIEGE") % [w, n])
 	c.draw.connect(func():
-		var f := UI.font("cond", 0.2)
-		var y := c.size.y - 4.0
-		c.draw_string_outline(f, Vector2(2, y), left, HORIZONTAL_ALIGNMENT_LEFT, -1, 10, 3, Color(0, 0, 0, 0.9))
-		c.draw_string(f, Vector2(2, y), left, HORIZONTAL_ALIGNMENT_LEFT, -1, 10, col)
-		var rw := f.get_string_size(right, HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x
-		c.draw_string_outline(f, Vector2(c.size.x - rw - 4.0, y), right, HORIZONTAL_ALIGNMENT_LEFT, -1, 9, 3, Color(0, 0, 0, 0.9))
-		c.draw_string(f, Vector2(c.size.x - rw - 4.0, y), right, HORIZONTAL_ALIGNMENT_LEFT, -1, 9, col)
-		c.draw_rect(Rect2(2, c.size.y - 1.5, c.size.x - 4.0, 1.0), Color(col.r, col.g, col.b, 0.45)))
+		var f := UI.font("wide", 0.0, 1)
+		var y := c.size.y - 5.0
+		c.draw_string(f, Vector2(12, y), left, HORIZONTAL_ALIGNMENT_LEFT, -1, 7, UI.TEXT if open else UI.FAINT)
+		var rw := f.get_string_size(right, HORIZONTAL_ALIGNMENT_LEFT, -1, 7).x
+		c.draw_string(f, Vector2(c.size.x - rw - 10.0, y), right, HORIZONTAL_ALIGNMENT_LEFT, -1, 7, col)
+		c.draw_rect(Rect2(12, c.size.y - 1.0, c.size.x - 22.0, 1.0), UI.LINE))
 	return c
 
 
-## Abzeichen der Event-Art rechts im Knopf; der Name wird davor gekürzt (Abstand rechts im Knopf-Stil)
-func _event_badge(b: Button, r: Dictionary, won: bool) -> void:
+## Abzeichen der Event-Art rechts im Eintrag; der Name wird davor gekürzt
+func _event_badge(b: Button, r: Dictionary, won: bool, open := true) -> void:
 	var rt: String = r["type"]
 	var label := tr(Catalog.EVENT_TYPES[rt]["label"]).to_upper()
 	var tier: int = r.get("tier", 1)
-	var bw := UI.badge_width(label, 8, tier)
-	for st in ["normal", "hover", "focus", "pressed", "disabled"]:
-		var sb: StyleBox = b.get_theme_stylebox(st).duplicate()
-		sb.content_margin_right = bw + 12.0
-		b.add_theme_stylebox_override(st, sb)
+	var bw := UI.badge_width(label, 7, tier)
+	(b.get_meta("box") as StyleBox).content_margin_right = bw + 18.0
 	var bd := Control.new()
 	bd.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	bd.set_anchors_preset(Control.PRESET_FULL_RECT)
+	bd.modulate.a = 1.0 if open else 0.4
 	b.add_child(bd)
 	bd.draw.connect(func():
-		UI.draw_badge(bd, Vector2(bd.size.x - bw - 8.0, (bd.size.y - 11.0) / 2.0), rt, label, 8, tier, won))
+		UI.draw_badge(bd, Vector2(bd.size.x - bw - 10.0, (bd.size.y - 11.0) / 2.0), rt, label, 7, tier, won))
 
 
 ## Infotext zu einem Karriere-Event: Ort und Art, das Ziel, die Beschreibung, dann Stand (gesperrt, Bestwert)
@@ -1041,7 +1217,8 @@ func _show_start_city() -> void:
 	_clear_menu()
 	_back = _show_main
 	_set_section("STARTSTADT")
-	career_map.visible = true  # Deutschland mit allen Rennen: grau gesperrt, grün offen, gold gewonnen
+	career_map.visible = true  # Deutschland mit allen Rennen: grau gesperrt, weiß offen, gold gewonnen
+	_fade_in(career_map)
 	career_map.selected = ""
 	var first := _button("Zufällige Stadt", func():
 		var towns := _start_towns()
@@ -1203,15 +1380,11 @@ func _show_color_grid(cat: String, group: String) -> void:
 	_cam_view = cat
 	section.text = tr(Catalog.PARTS[cat]["label"]).to_upper()
 	stats.get_parent().visible = false
-	_keys.text = tr("PFEILE  Farbe wählen      ENTER  Einbauen      ESC  Zurück      F11  Vollbild")
+	_set_keys(KEYS_GRID)
 	var opts: Array = Catalog.PARTS[cat]["options"]
 	var panel := PanelContainer.new()
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(0.02, 0.025, 0.05, 0.82)
-	sb.border_color = Color(UI.CYAN.r, UI.CYAN.g, UI.CYAN.b, 0.35)
-	sb.set_border_width_all(1)
-	sb.set_corner_radius_all(4)
-	sb.set_content_margin_all(8)
+	var sb := UI.panel_box(0.9)
+	sb.set_content_margin_all(9)
 	panel.add_theme_stylebox_override("panel", sb)
 	panel.anchor_left = 0.5
 	panel.anchor_right = 0.5
@@ -1219,58 +1392,75 @@ func _show_color_grid(cat: String, group: String) -> void:
 	panel.anchor_bottom = 1.0
 	panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	panel.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	panel.offset_bottom = -26.0
+	panel.offset_bottom = -28.0
 	var vb := VBoxContainer.new()
-	vb.add_theme_constant_override("separation", 6)
+	vb.add_theme_constant_override("separation", 7)
 	panel.add_child(vb)
 	var head := HBoxContainer.new()
-	head.add_theme_constant_override("separation", 10)
+	head.add_theme_constant_override("separation", 8)
 	vb.add_child(head)
 	var back := Button.new()
-	back.text = "◀ " + tr("Zurück").to_upper()
-	back.add_theme_font_size_override("font_size", 10)
+	back.theme_type_variation = "Ghost"
+	back.text = "‹  " + tr("Zurück").to_upper()
 	back.focus_mode = Control.FOCUS_NONE
 	back.pressed.connect(func():
 		Sfx.ui("back")
 		_back.call())
 	head.add_child(back)
-	var title := _label(head, 13)
-	title.label_settings.font = UI.font("cond", 0.2)
+	var sep := ColorRect.new()
+	sep.color = UI.LINE_HI
+	sep.custom_minimum_size = Vector2(1, 10)
+	sep.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	head.add_child(sep)
+	var title := UI.label(head, 9, "wide", UI.TEXT, 1)
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	title.size_flags_vertical = Control.SIZE_FILL
 	var grid := GridContainer.new()
 	grid.columns = mini(8, opts.size())
-	grid.add_theme_constant_override("h_separation", 5)
-	grid.add_theme_constant_override("v_separation", 5)
+	grid.add_theme_constant_override("h_separation", 6)
+	grid.add_theme_constant_override("v_separation", 6)
 	vb.add_child(grid)
 	var cells := []
+	var cell := Vector2(40, 28) if GameState.is_mobile() else Vector2(34, 22)  # Touch: größere Felder
 	for i in opts.size():
 		var idx := i
 		var b := Button.new()
-		b.custom_minimum_size = Vector2(40, 30)
+		b.theme_type_variation = "Swatch"
+		b.custom_minimum_size = cell
 		b.focus_mode = Control.FOCUS_ALL
 		var sw = _swatch(cat, idx)
-		var r := ColorRect.new()
-		r.color = sw if sw is Color else Color(0.08, 0.08, 0.1)
+		var r := Panel.new()  # Farbfeld mit leicht runden Ecken
+		var rb := StyleBoxFlat.new()
+		rb.bg_color = sw if sw is Color else Color(0.06, 0.065, 0.075)
+		rb.set_corner_radius_all(1)
+		r.add_theme_stylebox_override("panel", rb)
 		r.set_anchors_preset(Control.PRESET_FULL_RECT)
-		r.offset_left = 4.0
-		r.offset_top = 4.0
-		r.offset_right = -4.0
-		r.offset_bottom = -4.0
+		r.offset_left = 2.0
+		r.offset_top = 2.0
+		r.offset_right = -2.0
+		r.offset_bottom = -2.0
 		r.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		b.add_child(r)
 		if not sw is Color:
-			# "Aus" bzw. ohne eigene Farbe: Schrägstrich
-			var x := _label(r, 12, HORIZONTAL_ALIGNMENT_CENTER)
-			x.text = "/"
-			x.set_anchors_preset(Control.PRESET_FULL_RECT)
-			x.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		var mark := ColorRect.new()  # eingebaut: grüner Punkt in der Ecke
+			# "Aus" bzw. ohne eigene Farbe: feiner Schrägstrich
+			r.draw.connect(func(): r.draw_line(Vector2(r.size.x * 0.3, r.size.y * 0.8), Vector2(r.size.x * 0.7, r.size.y * 0.2), UI.FAINT, 1.0, true))
+		var mark := Panel.new()  # eingebaut: kleiner Punkt im Akzent in der Ecke
 		mark.name = "M"
-		mark.color = UI.GREEN
-		mark.size = Vector2(7, 7)
-		mark.position = Vector2(2, 2)
+		var mb := StyleBoxFlat.new()
+		mb.bg_color = UI.ACCENT
+		mb.set_corner_radius_all(3)
+		mb.border_color = Color(0, 0, 0, 0.6)
+		mb.set_border_width_all(1)
+		mb.anti_aliasing = true
+		mark.add_theme_stylebox_override("panel", mb)
+		mark.size = Vector2(6, 6)
+		mark.position = Vector2(cell.x - 8.0, 2)
 		mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		b.add_child(mark)
+		b.gui_input.connect(func(ev: InputEvent):
+			if ev is InputEventMouseMotion and not b.has_focus():
+				b.grab_focus())
 		b.focus_entered.connect(func():
 			Sfx.ui("move")
 			_preview_part(cat, idx)
@@ -1285,6 +1475,12 @@ func _show_color_grid(cat: String, group: String) -> void:
 	color_grid = panel
 	_info_panel.visible = false  # Name und Zustand stehen über dem Raster
 	_mark_grid(cells, cat)
+	# Raster und Titel blenden ein
+	panel.modulate.a = 0.0
+	var tw := create_tween().set_parallel().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	tw.tween_property(panel, "modulate:a", 1.0, 0.2)
+	section.modulate.a = 0.0
+	tw.tween_property(section, "modulate:a", 1.0, 0.24)
 	var installed: int = GameState.get_config(preview_car).get(cat, 0)
 	_grab.call_deferred(cells[clampi(installed, 0, cells.size() - 1)])
 
@@ -1294,7 +1490,7 @@ func _mark_grid(cells: Array, cat: String) -> void:
 	for i in cells.size():
 		var b: Button = cells[i]
 		b.get_node("M").visible = i == installed
-		b.modulate.a = 1.0 if GameState.is_part_unlocked(cat, i) else 0.35
+		b.modulate.a = 1.0 if GameState.is_part_unlocked(cat, i) else 0.32
 
 
 func _color_title(cat: String, idx: int) -> String:
@@ -1378,17 +1574,17 @@ func _strip_on(on: bool) -> void:
 		_info_panel.anchor_right = 0.0
 		_info_panel.offset_left = 14.0
 		_info_panel.offset_right = 290.0
-		_info_panel.offset_top = -94.0  # wächst nach oben, so hoch wie der Text
-		_info_panel.offset_bottom = -94.0
-		_keys.text = tr("←/→  Auswählen      ENTER  Einbauen/Öffnen      ESC  Zurück      F11  Vollbild")
+		_info_panel.offset_top = -96.0  # wächst nach oben, so hoch wie der Text
+		_info_panel.offset_bottom = -96.0
+		_set_keys(KEYS_STRIP)
 	else:
 		_info_panel.anchor_left = 1.0
 		_info_panel.anchor_right = 1.0
 		_info_panel.offset_left = -300.0
 		_info_panel.offset_right = -14.0
-		_info_panel.offset_top = -92.0
-		_info_panel.offset_bottom = -26.0
-		_keys.text = tr("ENTER  Auswählen      ESC  Zurück      ←/→ A/D  Ändern      F11  Vollbild")
+		_info_panel.offset_top = -82.0
+		_info_panel.offset_bottom = -28.0
+		_set_keys(KEYS_MENU)
 
 
 func _clear_strip() -> void:
@@ -1402,60 +1598,61 @@ func _clear_strip() -> void:
 ## Eine Kachel: Name groß, darunter klein (eingebautes Teil, Sperre). opts: key, part, swatch (Farbe), back, quiet
 func _tile(title_text: String, sub: String, cb: Callable, opts := {}) -> Button:
 	var b := Button.new()
+	b.theme_type_variation = "Tile"
 	var is_back: bool = opts.get("back", false)
-	b.custom_minimum_size = Vector2(76.0 if is_back else 118.0, 46.0)
+	b.custom_minimum_size = Vector2(70.0 if is_back else 112.0, 44.0)
 	b.focus_mode = Control.FOCUS_ALL
+	b.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS  # Klick wirkt sofort, bevor die Leiste zur Kachel rückt
 	for k in opts:
 		if k != "swatch":
 			b.set_meta(k, opts[k])
 	var t := Label.new()
 	t.name = "T"
-	t.label_settings = LabelSettings.new()
-	t.label_settings.font = UI.font("cond", 0.2)
-	t.label_settings.font_size = 13
+	t.label_settings = UI.text_settings(11, "cond", UI.TEXT, 1)
+	t.label_settings.shadow_color = Color(0, 0, 0, 0)
 	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	t.clip_text = true
 	t.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	t.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	t.offset_left = 9.0
-	t.offset_right = -5.0
-	t.offset_top = 6.0 if sub != "" or not is_back else 14.0
-	t.offset_bottom = t.offset_top + 17.0
+	t.offset_left = 6.0
+	t.offset_right = -6.0
+	t.offset_top = 9.0 if sub != "" or not is_back else 14.0
+	t.offset_bottom = t.offset_top + 16.0
 	t.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	b.add_child(t)
 	var u := Label.new()
 	u.name = "S"
-	u.label_settings = LabelSettings.new()
-	u.label_settings.font = UI.font("bold", 0.12)
-	u.label_settings.font_size = 8
+	u.label_settings = UI.text_settings(7, "wide", UI.DIM, 1)
+	u.label_settings.shadow_color = Color(0, 0, 0, 0)
 	u.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	u.clip_text = true
 	u.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	u.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	u.offset_left = 9.0
-	u.offset_right = -5.0
+	u.offset_left = 6.0
+	u.offset_right = -6.0
 	u.offset_top = 26.0
-	u.offset_bottom = 38.0
+	u.offset_bottom = 36.0
 	u.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	b.add_child(u)
 	var sw = opts.get("swatch", null)
 	if sw is Color:
-		# Farbfeld (Lack, Felgenfarbe, Folie, Neon, Licht)
-		var r := ColorRect.new()
+		# Farbfeld (Lack, Felgenfarbe, Folie, Neon, Licht): klein vor dem Untertitel, mit feinem hellem Rand
+		var r := Panel.new()
 		r.name = "W"
-		r.color = sw
-		r.position = Vector2(10, 28)
-		r.size = Vector2(9, 9)
+		var rb := StyleBoxFlat.new()
+		rb.bg_color = sw
+		rb.border_color = Color(1, 1, 1, 0.35)
+		rb.set_border_width_all(1)
+		rb.set_corner_radius_all(1)
+		r.add_theme_stylebox_override("panel", rb)
+		r.position = Vector2(9, 27)
+		r.size = Vector2(8, 8)
 		r.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		var rim := ColorRect.new()  # heller Rand: Schwarz auf dunkler Kachel sichtbar
-		rim.color = Color(1, 1, 1, 0.5)
-		rim.position = r.position - Vector2.ONE
-		rim.size = r.size + Vector2(2, 2)
-		rim.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		b.add_child(rim)
 		b.add_child(r)
-		u.offset_left = 20.0
-	_tile_text(b, ("◀ " if is_back else "") + title_text, sub)
+		u.offset_left = 19.0
+		b.resized.connect(_place_swatch.bind(b))
+	_tile_text(b, ("‹  " if is_back else "") + title_text, sub)
+	UI.menu_fx(b, "top", false)  # Maus darüber hellt nur auf: Fokus würde die Leiste unter der Maus wegschieben
 	b.focus_entered.connect(func():
 		Sfx.ui("move")
 		_center_strip(b)
@@ -1476,9 +1673,35 @@ func _tile(title_text: String, sub: String, cb: Callable, opts := {}) -> Button:
 func _tile_text(b: Button, title_text: String, sub: String) -> void:
 	(b.get_node("T") as Label).text = title_text.to_upper()
 	(b.get_node("S") as Label).text = sub.to_upper()
+	_place_swatch(b)
 
 
-## Schriftfarben je Zustand: gewählt (grüne Kachel) dunkel, eingebaut grün, gesperrt grau
+## Farbfeld direkt vor den (mittigen) Untertitel setzen, nicht an den Rand der Kachel
+func _place_swatch(b: Button) -> void:
+	var r: Control = b.get_node_or_null("W")
+	if r == null:
+		return
+	var u: Label = b.get_node("S")
+	var w := u.label_settings.font.get_string_size(u.text, HORIZONTAL_ALIGNMENT_LEFT, -1, u.label_settings.font_size).x
+	var bw := maxf(b.size.x, b.custom_minimum_size.x)
+	var total := w + 12.0  # Feld 8 + Abstand 4
+	var x0 := (bw - total) / 2.0
+	r.position.x = maxf(x0, 6.0)
+	u.offset_left = r.position.x + 12.0
+	u.offset_right = -(bw - (r.position.x + total)) + 1.0
+
+
+## Breite, die Titel und Untertitel einer Kachel brauchen
+func _tile_need(b: Button) -> float:
+	var t: Label = b.get_node("T")
+	var u: Label = b.get_node("S")
+	var tw := t.label_settings.font.get_string_size(t.text, HORIZONTAL_ALIGNMENT_LEFT, -1, t.label_settings.font_size).x + 16.0
+	var uw := u.label_settings.font.get_string_size(u.text, HORIZONTAL_ALIGNMENT_LEFT, -1, u.label_settings.font_size).x \
+		+ 16.0 + (12.0 if b.has_node("W") else 0.0)
+	return ceilf(maxf(tw, uw))
+
+
+## Schriftfarben je Zustand: gewählt hell, eingebaut im Akzent, gesperrt grau
 func _tile_colors(b: Node) -> void:
 	if not b is Button or not b.has_node("T"):
 		return
@@ -1486,10 +1709,9 @@ func _tile_colors(b: Node) -> void:
 	var t: Label = b.get_node("T")
 	var u: Label = b.get_node("S")
 	var locked: bool = b.get_meta("locked", false)
-	t.label_settings.font_color = Color(0.02, 0.05, 0.02) if focused else (Color(0.62, 0.64, 0.68) if locked else Color(0.95, 0.97, 1.0))
-	u.label_settings.font_color = Color(0.05, 0.14, 0.05) if focused else (UI.GREEN if b.get_meta("installed", false) else
-		(Color(1.0, 0.45, 0.35) if locked else UI.CYAN))
-	(b as Button).modulate.a = 0.72 if locked and not focused else 1.0
+	t.label_settings.font_color = UI.TEXT if focused else (UI.FAINT if locked else Color(0.8, 0.82, 0.86))
+	u.label_settings.font_color = UI.ACCENT if b.get_meta("installed", false) else (UI.FAINT if locked else UI.DIM)
+	(b as Button).modulate.a = 0.7 if locked and not focused else 1.0
 
 
 ## Leiste fertig: Ränder verknüpfen (rechts vom letzten geht es zum ersten), hoch/runter gesperrt, Fokus setzen.
@@ -1498,6 +1720,13 @@ func _strip_ready(focus_key := "", focus_i := -1) -> void:
 	var tiles := strip_box.get_children()
 	if tiles.is_empty():
 		return
+	# alle Kacheln einer Leiste gleich breit, so breit wie der längste Text (in Grenzen), damit nichts abgeschnitten wird
+	var w := 112.0
+	for b in tiles:
+		if not b.get_meta("back", false):
+			w = maxf(w, _tile_need(b))
+	for b in tiles:
+		b.custom_minimum_size.x = _tile_need(b) if b.get_meta("back", false) else minf(w, 168.0)
 	for i in tiles.size():
 		var b: Button = tiles[i]
 		b.focus_neighbor_left = b.get_path_to(tiles[(i - 1 + tiles.size()) % tiles.size()])
@@ -1510,12 +1739,12 @@ func _strip_ready(focus_key := "", focus_i := -1) -> void:
 			target = b
 	if focus_i >= 0 and focus_i < tiles.size():
 		target = tiles[focus_i]
-	# Leiste fährt von unten ein
+	# Leiste blendet ein und fährt ein kleines Stück von unten herein
 	strip_box.modulate.a = 0.0
 	var tw := create_tween().set_parallel().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	tw.tween_property(strip_box, "modulate:a", 1.0, 0.2)
 	section.modulate.a = 0.0
-	tw.tween_property(section, "modulate:a", 1.0, 0.25)
+	tw.tween_property(section, "modulate:a", 1.0, 0.24)
 	_strip_focus.call_deferred(target)
 
 
@@ -1523,7 +1752,8 @@ func _strip_focus(b: Button) -> void:
 	if not is_instance_valid(b) or not b.is_inside_tree():
 		return
 	strip_box.reset_size()
-	strip_box.position.y = 8.0
+	strip_box.position.y = 14.0
+	create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT).tween_property(strip_box, "position:y", 8.0, 0.22)
 	_center_strip(b, false)
 	b.grab_focus()
 
@@ -1654,11 +1884,15 @@ func _cycle_car(dir: int) -> void:
 	_refresh_car()
 
 
+## Autowahl: "‹ NAME ›" links (Links/Rechts blättert), rechts Nummer und ggf. GESPERRT; die Wertekarte zeigt Name
+## und Werte des gewählten Autos
 func _refresh_car() -> void:
 	var spec: Dictionary = Catalog.CARS[preview_car]
 	var unlocked := GameState.is_car_unlocked(preview_car)
-	menu.get_child(0).text = ("< %s >%s" % [spec["name"], "" if unlocked else tr("  [GESPERRT]")]).to_upper() \
-		+ "  %d/%d" % [Catalog.CAR_ORDER.find(preview_car) + 1, Catalog.CAR_ORDER.size()]
+	var b: Button = menu.get_child(0)
+	b.text = "‹  %s  ›" % str(spec["name"]).to_upper()
+	var n := "%d / %d" % [Catalog.CAR_ORDER.find(preview_car) + 1, Catalog.CAR_ORDER.size()]
+	_row_value(b, (tr("GESPERRT") + "  ·  " + n) if not unlocked else n)
 	_show_stats(preview_car, preview_cfg)
 	menu.get_child(1).disabled = not unlocked
 	info.text = tr(spec["desc"]) + tr("\nHöchstgeschwindigkeit ab Werk: %d km/h") % int(spec["top_speed"] * 3.6) \
@@ -1688,6 +1922,7 @@ func _show_language(first: bool) -> void:
 	for lang in I18n.LANGS:
 		var l: String = lang
 		var b := Button.new()
+		b.theme_type_variation = "MenuItem"
 		b.text = I18n.NAMES[l].to_upper()
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		b.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
@@ -1697,6 +1932,9 @@ func _show_language(first: bool) -> void:
 			GameState.set_language(l)
 			get_tree().reload_current_scene())  # alle Texte neu in der gewählten Sprache
 		menu.add_child(b)
+		_item_fx(b)
+		if l == GameState.language:
+			_row_value(b, "✓", UI.ACCENT)
 	_back = Callable() if first else _show_settings.bind("language")
 	if not first:
 		_button("< Zurück", _back)
@@ -1713,6 +1951,7 @@ func _confirm_reset() -> void:
 	info.text = tr("Alle Siege und Tuningteile gehen verloren.")
 	_button("Ja, zurücksetzen", func(): GameState.reset_progress(); _show_main())
 	_button("Abbrechen", _show_main)
+	_menu_in()
 	_grab.call_deferred(menu.get_child(1))
 
 

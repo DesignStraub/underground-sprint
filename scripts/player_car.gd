@@ -16,6 +16,7 @@ const Builder := preload("res://scripts/car_builder.gd")
 const EngineAudio := preload("res://scripts/engine_audio.gd")
 const Track := preload("res://scripts/track_builder.gd")
 const Knockable := preload("res://scripts/knockable.gd")
+const TireFx := preload("res://scripts/tire_fx.gd")
 
 ## Ende von Gang 1..5 als Anteil der Höchstgeschwindigkeit; der 6. reicht bis über Topspeed
 const GEARS := [0.0, 0.16, 0.31, 0.47, 0.63, 0.81, 1.3]
@@ -122,8 +123,6 @@ var blown := false
 var totaled := false
 var _limiter := false
 var _nos_empty := false
-var _sliding := false
-var _slide_out := 0.0
 var _thr_s := 0.0  # Gas weich nachgeführt (kein Sprung von 0 auf volle Kraft)
 var _nos_k := 0.0  # Nitro-Schub, weich ein- und ausgeblendet
 var _launch_t := 0.0  # > 0: perfekter Start (mehr Zug), < 0: Räder drehen durch (weniger Zug)
@@ -155,14 +154,28 @@ var _rail_tf := Vector3.FORWARD  # Straßenrichtung dort
 var _rail_speed := 0.0  # Tempo entlang der Straße (der Schwenk beim Spurwechsel ist kein Vortrieb)
 var _was_enabled := false
 var _slip_hold := 0.0  # 0..1: wie sehr das Heck gerade gelöst ist (Handbremse baut auf, Gas hält, klingt weich ab)
+## Rutsch-Modell (seit 2.35, _dyn_physics): im Drift-Modus immer, sonst ab der Handbremse, bis das Auto wieder greift
+var _dyn_on := false
+var _dyn_calm := 0.0  # s, die das Auto im Fahr-Modus schon wieder gerade läuft (dann zurück ins Griff-Modell)
+var _drive_a := 0.0  # Antriebsbeschleunigung dieses Takts (m/s²): nimmt der Hinterachse Seitenhalt
+var _course_prev := 0.0  # Fahrtrichtung (rad) im letzten Takt: daraus die echte Querbeschleunigung fürs Wanken
 var _cam_drift := 0.0  # wie weit die Kamera im Drift in Fahrtrichtung schaut (geglättet)
 var _shake_t := 0.0
 var _wall_cool := 0.0
 var _wall_turn := 0.0  # Restdrehung parallel zur Wand (rad), wird über einige Bilder abgebaut
 var _wall_t := 10.0  # Zeit seit dem letzten Wandkontakt (kurz danach zählt Rutschen nicht als Drift)
 var debug_hits := false  # nur für Tests (--handling, --trace): merkt sich, woran das Auto angeeckt ist
+var _vlog := OS.get_cmdline_user_args().has("--vlog")  # Test: Abheben und Landungen ausgeben
+## Test --drivebot=<ablauf>[:v0][:drift]: feste Eingaben nach Zeitplan (Handbremse-Einstieg, Gas-Drift, Halten mit
+## Lenk-Tippen, Anbremsen), Start mit v0 m/s, alle 0,1 s eine Zeile "BOT ..." (Tempo, Driftwinkel, Drehrate), am Ende
+## beendet sich das Spiel
+var _bot := ""
+var _bot_v0 := 20.0
+var _bot_t := -1.0
+var _bot_log := 0.0
 var last_hit := ""
 var half_width := 0.95  # halbe Breite des Modells (world.gd: Abstand beim Knapp-vorbei)
+var tire_fx: Node3D  # Reifenqualm und Reifenspuren (tire_fx.gd)
 var _collider_name := ""
 ## Rundkurs: abgeschlossene Runden und Gesamtfortschritt (Runden * Länge + Position)
 var lap := 0
@@ -241,6 +254,12 @@ func setup(car_id: String, cfg: Dictionary) -> void:
 	lat_acc = 14.0 + st["grip"] * 0.42  # 2,3–2,7 g ab Werk: griffig wie NFSU, aber enge Ecken wollen angebremst werden
 	drift_k = st["drift"]
 	drive_type = _spec.get("drive", "rwd")
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--drivebot="):
+			var bp := arg.substr(11).split(":")
+			_bot = bp[0]
+			if bp.size() > 1:
+				_bot_v0 = float(bp[1])
 	nitro_power = nos["power"]
 	nitro_cap = nos["capacity"]
 
@@ -253,6 +272,9 @@ func setup(car_id: String, cfg: Dictionary) -> void:
 	var col := CollisionShape3D.new()
 	var w: float = model.get_meta("width") / 2.0
 	half_width = w
+	tire_fx = TireFx.new()  # Reifenqualm und Reifenspuren (seit 2.35)
+	add_child(tire_fx)
+	tire_fx.setup(self, w, _length / 2.0 - _axle)
 	var l := _length / 2.0
 	var pts := PackedVector3Array()
 	for y in [-0.6, 0.6]:
@@ -295,6 +317,7 @@ func setup(car_id: String, cfg: Dictionary) -> void:
 	cam.doppler_tracking = Camera3D.DOPPLER_TRACKING_PHYSICS_STEP  # Gegner und Verkehr ziehen mit Dopplereffekt vorbei
 	add_child(cam)
 	cam.make_current()
+	tire_fx.warm(cam)
 	cam_mode = clampi(GameState.cam_mode, 0, CAM_NAMES.size() - 1)
 	_apply_cam()
 
@@ -355,6 +378,13 @@ func _physics_process(dt: float) -> void:
 	var steer_in := Input.get_action_strength("steer_right") - Input.get_action_strength("steer_left")
 	var hb := Input.is_action_pressed("handbrake")
 	var want_nitro := Input.is_action_pressed("nitro")
+	if _bot != "" and controls_enabled:
+		var bi := _bot_inputs(dt)
+		thr = bi[0]
+		brk = bi[1]
+		steer_in = bi[2]
+		hb = bi[3]
+		want_nitro = false
 	stun = maxf(stun - dt, 0.0)
 	_crash_cooldown = maxf(_crash_cooldown - dt, 0.0)
 	_wall_cool = maxf(_wall_cool - dt, 0.0)
@@ -551,6 +581,7 @@ func _physics_process(dt: float) -> void:
 		elif _launch_t < 0.0:
 			drive *= 0.75  # durchdrehende Räder
 		drive += accel * 0.6 * _shift_boost / 0.5  # über eine halbe Sekunde etwa so viel wie früher der Sprung (+1,6 m/s)
+		_drive_a = maxf(drive, 0.0)
 		a += drive
 		a -= drag_k * speed_fwd * absf(speed_fwd)
 		if thr < 0.05 and brk < 0.05:
@@ -584,9 +615,13 @@ func _physics_process(dt: float) -> void:
 	var l2 := 0.0
 	if drag_mode and not airborne and not loc.is_empty() and loc["path"]["id"] == 0 and (controls_enabled or finished):
 		l2 = _drag_rail(dt)
-	elif drift_mode and _sliding and not airborne:
-		_slip_hold = 0.6
-		l2 = _slide_physics(dt, fwd, right, thr, hb, a, eff_top, low_speed)
+	elif not airborne and (drift_mode or _dyn_on or (hb and spd > 8.0)):
+		if not _dyn_on:
+			_dyn_on = true
+			_dyn_calm = 0.0
+			_yaw_v += _spin  # Drehrate übernehmen, ohne Sprung
+			_spin = 0.0
+		l2 = _dyn_physics(dt, thr, brk, hb, eff_top)
 	else:
 		# Heckantrieb: Vollgas bei engem Einschlag und mittlerem Tempo lässt das Heck etwas kommen (stufenlos).
 		# Fronttriebler schieben dagegen unter Gas über die Vorderräder nach außen, Allradler ein wenig; beim
@@ -620,7 +655,7 @@ func _physics_process(dt: float) -> void:
 		# kaum Trägheit (glättet nur Sprünge in der Drehrate); 2.23 hatte 15/6,5 und war zu träge
 		var yaw_k := 4.0 if airborne else lerpf(30.0, 20.0, sf0)
 		_yaw_v = lerpf(_yaw_v, yaw, 1.0 - exp(-dt * yaw_k))
-		_rotate_front((_yaw_v + _spin) * dt, 0.6 * _slip_hold)
+		_rotate_front((_yaw_v + _spin) * dt, 0.25 * _slip_hold)
 
 		# Neue Fahrzeugachse; Geschwindigkeit bleibt zunächst in Weltrichtung -> Querschlupf entsteht
 		var new_fwd := -global_basis.z
@@ -659,9 +694,6 @@ func _physics_process(dt: float) -> void:
 			# Schwelle mit Puffer: kein Flackern; Schrammen an der Wand ist kein Drift (keine Punkte, kein Nitro)
 			drifting = spd > 10.0 and ang > (6.0 if drifting else 10.0) and _wall_t > 0.5
 			drift_angle = ang if drifting else 0.0
-			if drift_mode and spd > 10.0 and ang > 9.0 and f2 > 0.0 and _wall_t > 0.5:
-				_sliding = true
-				_slide_out = 0.0
 		else:
 			drifting = false
 			drift_angle = 0.0
@@ -678,12 +710,18 @@ func _physics_process(dt: float) -> void:
 	var sf := clampf(spd / top_speed, 0.0, 1.0)
 	# Gewichtsverlagerung: Nase taucht beim Bremsen ein, hebt sich beim Beschleunigen; Wanken nach der echten
 	# Querbeschleunigung (Gierrate * Tempo) nach außen, im Rutschen zusätzlich zur Rutschseite
-	var pitch := clampf(a * 0.0034, -0.065, 0.045)
+	var pitch := clampf(a * 0.0026, -0.045, 0.03)
 	if airborne:
 		pitch = 0.0  # in der Luft dreht sich das ganze Auto (unten), nicht die Karosserie
 	var yaw_now := wrapf(global_rotation.y - _yaw_prev, -PI, PI) / maxf(dt, 0.0001)
 	_yaw_prev = global_rotation.y
-	var roll := clampf(-yaw_now * spd / 9.81 * 0.03, -0.085, 0.085) - clampf(l2 * 0.003, -0.035, 0.035)
+	# Wanken nach der echten Querbeschleunigung (wie schnell die Fahrtrichtung dreht, mal Tempo), nicht nach der
+	# Drehrate des Autos: im Drift dreht das Auto schnell, die Fahrtrichtung kaum; bis 2.34 legte es sich dann bis 5°
+	# zur Seite und die Front tauchte ein. Sportfahrwerk: höchstens gut 2,5°.
+	var course := atan2(velocity.x, velocity.z)
+	var a_lat := wrapf(course - _course_prev, -PI, PI) / maxf(dt, 0.0001) * spd * smoothstep(3.0, 8.0, spd)
+	_course_prev = course
+	var roll := clampf(-a_lat / 9.81 * 0.022, -0.045, 0.045) - clampf(l2 * 0.0012, -0.012, 0.012)
 	if airborne:
 		roll = 0.0
 	# Federung: knapp 1,6 Hz, leicht unterdämpft (wippt beim Einlenken und Bremsen einmal sanft nach)
@@ -733,10 +771,85 @@ func _physics_process(dt: float) -> void:
 		tire = maxf(tire, 0.7)
 	audio.slip = tire
 	audio.speed = spd
+	tire_fx.step(dt, tire, not airborne and sinking <= 0.0, Vector3(velocity.x, 0.0, velocity.z).length())
 	_scrape_hold = maxf(_scrape_hold - dt, 0.0)
 	if _scrape_hold <= 0.0:
 		_scrape = move_toward(_scrape, 0.0, dt * 6.0)
 	audio.scrape = _scrape
+
+
+## Testfahrer (--drivebot): liefert [Gas, Bremse, Lenkung, Handbremse] für diesen Takt und schreibt die Werte mit
+func _bot_inputs(dt: float) -> Array:
+	if _bot_t < 0.0:
+		_bot_t = 0.0
+		collision_mask = 0  # Messfahrt: frei rutschen, ohne an der Leitplanke zu enden
+		var f0 := -global_basis.z
+		f0.y = 0.0
+		velocity = f0.normalized() * _bot_v0
+		speed_fwd = _bot_v0
+	_bot_t += dt
+	var t := _bot_t
+	var o := [0.0, 0.0, 0.0, false]
+	var tap := 1.0 if fmod(t, 0.3) < 0.15 else 0.0  # Tastatur: Lenken antippen
+	match _bot:
+		"hbentry":  # anrollen, kurz Handbremse mit vollem Einschlag, dann Gas und halb eingelenkt halten, dann loslassen
+			if t < 1.0:
+				o = [1.0, 0.0, 0.0, false]
+			elif t < 1.35:
+				o = [0.0, 0.0, 1.0, true]
+			elif t < 5.0:
+				o = [1.0, 0.0, 0.5, false]
+			elif t < 7.0:
+				o = [0.0, 0.0, 0.0, false]
+		"power":  # Vollgas und voll einlenken (Heck kommt unter Last), dann loslassen
+			if t < 0.5:
+				o = [1.0, 0.0, 0.0, false]
+			elif t < 4.5:
+				o = [1.0, 0.0, 1.0, false]
+			elif t < 6.5:
+				o = [0.0, 0.0, 0.0, false]
+		"tap":  # wie hbentry, aber im Drift wie mit der Tastatur: Lenkung antippen
+			if t < 1.0:
+				o = [1.0, 0.0, 0.0, false]
+			elif t < 1.35:
+				o = [0.0, 0.0, 1.0, true]
+			elif t < 6.0:
+				o = [1.0, 0.0, tap, false]
+			elif t < 8.0:
+				o = [0.0, 0.0, 0.0, false]
+		"brake":  # hart anbremsen und einlenken, dann Gas
+			if t < 1.0:
+				o = [1.0, 0.0, 0.0, false]
+			elif t < 1.5:
+				o = [0.0, 1.0, 1.0, false]
+			elif t < 5.0:
+				o = [1.0, 0.0, 0.7, false]
+			elif t < 7.0:
+				o = [0.0, 0.0, 0.0, false]
+		"counter":  # Drift einleiten, dann gegenlenken (Winkel soll kleiner werden, Auto fängt sich)
+			if t < 1.0:
+				o = [1.0, 0.0, 0.0, false]
+			elif t < 1.35:
+				o = [0.0, 0.0, 1.0, true]
+			elif t < 3.0:
+				o = [1.0, 0.0, 0.6, false]
+			elif t < 5.0:
+				o = [1.0, 0.0, -0.6, false]
+			elif t < 7.0:
+				o = [0.5, 0.0, 0.0, false]
+	_bot_log -= dt
+	if _bot_log <= 0.0:
+		_bot_log = 0.1
+		var f3 := -global_basis.z
+		f3.y = 0.0
+		f3 = f3.normalized()
+		var hv := Vector3(velocity.x, 0.0, velocity.z)
+		var beta := rad_to_deg(atan2(hv.dot(Vector3(-f3.z, 0.0, f3.x)), maxf(hv.dot(f3), 0.1)))
+		print("BOT t=%.1f v=%.1f beta=%.1f r=%.2f steer=%.2f in=%s drift=%d dyn=%d pos=(%.1f,%.1f)" % [t, hv.length(), beta,
+			_yaw_v, steer, str(o), int(drifting), int(_dyn_on or drift_mode), global_position.x, global_position.z])
+	if t > 8.5:
+		get_tree().quit()
+	return o
 
 
 ## Umfangsgeschwindigkeit der Räder vorn/hinten (m/s) für die Optik: sie rollen mit dem Tempo, blockieren bei der
@@ -952,42 +1065,158 @@ func _rotate_front(angle: float, k: float) -> void:
 	global_position += shift
 
 
-## Drift-Modus, Auto steht quer: Gas hält den Winkel, Lenken steuert ihn, die Fahrtrichtung dreht langsam nach.
-## Liefert die Quergeschwindigkeit (für Sound und Optik).
-func _slide_physics(dt: float, fwd: Vector3, right: Vector3, thr: float, hb: bool, a: float, eff_top: float, low_speed: float) -> float:
-	var vel := fwd * speed_fwd + right * speed_lat  # enthält schon den Antrieb entlang der Fahrzeugachse
-	var beta := atan2(speed_lat, maxf(speed_fwd, 0.5))  # > 0: Auto rutscht nach rechts weg (Linkskurve)
-	var yaw := -steer * steer_rate * 0.6 * (0.5 + 0.5 * low_speed)
-	yaw += signf(beta) * thr * (0.7 + 0.35 * drift_k) * clampf(absf(beta) / 0.3, 0.0, 1.0)
-	yaw -= beta * (1.1 + 0.9 * (1.0 - thr))  # ohne Gas richtet es sich auf
+## Rutsch-Modell (seit 2.35): Einspurmodell mit Vorder- und Hinterachse. Jede Achse hat eine Reifenkennlinie (die
+## Seitenkraft steigt mit dem Schräglaufwinkel bis zum Haftmaximum und fällt danach etwas ab: im Rutschen bleibt Halt,
+## aber weniger). Gas nimmt der Hinterachse Seitenhalt (das Heck kommt unter Last, mit Gefühl hält man den Winkel),
+## die Handbremse fast ganz, Bremsen verlagert Gewicht nach vorn. Das Auto dreht mit Trägheit um seinen Schwerpunkt,
+## die Fahrtrichtung folgt über die Reifenkräfte; bis 2.34 drehte es um die Vorderachse und schob das Heck sprunghaft.
+## Für die Tastatur: die Vorderräder zeigen von selbst ein Stück in Fahrtrichtung (Gegenlenken), Lenken in die Kurve
+## macht den Winkel größer, aus der Kurve kleiner; über 60° richtet ein Rückstellmoment das Auto wieder auf.
+## Im Drift-Modus immer, im Fahr-Modus ab der Handbremse, bis das Auto wieder greift. Liefert die Quergeschwindigkeit.
+const TIRE_C := 1.45  # Form der Reifenkennlinie (Spitze bei B·α ≈ 1,87, danach bis auf ~76 % ab)
+func _dyn_physics(dt: float, thr: float, brk: float, hb: bool, eff_top: float) -> float:
+	var wb := maxf(_length - 2.0 * _axle, 2.2)  # Radstand
+	var wf: float = {"mr": 0.45, "rr": 0.4}.get(drive_type, 0.53)  # Gewichtsanteil vorn
+	var la := wb * (1.0 - wf)  # Schwerpunkt bis Vorderachse
+	var lb := wb * wf  # Schwerpunkt bis Hinterachse
+	var g_tot := lat_acc * (0.6 if drift_mode else 0.85)
+	var d_f := g_tot * wf * (1.0 + 0.15 * brk)
+	# Fahr-Modus: hinten mehr Halt, sobald die Handbremse los ist (das Auto fängt sich nach der Kehre)
+	var d_r := g_tot * (1.0 - wf) * ((0.95 - 0.15 * drift_k) if drift_mode else (1.0 if hb else 1.2)) * (1.0 - 0.3 * brk)
 	if hb:
-		yaw *= 1.3
-	_spin = move_toward(_spin, 0.0, dt * 2.0)
-	_yaw_v = lerpf(_yaw_v, clampf(yaw, -3.2, 3.2), 1.0 - exp(-dt * 20.0))
-	_rotate_front((_yaw_v + _spin) * dt, 0.85)
+		d_r *= 0.3
+	if stun > 0.0:
+		d_f *= 0.4
+		d_r *= 0.4
+	# Antrieb und Seitenhalt teilen sich die Haftung (Kammscher Kreis): Hecktriebler hinten, Allrad halb/halb,
+	# Fronttriebler vorn. Im Drift-Modus fahren alle wie Hecktriebler.
+	var drv := _drive_a * ((1.0 + 0.5 * drift_k) if drift_mode else 0.6)
+	if drift_mode or drive_type in ["rwd", "mr", "rr"]:
+		d_r = sqrt(maxf(d_r * d_r - drv * drv, pow(0.45 * d_r, 2.0)))
+	elif drive_type == "awd":
+		d_r = sqrt(maxf(d_r * d_r - 0.25 * drv * drv, pow(0.6 * d_r, 2.0)))
+		d_f = sqrt(maxf(d_f * d_f - 0.25 * drv * drv, pow(0.6 * d_f, 2.0)))
+	else:
+		d_f = sqrt(maxf(d_f * d_f - drv * drv, pow(0.5 * d_f, 2.0)))
+	var b_f := 1.87 / 0.12  # Spitze bei 7° vorn
+	var b_r := 1.87 / 0.085  # 4,9° hinten: hinten steifer als vorn, so bleibt das Auto geradeaus stabil (untersteuernd)
+	var ik := la * lb * 1.05  # Trägheit um die Hochachse (je Masse)
+	var cs_k := 1.0  # Gegenlenk-Hilfe: Vorderräder zeigen in Fahrtrichtung der Vorderachse
+	var k_yaw := 3.5 if drift_mode else 4.0  # Dämpfung: das Auto dreht mit der Fahrtrichtung, nicht davon unabhängig
+	# Driftwinkel höchstens so groß, wie die Vorderräder noch gegenlenken können (Lenkeinschlag 52° wie ein Drift-Auto):
+	# darüber schob die Vorderachse das Auto weiter quer, und es fing sich ohne Gas nicht mehr
+	var b_max := deg_to_rad(45.0 if drift_mode else 40.0)
+	var f0 := -global_basis.z
+	f0.y = 0.0
+	f0 = f0.normalized()
+	var v := f0 * speed_fwd + Vector3(-f0.z, 0.0, f0.x) * speed_lat  # Antrieb dieses Takts schon drin
+	var r := _yaw_v
+	var n := 4
+	var h := dt / n
+	for i in n:
+		var f3 := -global_basis.z
+		f3.y = 0.0
+		f3 = f3.normalized()
+		var r3 := Vector3(-f3.z, 0.0, f3.x)
+		var u := v.dot(f3)
+		var w := v.dot(r3)
+		var spd := sqrt(u * u + w * w)
+		var beta := atan2(w, maxf(absf(u), 0.5))  # > 0: Auto rutscht nach rechts weg
+		# Lenkwinkel: im Rutschen zeigen die Vorderräder von selbst in die Richtung, in die die Vorderachse gerade fährt
+		# (Gegenlenken), die Lenkung gibt nur die Abweichung davon vor: in die Kurve lenken dreht das Auto weiter ein, aus
+		# der Kurve lenken richtet es auf. Bei Tempo reicht der Einschlag bis zum Haftmaximum der Vorderräder.
+		var lat_f := w - r * la
+		var d0 := atan2(lat_f, maxf(absf(u), 1.0)) * cs_k * smoothstep(0.04, 0.15, absf(beta))
+		var dmax := lerpf(0.55, 0.14, smoothstep(5.0, 30.0, spd))
+		var delta := clampf(d0 + steer * dmax, -0.9, 0.9)
+		# Schräglaufwinkel: Querbewegung am Rad (Drehung um den Schwerpunkt eingerechnet) zur Rollrichtung des Rads
+		var long_f := u * cos(delta) + lat_f * sin(delta)
+		var lat_fw := -u * sin(delta) + lat_f * cos(delta)
+		var a_f := atan2(lat_fw, maxf(absf(long_f), 3.0))
+		var a_r := atan2(w + r * lb, maxf(absf(u), 3.0))
+		var f_f := -d_f * sin(TIRE_C * atan(b_f * a_f))
+		var f_r := -d_r * sin(TIRE_C * atan(b_r * a_r))
+		var acc := r3 * (f_f * cos(delta) + f_r) - f3 * (f_f * sin(delta))
+		var rdot := (-la * f_f * cos(delta) + lb * f_r) / ik
+		# Drehrate der Fahrtrichtung (Querbeschleunigung / Tempo): die Drehung des Autos wird dorthin gedämpft, so ändert
+		# sich der Driftwinkel nur so schnell, wie die Kräfte ihn treiben (ohne Dämpfung schaukelte er sich auf)
+		var r_course := (v.z * acc.x - v.x * acc.z) / maxf(v.length_squared(), 1.0)
+		rdot -= k_yaw * (r - r_course)
+		rdot -= 60.0 * (beta - clampf(beta, -b_max, b_max))  # über b_max richtet es sich auf
+		# sehr langsam: Lenkung wie auf Schienen (sonst zappelt das Modell im Stand)
+		var kin := smoothstep(2.0, 7.0, spd)
+		# quer rutschende Reifen radieren: kostet Tempo je nach Winkel (im Drift hält Vollgas das Tempo, statt es zu steigern)
+		acc -= v.normalized() * (3.5 * absf(sin(beta)) if spd > 1.0 else 0.0)
+		v += acc * h * kin
+		r += rdot * h * kin
+		if kin < 1.0:
+			var r_kin := -u * tan(steer * dmax) / wb
+			r = lerpf(r_kin, r, kin)
+			v = (f3 * u).lerp(v, kin)
+		rotate_y(r * h)
+	var sv := v.length()
+	if sv > maxf(eff_top, absf(speed_fwd)):
+		v = v / sv * maxf(eff_top, absf(speed_fwd))
+	_yaw_v = r
+	velocity = Vector3(v.x, 0.0, v.z)
 	var nf := -global_basis.z
 	nf.y = 0.0
 	nf = nf.normalized()
-	var nr := Vector3(-nf.z, 0, nf.x)
-	var vs := vel.length()
-	var b2 := atan2(vel.dot(nr), vel.dot(nf))
-	# Seitenhalt im Rutschen: die Fahrtrichtung dreht mit begrenzter Rate zur Fahrzeugachse
-	var mu := lerpf(12.0, 9.0, drift_k) * (0.6 if hb else 1.0) * (0.3 if stun > 0.0 else 1.0)
-	var turn := signf(b2) * minf(absf(b2), mu / maxf(vs, 6.0) * dt)
-	vel = vel.rotated(Vector3.UP, turn)
-	b2 -= turn
-	vs = clampf(vs - lerpf(8.5, 5.5, drift_k) * absf(sin(b2)) * dt, 0.0, maxf(eff_top, 1.0))
-	velocity = vel.normalized() * vs if vel.length() > 0.01 else Vector3.ZERO
-	velocity.y = 0.0
-	drift_angle = rad_to_deg(absf(b2))
-	drifting = absf(b2) > deg_to_rad(8.0) and vs > 8.0
-	if absf(b2) < deg_to_rad(5.0) or vs < 6.0 or absf(b2) > deg_to_rad(100.0):
-		_slide_out += dt
-		if _slide_out > 0.15:
-			_sliding = false
-	else:
-		_slide_out = 0.0
-	return velocity.dot(nr)
+	var nr := Vector3(-nf.z, 0.0, nf.x)
+	var fw := velocity.dot(nf)
+	var lw := velocity.dot(nr)
+	var ang := rad_to_deg(atan2(absf(lw), maxf(absf(fw), 0.1)))
+	var vs := velocity.length()
+	# Schwelle mit Puffer: kein Flackern; Schrammen an der Wand ist kein Drift (keine Punkte, kein Nitro)
+	drifting = vs > 8.0 and fw > 0.0 and ang > (6.0 if drifting else 10.0) and _wall_t > 0.5
+	drift_angle = ang if drifting else 0.0
+	_slip_hold = clampf(ang / 30.0, 0.0, 1.0)
+	if not drift_mode:
+		# Fahr-Modus: greift das Auto wieder (gerade, ohne Handbremse), übernimmt das Griff-Modell
+		_dyn_calm = _dyn_calm + dt if not hb and ang < 4.0 else 0.0
+		if _dyn_calm > 0.3 or vs < 4.0:
+			_dyn_on = false
+			_slip_hold = 0.0
+	return lw
+
+
+## Lage auf der Strecke, stetig (seit 2.35): Track.locate nimmt den nächsten Punkt der ganzen Kurve. In Kehren liegt
+## der andere Schenkel manchmal näher (am Berg auf anderer Höhe): dann sprang die Position, das Auto hüpfte. Springt d
+## weiter, als das Auto gefahren sein kann, wird in der Nähe des alten d gesucht; nur wenn das Auto dort deutlich
+## weiter weg ist (abseits der Straße am anderen Schenkel), gilt der Sprung.
+func _locate_cont() -> Dictionary:
+	var p := _txi * global_position
+	var l := Track.locate(track, p)
+	if loc.is_empty() or l["path"] != loc["path"]:
+		return l
+	var pc: Curve3D = l["path"]["curve"]
+	var len := pc.get_baked_length()
+	var ring: bool = track["loop"] and l["path"]["id"] == 0
+	var dd: float = float(l["d"]) - float(loc["d"])
+	if ring:
+		dd = fposmod(dd + len / 2.0, len) - len / 2.0
+	var reach := Vector3(velocity.x, 0.0, velocity.z).length() * get_physics_process_delta_time() * 2.0 + 3.0
+	if absf(dd) <= reach:
+		return l
+	var best_d := float(loc["d"])
+	var best := 1e9
+	for k in 21:
+		var d2: float = float(loc["d"]) - reach + reach * k / 10.0
+		d2 = fposmod(d2, len) if ring else clampf(d2, 0.0, len)
+		var q := pc.sample_baked(d2)
+		var dist := Vector2(p.x - q.x, p.z - q.z).length()
+		if dist < best:
+			best = dist
+			best_d = d2
+	var fg := Track.frame_at(pc, float(l["d"]))
+	if best - Vector2(p.x - fg["pos"].x, p.z - fg["pos"].z).length() > 4.0:
+		return l
+	var f := Track.frame_at(pc, best_d)
+	var lat: float = (p - f["pos"]).dot(f["right"])
+	var score: float = best - (Track.hw(track, best_d) if l["path"]["id"] == 0 else float(l["path"]["half_w"]))
+	if l["path"]["id"] != 0:
+		score += 0.5
+	return {"path": l["path"], "d": best_d, "lat": lat, "score": score}
 
 
 ## Höhe: Gehweg, Rampen, Absprung, Flug, Landung, Wasser
@@ -995,7 +1224,7 @@ func _update_vertical(dt: float) -> void:
 	if track.is_empty():
 		position.y = 0.0
 		return
-	loc = Track.locate(track, _txi * global_position)
+	loc = _locate_cont()
 	path_id = loc["path"]["id"]
 	progress = Track.race_progress(loc)
 	lateral = loc["lat"]
@@ -1017,7 +1246,15 @@ func _update_vertical(dt: float) -> void:
 	_slope_pitch = atan(sl * (-global_basis.z).dot(tf))
 	_slope_roll = atan(sl * global_basis.x.dot(tf))
 	var bvy := (base - _base_y) / maxf(dt, 0.0001)
-	var crest := _base_ok and absf(base - _base_y) < 2.0 and bvy < _base_vy - GRAVITY * dt * 1.1 and absf(speed_fwd) > 15.0
+	# Kuppe: die Straße krümmt sich nach unten stärker, als die Schwerkraft das Auto bei diesem Tempo mitnimmt
+	# (v² · Krümmung > g). Seit 2.35 aus dem Höhenprofil selbst; vorher aus der Änderung der Höhe von Bild zu Bild, und
+	# jedes Zittern der Streckenposition (Kehren am Berg) ließ das Auto alle paar Meter kurz abheben und ruckeln.
+	var v_al := Vector3(velocity.x, 0.0, velocity.z).dot(tf)
+	var crest := false
+	if _base_ok and absf(v_al) > 15.0:
+		var e0 := Track.elev_at(pc, loc["d"])
+		var curv := (Track.elev_at(pc, loc["d"] + 3.0) - 2.0 * e0 + Track.elev_at(pc, loc["d"] - 3.0)) / 9.0
+		crest = -curv * v_al * v_al > GRAVITY * 1.05
 	_base_ok = true
 	_base_vy = bvy
 	_base_y = base
@@ -1038,6 +1275,9 @@ func _update_vertical(dt: float) -> void:
 	if gh - base < _curb_y - 0.35 and absf(speed_fwd) > 6.0 or crest or drop:
 		# Rampenende, Kuppe (die Straße fällt schneller weg, als die Schwerkraft das Auto mitnimmt) oder eine Kante,
 		# hinter der es tiefer geht (Damm, Rampe seitlich): abheben und fallen
+		if _vlog:
+			print("VLOG abheben %s v=%.1f vy=%.2f d=%.0f pfad=%d base=%.2f" % ["kuppe" if crest else ("kante" if drop else "rampe"),
+				absf(speed_fwd), _ground_vy, loc["d"], path_id, base])
 		airborne = true
 		vy = minf(_ground_vy, MAX_LAUNCH_VY)
 		air_time = 0.0
@@ -1097,6 +1337,8 @@ func _land(gh: float, water: bool) -> void:
 	vy = 0.0
 	last_air = air_time
 	landings += 1
+	if _vlog:
+		print("VLOG landung stoss=%.2f flug=%.2fs v=%.1f" % [impact, air_time, absf(speed_fwd)])
 	Sfx.play("thud", linear_to_db(clampf(impact / 14.0, 0.3, 1.0)), randf_range(0.9, 1.05))
 	audio.crash(clampf(impact / 30.0, 0.1, 0.4))
 	_shake = minf(_shake + impact * 0.025, 0.7)
@@ -1193,8 +1435,15 @@ func _update_tumble(dt: float) -> void:
 				_tumble_rest += dt
 				if _tumble_rest > 1.3:
 					var p: Dictionary = loc["path"]
-					var half: float = p["half_w"] - 2.0
-					place(_txf * Track.xform_at(p["curve"], loc["d"], clampf(loc["lat"], -half, half)))
+					if str(p.get("kind", "")) == "spur" or float(loc.get("score", 0.0)) > 6.0:
+						# über eine Mauer in eine Sackgasse oder neben die Strecke geflogen (seit 2.35): zurück auf die
+						# Hauptstraße an der nächsten Stelle, in Fahrtrichtung; vorher blieb man dort stecken
+						var mp: Dictionary = track["paths"][0]
+						var md := (mp["curve"] as Curve3D).get_closest_offset(_txi * global_position)
+						place(_txf * Track.xform_at(mp["curve"], md, Track.LANES[1]))
+					else:
+						var half: float = p["half_w"] - 2.0
+						place(_txf * Track.xform_at(p["curve"], loc["d"], clampf(loc["lat"], -half, half)))
 					stun = 0.3
 					return
 	var b := Basis(Vector3.BACK, _air_roll) * Basis(Vector3.RIGHT, _air_pitch)
@@ -1343,6 +1592,9 @@ func place(xform: Transform3D) -> void:
 	_cam_init = false
 	_base_ok = false
 	_curb_y = 0.0
+	loc = {}  # neue Stelle: Lage frisch bestimmen (_locate_cont sucht sonst beim alten d)
+	_yaw_v = 0.0
+	_dyn_on = false
 	_reset_pose()
 
 
@@ -1434,8 +1686,8 @@ func _hit_wall(pre: Vector3, n: Vector3, small := false, pole := false) -> void:
 		wall_hits += 1
 		audio.crash(clampf(vn / 30.0, 0.08, 1.0))
 		_shake = minf(_shake + vn * 0.03, 0.9)
-	if drift_mode and head_on > 0.5:
-		_sliding = false
+	if head_on > 0.5:
+		_yaw_v *= 0.3  # frontal an die Wand: die Drehung aus dem Rutschen ist weg
 	if trip:
 		start_tumble(n, absf(pre.dot(global_basis.x)))
 	elif vn > 12.0 and head_on > 0.75 and _crash_cooldown <= 0.0:

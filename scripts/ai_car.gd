@@ -405,8 +405,11 @@ func _push(o: Node, dv: Vector3) -> void:
 
 func _check_traffic_crash() -> void:
 	for t in traffic:
-		# Wracks nicht noch einmal: wer darin steckt, käme sonst nie wieder frei (Zusammenstoß, Benommenheit, wieder ...)
-		if t.path_id != path["id"] or t.wrecked:
+		# Wracks nicht noch einmal: wer darin steckt, käme sonst nie wieder frei (Zusammenstoß, Benommenheit, wieder ...).
+		# Seit 2.35 auch keine Wagen, die nach einem Unfall gerade zurück in die Spur finden (traffic_car.crash): sie
+		# stehen oder rollen langsam, der Gegner fährt um sie herum (_lane_free); vorher stießen beide immer wieder an
+		# und blockierten sich gegenseitig
+		if t.path_id != path["id"] or t.wrecked or int(t.get("crash") if t.get("crash") != null else 0) != 0:
 			continue
 		if absf(t.lateral() - lane) < 2.0 and absf(t.progress - d) < (t.length + length) / 2.0 and not airborne:
 			if stun <= 0.0:

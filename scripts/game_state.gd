@@ -94,7 +94,6 @@ var kept_cars: Array = []  # schon mit den alten Schwellen (bis 2.10, Siege bis 
 var kept_parts: Array = []  # "cat:index": bis 2.32 mit Siegen freigeschaltete Teile bleiben frei
 var kept_stages: Array = []  # bis 2.32 mit Siegen geöffnete Karriere-Stufen bleiben offen
 var title := 0  # gewählter Fahrer-Titel (Catalog.TITLES), muss frei sein
-var emblem := 0  # gewähltes Emblem (Index in Catalog.TITLES, dessen "emblem")
 const PROG := 2  # Fortschritts-Stand: 2 = alles über das Fahrer-Level (seit 2.33)
 
 
@@ -557,15 +556,6 @@ func title_name() -> String:
 	return tr(Catalog.TITLES[title if title_unlocked(title) else 0]["name"])
 
 
-func emblem_id() -> String:
-	return Catalog.TITLES[emblem if title_unlocked(emblem) else 0]["emblem"]
-
-
-## Emblem als Textur (assets/emblems/<id>.svg)
-func emblem_texture(id := "") -> Texture2D:
-	var path := "res://assets/emblems/%s.svg" % (id if id != "" else emblem_id())
-	return load(path) if ResourceLoader.exists(path) else null
-
 
 ## Eingebautes Tuning eines Autos (neues Dictionary): Leistung für alle gleich, Optik je Auto (fehlt: ab Werk)
 func get_config(car_id := "") -> Dictionary:
@@ -645,7 +635,7 @@ func save_game() -> void:
 	var text := JSON.stringify({
 		"wins": wins, "drift_wins": drift_wins, "current_car": current_car, "race_index": race_index,
 		"best_times": best_times, "tuning": tuning, "looks": looks, "won_events": won_events, "kept_cars": kept_cars, "outruns": outruns, "xp": xp,
-		"kept_parts": kept_parts, "kept_stages": kept_stages, "prog": PROG, "title": title, "emblem": emblem,
+		"kept_parts": kept_parts, "kept_stages": kept_stages, "prog": PROG, "title": title,
 		"gfx": {"preset": preset, "opts": gfx, "pixel": pixel_look, "vsync": vsync, "fps": fps_limit, "fullscreen": fullscreen,
 			"touch": touch_mode, "show_fps": show_fps, "jump_cam": jump_cam, "motion_blur": motion_blur,
 			"speed_fov": speed_fov, "cam_shake": cam_shake, "cam": cam_mode},
@@ -717,7 +707,6 @@ func load_game() -> void:
 	kept_parts = Array(data.get("kept_parts", [])).map(func(k): return str(k))
 	kept_stages = Array(data.get("kept_stages", [])).map(func(k): return int(k))
 	title = int(data.get("title", 0))
-	emblem = int(data.get("emblem", 0))
 	if data.has("won_events"):
 		won_events = Array(data["won_events"])
 	else:
@@ -777,7 +766,6 @@ func reset_progress() -> void:
 	kept_parts = []
 	kept_stages = []
 	title = 0
-	emblem = 0
 	xp = 0
 	save_game()
 

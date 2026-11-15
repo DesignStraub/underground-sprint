@@ -473,7 +473,8 @@ func _build_land() -> void:
 		pl.append(Vector2(bp[bp.size() - 1].x, bp[bp.size() - 1].z))
 		roads.append([pl, 0])
 	land = Landscape.new()
-	land.setup({"roads": [], "segments": [], "cities": [{"forest": true, "roads": roads}], "ring_r": 0.0, "urban": []})
+	# track: Bäume halten Abstand zum Bankett und stehen an Kuppen auf der Böschung (landscape._plan_corridors)
+	land.setup({"roads": [], "segments": [], "cities": [{"forest": true, "roads": roads, "track": track}], "ring_r": 0.0, "urban": []})
 	world.add_child(land)
 	var day: float = mood.get("day", 0.0)
 	land.set_daylight(day, clampf((1.0 - day) * 0.45 + (0.35 if race.get("mood", "") == "nebel" else 0.0), 0.0, 0.75))
@@ -1308,7 +1309,8 @@ func _on_player_finished() -> void:
 	# Fahrer-Erfahrung (seit 2.32): Stilpunkte des Rennens (im Drift-Event die Driftpunkte) plus Platz, je Stufe mehr.
 	# Seit 2.33 schaltet nur das Level frei (Stufen, Autos, Teile, Vinyls, Titel): die Zeilen dazu stehen in _xp_lines.
 	var tier: int = race.get("tier", 1)
-	_xp_gain = _race_xp + (int(drift_score) if event_type == "drift" else 0) + Catalog.race_xp(tier, place, first_win)
+	# Stilpunkte im Rennen zählen halb (seit 2.35), der Platz zählt voll: Rennen bringen deutlich mehr als freies Driften
+	_xp_gain = int(_race_xp * 0.5) + (int(drift_score) if event_type == "drift" else 0) + Catalog.race_xp(tier, place, first_win)
 	_xp_lines = GameState.add_xp(_xp_gain, false)
 	var key: String = race["name"]
 	var best: float = GameState.best_times.get(key, 0.0)
@@ -1341,7 +1343,7 @@ func _show_result(place: int, new_best: bool, unlocked: Array, dnf := "") -> voi
 	var panel := PanelContainer.new()
 	panel.theme = UI.theme()
 	panel.set_anchors_preset(Control.PRESET_CENTER)
-	panel.position = Vector2(-150, 0)
+	panel.position = Vector2(-150, -40)  # Knöpfe über dem Musik-Hinweis unten rechts
 	panel.custom_minimum_size = Vector2(300, 0)
 	hud["center"].get_parent().add_child(panel)
 	var vb := VBoxContainer.new()
@@ -1358,28 +1360,28 @@ func _show_result(place: int, new_best: bool, unlocked: Array, dnf := "") -> voi
 		var li := GameState.level_info()
 		var xl := _label(vb, 11, HORIZONTAL_ALIGNMENT_CENTER)
 		xl.text = tr("Erfahrung +%d XP   ·   LEVEL %d  (%d / %d)") % [_xp_gain, li["level"], li["into"], li["need"]]
-		xl.modulate = Color(0.55, 0.9, 1.0)
+		xl.modulate = UI.DIM
 		if not _xp_lines.is_empty():
 			var lu := _label(vb, 12, HORIZONTAL_ALIGNMENT_CENTER)
 			var shown := _xp_lines.slice(0, 9)
 			if _xp_lines.size() > 9:
 				shown.append(tr("… und %d weitere (Garage > Fahrer)") % (_xp_lines.size() - 9))
 			lu.text = "\n".join(shown)
-			lu.modulate = Color(0.4, 1.0, 0.55)
+			lu.modulate = UI.ACCENT
 	if place == 1:
 		var w := _label(vb, 11, HORIZONTAL_ALIGNMENT_CENTER)
 		w.text = (tr("Driftsiege gesamt: %d") % GameState.drift_wins) if event_type == "drift" else (tr("Rennsiege gesamt: %d") % GameState.wins)
 		if unlocked.size() > 0:
 			var u := _label(vb, 11, HORIZONTAL_ALIGNMENT_CENTER)
 			u.text = "\n".join(unlocked)
-			u.modulate = Color(0.4, 1.0, 0.5)
+			u.modulate = UI.ACCENT
 	else:
 		var w := _label(vb, 11, HORIZONTAL_ALIGNMENT_CENTER)
 		w.text = tr("Jeder Platz gibt Erfahrung, der Sieg am meisten.")
 		if GameState.difficulty > 0:
 			var h := _label(vb, 10, HORIZONTAL_ALIGNMENT_CENTER)
 			h.text = tr("Zu schwer? Einstellungen > Schwierigkeit: Leicht")
-			h.modulate = Color(0.7, 0.85, 1.0)
+			h.modulate = UI.DIM
 	var hb := HBoxContainer.new()
 	hb.alignment = BoxContainer.ALIGNMENT_CENTER
 	vb.add_child(hb)
@@ -1387,10 +1389,12 @@ func _show_result(place: int, new_best: bool, unlocked: Array, dnf := "") -> voi
 	again.text = tr("NOCHMAL")
 	again.pressed.connect(func(): get_tree().reload_current_scene())
 	hb.add_child(again)
+	UI.menu_fx(again, "bottom")
 	var back := Button.new()
 	back.text = tr("ZUR WELT") if GameState.in_world else "GARAGE"
 	back.pressed.connect(func(): get_tree().change_scene_to_file(_back_scene()))
 	hb.add_child(back)
+	UI.menu_fx(back, "bottom")
 	back.grab_focus.call_deferred()
 
 
@@ -1400,17 +1404,23 @@ func _back_scene() -> String:
 
 
 func _build_pause(root: Control) -> void:
+	# Abdunklung hinter dem Menü (seit 2.35), mit dem Menü sichtbar
+	var dim := ColorRect.new()
+	dim.color = Color(0.0, 0.0, 0.0, 0.55)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	dim.visible = false
+	root.add_child(dim)
 	pause_panel = VBoxContainer.new()
 	pause_panel.theme = UI.theme()
 	pause_panel.set_anchors_preset(Control.PRESET_CENTER)
-	pause_panel.position = Vector2(-70, -50)
+	pause_panel.position = Vector2(-70, -60)
 	pause_panel.custom_minimum_size = Vector2(140, 0)
 	pause_panel.add_theme_constant_override("separation", 3)
 	pause_panel.visible = false
 	root.add_child(pause_panel)
-	var title := _label(pause_panel, 28, HORIZONTAL_ALIGNMENT_CENTER)
-	title.label_settings.font = UI.font("cond", 0.22)
-	title.label_settings.font_color = UI.GREEN
+	pause_panel.visibility_changed.connect(func(): dim.visible = pause_panel.visible)
+	var title := UI.label(pause_panel, 20, "cond", UI.TEXT, 1, HORIZONTAL_ALIGNMENT_CENTER)
 	title.text = "PAUSE"
 	for entry in [["Weiter", _toggle_pause], ["Vollbild", GameState.toggle_fullscreen],
 			["Neustart", func(): _unpause(); get_tree().reload_current_scene()],
@@ -1421,6 +1431,7 @@ func _build_pause(root: Control) -> void:
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		b.pressed.connect(entry[1])
 		pause_panel.add_child(b)
+		UI.menu_fx(b)
 
 
 func _toggle_pause() -> void:

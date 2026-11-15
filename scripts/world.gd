@@ -102,7 +102,7 @@ var quiet := false  # Tests (--wtour): kein Verkehr, keine Herausforderer
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	GameState.in_world = true
-	quiet = Array(OS.get_cmdline_user_args()).any(func(a): return a.begins_with("--wtour"))
+	quiet = Array(OS.get_cmdline_user_args()).any(func(a): return a.begins_with("--wtour") or a.begins_with("--drivebot"))
 	# headless (Tests): der Ersatz-Renderer ist nicht threadsicher, Meshes aus dem Bau-Thread zerschießen dort die RIDs
 	_hitch = OS.get_cmdline_user_args().has("--hitch")
 	_threads = not OS.has_feature("web") and OS.get_processor_count() > 1 and not OS.get_cmdline_user_args().has("--nothreads") \
@@ -159,7 +159,7 @@ func _ready() -> void:
 	pc.top_speed *= GameState.pace()
 	pc.accel *= 0.8 + 0.2 * GameState.pace()
 	pc.place(spawn)
-	pc.drift_mode = GameState.world_drift
+	pc.drift_mode = GameState.world_drift or OS.get_cmdline_user_args().has("--botdrift")
 	pc.controls_enabled = true
 	player = pc
 	land.target = pc
@@ -187,6 +187,9 @@ func _ready() -> void:
 	_ready_done = true
 	if OS.get_cmdline_user_args().has("--worldcheck"):
 		_world_check()
+	if OS.get_cmdline_user_args().has("--lvltest"):  # Test: Bild der Level-Anzeige
+		get_tree().create_timer(1.0).timeout.connect(func(): _show_level_up([tr("LEVEL %d") % 18, tr("Auto: ") + "Ryujin 30Z",
+			tr("Titel: ") + tr("Drift-Samurai"), tr("Vinyl: ") + tr("Glitch")]))
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--wtour"):
 			var tour := WorldTour.new()
@@ -920,46 +923,35 @@ func _build_hud() -> void:
 	help.text = tr("Frei fahren: Marker anfahren startet ein Rennen\nM Karte  C Kamera  R Zurücksetzen  Esc Menü")
 	help.modulate.a = 0.7
 	hud["help"] = help
-	# Fahrer-Level oben links (seit 2.32): Emblem (2.33), Level, Balken bis zum nächsten, XP, Titel
-	var lv := Control.new()
-	lv.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	lv.position = Vector2(10, 8)
-	lv.size = Vector2(220, 48)
-	root.add_child(lv)
-	var em := TextureRect.new()
-	em.texture = GameState.emblem_texture()
-	em.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	em.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	em.position = Vector2(0, 0)
-	em.size = Vector2(38, 38)
-	em.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	lv.add_child(em)
-	var ll := _label(lv, 16)
-	ll.add_theme_font_override("font", UI.font("wide", 0.15))
-	ll.position = Vector2(44, -3)
-	var lbg := ColorRect.new()
-	lbg.color = Color(0, 0, 0, 0.55)
-	lbg.position = Vector2(44, 22)
-	lbg.size = Vector2(150, 5)
-	lbg.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	lv.add_child(lbg)
-	var lfill := ColorRect.new()
-	lfill.color = UI.CYAN
-	lfill.position = Vector2(44, 22)
-	lfill.size = Vector2(0, 5)
-	lfill.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	lv.add_child(lfill)
-	var lx := _label(lv, 8)
-	lx.position = Vector2(44, 27)
-	lx.modulate.a = 0.8
-	var lt := _label(lv, 9)
-	lt.position = Vector2(44, 37)
-	lt.add_theme_color_override("font_color", Color(1.0, 0.82, 0.3))
+	# Fahrer-Level (seit 2.35 unten statt oben links): eine schmale Leiste über die ganze Bildschirmbreite am unteren
+	# Rand, darüber klein Level und XP. Dezent, das Bild gehört der Straße.
+	var xbg := ColorRect.new()
+	xbg.color = Color(0, 0, 0, 0.45)
+	xbg.anchor_top = 1.0
+	xbg.anchor_bottom = 1.0
+	xbg.anchor_right = 1.0
+	xbg.offset_top = -3.0
+	xbg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(xbg)
+	var xfill := ColorRect.new()
+	xfill.color = Color(UI.CYAN.r, UI.CYAN.g, UI.CYAN.b, 0.8)
+	xfill.anchor_top = 1.0
+	xfill.anchor_bottom = 1.0
+	xfill.offset_top = -3.0
+	xfill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(xfill)
+	var ll := _label(root, 9, HORIZONTAL_ALIGNMENT_CENTER)
+	ll.anchor_left = 0.5
+	ll.anchor_right = 0.5
+	ll.anchor_top = 1.0
+	ll.anchor_bottom = 1.0
+	ll.offset_left = -200.0
+	ll.offset_right = 200.0
+	ll.offset_top = -17.0
+	ll.offset_bottom = -4.0
+	ll.modulate.a = 0.75
 	hud["lvl"] = ll
-	hud["lvl_fill"] = lfill
-	hud["lvl_xp"] = lx
-	hud["lvl_title"] = lt
-	hud["lvl_emblem"] = em
+	hud["lvl_fill"] = xfill
 	# laufender Drift unten in der Mitte: Punkte und Multiplikator, solange die Kette läuft
 	var dm := _label(root, 18, HORIZONTAL_ALIGNMENT_CENTER)
 	dm.anchor_left = 0.5
@@ -974,14 +966,17 @@ func _build_hud() -> void:
 	dm.add_theme_color_override("font_color", Color(1.0, 0.85, 0.2))
 	dm.visible = false
 	hud["drift"] = dm
-	# Level aufgestiegen: groß in der Mitte, darunter was es freischaltet
-	var lu := _label(root, 30, HORIZONTAL_ALIGNMENT_CENTER)
+	# Level aufgestiegen (seit 2.35 dezent unten über der Leiste statt groß in der Mitte): Level und das Wichtigste,
+	# was es freischaltet; alles Weitere steht in der Garage unter Fahrer
+	var lu := _label(root, 14, HORIZONTAL_ALIGNMENT_CENTER)
 	lu.anchor_left = 0.5
 	lu.anchor_right = 0.5
-	lu.anchor_top = 0.28
-	lu.anchor_bottom = 0.28
+	lu.anchor_top = 1.0
+	lu.anchor_bottom = 1.0
 	lu.offset_left = -300.0
 	lu.offset_right = 300.0
+	lu.offset_top = -112.0
+	lu.offset_bottom = -70.0
 	lu.add_theme_font_override("font", UI.font("wide", 0.15))
 	lu.add_theme_color_override("font_color", Color(0.4, 1.0, 0.55))
 	lu.visible = false
@@ -1085,24 +1080,35 @@ func _build_hud() -> void:
 
 
 func _build_pause(root: Control) -> void:
+	# Abdunklung hinter dem Menü (seit 2.35), mit dem Menü sichtbar
+	var dim := ColorRect.new()
+	dim.color = Color(0.0, 0.0, 0.0, 0.55)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	dim.visible = false
+	root.add_child(dim)
 	pause_panel = VBoxContainer.new()
 	pause_panel.theme = UI.theme()
 	pause_panel.set_anchors_preset(Control.PRESET_CENTER)
-	pause_panel.position = Vector2(-70, -50)
+	pause_panel.position = Vector2(-70, -72)  # über dem Musik-Hinweis unten rechts
 	pause_panel.custom_minimum_size = Vector2(140, 0)
 	pause_panel.add_theme_constant_override("separation", 3)
 	pause_panel.visible = false
 	root.add_child(pause_panel)
-	var title := _label(pause_panel, 28, HORIZONTAL_ALIGNMENT_CENTER)
+	pause_panel.visibility_changed.connect(func(): dim.visible = pause_panel.visible)
+	var title := UI.label(pause_panel, 20, "cond", UI.TEXT, 1, HORIZONTAL_ALIGNMENT_CENTER)
 	title.text = tr("PAUSE")
 	for entry in [["Weiter", _toggle_pause], ["Karte", func(): _toggle_pause(); _open_map()],
 			["Tuning", _to_garage.bind("tuning")], ["Auto wechseln", _to_garage.bind("cars")], ["Fahrer", _to_garage.bind("driver")],
 			["Vollbild", GameState.toggle_fullscreen],
 			["Garage", func(): _unpause(); GameState.in_world = false; get_tree().change_scene_to_file("res://scenes/garage.tscn")]]:
 		var b := Button.new()
-		b.text = tr(entry[0])
+		b.text = tr(entry[0]).to_upper()  # wie in der Garage: Großbuchstaben, linksbündig
+		b.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
+		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		b.pressed.connect(entry[1])
 		pause_panel.add_child(b)
+		UI.menu_fx(b)  # Auswahl gleitet ein, Maus darüber wählt aus (wie in der Garage)
 
 
 ## Esc > Tuning / Auto wechseln: Garage öffnet direkt dort, "Fertig" bringt einen an dieselbe Stelle zurück
@@ -1405,7 +1411,7 @@ func _check_near_miss() -> void:
 
 
 ## Einblendung über der Minikarte; Punkte füllen Nitro (wie im Rennen: 300 Punkte = 7,5 % einer Serienflasche)
-func _flash(text: String, col: Color, pts := 0) -> void:
+func _flash(text: String, col: Color, pts := 0, xp := -1) -> void:
 	if _feed == null:
 		return
 	var l := _label(_feed, 15)
@@ -1418,8 +1424,9 @@ func _flash(text: String, col: Color, pts := 0) -> void:
 		old.queue_free()
 	if pts > 0:
 		player.nitro = minf(player.nitro + minf(pts / 4000.0, 0.12) / player.nitro_cap, 1.0)
-		# Stilpunkte sind Erfahrung (seit 2.32); gespeichert wird gesammelt (_update_level_banner)
-		var lines := GameState.add_xp(pts, false)
+		# Stilpunkte sind Erfahrung (seit 2.32), in der freien Fahrt seit 2.35 nur ein Zehntel (Driften eigens, siehe
+		# DRIFT_XP): Rennen sollen deutlich mehr bringen (ein Rennsieg 3000 bis 7500 XP, eine Minute Driften gut 600)
+		var lines := GameState.add_xp(xp if xp >= 0 else int(round(pts * WORLD_XP)), false)
 		if not lines.is_empty():
 			_show_level_up(lines)
 		_update_level_hud()
@@ -1427,30 +1434,61 @@ func _flash(text: String, col: Color, pts := 0) -> void:
 
 # --- Fahrer-Level und Drift in der freien Fahrt (seit 2.32) ------------------------------------------------------
 
+var _xp_k := -1.0  # angezeigter Anteil der Leiste (läuft weich nach)
+const WORLD_XP := 0.1  # Anteil der Stilpunkte in der freien Fahrt, der als Erfahrung zählt
+const DUEL_XP := 1500  # gewonnenes Duell (zählt wie ein kleines Rennen)
+const DRIFT_XP := 0.04  # Erfahrung je Punkt einer Drift-Kette in der freien Fahrt (ohne Multiplikator)
+
+
 func _update_level_hud() -> void:
 	if not hud.has("lvl"):
 		return
 	var li := GameState.level_info()
-	hud["lvl"].text = tr("LEVEL %d") % li["level"]
-	hud["lvl_fill"].size.x = 150.0 * clampf(float(li["into"]) / float(li["need"]), 0.0, 1.0)
-	hud["lvl_xp"].text = "%d / %d XP" % [li["into"], li["need"]]
-	hud["lvl_title"].text = GameState.title_name().to_upper()
-	hud["lvl_emblem"].texture = GameState.emblem_texture()
+	if _lu_t <= 0.0:
+		hud["lvl"].text = tr("LEVEL %d") % li["level"] + "   ·   " + GameState.title_name().to_upper() + "   ·   " \
+			+ "%d / %d XP" % [li["into"], li["need"]]
+		hud["lvl"].remove_theme_color_override("font_color")
+		hud["lvl"].modulate.a = 0.75
+	var k := clampf(float(li["into"]) / float(li["need"]), 0.0, 1.0)
+	if _xp_k < 0.0 or k < _xp_k:
+		_xp_k = k  # Start oder neues Level: von vorn
+	hud["lvl_fill"].set_meta("k", k)
+
+
+## Leiste weich zum Stand nachführen (sonst springt sie bei jedem Punkt)
+func _update_xp_bar(dt: float) -> void:
+	if not hud.has("lvl_fill"):
+		return
+	var k: float = hud["lvl_fill"].get_meta("k", 0.0)
+	_xp_k = move_toward(_xp_k, k, dt * 0.6)
+	var w: float = (hud["lvl_fill"].get_parent() as Control).size.x
+	hud["lvl_fill"].offset_right = w * _xp_k
 
 
 func _show_level_up(lines: Array) -> void:
-	hud["levelup"].text = "\n".join(lines.slice(0, 3))
-	hud["levelup"].visible = true
+	# erste Zeile "LEVEL n", darunter höchstens ein Gewinn (Auto oder Stufe zuerst), der Rest steht in der Garage
+	var best := ""
+	for l in lines.slice(1):
+		if best == "" or str(l).begins_with(tr("Auto: ")) or str(l).begins_with(tr("STUFE")):
+			best = l
+			if str(l).begins_with(tr("Auto: ")):
+				break
+	var more := lines.size() - 1 - (1 if best != "" else 0)
+	# seit 2.35 in der kleinen Zeile über der XP-Leiste (vorher groß über dem Auto): sie leuchtet 4 s grün auf
+	var txt := tr("%s ERREICHT") % str(lines[0]) + ("   ·   " + best if best != "" else "") + (("   ·   " + tr("+%d mehr") % more) if more > 0 else "")
+	hud["lvl"].text = txt
+	hud["lvl"].add_theme_color_override("font_color", Color(0.45, 1.0, 0.6))
+	hud["lvl"].modulate.a = 1.0
 	_lu_t = 4.0
 	Sfx.ui("go")
-	for l in lines.slice(1, 6):
-		_flash(l, Color(0.4, 1.0, 0.55))
 
 
 func _update_level_banner(dt: float) -> void:
+	_update_xp_bar(dt)
 	if _lu_t > 0.0:
 		_lu_t -= dt
-		hud["levelup"].modulate.a = clampf(_lu_t / 0.6, 0.0, 1.0)
+		if _lu_t <= 0.0:
+			_update_level_hud()  # zurück zu Level und XP
 		if _lu_t <= 0.0:
 			hud["levelup"].visible = false
 	# XP gesammelt speichern (nicht bei jedem knapp vorbei die Datei schreiben)
@@ -1489,7 +1527,9 @@ func _update_world_drift(dt: float) -> void:
 		if _dr_chain > 0.0 and _dr_idle > 0.9:
 			var pts := int(_dr_chain * mult / 10.0) * 10
 			if pts >= 50:
-				_flash(tr("DRIFT") + ("  x%d" % mult if mult > 1 else ""), Color(1.0, 0.85, 0.2), pts)
+				# Erfahrung ohne den Ketten-Multiplikator (der zählt für Punkte und Nitro): eine Minute gutes Driften
+				# bringt so gut 600 XP, ein Rennsieg 3000 bis 7500
+				_flash(tr("DRIFT") + ("  x%d" % mult if mult > 1 else ""), Color(1.0, 0.85, 0.2), pts, int(_dr_chain * DRIFT_XP))
 			_dr_chain = 0.0
 			_dr_time = 0.0
 	var dm: Label = hud["drift"]
@@ -1661,6 +1701,11 @@ func _end_duel(won: bool) -> void:
 		GameState.save_game()
 		challenger.base_speed = 22.0  # gibt auf und fällt zurück
 		_flash(tr("HERAUSFORDERER ABGEHÄNGT (%d)") % GameState.outruns, Color(0.4, 1.0, 0.5), 1000)
+		# Duell gewonnen: Erfahrung wie ein kleines Rennen (die Stilpunkte oben zählen in der Welt nur zu einem Zehntel)
+		var dl := GameState.add_xp(DUEL_XP - int(round(1000 * WORLD_XP)), false)
+		if not dl.is_empty():
+			_show_level_up(dl)
+		_update_level_hud()
 		Sfx.ui("install")
 	else:
 		challenger.base_speed = challenger.get_meta("top")

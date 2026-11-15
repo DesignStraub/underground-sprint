@@ -745,28 +745,28 @@ static func stage_need(s: int) -> int:
 	return mini(STAGE_WINS, STAGES[s]["events"].size() - 1)
 
 
-## Fahrer-Titel mit Emblem (assets/emblems/<emblem>.svg): kommen mit dem Level, Titel und Emblem wählt man in der
-## Garage unter "Fahrer" frei aus allen freien. Sie stehen im HUD der Welt, in der Garage und bei Duellen.
+## Fahrer-Titel: kommen mit dem Level, man wählt in der Garage unter "Fahrer" einen der freien. Er steht in der
+## Garage. (2.33 hatte zu jedem Titel ein Emblem, seit 2.35 nicht mehr.)
 const TITLES := [
-	{"level": 1, "name": "Neuling", "emblem": "key"},
-	{"level": 2, "name": "Ampelstarter", "emblem": "light"},
-	{"level": 4, "name": "Kurvenkratzer", "emblem": "tire"},
-	{"level": 6, "name": "Nachtfahrer", "emblem": "moon"},
-	{"level": 8, "name": "Querfahrer", "emblem": "drift"},
-	{"level": 10, "name": "Lückenfinder", "emblem": "bolt"},
-	{"level": 12, "name": "Schrauber", "emblem": "piston"},
-	{"level": 14, "name": "Ringjäger", "emblem": "ring"},
-	{"level": 16, "name": "Phantom", "emblem": "mask"},
-	{"level": 18, "name": "Drift-Samurai", "emblem": "katana"},
-	{"level": 20, "name": "Asphaltkönig", "emblem": "crown"},
-	{"level": 22, "name": "Fuchsgeist", "emblem": "fox"},
-	{"level": 24, "name": "Autobahn-Engel", "emblem": "wings"},
-	{"level": 26, "name": "Oni", "emblem": "oni"},
-	{"level": 28, "name": "Einheit Null", "emblem": "mecha"},
-	{"level": 30, "name": "Drachenreiter", "emblem": "dragon"},
-	{"level": 35, "name": "Legende", "emblem": "star"},
-	{"level": 40, "name": "Ikone", "emblem": "diamond"},
-	{"level": 50, "name": "Unsterblich", "emblem": "phoenix"},
+	{"level": 1, "name": "Neuling"},
+	{"level": 2, "name": "Ampelstarter"},
+	{"level": 4, "name": "Kurvenkratzer"},
+	{"level": 6, "name": "Nachtfahrer"},
+	{"level": 8, "name": "Querfahrer"},
+	{"level": 10, "name": "Lückenfinder"},
+	{"level": 12, "name": "Schrauber"},
+	{"level": 14, "name": "Ringjäger"},
+	{"level": 16, "name": "Phantom"},
+	{"level": 18, "name": "Drift-Samurai"},
+	{"level": 20, "name": "Asphaltkönig"},
+	{"level": 22, "name": "Fuchsgeist"},
+	{"level": 24, "name": "Autobahn-Engel"},
+	{"level": 26, "name": "Oni"},
+	{"level": 28, "name": "Einheit Null"},
+	{"level": 30, "name": "Drachenreiter"},
+	{"level": 35, "name": "Legende"},
+	{"level": 40, "name": "Ikone"},
+	{"level": 50, "name": "Unsterblich"},
 ]
 const LEVEL_MAX := 99
 
@@ -791,7 +791,7 @@ static func level_rewards(l: int) -> Array:
 			out.append({"kind": "car", "id": id, "name": CARS[id]["name"]})
 	for t in TITLES.size():
 		if int(TITLES[t]["level"]) == l and l > 1:
-			out.append({"kind": "title", "index": t, "name": TITLES[t]["name"], "emblem": TITLES[t]["emblem"]})
+			out.append({"kind": "title", "index": t, "name": TITLES[t]["name"]})
 	for cat in PART_ORDER:
 		var opts: Array = PARTS[cat]["options"]
 		for i in opts.size():

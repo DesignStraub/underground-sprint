@@ -232,6 +232,48 @@ Außenring → nächste Stadt → Autobahn. Rundkurse und Drift-Kurse sind Schle
 - Browser: der Web-Export startet, die Welt baut sich ohne Skriptfehler auf (gut 25 s). Noch offen: eine Testfahrt mit
   Bildrate im sichtbaren Browserfenster (Herausforderer, Nachladen, Verkehr).
 
+## Driften mit echtem Rutsch-Modell, Qualm und Spuren, ruhiger am Berg (2.35)
+- **Rutsch-Modell** (`player_car._dyn_physics`): Einspurmodell mit Vorder- und Hinterachse und Reifenkennlinie (Seitenkraft
+  bis zum Haftmaximum, danach etwas weniger). Gas nimmt der Hinterachse Seitenhalt (Kammscher Kreis), die Handbremse
+  fast ganz, Bremsen verlagert Gewicht nach vorn; das Auto dreht mit Trägheit um seinen Schwerpunkt. Bis 2.34 drehte es
+  im Rutschen um die Vorderachse und schob das Heck sprunghaft zur Seite. Für die Tastatur: die Vorderräder zeigen von
+  selbst in Fahrtrichtung der Vorderachse (Gegenlenken), Lenken in die Kurve vergrößert den Winkel, aus der Kurve
+  verkleinert ihn; der Winkel bleibt unter dem Lenkeinschlag (45° im Drift-Modus), Gas weg und das Auto fängt sich in
+  etwa einer Sekunde. Im Drift-Modus (Q, Drift-Events) immer, im Fahr-Modus ab der Handbremse, bis das Auto wieder
+  greift; sonst bleibt das abgestimmte Griff-Modell. Messfahrten: `world.tscn -- --wspawn=ring:3 --car=hachi --botdrift
+  --drivebot=hbentry|power|tap|counter|brake:20` (Zeile "BOT ..." alle 0,1 s).
+- **Karosserie ruhiger:** Wanken nach der echten Querbeschleunigung (nicht nach der Drehrate, die im Drift groß ist),
+  höchstens gut 2,5°; weniger Nicken.
+- **Kein Ruckeln mehr am Berg:** die Lage auf der Strecke wird stetig weitergeführt (`_locate_cont`: in Kehren sprang
+  sie auf den anderen Schenkel, am Berg auf andere Höhe), Kuppen kommen aus der Krümmung des Höhenprofils (v² · Krümmung
+  > g) statt aus der Höhenänderung von Bild zu Bild. Auf dem Driftberg hob das Auto vorher bis zu 30-mal je Rennen kurz
+  ab, jede Landung bremste, wackelte und drückte die Front ein (`--vlog` gibt Abheben und Landungen aus).
+- **Reifenqualm und Reifenspuren** (`scripts/tire_fx.gd`, `shaders/skid.gdshader`): Spuren ab gut halber Rutsch-Stärke
+  (MultiMesh-Ringpuffer, ein Zeichenaufruf), verblassen in 45 s, im Drift-Event in 150 s (die Spur der letzten Runde liegt
+  noch da); Qualm dezent hellgrau aus den Hinterrädern im Drift, beim Durchdrehen und mit der Handbremse.
+- **Erfahrung:** in der freien Fahrt zählen Stilpunkte nur zu einem Zehntel, Drift-Ketten ohne Multiplikator (eine Minute
+  gutes Driften gut 600 XP), ein gewonnenes Duell 1500; im Rennen die Stilpunkte halb, der Platz voll (Sieg 3000 bis
+  7500). Level-Zeile unten (Level, Titel, XP) über einer XP-Leiste über die ganze Breite; ein Aufstieg leuchtet dort 4 s
+  grün auf statt groß in der Mitte. Embleme sind raus.
+- **Menüs wertiger** (`ui_style.gd`, `garage.gd`): ruhige Palette mit einem Akzent, flache dunkle Flächen mit feiner
+  Kante, klare Schrift ohne Konturen, Auswahl gleitet ein (Akzentstrich, leichter Verlauf), Maus darüber wählt aus,
+  Menüwechsel blenden weich über, Tastenhinweise als Tastenkappen. Garage als Studio mit Licht statt Neonröhren und
+  leuchtendem Ring; Ladebild, Karte, Intro, Pausenmenü und Rennergebnis im selben Stil.
+- **Kollisionen:** Seit Jolt (Physik-Standard ab Godot 4.6) erkannte der Fühler des Autos statisch eingefrorene Teile nie:
+  Laternen, Mülltonnen, Leitkegel ließen sich durchfahren. Sie frieren jetzt kinematisch ein (`knockable.gd`). Laternen
+  fliegen weg (gut 5 % Tempo), kippen von der Straße weg und blenden kurz nach der Landung aus; leichte Teile (Mülltonne,
+  Leitkegel, Briefkasten, Automat, Zeitungsboxen, Parkuhr, Schilder) fliegen ebenfalls. Fest (Crash): Bäume, Bank,
+  Hydrant, Poller, Kübel, Haltestelle, Telefonzelle, Container, Betonwand, Plakatwände, Reifenstapel; sie stehen mit
+  der Vorderseite mindestens 0,9 m hinter dem Bordstein. Landschaftsbäume halten Abstand zu allen befahrbaren Flächen
+  (`landscape._plan_corridors`, vorher standen 177 auf Waldstraßen), Bäume bis 6 m neben der Mauer haben einen festen
+  Stamm. Fliegt das Auto bei einem Überschlag über eine Mauer in eine Sackgasse, kommt es danach auf die Hauptstraße.
+- **Verkehrsunfälle** (`traffic_car.gd`): angefahrene Autos rutschen flach auf Straßenhöhe (vorher sanken sie bis 1,8 m
+  ein), rollen notfalls auf die Räder zurück, fahren nach 1 s Stillstand zurück in ihre Spur und weiter. Nur wer auf
+  dem Dach landet, bleibt 3 s liegen, blendet aus und kommt außer Sicht wieder; ebenso ein Auto, das sich nicht
+  befreien kann. Gegner rammen solche Autos nicht erneut, sondern fahren um sie herum (`ai_car._check_traffic_crash`).
+- **Tests im Hintergrund:** `.claude/testtools/gbg.sh` startet Godot ohne Ton und ohne Fokus (`open -g`, `--audio-driver
+  Dummy`), `env.sh` setzt `$G` darauf.
+
 ## Fake-Werbeplakate (2.34)
 - **12 ausgedachte Plakate**, trocken und kurz, keine echten Marken: Funkloch+ („Jetzt noch weniger Empfang“),
   Glasfaser kommt („Versprochen. Seit 2009“), Döner für 3,50 € („Unvergessen“), Socken in Sandalen („Jetzt auch in
@@ -246,7 +288,7 @@ Außenring → nächste Stadt → Autobahn. Rundkurse und Drift-Kurse sind Schle
   `tools/posters.gd` (braucht ein Fenster), Bildmotive als SVG von `tools/poster_gen.py`. Stoff: leicht hinterleuchtet
   (Leuchtbild multipliziert, nicht addiert: sonst lag ein weißer Schleier darauf), kaum Glanz.
 
-## Alles über das Fahrer-Level, Vinyls, Titel und Embleme (2.33)
+## Alles über das Fahrer-Level, Vinyls und Titel (2.33)
 - **Freischalten nur noch über das Level** (`Catalog.level_rewards`, `GameState.is_*_unlocked`): Karriere-Stufen
   (`STAGES[...]["level"]`: Szene 3, Hafen und Altstadt 7, Großstadt 12, Finale 17), alle Autos (Level 2 bis 22, die
   Exoten Raiden Zero 24 und Tengu RS 26), Leistungsteile und edle Lacke (`"level"` an den Optionen), Vinyls und Titel.
@@ -257,11 +299,10 @@ Außenring → nächste Stadt → Autobahn. Rundkurse und Drift-Kurse sind Schle
 - **Alte Spielstände** (`GameState._migrate_prog`, Spielstand ohne `"prog": 2`): was mit Siegen schon frei war, bleibt
   frei (`kept_cars`, `kept_parts`, `kept_stages`), und die gewonnenen Events zählen als Erfahrung nach der neuen
   Rechnung, falls das mehr ist als die bisherige.
-- **Garage > Fahrer:** Fahrerkarte (Emblem, Titel, Level, Balken), Titel wählen, Emblem wählen, Level-Liste (je Level,
-  was es bringt; rechts die Details und wie viel XP noch fehlen). In der Welt auch über Esc > Fahrer. 19 Titel von
-  „Neuling“ bis „Unsterblich“ (`Catalog.TITLES`), jeder mit Emblem (`assets/emblems/*.svg`); Titel und Emblem lassen
-  sich frei kombinieren. Oben links in der Welt: Emblem, Level, Balken, XP, Titel. Beim Aufstieg nennt das Spiel alles,
-  was neu frei ist.
+- **Garage > Fahrer:** Fahrerkarte (Titel, Level, Balken), Titel wählen, Level-Liste (je Level, was es bringt; rechts
+  die Details und wie viel XP noch fehlen). In der Welt auch über Esc > Fahrer. 19 Titel von „Neuling“ bis
+  „Unsterblich“ (`Catalog.TITLES`). Bis 2.34 gab es zu jedem Titel ein Emblem, seit 2.35 nicht mehr; der Titel steht
+  in der Level-Zeile unten in der Welt.
 - **25 Vinyls mit Motiv** (Folierung, ab Option 9): Speedlines, Tribal, Splitter, Sakura, Tiger, Zielflagge, Flammen,
   Pixeltarn, Blitze, Welle, Graffiti, Hexgitter, Platine, Farbbomben, Koi, Rising Sun, Glitch-Split, Kitsune, Oni,
   Drache, Engelsflügel, Einheit 07 (Mecha-Lackierung), Mecha, Lichtengel, Prisma. Jedes Motiv ist ein SVG

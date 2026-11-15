@@ -1,17 +1,18 @@
 extends Control
-## Studio-Intro: ONE HUMANITY Logo zoomt mit Wackeln herein, kurzer Sound, dann Garage.
+## Studio-Intro: ONE HUMANITY Logo blendet ruhig ein und wächst dabei ein wenig, kurzer Sound, dann Garage.
+## Seit 2.35 ohne Wackeln und Blitz (wirkte aufgesetzt), nur ein leiser Schein hinter dem Logo.
 ## Jede Taste / Klick / Gamepad-Knopf überspringt.
 
 const LOGO := preload("res://assets/one_humanity_logo.svg")
 const SOUND_PATH := "res://assets/intro_sound.mp3"  # optional, nicht im Git-Repo (Pixabay-Lizenz)
 const GLOW := preload("res://shaders/logo_glow.gdshader")
+const UI := preload("res://scripts/ui_style.gd")
 const NEXT_SCENE := "res://scenes/garage.tscn"
 const DURATION := 3.6
 
 var logo: TextureRect
 var halo: TextureRect
 var title: Label
-var flash: ColorRect
 var fade: ColorRect
 var mat: ShaderMaterial
 var _t := 0.0
@@ -19,16 +20,17 @@ var _leaving := false
 
 
 func _ready() -> void:
-	set_anchors_preset(Control.PRESET_FULL_RECT)
+	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	var bg := ColorRect.new()
-	bg.color = Color(0.0, 0.0, 0.0)
+	bg.color = UI.INK
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(bg)
 
-	# Weicher blauer Schein hinter dem Logo
+	# Leiser kühler Schein hinter dem Logo
 	var grad := Gradient.new()
-	grad.set_color(0, Color(0.15, 0.6, 1.0, 0.55))
-	grad.set_color(1, Color(0.15, 0.6, 1.0, 0.0))
+	grad.set_color(0, Color(0.55, 0.7, 0.9, 0.16))
+	grad.set_color(1, Color(0.55, 0.7, 0.9, 0.0))
+	grad.interpolation_mode = Gradient.GRADIENT_INTERPOLATE_CUBIC
 	var gt := GradientTexture2D.new()
 	gt.gradient = grad
 	gt.fill = GradientTexture2D.FILL_RADIAL
@@ -39,7 +41,7 @@ func _ready() -> void:
 	halo = TextureRect.new()
 	halo.texture = gt
 	halo.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	halo.size = Vector2(340, 340)
+	halo.size = Vector2(380, 380)
 	halo.pivot_offset = halo.size / 2.0
 	var add := CanvasItemMaterial.new()
 	add.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
@@ -55,29 +57,21 @@ func _ready() -> void:
 	logo.pivot_offset = logo.size / 2.0
 	mat = ShaderMaterial.new()
 	mat.shader = GLOW
+	mat.set_shader_parameter("glow_color", Color(0.55, 0.7, 0.95))
 	logo.material = mat
 	add_child(logo)
 
 	title = Label.new()
-	title.text = "O N E   H U M A N I T Y"
+	title.text = "ONE HUMANITY"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	var ls := LabelSettings.new()
-	ls.font_size = 16
-	ls.font_color = Color(0.92, 0.95, 1.0)
-	ls.shadow_color = Color(0.1, 0.6, 1.0, 0.6)
-	ls.shadow_size = 6
-	title.label_settings = ls
+	title.label_settings = UI.text_settings(9, "wide", UI.TEXT, 4)
+	title.label_settings.shadow_color = Color(0, 0, 0, 0)
 	title.size = Vector2(400, 24)
 	title.modulate.a = 0.0
 	add_child(title)
 
-	flash = ColorRect.new()
-	flash.color = Color(0.7, 0.9, 1.0, 0.0)
-	flash.set_anchors_preset(Control.PRESET_FULL_RECT)
-	flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(flash)
 	fade = ColorRect.new()
-	fade.color = Color(0, 0, 0, 1)
+	fade.color = Color(UI.INK.r, UI.INK.g, UI.INK.b, 1)
 	fade.set_anchors_preset(Control.PRESET_FULL_RECT)
 	fade.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(fade)
@@ -95,25 +89,21 @@ func _ready() -> void:
 func _process(dt: float) -> void:
 	_t += dt
 	var center := get_viewport_rect().size / 2.0
-	# Zoom: schneller Einschlag, dann langsames Weiterziehen
-	var hit := 1.0 - pow(1.0 - clampf(_t / 0.35, 0.0, 1.0), 3.0)
-	var s := lerpf(0.35, 0.92, hit) + _t * 0.035
+	# ruhiges Einblenden: das Logo wächst in gut einer Sekunde weich auf seine Größe und zieht dann kaum merklich weiter
+	var k := 1.0 - pow(1.0 - clampf(_t / 1.2, 0.0, 1.0), 3.0)
+	var s := lerpf(0.86, 0.9, k) + _t * 0.012
 	logo.scale = Vector2(s, s)
-	# Wackeln: kräftig beim Einschlag, dann ein leichtes Nachzittern
-	var shake := 9.0 * exp(-_t * 5.0) + 0.8
-	var off := Vector2(randf_range(-shake, shake), randf_range(-shake, shake))
-	logo.position = center - logo.size / 2.0 + Vector2(0, -16) + off
-	logo.rotation = randf_range(-1.0, 1.0) * 0.02 * exp(-_t * 4.0)
-	halo.position = center - halo.size / 2.0 + Vector2(0, -16) + off * 0.5
-	halo.scale = Vector2(s, s) * (1.0 + 0.04 * sin(_t * 6.0))
-	halo.modulate.a = 0.55 + 0.9 * exp(-_t * 2.5)
-	mat.set_shader_parameter("glow", 0.6 + 0.6 * exp(-_t * 3.0) + 0.1 * sin(_t * 9.0))
-	title.position = center + Vector2(-200, 82) + off * 0.4
-	title.modulate.a = clampf((_t - 0.7) / 0.5, 0.0, 1.0)
-	flash.color.a = 0.35 * exp(-_t * 10.0) if _t > 0.05 else 0.0
+	logo.modulate.a = k
+	logo.position = center - logo.size / 2.0 + Vector2(0, -16)
+	halo.position = center - halo.size / 2.0 + Vector2(0, -16)
+	halo.scale = Vector2(s, s)
+	halo.modulate.a = k
+	mat.set_shader_parameter("glow", 0.35 * k)
+	title.position = center + Vector2(-200, 80)
+	title.modulate.a = clampf((_t - 0.8) / 0.6, 0.0, 1.0)
 	# Ein- und Ausblenden
-	if _t < 0.12:
-		fade.color.a = 1.0 - _t / 0.12
+	if _t < 0.25:
+		fade.color.a = 1.0 - _t / 0.25
 	elif _t > DURATION - 0.6:
 		fade.color.a = clampf((_t - (DURATION - 0.6)) / 0.6, 0.0, 1.0)
 	else:

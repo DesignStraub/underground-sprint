@@ -341,9 +341,10 @@ func _draw_toast() -> void:
 		return
 	var vs := _toast.get_viewport_rect().size
 	var h := 24.0
-	var f_title := UI.font("cond", 0.2)
-	var f_art := UI.font("bold", 0.12)
-	var tw := maxf(f_title.get_string_size(_toast_title, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x,
+	# seit 2.35 im ruhigen Menü-Look: dunkle Blase mit Haarlinie, Titel klein und gesperrt, nur die Balken im Akzent
+	var f_title := UI.font("wide", 0.0, 1)
+	var f_art := UI.font("bold", 0.0)
+	var tw := maxf(f_title.get_string_size(_toast_title, HORIZONTAL_ALIGNMENT_LEFT, -1, 8).x,
 		f_art.get_string_size(_toast_artist, HORIZONTAL_ALIGNMENT_LEFT, -1, 7).x)
 	var full := h + 8.0 + tw + 10.0
 	var w := lerpf(h, full, open) * lerpf(0.6, 1.0, pop)
@@ -352,8 +353,8 @@ func _draw_toast() -> void:
 	var x0 := vs.x - 12.0 - w if toast_corner else (vs.x - w) / 2.0
 	var r := Rect2(Vector2(x0, y0 + (h - hh) / 2.0), Vector2(w, hh))
 	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(0.02, 0.03, 0.06, 0.72 * pop)
-	sb.border_color = Color(UI.GREEN.r, UI.GREEN.g, UI.GREEN.b, 0.55 * pop)
+	sb.bg_color = Color(UI.PANEL.r, UI.PANEL.g, UI.PANEL.b, 0.88 * pop)
+	sb.border_color = Color(1, 1, 1, 0.12 * pop)
 	sb.set_border_width_all(1)
 	sb.set_corner_radius_all(int(hh / 2.0))
 	sb.anti_aliasing = true
@@ -363,12 +364,12 @@ func _draw_toast() -> void:
 	var now := Time.get_ticks_msec() / 1000.0
 	for i in 3:
 		var bh := hh * (0.2 + 0.25 * (0.5 + 0.5 * sin(now * (7.0 + i * 2.3) + i * 1.7)))
-		_toast.draw_rect(Rect2(c + Vector2(-5.0 + i * 3.6, hh * 0.28 - bh), Vector2(2.4, bh)), Color(UI.GREEN.r, UI.GREEN.g, UI.GREEN.b, pop))
+		_toast.draw_rect(Rect2(c + Vector2(-5.0 + i * 3.6, hh * 0.28 - bh), Vector2(2.4, bh)), Color(UI.ACCENT.r, UI.ACCENT.g, UI.ACCENT.b, pop))
 	var ta := smoothstep(0.75, 1.0, open)
 	if ta > 0.0:
 		var x := r.position.x + hh + 4.0
-		_toast.draw_string(f_title, Vector2(x, r.position.y + 11.5), _toast_title, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(1, 1, 1, ta))
-		_toast.draw_string(f_art, Vector2(x, r.position.y + 20.0), _toast_artist, HORIZONTAL_ALIGNMENT_LEFT, -1, 7, Color(0.7, 0.75, 0.85, ta))
+		_toast.draw_string(f_title, Vector2(x, r.position.y + 11.0), _toast_title, HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color(UI.TEXT.r, UI.TEXT.g, UI.TEXT.b, ta))
+		_toast.draw_string(f_art, Vector2(x, r.position.y + 19.5), _toast_artist, HORIZONTAL_ALIGNMENT_LEFT, -1, 7, Color(UI.DIM.r, UI.DIM.g, UI.DIM.b, ta))
 
 
 func _process(_dt: float) -> void:
