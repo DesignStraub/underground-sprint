@@ -14,6 +14,7 @@ const TrainBody := preload("res://scripts/train_body.gd")
 const People := preload("res://scripts/people.gd")
 
 const SPEED := 32.0
+const TRAIN_TOP := 4.1  # Dach des Zugs über den Gleisen (m)
 const RAIL_HALF := 560.0
 const TRACK_OFF := 2.25  # zwei Gleise, je so weit vor und hinter der Mitte
 const PLAT_LEN := 95.0
@@ -431,10 +432,12 @@ func _build_train() -> void:
 				car.add_child(sp)
 		var cs := CollisionShape3D.new()
 		var bs := BoxShape3D.new()
-		# reicht tief unter die Gleise: ein Auto im Weg wird zur Seite gedrückt, nie nach unten durch den Boden
-		bs.size = Vector3(3.2, 9.0, l)
+		# von 1 m unter den Gleisen bis zum Dach (4,1 m): ein Auto im Weg steckt ganz darin und wird zur Seite gedrückt,
+		# nie nach unten durch den Boden. Bis 2.35 reichte der Kasten 5 m tief: auf den langen Gleisen quer durch die
+		# Stadt erwischte der Zug auch Autos, die tiefer unter ihm durchfuhren.
+		bs.size = Vector3(3.2, TRAIN_TOP + 1.0, l)
 		cs.shape = bs
-		cs.position = Vector3(0, 0, cz) + Vector3(0, -0.5, 0)
+		cs.position = Vector3(0, 0, cz) + Vector3(0, (TRAIN_TOP - 1.0) / 2.0, 0)
 		train.add_child(cs)
 		z += l + gap
 	train.visible = false
@@ -511,7 +514,10 @@ func _physics_process(dt: float) -> void:
 func _sweep_player(lp: Vector3) -> void:
 	var q: Vector3 = train.transform.affine_inverse() * lp
 	var hx := 1.6 + 1.2
-	if absf(q.x) >= hx or absf(q.z) >= train_len / 2.0 + 2.4 or q.y > 4.5:
+	# nur wo sich Auto (Rumpf 0,1 bis 1,3 m über seinem Ursprung) und Zug (1 m unter den Gleisen bis zum Dach) wirklich
+	# überschneiden: wer unter dem Zug durchfährt oder über ihn springt, wird nicht erfasst (bis 2.35 fehlte die Grenze
+	# nach unten, und über dem Dach griff er noch 0,4 m zu)
+	if absf(q.x) >= hx or absf(q.z) >= train_len / 2.0 + 2.4 or q.y >= TRAIN_TOP - 0.1 or q.y <= -2.3:
 		return
 	var side := signf(q.x) if absf(q.x) > 0.05 else 1.0
 	var out: Vector3 = train.transform * Vector3(side * (hx + 0.1), q.y, q.z)

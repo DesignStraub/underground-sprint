@@ -1349,6 +1349,9 @@ func _show_parts(cat: String, group: String) -> void:
 	if cat in COLOR_CATS:
 		_show_color_grid(cat, group)
 		return
+	if cat == "vinyl":
+		_show_vinyl_groups()  # erst die Kategorien (seit 2.36), siehe unten
+		return
 	_clear_menu()
 	_strip_on(true)
 	_back = _show_group.bind(group, cat)
@@ -1364,6 +1367,218 @@ func _show_parts(cat: String, group: String) -> void:
 		b.focus_entered.connect(func(): _preview_part(cat, idx))
 	_refresh_parts(cat)
 	_strip_ready("", installed + 1)
+
+
+# --- Folierung in Kategorien wie in NFS Underground (seit 2.36) -------------------------------------------------------
+
+## Erst die Kategorien (Keins, dann Catalog.PARTS.vinyl.groups: Streifen, Flammen, Tribal, Rennsport, Spezial,
+## Unikate), dann die Motive darin. Vorn die einfarbigen (Farbe unter Folienfarbe, die Kachel dafür steht auch am Ende
+## ihrer Motive), hinten die mit festen Farben. In den Motiven wechseln Hoch/Runter (auch Q/E und die Schultertasten)
+## die Kategorie; das Mausrad blättert, Rechtsklick geht zurück. Vorher stand alles in einer Leiste mit 34 Kacheln.
+const KEYS_VINYL := "←/→  Auswählen      ↑/↓  Kategorie      ENTER  Einbauen      ESC  Zurück      F11  Vollbild"
+var _vinyl_group := ""  # offene Kategorie, "" = Leiste der Kategorien
+var _vinyl_wheel_ms := 0
+
+
+## Eingebautes Vinyl; ein ausgeblendetes (die alten Motive mit Gesichtern) gilt als Keins
+func _vinyl_installed() -> int:
+	var i: int = GameState.get_config(preview_car).get("vinyl", 0)
+	return 0 if Catalog.part_of({"vinyl": i}, "vinyl").get("hidden", false) else i
+
+
+## Nimmt die Folienfarbe: die Streifen (ohne Bild) und die einfarbigen Motive (tint)
+static func _vinyl_tinted(idx: int) -> bool:
+	var opt: Dictionary = Catalog.PARTS["vinyl"]["options"][idx]
+	return idx > 0 and (not opt.has("art") or opt.get("tint", false))
+
+
+## Motive einer Kategorie (Indizes), nach Level, sonst in Katalog-Reihenfolge
+static func _vinyl_items(gid: String) -> Array:
+	var opts: Array = Catalog.PARTS["vinyl"]["options"]
+	var out := []
+	for i in opts.size():
+		if opts[i].get("group", "") == gid and not opts[i].get("hidden", false):
+			out.append(i)
+	out.sort_custom(func(a: int, b: int) -> bool:
+		var la := int(opts[a].get("level", 0))
+		var lb := int(opts[b].get("level", 0))
+		return la < lb or (la == lb and a < b))
+	return out
+
+
+static func _vinyl_group_def(gid: String) -> Dictionary:
+	for gr in Catalog.PARTS["vinyl"]["groups"]:
+		if gr["id"] == gid:
+			return gr
+	return {}
+
+
+static func _vinyl_group_tinted(gid: String) -> bool:
+	for i in _vinyl_items(gid):
+		if not _vinyl_tinted(i):
+			return false
+	return true
+
+
+## Kategorien als Kacheln: Zurück, Keins (baut sofort aus), dann die Kategorien; darunter "Farbe wählbar" oder "Feste
+## Farben". Die Kategorie mit dem eingebauten Motiv nennt es im Akzent und hat beim Öffnen den Fokus.
+func _show_vinyl_groups(focus := "") -> void:
+	_clear_menu()
+	_strip_on(true)
+	_vinyl_group = ""
+	_back = _show_group.bind("optik", "vinyl")
+	_cam_view = "vinyl"
+	section.text = tr(Catalog.PARTS["vinyl"]["label"]).to_upper()
+	stats.get_parent().visible = false
+	_tile(tr("Zurück"), "", _back, {"back": true})
+	var none := _tile("", "", func(): _install("vinyl", 0, "optik"), {"part": 0, "key": "none", "quiet": true})
+	none.focus_entered.connect(func(): _preview_part("vinyl", 0))
+	for gr in Catalog.PARTS["vinyl"]["groups"]:
+		var gid: String = gr["id"]
+		var b := _tile(tr(gr["label"]), "", _show_vinyl_items.bind(gid), {"key": gid, "vgroup": gid})
+		b.focus_entered.connect(_vinyl_group_focus.bind(gid))
+	_refresh_parts("vinyl")
+	_vinyl_wire()
+	var inst := _vinyl_installed()
+	_strip_ready(focus if focus != "" else (str(Catalog.PARTS["vinyl"]["options"][inst].get("group", "none")) if inst > 0 else "none"))
+
+
+func _vinyl_group_focus(gid: String) -> void:
+	_vinyl_preview_installed()
+	var gr := _vinyl_group_def(gid)
+	var items := _vinyl_items(gid)
+	var free := items.filter(func(i: int) -> bool: return GameState.is_part_unlocked("vinyl", i)).size()
+	var t := tr(gr["label"]) + "\n" + tr(gr["desc"]) + "\n"
+	t += tr("Farbe wählbar: unter Folienfarbe, auch am Ende der Motive.") if _vinyl_group_tinted(gid) else \
+		tr("Feste Farben: die Motive behalten ihre eigenen Farben.")
+	if free < items.size():
+		t += "\n" + tr("%d von %d Motiven frei") % [free, items.size()]
+	info.text = t
+
+
+## Vorschau zurück auf das Eingebaute (nach Motiven, die nur angesehen wurden)
+func _vinyl_preview_installed() -> void:
+	var base := GameState.get_config(preview_car)
+	if preview_cfg != base:
+		preview_cfg = base.duplicate()
+		_pv_cat = "vinyl"
+		_pv_pending = true
+		_pv_t = 0.07
+
+
+## Motive einer Kategorie: Vorschau beim Auswählen, Einbauen mit Enter (wenn frei). Einfarbige Kategorien haben am
+## Ende eine Kachel für die Folienfarbe (Farbraster, Zurück führt wieder hierher). focus_key "colour": diese Kachel.
+func _show_vinyl_items(gid: String, focus_key := "") -> void:
+	_clear_menu()
+	_strip_on(true)
+	_set_keys(KEYS_VINYL)
+	_vinyl_group = gid
+	_back = _show_vinyl_groups.bind(gid)
+	_cam_view = "vinyl"
+	section.text = (tr(Catalog.PARTS["vinyl"]["label"]) + "  ·  " + tr(_vinyl_group_def(gid)["label"])).to_upper()
+	stats.get_parent().visible = false
+	_tile(tr("Zurück"), "", _back, {"back": true})
+	var items := _vinyl_items(gid)
+	for i in items:
+		var idx: int = i
+		var b := _tile("", "", func(): _install("vinyl", idx, "optik"), {"part": idx, "quiet": true})
+		b.focus_entered.connect(func(): _preview_part("vinyl", idx))
+	if _vinyl_group_tinted(gid):
+		var c := _tile(tr(Catalog.PARTS["vinylcol"]["label"]), "", _vinyl_colour.bind(gid),
+			{"key": "colour", "swatch": _swatch("vinylcol", GameState.get_config(preview_car).get("vinylcol", 0))})
+		c.focus_entered.connect(func():
+			_vinyl_preview_installed()
+			info.text = tr(Catalog.PARTS["vinylcol"]["label"]) + ": " + tr(Catalog.part_of(GameState.get_config(preview_car), "vinylcol")["name"]) \
+				+ "\n" + tr("Färbt die Streifen und alle einfarbigen Motive (Kontrast: Weiß auf dunklem, Schwarz auf hellem Lack). ENTER öffnet die Farben."))
+	_refresh_parts("vinyl")
+	_vinyl_wire()
+	var pos := items.find(_vinyl_installed())
+	_strip_ready(focus_key, -1 if focus_key != "" else (pos + 1 if pos >= 0 else 1))
+
+
+## Folienfarbe aus den Motiven heraus: das Farbraster wie unter Optik, Zurück führt auf die Farbkachel
+func _vinyl_colour(gid: String) -> void:
+	_show_color_grid("vinylcol", "optik")
+	_back = _show_vinyl_items.bind(gid, "colour")
+
+
+## Hoch/Runter in den Motiven: vorige/nächste Kategorie (läuft rundherum)
+func _vinyl_step(dir: int) -> void:
+	var groups: Array = Catalog.PARTS["vinyl"]["groups"]
+	var i := 0
+	for k in groups.size():
+		if groups[k]["id"] == _vinyl_group:
+			i = k
+	Sfx.ui("move")
+	_show_vinyl_items(groups[(i + dir + groups.size()) % groups.size()]["id"])
+
+
+## Kategorien- und Farbkachel nachziehen (beim Öffnen und nach dem Einbauen): die Kategorie mit dem eingebauten Motiv
+## nennt es im Akzent, sonst steht dort "Farbe wählbar" oder "Feste Farben"; ganz gesperrte zeigen ihr Level
+func _refresh_vinyl_tiles() -> void:
+	var inst := _vinyl_installed()
+	var opts: Array = Catalog.PARTS["vinyl"]["options"]
+	for b in strip_box.get_children():
+		if b.has_meta("vgroup"):
+			var gid: String = b.get_meta("vgroup")
+			var items := _vinyl_items(gid)
+			var lv := 99
+			var open := false
+			for i in items:
+				lv = mini(lv, int(opts[i].get("level", 0)))
+				open = open or GameState.is_part_unlocked("vinyl", i)
+			var sub := tr("FARBE WÄHLBAR") if _vinyl_group_tinted(gid) else tr("FESTE FARBEN")
+			if inst in items:
+				sub = tr(opts[inst]["name"])
+			elif not open:
+				sub = tr("AB LEVEL %d") % lv
+			_tile_text(b, tr(_vinyl_group_def(gid)["label"]), sub)
+			b.set_meta("installed", inst in items)
+			b.set_meta("locked", not open)
+			_tile_colors(b)
+		elif b.get_meta("key", "") == "colour":
+			_tile_text(b, tr(Catalog.PARTS["vinylcol"]["label"]), tr(Catalog.part_of(GameState.get_config(preview_car), "vinylcol")["name"]))
+
+
+## Maus und Hoch/Runter für die Kacheln der Folierung (siehe _vinyl_input)
+func _vinyl_wire() -> void:
+	for c in strip_box.get_children():
+		(c as Control).gui_input.connect(_vinyl_input.bind(c))
+
+
+func _vinyl_input(ev: InputEvent, b: Control) -> void:
+	var mb := ev as InputEventMouseButton
+	if mb and mb.pressed:
+		var bi := mb.button_index
+		if bi == MOUSE_BUTTON_RIGHT:
+			b.accept_event()
+			Sfx.ui("back")
+			_back.call_deferred()
+		elif bi in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN, MOUSE_BUTTON_WHEEL_LEFT, MOUSE_BUTTON_WHEEL_RIGHT]:
+			# Mausrad: eine Kachel weiter je Raste (Trackpads senden viele kleine Schritte: höchstens alle 90 ms)
+			b.accept_event()
+			if Time.get_ticks_msec() - _vinyl_wheel_ms < 90:
+				return
+			_vinyl_wheel_ms = Time.get_ticks_msec()
+			var f := get_viewport().gui_get_focus_owner()
+			if f == null or f.get_parent() != strip_box:
+				f = b
+			var back := bi == MOUSE_BUTTON_WHEEL_UP or bi == MOUSE_BUTTON_WHEEL_LEFT
+			var nb := f.get_node_or_null(f.focus_neighbor_left if back else f.focus_neighbor_right) as Control
+			if nb:
+				nb.grab_focus()
+		return
+	if _vinyl_group == "" or not ev.is_pressed():
+		return
+	for a in [["ui_up", -1], ["ui_down", 1], ["shift_down", -1], ["shift_up", 1]]:
+		if ev.is_action_pressed(a[0], true):
+			b.accept_event()
+			# Stick: jede Bewegung über der Totzone meldet sich als gedrückt (ein Schub sprang sonst drei, vier
+			# Kategorien weiter oder einmal ganz herum); nur der erste Ausschlag schaltet
+			if ev is InputEventJoypadMotion and not Input.is_action_just_pressed_by_event(a[0], ev):
+				return
+			_vinyl_step.call_deferred(a[1])
+			return
 
 
 ## Farben (Lack, Felgenfarbe, Folienfarbe, Neon, Licht) als Raster statt als Leiste (seit 2.27): alle Farben auf einen
@@ -1505,6 +1720,9 @@ func _color_title(cat: String, idx: int) -> String:
 
 func _refresh_parts(cat: String) -> void:
 	var installed: int = GameState.get_config(preview_car).get(cat, 0)
+	if cat == "vinyl":
+		installed = _vinyl_installed()
+		_refresh_vinyl_tiles()
 	for b in strip_box.get_children():
 		if not b.has_meta("part"):
 			continue
@@ -1819,10 +2037,10 @@ func _part_info(cat: String, idx: int) -> void:
 	var t := tr(Catalog.PARTS[cat]["label"]) + ": " + tr(opt["name"])
 	match cat:
 		"vinyl":
-			if opt.has("art"):
-				t += "\n" + tr("Passt auf jedes Auto: das Motiv legt sich an Länge und Linie der Karosserie an.")
-				if opt.get("tint", false):
-					t += "\n" + tr("Einfarbig: die Farbe stellst du unter Folienfarbe ein.")
+			if idx > 0:
+				# seit 2.36: jedes Motiv sagt, ob es die Folienfarbe nimmt (Streifen und einfarbige Motive) oder nicht
+				t += "\n" + (tr("Einfarbig: die Farbe stellst du unter Folienfarbe ein.") if _vinyl_tinted(idx) else
+					tr("Feste Farben: die Folienfarbe wirkt hier nicht."))
 		"engine", "turbo":
 			t += "\n" + tr("Beschleunigung +%d %%   ·   Topspeed +%d %%") % [roundi((opt["accel"] - 1.0) * 100.0), roundi((opt["top"] - 1.0) * 100.0)]
 		"nitro":
@@ -1856,7 +2074,7 @@ func _part_info(cat: String, idx: int) -> void:
 				t += "\n" + tr("Nur Optik: der Reifen behält seinen Durchmesser, die Flanke wird flacher.")
 	if not GameState.is_part_unlocked(cat, idx):
 		t += "\n" + tr("Gesperrt: kommt mit Fahrer-Level %d (du bist Level %d).") % [int(opt.get("level", 1)), GameState.level()]
-	elif idx != GameState.get_config(preview_car).get(cat, 0):
+	elif idx != (_vinyl_installed() if cat == "vinyl" else GameState.get_config(preview_car).get(cat, 0)):
 		t += "\n" + tr("ENTER: einbauen")
 	info.text = t
 

@@ -11,6 +11,10 @@ const WHEEL_R := 0.32
 const CLEARANCE := 0.15
 const AXLE := 0.78  # Achse so weit von Bug und Heck
 const CAR_LAYER := 2  # eigene Sichtebene: das Unterbodenlicht malt nur auf die Straße, nicht auf Autos
+## Sichtebene des Reifenqualms (tire_fx, seit 2.36): Neon, Lichtteppiche und Scheinwerfer der Autos beleuchten ihn nicht
+## (Laternen schon). Bis 2.35 färbte das Neon-Decal den Qualm in einem scharf begrenzten Kasten.
+const SMOKE_LAYER := 1 << 10
+const OWN_LIGHT_MASK := 0xFFFFF & ~SMOKE_LAYER
 const SHELL_SUB := 3  # Teilstücke je Band beim Verfeinern der Querschnitte (_refine)
 const FRONT_SEAM := 0.075  # Fuge Frontschürze (t)
 const REAR_SEAM := 0.94  # Fuge Heckschürze (t)
@@ -72,6 +76,23 @@ const SHAPES := {
 		"roof": 1.28, "deck": 0.99, "tail": 1.0, "belt": 0.88, "fender": 0.055, "hips": 0.06,
 		"round_f": 0.06, "round_r": 0.04, "tumble": 0.12, "hl": {6: 0.075, 5: 0.06}, "tl": {},
 		"doors": [0.37, 0.545, 0.725], "intake": Vector2(0.62, 0.17), "pipes": [0.42], "pipe_r": 0.072,
+	},
+	"yari": {  # Allrad-Rallye-Limousine (seit 2.36, Evo-Gefühl): hohes kantiges Glashaus, riesiges Maul mit Ladeluftkühler,
+		# große Seiteneinlässe mit Nebelscheinwerfern, Haube mit Luftauslässen, ausgestellte Backen, klare Rückleuchten,
+		# hoher Flügel, ein dickes Endrohr
+		"nose": 0.68, "hood": 0.9, "cowl": 0.36, "rf": 0.49, "rr": 0.69, "ge": 0.815, "cp": 0.75,
+		"roof": 1.31, "deck": 1.0, "tail": 1.0, "belt": 0.89, "fender": 0.065, "hips": 0.07,
+		"round_f": 0.06, "round_r": 0.04, "tumble": 0.11, "hl": {}, "tl": {},
+		"doors": [0.36, 0.545, 0.725], "intake": Vector2(0.56, 0.15), "pipes": [0.44], "pipe_r": 0.06,
+		"axle": 0.9, "wheel_r": 0.325, "tire_w": 0.235, "edge_f": 0.055, "edge_r": 0.05,
+	},
+	"tatsumaki": {  # Kreiskolben-Coupé (seit 2.36, FD-Gefühl): sehr flach und rund, Klappscheinwerfer, Kotflügel höher als
+		# die Haube, Doppelbuckel-Dach (bubble), lange gewölbte Heckscheibe, schmales Leuchtenband, Bügelflügel
+		"nose": 0.54, "hood": 0.79, "cowl": 0.405, "rf": 0.55, "rr": 0.625, "ge": 0.885, "cp": 0.7,
+		"roof": 1.16, "deck": 0.93, "tail": 0.95, "belt": 0.8, "fender": 0.085, "hips": 0.075,
+		"round_f": 0.24, "round_r": 0.16, "tumble": 0.25, "hl": {}, "tl": {},
+		"doors": [0.415, 0.665], "intake": Vector2(0.38, 0.115), "pipes": [0.3, 0.405], "pipe_r": 0.045,
+		"axle": 0.92, "tire_w": 0.235, "edge_f": 0.09, "edge_r": 0.075, "bubble": 0.014,
 	},
 	"tsubame": {  # Roadster (S2000/MX-5): lange Haube, kleines Stoffverdeck weit hinten, kurzes Heck
 		"nose": 0.57, "hood": 0.8, "cowl": 0.465, "rf": 0.585, "rr": 0.655, "ge": 0.765, "cp": 0.71,
@@ -255,7 +276,12 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 		"stripe": stripe_m,
 		"carbon": carbon_mat(),
 		"top": mat(Color(0.03, 0.03, 0.035), 0.0, 0.95),
+		"pillar": mat(Color(0.008, 0.008, 0.01), 0.1, 0.16),  # Klavierlack-Schwarz (B-Säule)
+		"dark": dark,
 	}
+	# Fensterrahmen: schwarze Dichtung (dieselbe Fläche wie die Fugen), bei Autos mit Chromstoßstangen Chrom
+	mats["frame"] = mat(Color(0.75, 0.75, 0.78), 0.95, 0.15) if S.get("chrome_bumpers", false) else mats["seam"]
+	mats["cowl"] = mats["seam"]  # Windlauf und dunkle Siebdruckränder der Scheiben
 	_shell(body, S, W, L, flare, int(cfg.get("vinyl", 0)), mats, hood == 5 or hood == 6)
 	var front: PackedVector2Array = _section(S, 0.0, W, L, flare)["p"]
 	var rear: PackedVector2Array = _section(S, 1.0, W, L, flare)["p"]
@@ -266,11 +292,22 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 	var amber := mat(Color(1, 0.55, 0.05), 0, 0.3, Color(1, 0.5, 0.0), 1.5)
 	var fw: float = front[6].x  # halbe Breite der Bugfläche in Gürtelhöhe
 	var iv: Vector2 = S["intake"]
-	_add(fb, box(Vector3(fw * 2.0 * iv.x, iv.y, 0.012)), dark, Vector3(0, CLEARANCE + 0.07 + iv.y / 2.0, zf - 0.004))
-	if int(cfg.get("turbo", 0)) > 0:
-		# Ladeluftkühler hinter dem Einlass: silbernes Netz mit Lamellen
+	var iw := fw * 2.0 * iv.x
+	var ic_k := 0.86  # Breite des Ladeluftkühlers im Einlass
+	match car_id:
+		"tatsumaki":  # ovales Maul
+			_add(fb, _rplate(iw, iv.y, iv.y * 0.48), grille_mat(), Vector3(0, CLEARANCE + 0.07 + iv.y / 2.0, zf - 0.004))
+			ic_k = 0.66
+		"yari":  # großes Trapez, unten schmaler
+			_add(fb, _poly_plate(PackedVector2Array([Vector2(-iw * 0.45, -iv.y / 2), Vector2(iw * 0.45, -iv.y / 2), Vector2(iw / 2, iv.y / 2),
+				Vector2(-iw / 2, iv.y / 2)]), 0.02, 0.012), grille_mat(), Vector3(0, CLEARANCE + 0.07 + iv.y / 2.0, zf - 0.004))
+			ic_k = 0.8
+		_:
+			_add(fb, box(Vector3(iw, iv.y, 0.012)), dark, Vector3(0, CLEARANCE + 0.07 + iv.y / 2.0, zf - 0.004))
+	if int(cfg.get("turbo", 0)) > 0 or car_id == "yari":
+		# Ladeluftkühler hinter dem Einlass: silbernes Netz mit Lamellen (Yari ab Werk)
 		var ic := mat(Color(0.55, 0.57, 0.6), 0.85, 0.35)
-		var icw := fw * 2.0 * iv.x * 0.86
+		var icw := iw * ic_k
 		var ich := iv.y * 0.78
 		_add(fb, box(Vector3(icw, ich, 0.01)), ic, Vector3(0, CLEARANCE + 0.07 + iv.y / 2.0, zf - 0.011))
 		for k in int(ich / 0.022):
@@ -290,6 +327,38 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 				_add(fb, box(Vector3(0.2, 0.045, 0.012)), head_m, Vector3(s * (fw - 0.2), CLEARANCE + 0.22, zf - 0.005))
 				_add(fb, box(Vector3(0.07, 0.045, 0.012)), amber, Vector3(s * (fw - 0.05), CLEARANCE + 0.22, zf - 0.004))
 			hy = CLEARANCE + 0.22
+		"tatsumaki":  # FD-Gefühl: ovales Maul (oben), außen kleine runde Einlässe mit Blinkern, Klappscheinwerfer: in der
+			# Garage zu (Fugen auf den Kotflügeln), auf der Straße hochgeklappt (_popup_pods)
+			for s in [-1, 1]:
+				var sx: float = s * (fw - 0.19)
+				_add(fb, _rplate(0.19, 0.075, 0.034), grille_mat(), Vector3(sx, CLEARANCE + 0.14, zf - 0.004))
+				_add(fb, _rplate(0.075, 0.028, 0.013, 0.01), amber, Vector3(s * (fw - 0.135), CLEARANCE + 0.15, zf - 0.011))
+				_add(fb, _disc(0.02, 0.01), mat(Color(0.75, 0.77, 0.8), 0.9, 0.1), Vector3(s * (fw - 0.235), CLEARANCE + 0.145, zf - 0.011)).rotation_degrees.x = 90
+				_add(fb, _rplate(0.11, 0.02, 0.009, 0.01), amber, Vector3(s * (fw - 0.08), S["nose"] - 0.075, zf - 0.006))
+			if headlights:
+				hy = _popup_pods(body, S, W, L, flare, paint, head_m, dark, 0.5, 0.34, 0.24, 0.6)
+			else:
+				_popups(body, S, W, L, flare, mats["seam"], 0.5, 0.34, 0.24, 0.6)
+				hy = CLEARANCE + 0.15
+		"yari":  # Evo-Gefühl: große, nach hinten gezogene klare Scheinwerfer, dazwischen ein schmaler Grill mit Schild in
+			# Wagenfarbe, unten das große Trapez mit Ladeluftkühler, außen hohe Einlässe mit runden Nebelscheinwerfern
+			var y0: float = front[5].y - 0.035
+			var y1: float = front[6].y + 0.014
+			var ym := (y0 + y1) / 2.0
+			_lamp(fb, S, W, L, flare, dark, y0 - 0.012, y1 + 0.012, fw - 0.4, 0.088, 0.0, 0.004)
+			_lamp(fb, S, W, L, flare, head_m, y0, y1, fw - 0.38, 0.084, 0.0, 0.008)
+			_lamp(fb, S, W, L, flare, amber, y0, y0 + 0.018, fw - 0.13, 0.084, 0.0, 0.011)
+			var gw := (fw - 0.42) * 2.0
+			for s in [-1, 1]:
+				_add(fb, _rplate(gw / 2.0 - 0.01, 0.06, 0.01), grille_mat(), Vector3(s * gw / 4.0, ym, zf - 0.006))
+				_add(fb, _rplate(0.16, 0.13, 0.03), grille_mat(), Vector3(s * (fw - 0.14), CLEARANCE + 0.15, zf - 0.004))
+				_add(fb, _disc(0.046, 0.012), mat(Color(0.75, 0.75, 0.78), 0.95, 0.15), Vector3(s * (fw - 0.14), CLEARANCE + 0.15, zf - 0.009)).rotation_degrees.x = 90
+				_add(fb, _disc(0.037, 0.012), head_m, Vector3(s * (fw - 0.14), CLEARANCE + 0.15, zf - 0.012)).rotation_degrees.x = 90
+			# Schild in der Mitte: lackiertes Trapez mit kleiner Plakette
+			_add(fb, _poly_plate(PackedVector2Array([Vector2(-0.07, -0.035), Vector2(0.07, -0.035), Vector2(0.05, 0.04), Vector2(-0.05, 0.04)]),
+				0.01, 0.014), paint, Vector3(0, ym - 0.004, zf - 0.009))
+			_add(fb, _rplate(0.05, 0.03, 0.012, 0.006), mat(Color(0.75, 0.75, 0.78), 0.95, 0.15), Vector3(0, ym, zf - 0.017))
+			hy = ym
 		"vortex":  # kantige Scheinwerfer bis in die Front, Nebelscheinwerfer
 			for s in [-1, 1]:
 				_add(fb, box(Vector3(0.3, 0.08, 0.012)), head_m, Vector3(s * (fw - 0.2), hy, zf - 0.004))
@@ -504,6 +573,7 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 			hy = S["nose"] - 0.05
 		_:
 			pass
+	_grille_intakes(fb, dark)
 	# Echte Scheinwerfer nur mit dem vollen Renderer: im Browser zeichnet jedes Licht jedes Objekt, das es trifft,
 	# noch einmal (das kostete bei vier Autos viel); dort macht der Lichtteppich (_light_pools) den Lichtschein
 	if headlights and RenderingServer.get_current_rendering_method() != "gl_compatibility":
@@ -514,6 +584,7 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 		spot.light_energy = 4.0
 		spot.light_color = light_c
 		spot.rotation_degrees.x = -4.0
+		spot.light_cull_mask = OWN_LIGHT_MASK
 		body.add_child(spot)
 
 	# Heck: Kennzeichen, Diffusor, Rückleuchten je Auto
@@ -572,6 +643,31 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 			lamp.call(tail_m, y0, y1, rw - 0.35, 0.962, 0.006)
 			for s in [-1, 1]:
 				_add(rbm, box(Vector3(0.1, y1 - y0, 0.012)), rev_m, Vector3(s * (rw - 0.41), (y0 + y1) / 2.0, zr + 0.009))
+		"yari":  # klare Rückleuchten um die Ecken (silbernes Glas), darin zwei rote Ringe, Blinker und Rückfahrlicht
+			var y0 := r_mid + 0.01
+			var y1 := r_belt - 0.012
+			var ym := (y0 + y1) / 2.0
+			var clear := mat(Color(0.62, 0.62, 0.66), 0.85, 0.08)
+			lamp.call(dark, y0 - 0.014, y1 + 0.014, rw - 0.5, 0.955, 0.004)
+			lamp.call(clear, y0, y1, rw - 0.48, 0.96, 0.006)
+			var rr := minf((y1 - y0) / 2.0 - 0.008, 0.05)
+			for s in [-1, 1]:
+				for k in 2:
+					_add(rbm, _disc(rr, 0.012), tail_m, Vector3(s * (rw - 0.13 - k * (2.0 * rr + 0.04)), ym, zr + 0.009)).rotation_degrees.x = 90
+				_add(rbm, _disc(rr * 0.55, 0.012), amber, Vector3(s * (rw - 0.13 - 2.0 * (2.0 * rr + 0.04)), ym + rr * 0.4, zr + 0.009)).rotation_degrees.x = 90
+				_add(rbm, _disc(rr * 0.5, 0.012), rev_m, Vector3(s * (rw - 0.13 - 2.0 * (2.0 * rr + 0.04)), ym - rr * 0.5, zr + 0.009)).rotation_degrees.x = 90
+		"tatsumaki":  # FD-Gefühl: schmales, dunkel getöntes Leuchtenband über das ganze Heck, darin je Seite runde Leuchten
+			var y1 := r_belt - 0.006
+			var y0 := y1 - 0.075
+			var ym := (y0 + y1) / 2.0
+			lamp.call(dark, y0 - 0.01, y1 + 0.01, 0.0, 0.955, 0.004)
+			lamp.call(lens, y0, y1, 0.0, 0.96, 0.006)
+			var rr := (y1 - y0) / 2.0 - 0.006
+			for s in [-1, 1]:
+				for k in 2:
+					_add(rbm, _disc(rr, 0.012), tail_m, Vector3(s * (rw - 0.12 - k * (2.0 * rr + 0.03)), ym, zr + 0.01)).rotation_degrees.x = 90
+				_add(rbm, _disc(rr * 0.8, 0.012), amber, Vector3(s * (rw - 0.12 - 2.0 * (2.0 * rr + 0.03)), ym, zr + 0.01)).rotation_degrees.x = 90
+				_add(rbm, _disc(rr * 0.6, 0.012), rev_m, Vector3(s * 0.2, ym, zr + 0.01)).rotation_degrees.x = 90
 		"tsubame":  # schmale Leuchten über die Ecken, innen ein heller Streifen
 			var y0 := r_belt - 0.085
 			var y1 := r_belt - 0.02
@@ -735,21 +831,24 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 		_kaizen_extras(body, S, W, L, mats)
 	_extras(body, fb, rbm, car_id, S, W, L, flare, hood, kit, dark, paint)
 
-	# Spiegel, Türgriffe
+	# Spiegel: dunkles Dreieck in der Fensterecke, Arm, Gehäuse quer zur Fahrt (rund, leicht nach hinten gepfeilt), hinten
+	# das dunkle Spiegelglas. Seit 2.36 sitzt das Gehäuse auf einem Arm etwas von der Tür ab (vorher klebte es daran).
 	var ms: PackedVector2Array = _section(S, S["cowl"] + 0.035, W, L, flare)["p"]
 	var mz: float = zf + (S["cowl"] + 0.035) * L
-	var doors: Array = S["doors"]
-	var hs: PackedVector2Array = _section(S, doors[1] - 0.035, W, L, flare)["p"]
 	for s in [-1, 1]:
-		# Fuß an der Tür, Gehäuse quer zur Fahrt (rund, leicht nach hinten gepfeilt), hinten das dunkle Spiegelglas
-		_add(body, rbox(Vector3(0.1, 0.03, 0.045), 0.012), dark, Vector3(s * (ms[6].x + 0.04), ms[6].y + 0.04, mz))
+		_add(body, rbox(Vector3(0.03, 0.06, 0.1), 0.01), mats["pillar"], Vector3(s * (ms[6].x - 0.004), ms[6].y + 0.045, mz + 0.012))
+		var arm := _add(body, rbox(Vector3(0.1, 0.022, 0.04), 0.009), paint, Vector3(s * (ms[6].x + 0.05), ms[6].y + 0.06, mz + 0.004))
+		arm.rotation.z = s * 0.3
 		var mp := Node3D.new()
-		mp.position = Vector3(s * (ms[6].x + 0.11), ms[6].y + 0.07, mz)
+		mp.position = Vector3(s * (ms[6].x + 0.145), ms[6].y + 0.085, mz)
 		mp.rotation.y = -s * 0.14
 		body.add_child(mp)
 		_add(mp, rbox(Vector3(0.17, 0.09, 0.075), 0.03), paint, Vector3.ZERO)
 		_add(mp, rbox(Vector3(0.145, 0.07, 0.01), 0.004), mats["glass"], Vector3(0, 0, 0.036))
-		_add(body, box(Vector3(0.012, 0.022, 0.1)), dark, Vector3(s * (hs[5].x * 0.4 + hs[6].x * 0.6 + 0.008), hs[6].y - 0.05, zf + (doors[1] - 0.035) * L))
+	# Türgriffe, Fugen von Haube und Deckel, Antenne, Wappen, Rückstrahler, Heckwischer
+	_door_handles(body, S, W, L, flare, paint, mats["seam"])
+	_panel_lines(body, car_id, S, W, L, flare, mats["seam"])
+	_small_parts(body, car_id, spec, S, W, L, flare, dark, mats)
 	# Radläufe mit gerollter Kante, seitliche Begrenzungsleuchten, Tankdeckel, dritte Bremsleuchte
 	_arch_lips(body, S, W, L, flare, paint)
 	for e in [[0.05, amber], [0.955, mats["tail"]]]:
@@ -763,7 +862,7 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 			var mk := _add(body, rbox(Vector3(0.012, 0.028, 0.075), 0.005), e[1], Vector3(s * (_side_x(S, tm, ym, W, L, flare) + 0.003), ym, zf + tm * L))
 			mk.rotation.y = -s * ang
 	if not S.get("mid", false) and not S.get("rear_engine", false):
-		var tf: float = (doors[-1] + REAR_SEAM) / 2.0
+		var tf: float = (float((S["doors"] as Array)[-1]) + REAR_SEAM) / 2.0
 		var pf: PackedVector2Array = _section(S, tf, W, L, flare)["p"]
 		var yf: float = lerpf(pf[5].y, pf[6].y, 0.55)
 		var xf := _side_x(S, tf, yf, W, L, flare)
@@ -817,10 +916,29 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 		for zi in [-1, 1]:
 			for s in [-1, 1]:
 				_add(body, box(Vector3(0.22, 0.2, 0.012)), flap, Vector3(s * (W / 2.0 - 0.18), CLEARANCE + 0.04, zi * (L / 2.0 - axle(S)) + wheel_r(S) + 0.1))
+	elif car_id == "yari" and hood == 0:
+		# Haube mit großem Luftauslass vorn in der Mitte (Lamellen in Wagenfarbe über dunkler Öffnung) und je Seite einer
+		# Reihe Kiemen
+		var vt := 0.15
+		var q := _top_pt(S, vt, 0.0, W, L, flare)
+		var slope := atan2(_top_c(S, vt + 0.02) - _top_c(S, vt - 0.02), 0.04 * L)
+		var pv := Node3D.new()
+		pv.position = (q[0] as Vector3) + Vector3(0, 0.003, 0)
+		pv.rotation.x = -slope
+		body.add_child(pv)
+		_add(pv, rbox(Vector3(0.5, 0.012, 0.24), 0.005), mats["seam"], Vector3.ZERO)
+		for k in 5:
+			_add(pv, box(Vector3(0.47, 0.016, 0.014)), paint, Vector3(0, 0.004, -0.09 + k * 0.045))
+		for s in [-1, 1]:
+			for k in 4:
+				var t := 0.22 + k * 0.012
+				var sq := _top_pt(S, t, s * 0.37, W, L, flare)
+				var sl := _add(body, box(Vector3(0.17, 0.008, 0.018)), dark, (sq[0] as Vector3) + Vector3(0, 0.004, 0))
+				sl.rotation.x = -slope
 
 	if hood != 0:
 		_hood(body, S, W, L, flare, hood, dark, mats["carbon"] if hood == 6 else paint)
-	elif int(cfg.get("engine", 0)) >= 3 and car_id not in ["vortex", "raijin", "falke", "furia"]:
+	elif int(cfg.get("engine", 0)) >= 3 and car_id not in ["vortex", "raijin", "falke", "furia", "yari"]:
 		var lt: float = (S["ge"] + 1.0) / 2.0 - 0.03 if engine_rear(S) else 0.24  # Mittel-/Heckmotor: Lamellen hinten
 		var hv: PackedVector2Array = _section(S, lt, W, L, flare)["p"]
 		for sx in [-1, 1]:
@@ -912,6 +1030,19 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 		for s in [-1, 1]:
 			_add(body, tapered_box(Vector2(0.06, 0.4), Vector2(0.05, 0.26), 0.11, 0.06), paint, Vector3(s * (W / 2.0 - 0.13), fy - 0.02, wz + 0.02))
 		_add(body, _airfoil(W - 0.18, 0.24, 0.035), paint, Vector3(0, fy + 0.1, wz + 0.08)).rotation_degrees.x = -4
+	elif sp == 0 and car_id == "tatsumaki":
+		# Serienflügel: flacher Bügel hinten auf der Klappe, Stützen außen in Wagenfarbe
+		var bt := 1.0 - 0.13 / L
+		var by: float = (_section(S, bt, W, L, flare)["p"] as PackedVector2Array)[10].y
+		for s in [-1, 1]:
+			_add(body, tapered_box(Vector2(0.05, 0.2), Vector2(0.045, 0.12), 0.095, 0.03), paint, Vector3(s * (W / 2.0 - 0.27), by - 0.02, zr - 0.13))
+		_add(body, _airfoil(W - 0.5, 0.17, 0.03), paint, Vector3(0, by + 0.075, zr - 0.11)).rotation_degrees.x = -4
+	elif sp == 0 and car_id == "yari":
+		# Serienflügel: hoch auf zwei dunklen Stützen, großes Blatt mit Abrisskante, Endplatten in Wagenfarbe
+		for s in [-1, 1]:
+			_add(body, rbox(Vector3(0.045, 0.3, 0.13), 0.012), dark, Vector3(s * (W / 2.0 - 0.36), deck_y + 0.14, wz + 0.02))
+			_add(body, _endplate(0.03, 0.17, 0.4), paint, Vector3(s * (W / 2.0 - 0.09), deck_y + 0.3, wz + 0.02))
+		_add(body, _airfoil(W - 0.18, 0.34, 0.045), paint, Vector3(0, deck_y + 0.29, wz + 0.02)).rotation_degrees.x = -6
 	elif sp == 1:
 		_add(body, _airfoil(W - 0.4, 0.16, 0.045), paint, Vector3(0, deck_y + 0.02, zr - 0.12))
 	elif sp == 2 or sp == 3:
@@ -939,7 +1070,7 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 		dc.albedo_mix = 0.0
 		dc.upper_fade = 0.2
 		dc.lower_fade = 0.3
-		dc.cull_mask = 0xFFFFF & ~CAR_LAYER
+		dc.cull_mask = 0xFFFFF & ~(CAR_LAYER | SMOKE_LAYER)
 		dc.distance_fade_enabled = true
 		dc.distance_fade_begin = 70.0
 		dc.distance_fade_length = 20.0
@@ -969,6 +1100,7 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 			ol.light_energy = 0.9
 			ol.light_specular = 0.0  # kein Glanzpunkt: sonst spiegelt sich das Licht als Streifen in Pfützen
 			ol.omni_range = 2.6
+			ol.light_cull_mask = OWN_LIGHT_MASK
 			ol.position = Vector3(0, 0.12, z * L * 0.3)
 			body.add_child(ol)
 
@@ -1006,15 +1138,38 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 		5:  # Rennauspuff: ein großes Rohr in der Mitte
 			pr = 0.085
 			pipes = [0.0]
+	# Endrohr (seit 2.36 doppelwandig): außen das Rohr, an der Mündung ein gerollter Rand, innen ein dunkles Rohr mit
+	# zurückgesetztem Boden (vorher eine flache dunkle Scheibe vorn auf dem Rohr)
+	var lip_m := TorusMesh.new()
+	lip_m.inner_radius = pr * 0.8
+	lip_m.outer_radius = pr * 1.02
+	lip_m.rings = 24
+	lip_m.ring_segments = 6
+	var wall := CylinderMesh.new()
+	wall.top_radius = pr * 0.82
+	wall.bottom_radius = pr * 0.82
+	wall.height = 0.1
+	wall.radial_segments = 20
+	wall.rings = 1
+	wall.cap_top = false
+	wall.cap_bottom = false
+	wall.flip_faces = true
 	for x in pipes:
 		var pipe := CylinderMesh.new()
 		pipe.top_radius = pr - 0.005
 		pipe.bottom_radius = pr
 		pipe.height = 0.16
+		pipe.radial_segments = 24
 		var p := _add(body, pipe, pipe_m, Vector3(x, CLEARANCE + 0.08, zr + 0.03))
 		p.rotation_degrees.x = 90
 		p.scale = Vector3(1, 1, oval)
-		var inner := _add(body, _disc(pr * 0.72, 0.01), dark, Vector3(x, CLEARANCE + 0.08, zr + 0.112))
+		var lip := _add(body, lip_m, pipe_m, Vector3(x, CLEARANCE + 0.08, zr + 0.108))
+		lip.rotation_degrees.x = 90
+		lip.scale = Vector3(1, 0.45, oval)
+		var wl := _add(body, wall, dark, Vector3(x, CLEARANCE + 0.08, zr + 0.06))
+		wl.rotation_degrees.x = 90
+		wl.scale = Vector3(1, 1, oval)
+		var inner := _add(body, _disc(pr * 0.82, 0.01), mats["seam"], Vector3(x, CLEARANCE + 0.08, zr + 0.02))
 		inner.rotation_degrees.x = 90
 		inner.scale = Vector3(1, 1, oval)
 		var cone := CylinderMesh.new()
@@ -1129,6 +1284,7 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 
 	var head_spots := _lamp_spots(body, mats["head"])
 	var tail_spots := _lamp_spots(body, mats["tail"])
+	_lamp_detail(body, mats, L, light_c, not car_id in POPUP_IN)
 	body.position.y -= Catalog.part_of(cfg, "suspension")["drop"] + S.get("drop", 0.0)
 	if batch and not OS.get_cmdline_user_args().has("--nobatch"):
 		_merge_parts(root, body, fronts, spinners, flames)
@@ -1169,7 +1325,7 @@ static func plate_text(car_id: String) -> String:
 	var nums := {"kaizen": "92", "hachi": "86", "sakura": "15", "hayate": "88", "kitsune": "18", "tsubame": "99",
 		"mirai": "240", "tenshi": "91", "kumo": "100", "raijin": "4", "vortex": "34", "ronin": "33", "shiden": "1",
 		"ryujin": "300", "kaze": "7", "chibi": "660", "hotaru": "64", "tanuki": "20", "kaido": "73", "hakone": "24",
-		"kagura": "10", "falke": "911", "furia": "12"}
+		"kagura": "10", "falke": "911", "furia": "12", "yari": "8", "tatsumaki": "13"}
 	return "NF-G " + str(nums.get(car_id, str(absi(hash(car_id)) % 900 + 100)))
 
 
@@ -1419,6 +1575,11 @@ static func _tire_mesh(tw: float, rb: float) -> ArrayMesh:
 	var sh := R - 0.02 - rb
 	var side := [Vector2(-h + 0.012, rb), Vector2(-h + 0.004, rb + 0.008), Vector2(-h - 0.003, rb + sh * 0.5),
 		Vector2(-h - 0.005, rb + sh * 0.78), Vector2(-h - 0.002, R - 0.02), Vector2(-h + 0.008, R - 0.007), Vector2(-h + 0.022, R)]
+	if sh > 0.07:
+		# seit 2.36: Felgenschutz-Wulst am Fuß der Flanke und eine flache Kehle dahinter (fängt einen hellen Ring Licht)
+		side = [Vector2(-h + 0.012, rb), Vector2(-h + 0.002, rb + 0.006), Vector2(-h - 0.006, rb + 0.015), Vector2(-h - 0.002, rb + 0.026),
+			Vector2(-h - 0.004, rb + sh * 0.5), Vector2(-h - 0.005, rb + sh * 0.78), Vector2(-h - 0.002, R - 0.02), Vector2(-h + 0.008, R - 0.007),
+			Vector2(-h + 0.022, R)]
 	var prof: Array = side.duplicate()
 	var tread := h - 0.022
 	for g in [-0.5, 0.0, 0.5]:
@@ -2255,6 +2416,542 @@ static func _kaizen_extras(body: Node3D, S: Dictionary, W: float, L: float, mats
 	body.add_child(l)
 
 
+## --- Feinheiten (seit 2.36): Türgriffe, Fugen, Antenne, Wappen, Rückstrahler, Heckwischer, Gitter, Leuchten-Innenleben.
+## Bis 2.35 wirkten die Autos etwas wie Spielzeug: Glas ohne Säulen und Rahmen, gleichmäßig leuchtende Lampenflächen,
+## keine Fugen an Haube und Deckel, Spiegel ohne Arm.
+
+## Türgriffe: lackierter Griff mit dunkler Fuge rundherum, vorn an der Hinterkante jeder Tür, der Flanke folgend
+static func _door_handles(body: Node3D, S: Dictionary, W: float, L: float, flare: float, paint: Material, gap: Material) -> void:
+	var zf := -L / 2.0
+	var d: Array = S["doors"]
+	var ends: Array = [d[1]] if d.size() < 3 else [d[1], d[2]]
+	for te in ends:
+		var t: float = float(te) - 0.12 / L
+		var y: float = float((_section(S, t, W, L, flare)["p"] as PackedVector2Array)[6].y) - 0.06
+		var x := _side_x(S, t, y, W, L, flare)
+		var ang := atan2(_side_x(S, t + 0.01, y, W, L, flare) - _side_x(S, t - 0.01, y, W, L, flare), 0.02 * L)
+		for s in [-1, 1]:
+			var rim := _add(body, rbox(Vector3(0.008, 0.032, 0.125), 0.003), gap, Vector3(s * (x + 0.001), y, zf + t * L))
+			rim.rotation.y = -s * ang
+			var hd := _add(body, rbox(Vector3(0.014, 0.022, 0.112), 0.006), paint, Vector3(s * (x + 0.005), y, zf + t * L))
+			hd.rotation.y = -s * ang
+
+
+## Punkt auf der Oberseite der Haut (Haube, Dach, Deckel) bei t im Abstand x von der Mitte und die Flächennormale dort.
+## Folgt dem verfeinerten Querschnitt wie die Haut (_shell), nicht der Näherung _top_y: Fugen liegen sonst in der
+## Haube oder schweben darüber.
+static func _top_pt(S: Dictionary, t: float, x: float, W: float, L: float, flare: float) -> Array:
+	var p := _refine(_section(S, t, W, L, flare)["p"], SHELL_SUB)
+	var ax := absf(x)
+	var sx := 1.0 if x >= 0.0 else -1.0
+	var z := (t - 0.5) * L
+	for j in range(_ref_idx(7), p.size() - 1):
+		var a := p[j]
+		var b := p[j + 1]
+		if ax <= a.x + 1e-5 and ax >= b.x - 1e-5:
+			var f := (a.x - ax) / maxf(a.x - b.x, 1e-5)
+			var q := a.lerp(b, f)
+			var dd := b - a
+			var n2 := Vector2(dd.y, -dd.x).normalized()
+			if n2.y < 0.0:
+				n2 = -n2
+			return [Vector3(x, q.y, z), Vector3(n2.x * sx, n2.y, 0.0)]
+	var top := p[p.size() - 1]
+	return [Vector3(x, top.y, z), Vector3.UP]
+
+
+## Schmales Band entlang einer Linie auf der Haut (Fugen): pts Punkte, nrm Flächennormalen, w Breite, lift Abstand
+static func _ribbon(pts: Array, nrm: Array, w: float, lift := 0.0025) -> ArrayMesh:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var n := pts.size()
+	var lo := []
+	var hi := []
+	var nn := []
+	for i in n:
+		var tg: Vector3 = ((pts[mini(i + 1, n - 1)] as Vector3) - (pts[maxi(i - 1, 0)] as Vector3)).normalized()
+		var nv: Vector3 = nrm[i]
+		nv = (nv - tg * nv.dot(tg)).normalized()
+		var sd := tg.cross(nv).normalized() * w / 2.0
+		var p: Vector3 = (pts[i] as Vector3) + nv * lift
+		lo.append(p - sd)
+		hi.append(p + sd)
+		nn.append(nv)
+	for i in n - 1:
+		var nf: Vector3 = (nn[i] + nn[i + 1]).normalized()
+		_tri(st, lo[i], hi[i], hi[i + 1], nn[i], nn[i], nn[i + 1], nf)
+		_tri(st, lo[i], hi[i + 1], lo[i + 1], nn[i], nn[i + 1], nn[i + 1], nf)
+	return st.commit()
+
+
+## Innenkante der geschlossenen Klappscheinwerfer je Auto: die Haubenfuge läuft innen daran vorbei
+const POPUP_IN := {"ronin": 0.3, "hachi": 0.24, "kitsune": 0.25, "tenshi": 0.29, "shiden": 0.3, "tatsumaki": 0.31}
+
+
+## Fugen um Haube und Heckdeckel (bzw. Heckklappe): Seitenlinien auf der Oberseite knapp innerhalb der Schulter, vorn
+## quer über den Bug, hinten eine Querfuge auf der Heckfläche unter den Leuchten. Eine Fläche aus schmalen Bändern.
+static func _panel_lines(body: Node3D, car_id: String, S: Dictionary, W: float, L: float, flare: float, gap: Material) -> void:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var wd := 0.0065
+	var hx := func(t: float) -> float:
+		var p: PackedVector2Array = _section(S, t, W, L, flare)["p"]
+		var x: float = p[7].x - 0.022
+		if POPUP_IN.has(car_id):
+			x = minf(x, float(POPUP_IN[car_id]) - 0.02)
+		return x
+	var add_line := func(pts: Array, nrm: Array) -> void:
+		var m := _ribbon(pts, nrm, wd)
+		st.append_from(m, 0, Transform3D.IDENTITY)
+	# Haube: Seiten von der Fuge der Frontschürze bis zum Windlauf, vorn quer
+	var ta := FRONT_SEAM + 0.004
+	var tb: float = float(S["cowl"]) - 0.045 / L
+	for s in [-1.0, 1.0]:
+		var pts := []
+		var nrm := []
+		for k in 13:
+			var t := lerpf(ta, tb, k / 12.0)
+			var q := _top_pt(S, t, s * hx.call(t), W, L, flare)
+			pts.append(q[0])
+			nrm.append(q[1])
+		add_line.call(pts, nrm)
+	var front := []
+	var fn := []
+	var xa: float = hx.call(ta)
+	for k in 11:
+		var q := _top_pt(S, ta, lerpf(-xa, xa, k / 10.0), W, L, flare)
+		front.append(q[0])
+		fn.append(q[1])
+	add_line.call(front, fn)
+	# Heckdeckel bzw. Heckklappe: Seiten bis an die Heckkante, bei der Klappe dazu die Querfuge am Dachende
+	var hatch: bool = float(S["ge"]) >= 0.86 and not S.get("mid", false) and not S.get("softtop", false)
+	var tr0: float = (float(S["rr"]) - 0.006 / L) if hatch else (float(S["ge"]) + 0.006 / L)
+	var tr1 := 1.0 - 0.012 / L
+	for s in [-1.0, 1.0]:
+		var pts := []
+		var nrm := []
+		for k in 13:
+			var t := lerpf(tr0, tr1, k / 12.0)
+			var x: float = (_section(S, t, W, L, flare)["p"] as PackedVector2Array)[7].x - 0.03
+			var q := _top_pt(S, t, s * x, W, L, flare)
+			pts.append(q[0])
+			nrm.append(q[1])
+		add_line.call(pts, nrm)
+	if hatch:
+		var xr: float = (_section(S, tr0, W, L, flare)["p"] as PackedVector2Array)[7].x - 0.03
+		var top := []
+		var tn := []
+		for k in 11:
+			var q := _top_pt(S, tr0, lerpf(-xr, xr, k / 10.0), W, L, flare)
+			top.append(q[0])
+			tn.append(q[1])
+		add_line.call(top, tn)
+	# Querfuge auf der Heckfläche: Unterkante von Deckel bzw. Klappe, knapp unter der Flankenmitte
+	var rp: PackedVector2Array = _section(S, 1.0, W, L, flare)["p"]
+	var yl: float = rp[5].y - 0.035
+	var xl := _side_x(S, 1.0, yl, W, L, flare) - 0.09
+	var z := L / 2.0 + 0.0025
+	var rear := []
+	var rn := []
+	for k in 2:
+		rear.append(Vector3(lerpf(-xl, xl, k), yl, z))
+		rn.append(Vector3(0, 0, 1))
+	add_line.call(rear, rn)
+	var mi := MeshInstance3D.new()
+	mi.mesh = st.commit()
+	mi.material_override = gap
+	_near(mi)
+	body.add_child(mi)
+
+
+## Kleinteile: Antenne, Wappen vorn und hinten, Rückstrahler in der Heckschürze, Heckwischer bei Fließhecks,
+## Waschdüsen auf der Haube
+static func _small_parts(body: Node3D, car_id: String, spec: Dictionary, S: Dictionary, W: float, L: float, flare: float,
+		dark: Material, mats: Dictionary) -> void:
+	var zf := -L / 2.0
+	var zr := L / 2.0
+	var chrome := mat(Color(0.75, 0.75, 0.78), 0.95, 0.15)
+	# Antenne: alte Autos mit Stabantenne auf dem rechten Kotflügel vorn, sonst ein kurzer Stab hinten auf dem Dach
+	if S.get("chrome_bumpers", false) or car_id == "hachi":
+		var ta: float = float(S["cowl"]) - 0.03
+		var pa: PackedVector2Array = _section(S, ta, W, L, flare)["p"]
+		var base := Vector3(pa[6].x - 0.03, pa[6].y + 0.005, zf + ta * L)
+		_add(body, _disc(0.012, 0.012), chrome, base)
+		var rod := _near(_add(body, _rod(0.0028, 0.62), chrome, base + Vector3(0, 0.31, 0.03)))
+		rod.rotation.x = 0.1
+	elif not S.get("softtop", false):
+		var tr: float = float(S["rr"]) - 0.025
+		var q := _top_pt(S, tr, 0.0, W, L, flare)
+		var bp: Vector3 = q[0]
+		var bb := _add(body, rbox(Vector3(0.03, 0.016, 0.06), 0.007), dark, bp + Vector3(0, 0.006, 0))
+		bb.rotation.x = -atan2(_top_c(S, tr + 0.01) - _top_c(S, tr - 0.01), 0.02 * L)
+		var rod := _near(_add(body, _rod(0.0025, 0.26), dark, bp + Vector3(0, 0.12, 0.065)))
+		rod.rotation.x = 0.5
+	# Wappen: kleine Chromplakette vorn oben in der Mitte (nicht bei Autos mit eigenem Emblem im Gitter) und
+	# Typenschild rechts auf dem Heck unter den Leuchten
+	if not car_id in ["kaizen", "kumo", "kaido", "chibi", "hakone", "yari"]:
+		var yb: float = float(S["nose"]) - 0.045
+		_near(_add(body, _rplate(0.07, 0.028, 0.01, 0.006), chrome, Vector3(0, yb, zf - 0.007)))
+	var rp: PackedVector2Array = _section(S, 1.0, W, L, flare)["p"]
+	var yr: float = rp[5].y - 0.075
+	var xr := minf(_side_x(S, 1.0, yr, W, L, flare) - 0.2, 0.42)
+	_near(_add(body, _rplate(0.13, 0.02, 0.006, 0.005), chrome, Vector3(xr, yr, zr + 0.004)))
+	# Rückstrahler unten an den Ecken der Heckschürze
+	var refl := mat(Color(0.25, 0.02, 0.02), 0.2, 0.25, Color(0.5, 0.0, 0.0), 0.5)  # wie die Blende hinten (build)
+	var yf := CLEARANCE + 0.2
+	var xf := _side_x(S, 1.0, yf, W, L, flare) - 0.14
+	for s in [-1, 1]:
+		_near(_add(body, _rplate(0.09, 0.024, 0.01, 0.006), refl, Vector3(s * xf, yf, zr + 0.003)))
+	# Heckwischer auf der Heckscheibe der Fließhecks: Arm von unten Mitte schräg nach oben
+	if str(spec.get("style", "")) == "hatch":
+		var tw: float = float(S["ge"]) - 0.03
+		var q := _top_pt(S, tw, 0.0, W, L, flare)
+		var slope := atan2(_top_c(S, tw + 0.01) - _top_c(S, tw - 0.01), 0.02 * L)
+		var pv := Node3D.new()
+		pv.position = (q[0] as Vector3) + Vector3(0, 0.012, 0)
+		pv.rotation.x = -slope
+		body.add_child(pv)
+		_add(pv, _disc(0.018, 0.014), dark, Vector3.ZERO)
+		var arm := _near(_add(pv, box(Vector3(0.36, 0.01, 0.014)), mat(Color(0.09, 0.09, 0.1), 0.4, 0.45), Vector3(-0.17, 0.006, -0.05)))
+		arm.rotation.y = -0.28
+	# Waschdüsen auf der Haube vor dem Windlauf
+	var tn: float = float(S["cowl"]) - 0.07 / L
+	for s in [-1, 1]:
+		var q := _top_pt(S, tn, s * 0.22, W, L, flare)
+		_near(_add(body, rbox(Vector3(0.022, 0.012, 0.03), 0.005), dark, (q[0] as Vector3) + Vector3(0, 0.004, 0)))
+
+
+## Dünner Stab entlang Y (Antenne)
+static func _rod(r: float, h: float) -> CylinderMesh:
+	var key := "rod_%.4f_%.3f" % [r, h]
+	if _mesh_cache.has(key):
+		return _mesh_cache[key]
+	var c := CylinderMesh.new()
+	c.top_radius = r * 0.7
+	c.bottom_radius = r
+	c.height = h
+	c.radial_segments = 6
+	c.rings = 1
+	_mesh_cache[key] = c
+	return c
+
+
+## Flache Platte mit runden Ecken: Umriss pts (x, y), Eckenradius r, Dicke d entlang Z, Mitte im Ursprung, beide Seiten
+## (vorn -Z, hinten +Z). Einlässe, Gehäuse, Plaketten; rundere Formen als ein Quader.
+static func _poly_plate(pts: PackedVector2Array, r: float, d: float) -> ArrayMesh:
+	var key := "pp_%s_%.4f_%.4f" % [str(pts), r, d]
+	if _mesh_cache.has(key):
+		return _mesh_cache[key]
+	var outline := PackedVector2Array()
+	var n := pts.size()
+	for i in n:
+		var c := pts[i]
+		var a := pts[(i - 1 + n) % n] - c
+		var b := pts[(i + 1) % n] - c
+		var rr := minf(r, minf(a.length(), b.length()) * 0.49)
+		if rr < 0.001:
+			outline.append(c)
+			continue
+		var p0 := c + a.normalized() * rr
+		var p1 := c + b.normalized() * rr
+		for k in 6:
+			var f := k / 5.0
+			outline.append(p0.lerp(c, f).lerp(c.lerp(p1, f), f))
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var tri := Geometry2D.triangulate_polygon(outline)
+	var hz := d / 2.0
+	for e in [-1.0, 1.0]:
+		var nz := Vector3(0, 0, e)
+		for k in range(0, tri.size(), 3):
+			var va := outline[tri[k]]
+			var vb := outline[tri[k + 1]]
+			var vc := outline[tri[k + 2]]
+			_tri(st, Vector3(va.x, va.y, e * hz), Vector3(vb.x, vb.y, e * hz), Vector3(vc.x, vc.y, e * hz), nz, nz, nz, nz)
+	var no := outline.size()
+	var ctr := Vector2.ZERO
+	for v in outline:
+		ctr += v
+	ctr /= no
+	for i in no:
+		var j := (i + 1) % no
+		var dd := outline[j] - outline[i]
+		var n2 := Vector2(dd.y, -dd.x).normalized()
+		if n2.dot((outline[i] + outline[j]) / 2.0 - ctr) < 0.0:
+			n2 = -n2
+		var nv := Vector3(n2.x, n2.y, 0.0)
+		var A := Vector3(outline[i].x, outline[i].y, -hz)
+		var B := Vector3(outline[j].x, outline[j].y, -hz)
+		var C := Vector3(outline[j].x, outline[j].y, hz)
+		var D := Vector3(outline[i].x, outline[i].y, hz)
+		_tri(st, A, B, C, nv, nv, nv, nv)
+		_tri(st, A, C, D, nv, nv, nv, nv)
+	var m := st.commit()
+	_mesh_cache[key] = m
+	return m
+
+
+## Rechteckige Platte w x h mit Eckenradius r (siehe _poly_plate)
+static func _rplate(w: float, h: float, r: float, d := 0.012) -> ArrayMesh:
+	return _poly_plate(PackedVector2Array([Vector2(-w / 2, -h / 2), Vector2(w / 2, -h / 2), Vector2(w / 2, h / 2), Vector2(-w / 2, h / 2)]), r, d)
+
+
+## Gitter für Lufteinlässe: Wabenmuster im Shader (Lage aus den Modellkoordinaten, darum auch nach dem Verschmelzen
+## gleich groß), dunkle Öffnungen, matt glänzende Stege. Ein Material für alle Autos (ein Draw Call je Auto).
+static var _grille: ShaderMaterial
+
+
+static func grille_mat() -> ShaderMaterial:
+	if _grille:
+		return _grille
+	var sh := Shader.new()
+	sh.code = """shader_type spatial;
+// Wabengitter (car_builder.grille_mat): Muster in Modellkoordinaten, Projektion nach der größten Normalen-Achse
+uniform float cell = 0.017;
+varying vec3 lp;
+varying vec3 ln;
+void vertex() {
+	lp = VERTEX;
+	ln = NORMAL;
+}
+float hexd(vec2 p) {
+	p = abs(p);
+	return max(dot(p, vec2(0.5, 0.8660254)), p.x);
+}
+void fragment() {
+	vec3 n = abs(ln);
+	vec2 uv = (n.z >= n.x && n.z >= n.y) ? lp.xy : ((n.x >= n.y) ? lp.zy : lp.xz);
+	uv /= cell;
+	vec2 r = vec2(1.0, 1.7320508);
+	vec2 h = r * 0.5;
+	vec2 a = mod(uv, r) - h;
+	vec2 b = mod(uv - h, r) - h;
+	vec2 g = dot(a, a) < dot(b, b) ? a : b;
+	float d = hexd(g);
+	float aa = fwidth(d) * 1.2;
+	float web = smoothstep(0.4 - aa, 0.4 + aa, d);
+	ALBEDO = mix(vec3(0.004), vec3(0.055, 0.056, 0.06), web);
+	METALLIC = 0.4 * web;
+	ROUGHNESS = mix(0.95, 0.42, web);
+}
+"""
+	_grille = ShaderMaterial.new()
+	_grille.shader = sh
+	_grille.set_meta("lod_color", Color(0.02, 0.02, 0.022))
+	return _grille
+
+
+## Lufteinlässe der Frontschürze mit Gitter: dünne dunkle Platten vorn (Einlass, Nebelscheinwerfer-Mulden, Grill) bekommen
+## das Wabenmuster statt einfarbig Schwarz
+static func _grille_intakes(fb: Node3D, dark: Material) -> void:
+	for c in fb.get_children():
+		if c is MeshInstance3D and (c as MeshInstance3D).material_override == dark and (c as MeshInstance3D).mesh is BoxMesh:
+			var sz: Vector3 = ((c as MeshInstance3D).mesh as BoxMesh).size
+			if sz.z <= 0.016 and sz.y >= 0.035 and sz.x >= 0.08:
+				(c as MeshInstance3D).material_override = grille_mat()
+
+
+## Innenleben der Leuchten. Die Leuchtflächen (Material head bzw. tail) vorn und hinten werden je Seite gesucht:
+## Scheinwerfer bekommen eine Reflektor-Fläche statt gleichmäßigen Leuchtens, darin helle Projektoren mit Chromring und
+## ein Tagfahrlicht-Streifen; Rückleuchten ein dunkleres Streuglas mit hellem Lichtband und Ring, runde Leuchten einen
+## Ring mit Glühfaden-Mitte. front: Scheinwerfer bearbeiten (nicht bei geschlossenen Klappscheinwerfern).
+static func _lamp_detail(body: Node3D, mats: Dictionary, L: float, light_c: Color, front: bool) -> void:
+	var zf := -L / 2.0
+	var zr := L / 2.0
+	var head: Material = mats["head"]
+	var tail: Material = mats["tail"]
+	# alle Flächen mit Leuchtenmaterial: [MeshInstance, Fläche, Punkte im Body-Raum]
+	var found := {head: [], tail: []}
+	var stack: Array = [body]
+	while not stack.is_empty():
+		var nd: Node = stack.pop_back()
+		stack.append_array(nd.get_children())
+		if not nd is MeshInstance3D or (nd as MeshInstance3D).mesh == null:
+			continue
+		var mi := nd as MeshInstance3D
+		var xf := Transform3D.IDENTITY
+		var p: Node = mi
+		while p != null and p != body:
+			xf = (p as Node3D).transform * xf
+			p = p.get_parent()
+		for si in mi.mesh.get_surface_count():
+			var m: Material = mi.material_override if mi.material_override else mi.mesh.surface_get_material(si)
+			if m == head or m == tail:
+				var pts := PackedVector3Array()
+				for v in mi.mesh.surface_get_arrays(si)[Mesh.ARRAY_VERTEX]:
+					pts.append(xf * v)
+				found[m].append([mi, si, pts])
+	var hot_h := mat(Color(1, 1, 1), 0.0, 0.3, Color(1, 1, 1).lerp(light_c, 0.6), 5.0)
+	var bezel := mat(Color(0.75, 0.75, 0.78), 0.95, 0.15)
+	var lens_h := mat(Color(0.55, 0.57, 0.6), 1.0, 0.08, Color(1, 1, 0.97).lerp(light_c, 0.5), 0.5)
+	var lens_t := mat(Color(0.32, 0.015, 0.015), 0.3, 0.14, Color(0.95, 0.04, 0.02), 1.25)
+	var hot_t := mat(Color(1, 0.2, 0.15), 0.0, 0.3, Color(1, 0.1, 0.05), 4.2)
+	var red_in := mat(Color(0.25, 0.02, 0.02), 0.2, 0.25, Color(0.5, 0.0, 0.0), 0.5)  # wie die Blende hinten (build)
+	# Fernansicht (_build_lod): dort leuchten die Flächen wieder gleichmäßig hell, das Innenleben fehlt
+	lens_h.set_meta("lod_material", head)
+	lens_t.set_meta("lod_material", tail)
+	for kind in ["head", "tail"]:
+		if kind == "head" and not front:
+			continue
+		var m: Material = head if kind == "head" else tail
+		for s in [-1.0, 1.0]:
+			var pts := PackedVector3Array()
+			var parts := []
+			var discs := []
+			for e in found[m]:
+				var mine := PackedVector3Array()
+				for v in (e[2] as PackedVector3Array):
+					if signf(v.x) != s or absf(v.x) < 0.1:
+						continue
+					if kind == "head" and (v.z > zf + 0.12 or v.y < CLEARANCE + 0.19):
+						continue
+					if kind == "tail" and v.z < zr - 0.12:
+						continue
+					mine.append(v)
+				if mine.is_empty():
+					continue
+				if (e[0] as MeshInstance3D).mesh is CylinderMesh:
+					discs.append(e)
+				else:
+					parts.append(e)
+					pts.append_array(mine)
+			# runde Leuchten: hinten ein leuchtender Ring (die Scheibe selbst) um dunkleres Glas mit hellem Punkt, vorn ein
+			# Reflektor mit heller Lampe in der Mitte
+			for e in discs:
+				var mi: MeshInstance3D = e[0]
+				var cyl := mi.mesh as CylinderMesh
+				var r: float = cyl.top_radius
+				if r < 0.026:
+					continue
+				var c: Vector3 = Vector3.ZERO
+				for v in (e[2] as PackedVector3Array):
+					c += v
+				c /= (e[2] as PackedVector3Array).size()
+				if signf(c.x) != s:
+					continue
+				if kind == "tail":
+					var zc: float = c.z + cyl.height / 2.0
+					_near(_add(body, _disc(r * 0.64, 0.004), red_in, Vector3(c.x, c.y, zc + 0.0015))).rotation_degrees.x = 90
+					_near(_add(body, _disc(r * 0.2, 0.004), hot_t, Vector3(c.x, c.y, zc + 0.003))).rotation_degrees.x = 90
+				elif absf(mi.rotation_degrees.x - 90.0) < 1.0:
+					var zc: float = c.z - cyl.height / 2.0
+					mi.material_override = lens_h
+					_near(_add(body, _disc(r * 0.42, 0.004), hot_h, Vector3(c.x, c.y, zc - 0.0015))).rotation_degrees.x = 90
+			if pts.size() < 3:
+				continue
+			var lo := pts[0]
+			var hi := pts[0]
+			for v in pts:
+				lo = lo.min(v)
+				hi = hi.max(v)
+			var x_in := absf(hi.x) if s < 0.0 else lo.x
+			var x_out := absf(lo.x) if s < 0.0 else hi.x
+			var w := x_out - x_in
+			var h := hi.y - lo.y
+			if w < 0.09 or h < 0.03:
+				continue
+			# Stirnfläche: die Punkte vorn (bzw. hinten) bis 4,5 cm hinter der vordersten Stelle, nach |x| sortiert; z bei x
+			# dazwischen linear (Quader haben nur Eckpunkte). Um die Ecke gezogene Teile zählen nicht.
+			var z_edge: float = lo.z if kind == "head" else hi.z
+			var layer := []
+			for v in pts:
+				if absf(v.z - z_edge) < 0.045:
+					layer.append(Vector2(absf(v.x), v.z))
+			layer.sort_custom(func(a, b): return a.x < b.x)
+			# je x nur die vorderste (hinten: hinterste) Stelle: dünne Teile haben auch eine Rückseite
+			var front_l := []
+			for q in layer:
+				var qv: Vector2 = q
+				if not front_l.is_empty() and qv.x - (front_l[-1] as Vector2).x < 0.002:
+					var last: Vector2 = front_l[-1]
+					front_l[-1] = Vector2(last.x, minf(last.y, qv.y) if kind == "head" else maxf(last.y, qv.y))
+				else:
+					front_l.append(qv)
+			layer = front_l
+			var face := func(xq: float) -> float:
+				if layer.is_empty() or xq < (layer[0] as Vector2).x - 0.003 or xq > (layer[-1] as Vector2).x + 0.003:
+					return INF
+				var prev: Vector2 = layer[0]
+				for q in layer:
+					var qv: Vector2 = q
+					if qv.x >= xq:
+						if qv.x - prev.x < 1e-4:
+							return qv.y
+						return lerpf(prev.y, qv.y, (xq - prev.x) / (qv.x - prev.x))
+					prev = qv
+				return prev.y
+			if layer.size() < 2:
+				continue
+			x_in = maxf(x_in, (layer[0] as Vector2).x)
+			var x_face: float = (layer[-1] as Vector2).x
+			var fw := x_face - x_in
+			if fw < 0.07:
+				continue
+			for e in parts:
+				var mi: MeshInstance3D = e[0]
+				if mi.material_override == m:
+					mi.material_override = lens_h if kind == "head" else lens_t
+				else:
+					mi.mesh.surface_set_material(e[1], lens_h if kind == "head" else lens_t)
+			var dz := -1.0 if kind == "head" else 1.0
+			var yc := (lo.y + hi.y) / 2.0
+			if kind == "head":
+				# Projektoren: innen beginnend, einer oder zwei
+				var r := clampf(h * 0.34, 0.016, 0.042)
+				var n := 2 if fw >= 0.26 and h >= 0.05 else 1
+				for k in n:
+					var xc := x_in + r * 1.6 + 0.008 + k * r * 2.75
+					if xc + r * 1.3 > x_face:
+						break
+					var zc: float = face.call(xc)
+					if not is_finite(zc):
+						continue
+					_near(_add(body, _disc(r * 1.3, 0.004), bezel, Vector3(s * xc, yc, zc - 0.002))).rotation_degrees.x = 90
+					_near(_add(body, _disc(r, 0.004), hot_h, Vector3(s * xc, yc, zc - 0.004))).rotation_degrees.x = 90
+				# Tagfahrlicht: Streifen an der Unterkante über die Stirnfläche
+				if fw >= 0.15:
+					var line := []
+					var ln := []
+					for k in 7:
+						var xq := lerpf(x_in + 0.012, x_face - 0.008, k / 6.0)
+						var zq: float = face.call(xq)
+						if is_finite(zq):
+							line.append(Vector3(s * xq, lo.y + 0.009, zq + dz * 0.003))
+							ln.append(Vector3(0, 0, dz))
+					if line.size() >= 2:
+						_near(_add(body, _ribbon(line, ln, maxf(0.006, h * 0.12), 0.0), hot_h, Vector3.ZERO))
+			else:
+				# außen ein leuchtender Ring, innen davor ein Lichtband, bei breiten Leuchten Stege dazwischen
+				var bar_end := x_face - 0.012
+				if h >= 0.05 and fw >= 0.14:
+					var r := clampf(h * 0.3, 0.018, 0.05)
+					var xc := x_face - r - 0.02
+					var zc: float = face.call(xc)
+					if is_finite(zc):
+						var yr := yc
+						_near(_add(body, _disc(r, 0.004), hot_t, Vector3(s * xc, yr, zc + 0.003))).rotation_degrees.x = 90
+						_near(_add(body, _disc(r * 0.62, 0.004), red_in, Vector3(s * xc, yr, zc + 0.0045))).rotation_degrees.x = 90
+						bar_end = xc - r - 0.015
+				var line := []
+				var ln := []
+				var yb := hi.y - h * 0.3
+				for k in 7:
+					var xq := lerpf(x_in + 0.015, bar_end, k / 6.0)
+					var zq: float = face.call(xq)
+					if is_finite(zq):
+						line.append(Vector3(s * xq, yb, zq + dz * 0.003))
+						ln.append(Vector3(0, 0, dz))
+				if line.size() >= 2 and bar_end - x_in > 0.06:
+					_near(_add(body, _ribbon(line, ln, clampf(h * 0.16, 0.007, 0.016), 0.0), hot_t, Vector3.ZERO))
+				if fw >= 0.3:
+					var nd := 2 if fw >= 0.5 else 1
+					for k in nd:
+						var xq := x_in + fw * float(k + 1) / float(nd + 1)
+						var zq: float = face.call(xq)
+						if is_finite(zq):
+							_near(_add(body, box(Vector3(0.006, h * 0.8, 0.004)), mats["seam"], Vector3(s * xq, yc, zq + 0.0035)))
+
+
 ## Ein Auto hat 50 bis 70 Einzelteile, jedes wäre ein eigener Draw Call. Alles, was sich gemeinsam bewegt
 ## (Karosserie, jeder Achsschenkel, jedes Rad), wird je Material zu einer Fläche verschmolzen.
 static func _merge_parts(root: Node3D, body: Node3D, fronts: Array, spinners: Array, flames: Array) -> void:
@@ -2295,9 +2992,22 @@ static func _build_lod(root: Node3D, flames: Array, dist: float) -> void:
 			swap.append(nd)
 			(nd as MeshInstance3D).visible = nd.has_meta("lod_only")
 	var buckets := {}
-	collect_static(root, Transform3D.IDENTITY, stops, {}, buckets, func(_mi, _xf): return 0)
+	var canon := {}
+	collect_static(root, Transform3D.IDENTITY, stops, canon, buckets, func(_mi, _xf): return 0)
 	for nd in swap:
 		(nd as MeshInstance3D).visible = nd.has_meta("near_only")
+	# Leuchten mit Innenleben (_lamp_detail) in der Fernansicht wieder mit dem hellen Material, in derselben Fläche
+	for key in buckets.keys():
+		var m0: Material = key[0]
+		if m0.has_meta("lod_material"):
+			var alt = merge_material(m0.get_meta("lod_material"), canon)
+			if alt == null:
+				continue
+			var nk := [alt, key[1], key[2]]
+			if not buckets.has(nk):
+				buckets[nk] = []
+			buckets[nk].append_array(buckets[key])
+			buckets.erase(key)
 	var mesh := ArrayMesh.new()
 	var pos := PackedVector3Array()
 	var nrm := PackedVector3Array()
@@ -2452,12 +3162,25 @@ static func merge_step(parent: Node3D, job: Dictionary, budget_ms: int) -> bool:
 		mi.set_meta("merge_extra", key[2])
 		parent.add_child(mi)
 		job["made"].append(mi)
-	# Teile mit mehreren Flächen nur entfernen, wenn alle Flächen verschmolzen wurden
+	# Teile mit mehreren Flächen nur entfernen, wenn alle Flächen verschmolzen wurden. Seit 2.36 (loose: Autos, Verkehr,
+	# Umfahrbares): eine allein gebliebene Fläche eines sonst verschmolzenen Teils wird als eigenes Mesh herausgelöst. Bis
+	# 2.35 blieb das ganze Teil stehen, seine verschmolzenen Flächen wurden doppelt gezeichnet (bei den Autos oft die
+	# ganze Karosserie-Haut, wenn eine Fläche ein eigenes Material hatte).
 	if job["drop"] == null:
 		for key in buckets:
 			if buckets[key].size() < 2:
 				for it in buckets[key]:
-					gone.erase(it[3])
+					if loose and gone.has(it[3]) and (it[0] as Mesh).get_surface_count() > 1:
+						var st1 := SurfaceTool.new()
+						st1.append_from(it[0], it[1], it[2])
+						var one := MeshInstance3D.new()
+						one.mesh = st1.commit()
+						one.material_override = key[0]
+						one.set_meta("merge_extra", key[2])
+						parent.add_child(one)
+						job["made"].append(one)
+					else:
+						gone.erase(it[3])
 		job["drop"] = gone.keys()
 	var drop: Array = job["drop"]
 	while job["dropped"] < drop.size():
@@ -2711,7 +3434,7 @@ static func _light_pools(root: Node3D, W: float, L: float, light_c: Color) -> vo
 		dc.albedo_mix = 0.0
 		dc.upper_fade = 0.3
 		dc.lower_fade = 0.3
-		dc.cull_mask = 0xFFFFF & ~CAR_LAYER
+		dc.cull_mask = 0xFFFFF & ~(CAR_LAYER | SMOKE_LAYER)
 		dc.distance_fade_enabled = true
 		dc.distance_fade_begin = 80.0
 		dc.distance_fade_length = 20.0
@@ -2843,6 +3566,12 @@ static func _section(S: Dictionary, t: float, W: float, L: float, flare: float) 
 		Vector2((w2 + w3) / 2.0 + 0.012, (y2 + belt) / 2.0), Vector2(w3, belt), p4,
 		Vector2(p4.x * 0.55, top + (p4.y - top) * 0.3025), Vector2(p4.x * 0.18, top + (p4.y - top) * 0.0324),
 		Vector2(0.0, top)])
+	# Doppelbuckel-Dach (bubble, seit 2.36): die Dachmitte liegt etwas tiefer als die Buckel über den Sitzen
+	var bub: float = S.get("bubble", 0.0)
+	if bub > 0.0 and t > S["rf"] and t < S["rr"]:
+		var kb := sin(PI * (t - S["rf"]) / (S["rr"] - S["rf"]))
+		pts[10] = pts[10] - Vector2(0.0, bub * kb)
+		pts[9] = pts[9] - Vector2(0.0, bub * 0.6 * kb)
 	# Bug und Heck mit runden Kanten (Viertelkreis, Radius edge_f/edge_r): in den letzten Zentimetern rücken Flanke,
 	# Schulter und Dach nach innen, die Stirnfläche wird kleiner. Bis 2.20 endete das Auto in einer senkrechten Wand
 	# mit scharfer Kante. Die Unterkante bleibt (Lippe, Einlass, Diffusor hängen dort), vorn auch die Haubenkante.
@@ -2872,6 +3601,8 @@ static func _section(S: Dictionary, t: float, W: float, L: float, flare: float) 
 ## Querschnitt verfeinern: ab dem Schweller (Punkt 3) bis zur Dachmitte eine Kurve durch die Punkte (Catmull-Rom,
 ## zentripetal: läuft durch jeden Punkt, ohne Schlaufen), je Band sub Teilstücke. Punkte 0–3 (Unterboden, Radhaus)
 ## bleiben. Zur Dachmitte hin waagerecht (gespiegelter Nachbarpunkt).
+## Seit 2.36 mit eigenen Teilpunkten für die Seitenscheibe (Band 6: schmale Streifen unten und oben für Dichtung und
+## Rahmen) und das Band über der Schulter (7: schmaler Streifen außen für A-Säule und Dachkante), sonst sub je Band.
 static func _refine(p: PackedVector2Array, sub: int) -> PackedVector2Array:
 	var out := PackedVector2Array([p[0], p[1], p[2], p[3]])
 	for j in range(3, 10):
@@ -2879,9 +3610,25 @@ static func _refine(p: PackedVector2Array, sub: int) -> PackedVector2Array:
 		var b := p[j + 1]
 		var pa := p[j - 1] if j > 3 else a - (b - a)
 		var pb := p[j + 2] if j < 9 else Vector2(-p[9].x, p[9].y)
-		for k in range(1, sub + 1):
-			out.append(_cr(pa, a, b, pb, float(k) / sub) if k < sub else b)
+		var ks: Array = KNOTS.get(j, [])
+		if ks.is_empty():
+			for k in range(1, sub + 1):
+				ks.append(float(k) / sub)
+		for f in ks:
+			out.append(_cr(pa, a, b, pb, f) if f < 1.0 else b)
 	return out
+
+
+## Teilpunkte der Bänder mit Rahmen (Anteil 0..1 entlang des Bandes, der letzte ist das Bandende); siehe _refine, _skin
+const KNOTS := {6: [0.075, 0.37, 0.66, 0.925, 1.0], 7: [0.16, 0.45, 0.74, 1.0]}
+
+
+## Index des ursprünglichen Punkts k (3..10) im verfeinerten Querschnitt
+static func _ref_idx(k: int) -> int:
+	var i := 3
+	for b in range(3, k):
+		i += (KNOTS[b] as Array).size() if KNOTS.has(b) else SHELL_SUB
+	return i
 
 
 ## Zentripetale Catmull-Rom-Kurve zwischen p1 und p2 bei f (0..1)
@@ -2917,11 +3664,36 @@ static func _popups(body: Node3D, S: Dictionary, W: float, L: float, flare: floa
 			_add(body, box(Vector3(0.008, 0.008, z1 - z0)), seam_m, Vector3(s * x, _top_y(pm, x / pm[7].x) + 0.004, zf + zm))
 
 
+## Hochgeklappte Klappscheinwerfer (seit 2.36, Tatsumaki auf der Straße): je Seite ein Gehäuse, das vorn aus der Öffnung
+## in der Haube steht (oben lackierter Deckel, vorn dunkler Rahmen mit Glas), dahinter die dunkle Öffnung. Liefert die
+## Höhe der Lampen (für den Scheinwerfer).
+static func _popup_pods(body: Node3D, S: Dictionary, W: float, L: float, flare: float, paint: Material, lamp: Material,
+		dark: Material, x_c: float, w: float, z0: float, z1: float) -> float:
+	var zf := -L / 2.0
+	var yl := 0.0
+	var tm := (z0 + z1) / 2.0 / L
+	var slope := atan2(_top_c(S, z1 / L) - _top_c(S, z0 / L), z1 - z0)
+	for s in [-1, 1]:
+		var q := _top_pt(S, tm, s * x_c, W, L, flare)
+		var base: Vector3 = q[0]
+		var hole := _add(body, rbox(Vector3(w, 0.01, z1 - z0), 0.004), dark, base + Vector3(0, 0.001, 0))
+		hole.rotation.x = -slope
+		var qf := _top_pt(S, (z0 + 0.03) / L, s * x_c, W, L, flare)
+		var pod := Node3D.new()
+		pod.position = Vector3(s * x_c, (qf[0] as Vector3).y, zf + z0 + 0.03)
+		body.add_child(pod)
+		_add(pod, rbox(Vector3(w - 0.02, 0.135, 0.13), 0.02), paint, Vector3(0, 0.06, 0.06))
+		_add(pod, _rplate(w - 0.05, 0.095, 0.02, 0.01), dark, Vector3(0, 0.065, -0.008))
+		_add(pod, _rplate(w - 0.075, 0.074, 0.016, 0.01), lamp, Vector3(0, 0.065, -0.012))
+		yl = (qf[0] as Vector3).y + 0.065
+	return yl
+
+
 ## x der Flanke in Höhe y beim Querschnitt t (zwischen Schweller und Schulter)
 static func _side_x(S: Dictionary, t: float, y: float, W: float, L: float, flare: float) -> float:
 	# auf der verfeinerten Kurve (wie die Haut, _shell): sonst liegen Leuchten an den runden Ecken in der Haut
 	var p := _refine(_section(S, t, W, L, flare)["p"], SHELL_SUB)
-	var top := 3 + 4 * SHELL_SUB  # ursprünglicher Punkt 7 (Schulter)
+	var top := _ref_idx(7)  # ursprünglicher Punkt 7 (Schulter)
 	if y <= p[3].y:
 		return p[3].x
 	for j in range(3, top):
@@ -2981,21 +3753,39 @@ static func _lamp(parent: Node3D, S: Dictionary, W: float, L: float, flare: floa
 	return mi
 
 
-## Material eines Hautstücks (Band b zwischen Punkt b und b+1) bei t
-static func _skin(S: Dictionary, b: int, t: float, g: float, seam: bool, vinyl: int, carbon_hood := false) -> String:
+## Material eines Hautstücks (Band b zwischen Punkt b und b+1) bei t; f = Lage im Band (0 unten/außen .. 1 oben/innen)
+## Seit 2.36 Glas mit Rahmen: Seitenscheiben mit Dichtung an der Gürtellinie, Rahmen oben und hinten, dunkle B-Säule
+## (_pillars); Frontscheibe zwischen A-Säulen in Wagenfarbe, oben ein dunkler Siebdruckrand, davor die dunkle
+## Windlauf-Abdeckung; Heckscheibe ebenso mit Dachkante in Wagenfarbe und dunklem Rand. Bis 2.35 lief das Glas als
+## eine Kuppel ohne Säulen um das ganze Dach (wirkte wie ein Spielzeugauto).
+static func _skin(S: Dictionary, b: int, t: float, g: float, seam: bool, vinyl: int, carbon_hood := false, f := 0.5, L := 4.4) -> String:
 	if b <= 2:
 		return "under"
 	if seam and b <= 5:
 		return "seam"
-	if b == 6 and t > S["cowl"] and t < S["cp"] and g > 0.25:
+	var cowl: float = S["cowl"]
+	var rf: float = S["rf"]
+	var a_post: bool = b == 7 and f < KNOTS[7][0]
+	if b == 6 and t > cowl and t < S["cp"] and g > 0.25:
+		if f < KNOTS[6][0] or f > KNOTS[6][3] or t > float(S["cp"]) - 0.022 / L:
+			return "frame"
+		for pc in _pillars(S):
+			if absf(t - pc[0]) < pc[1] / L:
+				return "pillar"
 		return "glass"
-	if b >= 7 and t > S["cowl"] and t < S["rf"]:
-		return "glass"
+	if b >= 7 and t > cowl and t < rf:
+		if a_post:
+			return "paint"
+		return "cowl" if t > rf - 0.028 / L else "glass"
+	if b >= 7 and not a_post and t > cowl - 0.04 / L and t <= cowl:
+		return "cowl"  # Windlauf vor der Scheibe
 	# Stoffverdeck: Dach, kleines Heckfenster, hinterer Teil der Seite
-	if S.get("softtop", false) and t >= S["rf"] and t < S["ge"] and (b >= 7 or (b == 6 and g > 0.25)):
+	if S.get("softtop", false) and t >= rf and t < S["ge"] and (b >= 7 or (b == 6 and g > 0.25)):
 		return "glass" if b >= 8 and t > S["rr"] + 0.02 and t < S["ge"] - 0.015 else "top"
 	if b >= 7 and t > S["rr"] and t < S["ge"]:
-		return "glass"
+		if a_post:
+			return "paint"
+		return "cowl" if t < float(S["rr"]) + 0.022 / L or t > float(S["ge"]) - 0.018 / L else "glass"
 	var hl: Dictionary = S["hl"]
 	if hl.has(b) and t < hl[b]:
 		return "head"
@@ -3033,6 +3823,21 @@ static func _skin(S: Dictionary, b: int, t: float, g: float, seam: bool, vinyl: 
 	return "paint"
 
 
+## Dunkle Säulen in den Seitenscheiben: [t der Mitte, halbe Breite in m]. Viertürer: B-Säule zwischen den Türen und ein
+## Steg vor dem hinteren Seitenfenster; Coupés: ein Steg zwischen Tür- und hinterem Seitenfenster, wenn es eins gibt.
+static func _pillars(S: Dictionary) -> Array:
+	var d: Array = S["doors"]
+	var cp: float = S["cp"]
+	if d.size() >= 3:
+		var out := [[d[1], 0.036]]
+		if cp - d[2] > 0.025:
+			out.append([d[2], 0.016])
+		return out
+	if cp - d[1] > 0.035:
+		return [[d[1], 0.02]]
+	return []
+
+
 ## Karosserie-Haut aus Querschnitten: Frontschürze, Mittelteil, Heckschürze als eigene Meshes. Fugen (Schürzen,
 ## Türen) sind schmale dunkle Bänder zwischen zwei dicht liegenden Querschnitten.
 static func _shell(body: Node3D, S: Dictionary, W: float, L: float, flare: float, vinyl: int, mats: Dictionary, carbon_hood := false) -> void:
@@ -3045,6 +3850,11 @@ static func _shell(body: Node3D, S: Dictionary, W: float, L: float, flare: float
 	for wz in [-L / 2.0 + axle(S), L / 2.0 - axle(S)]:
 		for e in [-1.0, 1.0]:
 			must.append_array([(wz + e * (ra - 0.002)) / L + 0.5, (wz + e * (ra + 0.002)) / L + 0.5])
+	# Ränder von Glas, Rahmen und Säulen (_skin)
+	must.append_array([S["cowl"], S["cowl"] - 0.04 / L, S["rf"], S["rf"] - 0.028 / L, S["rr"], S["rr"] + 0.022 / L,
+		S["ge"], S["ge"] - 0.018 / L, S["cp"], S["cp"] - 0.022 / L])
+	for pc in _pillars(S):
+		must.append_array([pc[0] - pc[1] / L, pc[0] + pc[1] / L])
 	var extra := []
 	var n := int(L / 0.09)
 	for i in n + 1:
@@ -3075,9 +3885,17 @@ static func _shell(body: Node3D, S: Dictionary, W: float, L: float, flare: float
 	# Querschnitte verfeinern (runde Flanken, Schultern, Dachkanten); band[k] = ursprüngliches Band des Teilstücks k
 	# (Material, Fugen, Folien bleiben, wo sie waren)
 	var band := [0, 1, 2]
+	var bandf := [0.5, 0.5, 0.5]  # Lage des Teilstücks im Band (Mitte, 0..1): Rahmen und Säulen in _skin
 	for b in range(3, 10):
-		for k in SHELL_SUB:
+		var ks: Array = KNOTS.get(b, [])
+		if ks.is_empty():
+			for k in SHELL_SUB:
+				ks.append(float(k + 1) / SHELL_SUB)
+		var f0 := 0.0
+		for f in ks:
 			band.append(b)
+			bandf.append((f0 + float(f)) / 2.0)
+			f0 = f
 	for sc in secs:
 		sc["p"] = _refine(sc["p"], SHELL_SUB)
 	var ns := secs.size()
@@ -3101,18 +3919,21 @@ static func _shell(body: Node3D, S: Dictionary, W: float, L: float, flare: float
 			var d: Vector3 = V.call(i + 1, j)
 			var fn := (c - a).cross(d - b)
 			var mid := (a + b + c + d) / 4.0
-			if fn.dot(Vector3(mid.x, mid.y - 0.55, 0.0)) < 0.0:
+			# außen = weg von einem Punkt in der Wagenmitte. Für die Außenhaut liegt er seit 2.36 tiefer (0,36 m statt
+			# 0,55 m): bei flacher Nase (Ronin, Tatsumaki) lag die Haubenvorderkante darunter, ihre Flächen zeigten nach
+			# innen und fehlten (man sah in den Wagen hinein)
+			if fn.dot(Vector3(mid.x, mid.y - (0.55 if j < 3 else 0.36), 0.0)) < 0.0:
 				fn = -fn
 			fnorm[i].append(fn)
 			if j >= 3:
 				for q in [[i, j], [i, j + 1], [i + 1, j], [i + 1, j + 1]]:
 					vnorm[q[0]][q[1]] += fn
+	# Dreiecke je Teil und Material als Listen (seit 2.36 statt SurfaceTool je Punkt: die Haut ist der teuerste Schritt
+	# beim Bauen, so geht es gut doppelt so schnell)
 	var parts := {"FrontBumper": {}, "Shell": {}, "RearBumper": {}}
-	var get_st := func(part: String, key: String) -> SurfaceTool:
+	var get_buf := func(part: String, key: String) -> Array:
 		if not parts[part].has(key):
-			var st := SurfaceTool.new()
-			st.begin(Mesh.PRIMITIVE_TRIANGLES)
-			parts[part][key] = st
+			parts[part][key] = [[], []]
 		return parts[part][key]
 	for i in ns - 1:
 		var t0: float = secs[i]["t"]
@@ -3124,29 +3945,53 @@ static func _shell(body: Node3D, S: Dictionary, W: float, L: float, flare: float
 			if absf(t0 - sm) < 1e-6 and t1 - t0 < 0.01 / L:
 				is_seam = true
 		var part := "FrontBumper" if tm < FRONT_SEAM else ("RearBumper" if tm > REAR_SEAM + 0.001 else "Shell")
+		var last_key := ""
+		var bv: Array = []
+		var bn: Array = []
 		for j in NP - 1:
 			var fn: Vector3 = fnorm[i][j]
 			if fn.length_squared() < 1e-12:
 				continue
 			var bj: int = band[j]
-			var key := _skin(S, bj, tm, gm, is_seam, vinyl, carbon_hood)
-			var st: SurfaceTool = get_st.call(part, key)
-			var q := [[i, j], [i, j + 1], [i + 1, j + 1], [i + 1, j]]
-			var pos := []
-			var nrm := []
-			for c in q:
-				pos.append(V.call(c[0], c[1]))
-				var vn: Vector3 = vnorm[c[0]][c[1]]
-				nrm.append(vn.normalized() if j >= 3 and vn.length_squared() > 1e-12 else fn.normalized())
-			for side in [1.0, -1.0]:
-				var m := Vector3(side, 1.0, 1.0)
-				var P := []
-				var N := []
-				for k in 4:
-					P.append(pos[k] * m)
-					N.append(nrm[k] * m)
-				_tri(st, P[0], P[1], P[2], N[0], N[1], N[2], fn * m)
-				_tri(st, P[0], P[2], P[3], N[0], N[2], N[3], fn * m)
+			var key := _skin(S, bj, tm, gm, is_seam, vinyl, carbon_hood, bandf[j], L)
+			if key != last_key:
+				var buf: Array = get_buf.call(part, key)
+				bv = buf[0]
+				bn = buf[1]
+				last_key = key
+			var p0: Vector3 = V.call(i, j)
+			var p1: Vector3 = V.call(i, j + 1)
+			var p2: Vector3 = V.call(i + 1, j + 1)
+			var p3: Vector3 = V.call(i + 1, j)
+			var n0 := fn.normalized()
+			var n1 := n0
+			var n2 := n0
+			var n3 := n0
+			if j >= 3:
+				var v0: Vector3 = vnorm[i][j]
+				var v1: Vector3 = vnorm[i][j + 1]
+				var v2: Vector3 = vnorm[i + 1][j + 1]
+				var v3: Vector3 = vnorm[i + 1][j]
+				n0 = v0.normalized() if v0.length_squared() > 1e-12 else n0
+				n1 = v1.normalized() if v1.length_squared() > 1e-12 else n1
+				n2 = v2.normalized() if v2.length_squared() > 1e-12 else n2
+				n3 = v3.normalized() if v3.length_squared() > 1e-12 else n3
+			# Umlaufsinn je Dreieck (die gespiegelte Seite läuft andersherum): an den verdrehten Vierecken der Radläufe
+			# liegt das zweite Dreieck andersherum als das erste; einmal je Viereck entschieden, zeigte es nach innen
+			# und fehlte (vier kleine Löcher je Auto)
+			var m := Vector3(-1.0, 1.0, 1.0)
+			if (p2 - p0).cross(p1 - p0).dot(fn) < 0.0:
+				bv.append_array([p0, p2, p1, p0 * m, p1 * m, p2 * m])
+				bn.append_array([n0, n2, n1, n0 * m, n1 * m, n2 * m])
+			else:
+				bv.append_array([p0, p1, p2, p0 * m, p2 * m, p1 * m])
+				bn.append_array([n0, n1, n2, n0 * m, n2 * m, n1 * m])
+			if (p3 - p0).cross(p2 - p0).dot(fn) < 0.0:
+				bv.append_array([p0, p3, p2, p0 * m, p2 * m, p3 * m])
+				bn.append_array([n0, n3, n2, n0 * m, n2 * m, n3 * m])
+			else:
+				bv.append_array([p0, p2, p3, p0 * m, p3 * m, p2 * m])
+				bn.append_array([n0, n2, n3, n0 * m, n3 * m, n2 * m])
 	# Stirnflächen vorn und hinten
 	for e in [[0, "FrontBumper", -1.0], [ns - 1, "RearBumper", 1.0]]:
 		var p: PackedVector2Array = secs[e[0]]["p"]
@@ -3172,16 +4017,24 @@ static func _shell(body: Node3D, S: Dictionary, W: float, L: float, flare: float
 				tri.append_array([clean.size() - 1, k, (k + 1) % (clean.size() - 1)])
 		var z: float = secs[e[0]]["z"]
 		var nz := Vector3(0, 0, e[2])
-		var st: SurfaceTool = get_st.call(e[1], "paint")
+		var buf: Array = get_buf.call(e[1], "paint")
 		for k in range(0, tri.size(), 3):
 			var a := Vector3(clean[tri[k]].x, clean[tri[k]].y, z)
 			var b := Vector3(clean[tri[k + 1]].x, clean[tri[k + 1]].y, z)
 			var c := Vector3(clean[tri[k + 2]].x, clean[tri[k + 2]].y, z)
-			_tri(st, a, b, c, nz, nz, nz, nz)
+			if (c - a).cross(b - a).dot(nz) < 0.0:
+				(buf[0] as Array).append_array([a, c, b])
+			else:
+				(buf[0] as Array).append_array([a, b, c])
+			(buf[1] as Array).append_array([nz, nz, nz])
 	for part in parts:
 		var mesh := ArrayMesh.new()
 		for key in parts[part]:
-			parts[part][key].commit(mesh)
+			var arr := []
+			arr.resize(Mesh.ARRAY_MAX)
+			arr[Mesh.ARRAY_VERTEX] = PackedVector3Array(parts[part][key][0])
+			arr[Mesh.ARRAY_NORMAL] = PackedVector3Array(parts[part][key][1])
+			mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
 			mesh.surface_set_material(mesh.get_surface_count() - 1, mats[key])
 		var mi := MeshInstance3D.new()
 		mi.name = part

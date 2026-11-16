@@ -232,6 +232,98 @@ Außenring → nächste Stadt → Autobahn. Rundkurse und Drift-Kurse sind Schle
 - Browser: der Web-Export startet, die Welt baut sich ohne Skriptfehler auf (gut 25 s). Noch offen: eine Testfahrt mit
   Bildrate im sichtbaren Browserfenster (Herausforderer, Nachladen, Verkehr).
 
+## JDM-Autos, Qualm wie Rauch, Strecken mit Charakter, Autobahndreiecke (2.36)
+- **Zwei neue Autos** (`catalog.gd`, `car_builder.gd`), beide auch Gegner und Herausforderer:
+  - **Yari Shinka VIII** (*yari* = Lanze, *shinka* = Evolution): kantige Allrad-Rallye-Limousine im Geist eines Lancer
+    Evo VIII. Trapez-Lufteinlass mit sichtbarem Ladeluftkühler, Haube mit Mittelhutze und Kiemen, breite Backen, hoher
+    Flügel, klare Rückleuchten mit roten Ringen. Klasse A, ab Level 12, Klang Turbo-Vierzylinder.
+  - **Tatsumaki RE** (*tatsumaki* = Wirbelsturm): flaches Kreiskolben-Coupé im Geist eines RX-7 (FD). Kotflügel höher als
+    die Haube, Doppelbuckel-Dach, lange Glasheckklappe, ovales Maul, Klappscheinwerfer (in der Garage zu, auf der Straße
+    oben), Rückleuchtenband mit runden Lampen. Hinterradantrieb, Klasse A, ab Level 14, Klang Kreiskolben.
+- **Mehr Details an allen 27 Autos:** Fensterrahmen (A-Säulen und Dachkanten in Wagenfarbe, schwarze Gummis und
+  B-Säule, Windlauf), Fugen um Haube und Heckklappe, Türgriffe, Spiegel auf Armen, Antenne, Plaketten, Rückstrahler,
+  Heckwischer an Schräghecks. Scheinwerfer mit Reflektor, Projektoren und Tagfahrlicht-Streifen, Rückleuchten mit
+  Lichtleiste, Ring und Stegen, Wabengitter in den Lufteinlässen, doppelwandige Endrohre. Behoben: die Haube des Ronin
+  zeigte vorn nach innen (Loch ins Auto), zusammengelegte Teile wurden teils doppelt gezeichnet. Ein Auto ist trotzdem
+  so schnell gebaut wie vorher (gut 60 ms); nah gesehen hat es 10 bis 15 % mehr Dreiecke.
+- **Qualm sieht nach Rauch aus** (`tire_fx.gd`): weiche Wolken aus Rauschen (vier Formen), zufällig gedreht, wachsend
+  und vergehend, rund schattiert, weich an Boden und Auto. Die „Kästen“ waren die Lichtteppiche von Unterbodenneon und
+  Rückleuchten (Decals), die den Qualm scharf begrenzt einfärbten. Der Qualm hat jetzt eine eigene Sichtebene: Neon,
+  Scheinwerfer und Lichtteppiche der Autos lassen ihn aus, Laternen beleuchten ihn.
+- **Splitter statt Kästchen:** Umgefahrene Laternen, Tonnen und Schilder streuen dünne, sich drehende Splitter in ihrer
+  Farbe, Unfälle Glassplitter; dazu eine leichte Staubwolke aus demselben Stoff wie der Qualm (`TireFx.shards`,
+  `TireFx.dust_puff`).
+- **Jedes Auto fährt sich anders** (`player_car._setup_feel`): aus Länge mal Breite und Bauart (Limousine schwerer,
+  Roadster und Mittelmotor leichter) ein Gewicht. Kleine Autos lenken direkter und drehen schneller ein (volle Drehrate
+  nach gut 0,1 s), große träger (gut 0,25 s), Limousinen wanken mehr, im Rutsch-Modell haben schwere Autos mehr
+  Trägheit, die Kamera folgt kleinen Autos straffer.
+- **Vinyls in Kategorien wie in Underground** (Garage > Tuning > Optik > Folierung): erst die Kategorie, dann die
+  Motive. Vorn die einfarbigen in der Folienfarbe: Streifen (8), Flammen (Feuerzungen, Inferno, Geisterflammen), Tribal
+  (Tribal, Tiger, Aufwind), Rennsport (Speedlines, Splitter, Zielflagge, Startnummer, Karo-Streifen). Hinten die mit
+  festen Farben: Spezial (Pixeltarn, Blitze, Hexgitter, Platine, Farbbomben, Rising Sun, Glitch, Prisma) und Unikate
+  (Sakura, Hot Rod, Welle, Graffiti, Koi, Engelsflügel, Einheit 07, Lichtengel). Die Motive mit Gesichtern (Kitsune,
+  Oni, Drache, Mecha) sind raus; wer eines trug, fährt ohne Folie, Gegner bekommen ein anderes (`hidden`, die Plätze
+  bleiben wegen der Spielstände).
+- **Strecken mit Charakter** (`scripts/track_design.gd`: handgezeichnete Verläufe mit Höhenprofil, Gelände, Tunneln,
+  Wahrzeichen; `shaders/mountain.gdshader` für Waldboden, Fels und Weinberg):
+  - **Driftberg:** statt 16 gleicher Kehren eine Passstraße im Harz, 2,23 km, vom Tal auf 35 m. Schneller Bogen,
+    Kehrentreppe (drei Schenkel, je gut 8 m höher), S-Kurven über den Kamm, Gipfelkehre mit Aussichtspunkt, gut 80 m
+    Felstunnel unter dem Sendeturm, schnelle Abfahrt (bis 11,8 %). Bergseitig Felswände und Betonmauer, talseitig
+    Leitplanke, Fichtenwald, Granitbrocken, Berggasthof. Stimmung Mitternacht (im Nebel sah man vom Aussichtspunkt
+    nichts).
+  - **Köln:** 585 m am Rheinufer mit Tunnel, Kehre vor dem Dom und der Hohenzollernbrücke, dann der Ring mit Boulevards
+    und Schikane.
+  - **Bremen:** an der Weser mit Tunnel, Brücke über das Hafenbecken, Kai mit Kränen, Zickzack durch die Altstadt am
+    Rathaus mit dem Roland vorbei.
+  - **Hamburg Hafen-Drift:** Containerterminal statt 12-Kehren-Stern: Elbkai, Bogen, S-Kurven, zwei Kehren hintereinander,
+    ein langer gleichmäßiger Bogen für lange Ketten; gegenüber die Elbphilharmonie.
+  - **Stuttgart:** Boulevard mit Tunnel, zwei Kehren den Weinberg hinauf zum Fernsehturm (24 m), geschwungene Abfahrt.
+    Der Weinberg hat Rebzeilen, Terrassenmauern und Wengerterhäuschen, nachts dunklen Boden (die „helle Platte“ waren
+    Nebelschichten über dem Hang, dort ist der Nebel jetzt aus).
+  - **Frankfurt Bankenviertel-Sprint:** Start in der Hochhausschlucht mit einem Turm am Ende, harte Rechtskurve,
+    Unterführung (Theatertunnel), am Main entlang, Brücke nach Sachsenhausen, am Römer vorbei, Gassen-Abkürzung.
+  - **München Prachtallee-Sprint:** 600 m Boulevard mit Mittelstreifen durch das Siegestor, Damm über den See im
+    Englischen Garten, Isarbrücke, 8 m Terrassen-Anstieg am Friedensengel.
+  - **Hamburg Hafenrunde:** Reeperbahn, Landungsbrücken, Damm über das Hafenbecken, Gasse durch die Speicherstadt, 22 m
+    hohe Schrägseilbrücke (Köhlbrandbrücke), Containerterminal.
+  - **Dortmund Schnellstraßen-Sprint:** Start am Hochofen, B1 mit Mittelstreifen, 1,3 km Vollgas an Stadion und
+    Fernsehturm vorbei, Westfalentunnel, 7 m hohe Hochstraße über ein Gleisfeld (12 Gleise, Güterzüge, Flutlicht), hart
+    auf den Wall bremsen, Gasse durch die Altstadt; dazu ein Förderturm.
+  - **Nürnberg Altstadtring:** an der Stadtmauer entlang (Mauer, Türme, Graben, Lücken für die Straßen), Laufer Tor und
+    Spittlertor, 14 m hinauf zur Burg, Brücke über die Pegnitz.
+  - **Heidelberg Altstadt-Hügel:** Brückentor mit zwei Türmen, Alte Brücke, Gasse durch die Altstadt, weite Kehre hinauf
+    auf 29 m am Schloss vorbei (neu gebaut, auf einer Terrasse, zur Stadt gewandt), Abfahrt durch den Wald, Ziel am Neckar.
+  - **Rostock Hafen-Sprint:** Start am Kröpeliner Tor, Marienkirche, Hafenkai, Speichergasse, Warnowtunnel 11,5 m unter
+    dem Fluss, Damm über das Hafenbecken, Ziel am Leuchtturm.
+  - **Stadion-Drift:** statt des Sterns ein langer gleichmäßiger Bogen um die Arena, Wechsel über die Parkplätze, ein
+    7 m hohes Parkdeck mit einer Kehre oben.
+  - Sprints bleiben A nach B mit ihren Ausfahrten am Start und am Ziel. Brücken stehen jetzt dort, wo die Straße
+    wirklich Wasser kreuzt (in Nürnberg stand eine im Trockenen); zufällige Mittelstreifen und Hochbahnen sind in den
+    entworfenen Städten aus (ein Mittelstreifen-Kopf mitten in der Kurve hinter dem Frankfurter Tunnel).
+  - **Querstraßen** (nur in der freien Fahrt, im Rennen abgesperrt): Köln 2, Bremen, Stuttgart, Frankfurt, München,
+    Dortmund und Heidelberg je 1, Nürnberg 2, mit Häusern quer durch die Runde. Man fährt nicht mehr nur im Kreis.
+  - Unverändert: die Städte nach echten Karten (Aachen, Würzburg, Bad Kissingen, Tauberbischofsheim, Hammelburg,
+    Berlin Kreuzberg), Freudenstadt und die Drag-Strecken.
+- **Autobahndreiecke wie in Underground** (`scripts/interchange.gd`, geplant in `world_layout._plan_interchanges`):
+  Wo eine Querspange oder Speiche auf den inneren Ring trifft, gabelt sich die Straße in einem Y (Sperrfläche mit
+  Schraffur, Anpralldämpfer gelb-schwarz). Die Rampen zur anderen Seite führen auf einer Brücke über den Ring
+  (13,5 m an Spangen, 16,5 m an Speichen; Fahrbahnplatte, schlanke Pfeiler alle 34 m, Widerlager), die Rampen zur
+  nahen Seite fädeln mit 90 m Beschleunigungsspur ein. Dazu Betonschutzwände, Stützmauern, Leitpfosten, Laternen,
+  eine blaue Schilderbrücke über dem Abzweig und Vorwegweiser 260 m vor jeder Ausfahrt; im Bild oben „AUTOBAHNDREIECK
+  <STADT>“. Fünf Dreiecke (Bad Kissingen, Frankfurt, Berlin, München, Dortmund), wo es eng ist kompakter (Radius
+  62 m); drei Stellen bleiben flach (zu kurz oder zu eng). Kein Verkehr auf den Rampen.
+- **Talbrücken und Einschnitte:** Der Ring führt auf vier Talbrücken (12 bis 14,5 m hoch, Doppelpfeiler alle 46 m)
+  über neue Seen und durch drei Einschnitte (700 m lang, 9 bis 12 m tief, Böschungen 1:1,5, Feldwegbrücke darüber).
+  Das Gelände folgt den neuen Straßen, Karte und Minikarte zeigen die Rampen. Auf Brücken liegt die Fahrbahn eben,
+  Kuppen, die nicht auf ein kurzes Ringstück passen, fallen weg (sie warfen das Auto auf einer Spange um).
+- **Test:** `world.tscn -- --wtour=dreieck` fährt jede Rampe in beide Richtungen ab (auch über die Brücke),
+  `--noix` baut die Welt ohne Dreiecke (Vergleich).
+- **Zug und Brücken:** Der Zug traf das Auto auch dann, wenn er oben über eine Brücke fuhr und das Auto unten durch
+  (`rail_crossing._sweep_player` prüfte die Höhe nur nach oben). Jetzt nur noch auf Höhe der Gleise.
+- **Aachen wieder mit eigenem Lied:** In Aachen läuft „AC“ von Bruder Jakob und Jonas Platin (`music.city_track`). Die
+  Datei liegt nicht im Repo (mit Erlaubnis verwendet, `.gitignore`); den Builds 2.33 bis 2.35 fehlte sie, dort lief
+  in Aachen die normale Musik. Vor dem Export muss sie in `music/staedte/` liegen.
+
 ## Driften mit echtem Rutsch-Modell, Qualm und Spuren, ruhiger am Berg (2.35)
 - **Rutsch-Modell** (`player_car._dyn_physics`): Einspurmodell mit Vorder- und Hinterachse und Reifenkennlinie (Seitenkraft
   bis zum Haftmaximum, danach etwas weniger). Gas nimmt der Hinterachse Seitenhalt (Kammscher Kreis), die Handbremse
@@ -303,7 +395,7 @@ Außenring → nächste Stadt → Autobahn. Rundkurse und Drift-Kurse sind Schle
   die Details und wie viel XP noch fehlen). In der Welt auch über Esc > Fahrer. 19 Titel von „Neuling“ bis
   „Unsterblich“ (`Catalog.TITLES`). Bis 2.34 gab es zu jedem Titel ein Emblem, seit 2.35 nicht mehr; der Titel steht
   in der Level-Zeile unten in der Welt.
-- **25 Vinyls mit Motiv** (Folierung, ab Option 9): Speedlines, Tribal, Splitter, Sakura, Tiger, Zielflagge, Flammen,
+- **25 Vinyls mit Motiv** (Folierung, ab Option 9; seit 2.36 in Kategorien, die vier mit Gesichtern sind raus): Speedlines, Tribal, Splitter, Sakura, Tiger, Zielflagge, Flammen,
   Pixeltarn, Blitze, Welle, Graffiti, Hexgitter, Platine, Farbbomben, Koi, Rising Sun, Glitch-Split, Kitsune, Oni,
   Drache, Engelsflügel, Einheit 07 (Mecha-Lackierung), Mecha, Lichtengel, Prisma. Jedes Motiv ist ein SVG
   (`assets/vinyls`, erzeugt von `tools/vinyl_gen.py`, reines Python): oben die Flanke (Bug links, Heck rechts,
@@ -1131,6 +1223,10 @@ Texte, Cover und Screenshots für die itch.io-Seite: `release/`.
   Wind, Abrollen, Schrammen
 - `scripts/loading_screen.gd` – Ladebildschirm vor dem Rennen
 - `scripts/track_builder.gd` – prozedurale Stadtstrecke
+- `scripts/track_design.gd` – handgezeichnete Strecken (Verlauf, Höhenprofil, Gelände, Tunnel, Wahrzeichen, Querstraßen)
+  für Driftberg und die entworfenen Städte, `shaders/mountain.gdshader` – Waldboden, Fels, Weinberg
+- `scripts/interchange.gd` – Autobahndreiecke der offenen Welt (Gabelung, Rampen, Brücke, Schilder) und Talbrücken
+- `scripts/tire_fx.gd` – Reifenqualm, Reifenspuren, Staub und Splitter
 - `scripts/ai_car.gd` – Gegner
 - `scripts/garage.gd` / `scripts/race.gd` – Menü und Rennen
 - `scripts/intro.gd` – Studio-Intro

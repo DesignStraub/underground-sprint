@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://mnj5dof0c51h"
-path="res://.godot/imported/dragon.svg-5d1b748419b83427eeb212ba8edd4d16.ctex"
+uid="uid://ctgft63ep4wcq"
+path="res://.godot/imported/ghostflames.svg-836b8e61286f470e8a2aaa3b945509c8.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/vinyls/dragon.svg"
-dest_files=["res://.godot/imported/dragon.svg-5d1b748419b83427eeb212ba8edd4d16.ctex"]
+source_file="res://assets/vinyls/ghostflames.svg"
+dest_files=["res://.godot/imported/ghostflames.svg-836b8e61286f470e8a2aaa3b945509c8.ctex"]
 
 [params]
 

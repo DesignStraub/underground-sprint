@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://det15bf75364p"
-path="res://.godot/imported/kitsune.svg-37b372b70c455c58c4f355e2b0a3d9e4.ctex"
+uid="uid://cb33f3py4sf7f"
+path="res://.godot/imported/checkstripe.svg-aef89365b84167504043a882293a12c7.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/vinyls/kitsune.svg"
-dest_files=["res://.godot/imported/kitsune.svg-37b372b70c455c58c4f355e2b0a3d9e4.ctex"]
+source_file="res://assets/vinyls/checkstripe.svg"
+dest_files=["res://.godot/imported/checkstripe.svg-aef89365b84167504043a882293a12c7.ctex"]
 
 [params]
 

@@ -159,6 +159,12 @@ var _dyn_on := false
 var _dyn_calm := 0.0  # s, die das Auto im Fahr-Modus schon wieder gerade läuft (dann zurück ins Griff-Modell)
 var _drive_a := 0.0  # Antriebsbeschleunigung dieses Takts (m/s²): nimmt der Hinterachse Seitenhalt
 var _course_prev := 0.0  # Fahrtrichtung (rad) im letzten Takt: daraus die echte Querbeschleunigung fürs Wanken
+## Fahrgefühl je Auto (seit 2.36, _setup_feel): wie schwer sich das Auto anfühlt, 0 (Kei-Car) bis 1 (großer GT)
+var mass_k := 0.5
+var _yaw_resp := 25.0  # wie schnell die Drehrate der Lenkung folgt (1/s): klein flink, groß träge
+var _steer_k := 1.0  # wie schnell eingelenkt wird
+var _roll_k := 1.0  # wie stark die Karosserie wankt und nickt
+var _cam_k := 1.0  # wie eng die Verfolgerkamera folgt
 var _cam_drift := 0.0  # wie weit die Kamera im Drift in Fahrtrichtung schaut (geglättet)
 var _shake_t := 0.0
 var _wall_cool := 0.0
@@ -254,6 +260,7 @@ func setup(car_id: String, cfg: Dictionary) -> void:
 	lat_acc = 14.0 + st["grip"] * 0.42  # 2,3–2,7 g ab Werk: griffig wie NFSU, aber enge Ecken wollen angebremst werden
 	drift_k = st["drift"]
 	drive_type = _spec.get("drive", "rwd")
+	_setup_feel()
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--drivebot="):
 			var bp := arg.substr(11).split(":")
@@ -607,6 +614,7 @@ func _physics_process(dt: float) -> void:
 	var steer_speed := lerpf(6.0, 3.0, sf0) if absf(steer_in) > 0.01 else lerpf(8.0, 5.0, sf0)
 	if steer_in * steer < 0.0:
 		steer_speed = lerpf(9.0, 6.0, sf0)  # Gegenlenken geht schneller als Einlenken
+	steer_speed *= _steer_k
 	steer = move_toward(steer, steer_in, dt * steer_speed)
 	var low_speed := clampf(spd / 2.0, 0.0, 1.0)
 	# Drehrate: langsam begrenzt durch den Wendekreis (Lenkgeometrie), bei Tempo durch die Querbeschleunigung
@@ -653,7 +661,7 @@ func _physics_process(dt: float) -> void:
 				yaw *= 1.0 + 0.25 * smoothstep(0.5, 1.0, absf(steer)) * _thr_s * smoothstep(10.0, 16.0, spd)
 		_spin = move_toward(_spin, 0.0, dt * 2.0)
 		# kaum Trägheit (glättet nur Sprünge in der Drehrate); 2.23 hatte 15/6,5 und war zu träge
-		var yaw_k := 4.0 if airborne else lerpf(30.0, 20.0, sf0)
+		var yaw_k := 4.0 if airborne else lerpf(_yaw_resp, _yaw_resp * 0.65, sf0)
 		_yaw_v = lerpf(_yaw_v, yaw, 1.0 - exp(-dt * yaw_k))
 		_rotate_front((_yaw_v + _spin) * dt, 0.25 * _slip_hold)
 
@@ -710,7 +718,7 @@ func _physics_process(dt: float) -> void:
 	var sf := clampf(spd / top_speed, 0.0, 1.0)
 	# Gewichtsverlagerung: Nase taucht beim Bremsen ein, hebt sich beim Beschleunigen; Wanken nach der echten
 	# Querbeschleunigung (Gierrate * Tempo) nach außen, im Rutschen zusätzlich zur Rutschseite
-	var pitch := clampf(a * 0.0026, -0.045, 0.03)
+	var pitch := clampf(a * 0.0026 * _roll_k, -0.045 * _roll_k, 0.03 * _roll_k)
 	if airborne:
 		pitch = 0.0  # in der Luft dreht sich das ganze Auto (unten), nicht die Karosserie
 	var yaw_now := wrapf(global_rotation.y - _yaw_prev, -PI, PI) / maxf(dt, 0.0001)
@@ -721,7 +729,7 @@ func _physics_process(dt: float) -> void:
 	var course := atan2(velocity.x, velocity.z)
 	var a_lat := wrapf(course - _course_prev, -PI, PI) / maxf(dt, 0.0001) * spd * smoothstep(3.0, 8.0, spd)
 	_course_prev = course
-	var roll := clampf(-a_lat / 9.81 * 0.022, -0.045, 0.045) - clampf(l2 * 0.0012, -0.012, 0.012)
+	var roll := clampf(-a_lat / 9.81 * 0.022 * _roll_k, -0.045 * _roll_k, 0.045 * _roll_k) - clampf(l2 * 0.0012, -0.012, 0.012)
 	if airborne:
 		roll = 0.0
 	# Federung: knapp 1,6 Hz, leicht unterdämpft (wippt beim Einlenken und Bremsen einmal sanft nach)
@@ -778,6 +786,28 @@ func _physics_process(dt: float) -> void:
 	audio.scrape = _scrape
 
 
+## Fahrgefühl je Auto (seit 2.36): bis 2.35 reagierten alle Autos fast gleich schnell auf die Lenkung, Limousinen
+## fühlten sich gleich an. Jetzt zählt das Gewicht (aus Länge mal Breite, Limousinen etwas schwerer, Roadster und
+## Mittelmotor etwas leichter): kleine Autos lenken flink ein, die Drehrate folgt fast sofort, die Karosserie bleibt
+## straff; große Limousinen und GTs bauen die Drehung spürbar auf, lenken langsamer ein, wanken und nicken mehr, die
+## Kamera hängt etwas nach. Grip, Lenkwinkel und Leistung bleiben die Werte aus dem Katalog.
+func _setup_feel() -> void:
+	var area: float = float(_spec.get("length", 4.3)) * float(_spec.get("width", 1.75))
+	mass_k = clampf((area - 5.0) / 4.7, 0.0, 1.0)
+	match str(_spec.get("style", "coupe")):
+		"sedan":
+			mass_k += 0.15
+		"roadster":
+			mass_k -= 0.12
+	if drive_type == "mr":
+		mass_k -= 0.08
+	mass_k = clampf(mass_k, 0.0, 1.0)
+	_yaw_resp = lerpf(40.0, 9.0, mass_k)
+	_steer_k = lerpf(1.3, 0.72, mass_k)
+	_roll_k = lerpf(0.75, 1.4, mass_k) * (1.15 if str(_spec.get("style", "")) == "sedan" else 1.0)
+	_cam_k = lerpf(1.15, 0.8, mass_k)
+
+
 ## Testfahrer (--drivebot): liefert [Gas, Bremse, Lenkung, Handbremse] für diesen Takt und schreibt die Werte mit
 func _bot_inputs(dt: float) -> Array:
 	if _bot_t < 0.0:
@@ -826,6 +856,13 @@ func _bot_inputs(dt: float) -> Array:
 				o = [1.0, 0.0, 0.7, false]
 			elif t < 7.0:
 				o = [0.0, 0.0, 0.0, false]
+		"step":  # geradeaus, dann 1 s voll einlenken (Ansprechen der Lenkung messen), dann wieder geradeaus
+			if t < 1.0:
+				o = [0.6, 0.0, 0.0, false]
+			elif t < 2.0:
+				o = [0.6, 0.0, 1.0, false]
+			elif t < 3.5:
+				o = [0.6, 0.0, 0.0, false]
 		"counter":  # Drift einleiten, dann gegenlenken (Winkel soll kleiner werden, Auto fängt sich)
 			if t < 1.0:
 				o = [1.0, 0.0, 0.0, false]
@@ -1100,7 +1137,7 @@ func _dyn_physics(dt: float, thr: float, brk: float, hb: bool, eff_top: float) -
 		d_f = sqrt(maxf(d_f * d_f - drv * drv, pow(0.5 * d_f, 2.0)))
 	var b_f := 1.87 / 0.12  # Spitze bei 7° vorn
 	var b_r := 1.87 / 0.085  # 4,9° hinten: hinten steifer als vorn, so bleibt das Auto geradeaus stabil (untersteuernd)
-	var ik := la * lb * 1.05  # Trägheit um die Hochachse (je Masse)
+	var ik := la * lb * 1.05 * lerpf(0.8, 1.3, mass_k)  # Trägheit um die Hochachse (je Masse), große Autos träger
 	var cs_k := 1.0  # Gegenlenk-Hilfe: Vorderräder zeigen in Fahrtrichtung der Vorderachse
 	var k_yaw := 3.5 if drift_mode else 4.0  # Dämpfung: das Auto dreht mit der Fahrtrichtung, nicht davon unabhängig
 	# Driftwinkel höchstens so groß, wie die Vorderräder noch gegenlenken können (Lenkeinschlag 52° wie ein Drift-Auto):
@@ -1549,7 +1586,7 @@ func _update_camera(dt: float, sf: float) -> void:
 			_cam_pos = global_position + Basis(Vector3.UP, yaw) * Vector3(0, height, dist)
 			_cam_init = true
 		# etwas Verzögerung: in Kurven sieht man das Auto einlenken (wie die NFSU-Verfolgerkamera)
-		_cam_yaw = lerp_angle(_cam_yaw, yaw, 1.0 - exp(-dt * (2.0 if airborne else 4.5)))
+		_cam_yaw = lerp_angle(_cam_yaw, yaw, 1.0 - exp(-dt * (2.0 if airborne else 4.5 * _cam_k)))
 		var target := global_position + Basis(Vector3.UP, _cam_yaw) * Vector3(0, height, dist)
 		_cam_pos = _cam_pos.lerp(target, 1.0 - exp(-dt * 20.0))
 		_cam_pos.y = lerpf(_cam_pos.y, target.y, 1.0 - exp(-dt * (6.0 if airborne else 20.0)))
@@ -1773,10 +1810,10 @@ func _crash_fx(at: Vector3, hit: float) -> void:
 		p.initial_velocity_max = 6.0 + hit * 0.35
 		p.scale_amount_min = 0.5
 		p.scale_amount_max = 1.2
-		var m := BoxMesh.new()
+		var m: PrimitiveMesh = BoxMesh.new()
 		var mat := StandardMaterial3D.new()
 		if kind == 0:
-			m.size = Vector3(0.02, 0.02, 0.16)  # Funken
+			(m as BoxMesh).size = Vector3(0.02, 0.02, 0.16)  # Funken
 			mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 			mat.albedo_color = Color(1.0, 0.75, 0.3)
 			mat.emission_enabled = true
@@ -1784,16 +1821,25 @@ func _crash_fx(at: Vector3, hit: float) -> void:
 			mat.emission_energy_multiplier = 4.0
 			p.particle_flag_align_y = true
 		else:
-			m.size = Vector3(0.09, 0.02, 0.09)  # Glas
-			mat.albedo_color = Color(0.7, 0.85, 0.95, 0.8)
+			# Glas: dünne Splitter, die sich im Flug drehen (bis 2.35 flache Kästchen)
+			mat.albedo_color = Color(0.7, 0.85, 0.95)
 			mat.metallic = 0.6
 			mat.roughness = 0.1
+			var sh := TireFx.shards(mat, 0.1)
+			m = sh.mesh as PrimitiveMesh
+			p.particle_flag_rotate_y = true
+			p.angle_min = -180.0
+			p.angle_max = 180.0
+			p.angular_velocity_min = -720.0
+			p.angular_velocity_max = 720.0
+			sh.free()
 		m.material = mat
 		p.mesh = m
 		p.position = at + Vector3(0, 0.7, 0)
 		get_parent().add_child(p)
 		p.emitting = true
 		get_tree().create_timer(2.0).timeout.connect(p.queue_free)
+	TireFx.dust_puff(get_parent(), at + Vector3(0, 0.5, 0), 6, 1.1)
 
 
 ## Vom Zug erfasst (rail_crossing._sweep_player): mitgerissen und seitlich weggeschleudert, Dreher, kurz keine
@@ -1904,6 +1950,7 @@ func _jump_cam_check() -> void:
 		_jc_light.omni_range = 6.0
 		_jc_light.light_energy = 1.4
 		_jc_light.light_color = Color(0.85, 0.9, 1.0)
+		_jc_light.light_cull_mask = Builder.OWN_LIGHT_MASK  # nicht den Reifenqualm anstrahlen
 		add_child(_jc_light)
 	_jc_light.visible = true
 

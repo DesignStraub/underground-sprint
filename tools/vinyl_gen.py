@@ -2,7 +2,7 @@
 """Vinyls und Embleme als SVG erzeugen (seit 2.33). Reines Python, keine Pakete.
 
     python3 tools/vinyl_gen.py            # alle
-    python3 tools/vinyl_gen.py tribal oni # nur diese
+    python3 tools/vinyl_gen.py tribal inferno # nur diese
 
 Vinyl (assets/vinyls/<id>.svg, 2048 x 1024): oben (y 0..512) die Flanke, x 0 = Bug, x 2048 = Heck, y 0 = Gürtellinie,
 y 512 = Schweller. Unten (y 512..1024) die Draufsicht: x wie oben, y 512 = linke Seite, 768 = Mitte, 1024 = rechte
@@ -935,225 +935,6 @@ def v_koi():
     return vinyl(side, top, d1 + d2 + d3)
 
 
-def fox_tail(x0, y0, ln, dy, w, col, tip_c, seed, edge="#a8320a"):
-    """Buschiger Fuchsschwanz: von der Wurzel (x0, y0) nach hinten, fächert um dy auf, dick in der Mitte, Spitze weiß
-    und leicht gerollt, Fell-Zacken am Rand."""
-    n = 26
-    sp = []
-    for k in range(n):
-        t = k / (n - 1)
-        sp.append((x0 + ln * t, y0 + dy * t ** 0.8 + math.sin(t * 3.0 + seed) * 22 - 50 * t ** 4 * (1 if dy <= 0 else -1)))
-    wd = []
-    for k in range(n):
-        t = k / (n - 1)
-        base = w * (0.25 + 0.85 * math.sin(math.pi * min(t * 1.05, 1.0)) ** 0.7) * (1 - t ** 6)
-        wd.append(base * (1.1 if k % 2 and t > 0.15 else 0.96))
-    wd[-1] = 0
-    body = ribbon(sp, wd, 0.6)
-    return [path(body, col, edge, 5), path(ribbon(sp[17:], wd[17:], 0.6), tip_c, edge, 4)]
-
-
-def kitsune_mask(cx, cy, sc):
-    out = []
-    head = [(0, -100), (70, -112), (150, -205), (178, -60), (165, 40), (95, 128), (22, 185), (0, 192)]
-    out.append(path(catmull(T(sym(head), cx, cy, sc), True, 0.7), "#f8f5ef", "#1d1d1d", 6 * sc))
-    for sgn in (1, -1):
-        ear = [(sgn * 82, -110), (sgn * 145, -180), (sgn * 155, -80)]
-        out.append(poly(T(ear, cx, cy, sc), "#e0202a"))
-        # Augen: schräge Schlitze, rot umrandet
-        eye = [(sgn * 30, -4), (sgn * 70, -30), (sgn * 118, -32), (sgn * 98, -6), (sgn * 60, 6)]
-        out.append(path(catmull(T(eye, cx, cy, sc), True, 0.6), "#e0202a"))
-        eye2 = [(sgn * 46, -6), (sgn * 74, -24), (sgn * 104, -26), (sgn * 90, -10), (sgn * 64, -2)]
-        out.append(path(catmull(T(eye2, cx, cy, sc), True, 0.6), "#141414"))
-        # Brauen-Flammen
-        br = [(sgn * 26, -52), (sgn * 70, -78), (sgn * 120, -70), (sgn * 96, -60), (sgn * 60, -58)]
-        out.append(path(catmull(T(br, cx, cy, sc), True, 0.8), "#e0202a"))
-        # Wangen-Striche
-        for k in range(3):
-            out.append(pl(T([(sgn * 70, 52 + k * 22), (sgn * 140, 40 + k * 26)], cx, cy, sc), "#e0202a", 9 * sc))
-        out.append(pl(T([(sgn * 20, 160), (sgn * 55, 140)], cx, cy, sc), "#e0202a", 7 * sc))
-    out.append(path(catmull(T([(0, -95), (18, -60), (0, -22), (-18, -60)], cx, cy, sc), True), "#e0202a"))
-    out.append(circ(cx, cy - 58 * sc, 8 * sc, "#ffd23f"))
-    out.append(ell(cx, cy + 150 * sc, 20 * sc, 13 * sc, "#141414"))
-    return out
-
-
-def v_kitsune():
-    side, top = [], []
-    defs = lin_grad("ft", 900, 0, 2048, 0, [(0, "#ff4d00"), (1, "#ff9a1f")])
-    for k, (dy, ln, w) in enumerate([(-210, 900, 92), (190, 880, 92), (-100, 1000, 100), (90, 990, 100), (0, 1060, 108)]):
-        side += fox_tail(960, 262, ln, dy, w, "url(#ft)", "#fff6ea", k + 3)
-    # Fuchsfeuer
-    for (x, y, rr) in [(560, 110, 26), (640, 420, 20), (1500, 470, 18), (1720, 40, 16)]:
-        side.append(path(catmull([(x, y - rr * 2.2), (x + rr, y - rr * 0.2), (x + rr * 0.6, y + rr), (x - rr * 0.6, y + rr),
-                                  (x - rr, y - rr * 0.2)], True), "#7fe6ff", extra='fill-opacity="0.85"'))
-        side.append(circ(x, y + rr * 0.2, rr * 0.5, "#ffffff"))
-    side += kitsune_mask(900, 270, 1.15)
-
-    def deck(s):
-        out = []
-        for k, (o, ln, w) in enumerate([(210, 820, 70), (120, 760, 64)]):
-            out += fox_tail(1000, ty(s, 40), ln, s * (o - 40), w, "#ff6a10", "#fff6ea", k + 9 + s)
-        return out
-    top += mirror_top(deck)
-    top += kitsune_mask(1180, TC, 0.6)
-    return vinyl(side, top, defs)
-
-
-def oni_mask(cx, cy, sc):
-    out = []
-    face = [(0, -165), (95, -158), (160, -95), (178, 0), (160, 95), (110, 165), (40, 198), (0, 202)]
-    # Hörner hinter dem Gesicht
-    for sgn in (1, -1):
-        horn = [(sgn * 55, -130), (sgn * 120, -190), (sgn * 190, -280), (sgn * 130, -150), (sgn * 105, -105)]
-        out.append(path(catmull(T(horn, cx, cy, sc), True, 0.7), "#f1e3b5", "#1a1a1a", 6 * sc))
-        out.append(pl(T([(sgn * 100, -150), (sgn * 140, -190)], cx, cy, sc), "#c7a960", 6 * sc))
-    out.append(path(catmull(T(sym(face), cx, cy, sc), True, 0.8), "#c8141c", "#1a1a1a", 7 * sc))
-    out.append(path(catmull(T(sym([(0, -150), (70, -140), (120, -80), (90, -60), (0, -70)]), cx, cy, sc), True), "#e23a2c"))
-    for sgn in (1, -1):
-        brow = [(sgn * 18, -62), (sgn * 70, -96), (sgn * 150, -112), (sgn * 140, -80), (sgn * 70, -58), (sgn * 26, -40)]
-        out.append(poly(T(brow, cx, cy, sc), "#141414"))
-        out.append(ell(cx + sgn * 72 * sc, cy - 26 * sc, 44 * sc, 26 * sc, "#ffd23f", -sgn * 14, 'stroke="#141414" stroke-width="%s"' % f(6 * sc)))
-        out.append(circ(cx + sgn * 66 * sc, cy - 24 * sc, 13 * sc, "#141414"))
-        for k in range(3):
-            out.append(pl(T([(sgn * 120, -40 + k * 30), (sgn * 160, -30 + k * 34)], cx, cy, sc), "#7a0a10", 6 * sc))
-    out.append(path(catmull(T([(0, 10), (34, 40), (48, 62), (20, 70), (0, 60), (-20, 70), (-48, 62), (-34, 40)], cx, cy, sc), True),
-                    "#9e0d14", "#141414", 5 * sc))
-    mouth = [(-118, 92), (-60, 84), (0, 90), (60, 84), (118, 92), (88, 140), (0, 168), (-88, 140)]
-    out.append(path(catmull(T(mouth, cx, cy, sc), True, 0.8), "#2a0508", "#141414", 6 * sc))
-    for k in range(-4, 5):
-        x = k * 22
-        out.append(poly(T([(x - 10, 92 - abs(k) * 1.5), (x + 10, 92 - abs(k) * 1.5), (x, 110)], cx, cy, sc), "#fbf6e8"))
-    for sgn in (1, -1):
-        out.append(poly(T([(sgn * 62, 150), (sgn * 86, 146), (sgn * 70, 92)], cx, cy, sc), "#fbf6e8", 'stroke="#141414" stroke-width="3"'))
-        out.append(poly(T([(sgn * 30, 88), (sgn * 50, 88), (sgn * 40, 128)], cx, cy, sc), "#fbf6e8", 'stroke="#141414" stroke-width="3"'))
-    return out
-
-
-def v_oni():
-    side, top = [], []
-    for col, k, sh, grow in [("#ffb000", 1.0, 0, 16), ("#141414", 1.0, 0, 0), ("#3a0a0e", 0.7, 60, 0)]:
-        for sp, wd in flame_tongues(950 + sh, 270, 360, 1000, 6, 77, 40, k):
-            side.append(path(ribbon(sp, [w + grow for w in wd]), col))
-    side += oni_mask(860, 280, 1.0)
-
-    def hood(s):
-        out = []
-        for col, k, sh, grow in [("#ffb000", 1.0, 0, 12), ("#141414", 1.0, 0, 0)]:
-            for sp, wd in flame_tongues(30 + sh, ty(s, 150), 180, 650, 4, 90 + s, 22, k):
-                out.append(path(ribbon(sp, [w + grow for w in wd]), col))
-        return out
-    top += mirror_top(hood)
-    top += oni_mask(1180, TC + 10, 0.55)
-    return vinyl(side, top)
-
-
-def dragon_head(x, y, sc, flip=1):
-    """Drachenkopf, Maul nach links (flip=1)."""
-    def Q(pts):
-        return T([(px * flip, py) for px, py in pts], x, y, sc)
-    out = []
-    # Mähne
-    for k in range(7):
-        a = k * 0.38
-        out.append(poly(Q([(60, -30 + k * 10), (150 + k * 12, -110 + k * 32), (110, -10 + k * 12)]), "#d7261e"))
-    # Hörner (Geweih)
-    for dy, ln in [(-60, 1.0), (-48, 0.8)]:
-        out.append(path(catmull(Q([(20, dy), (90, dy - 40 * ln), (170, dy - 70 * ln), (190, dy - 64 * ln), (110, dy - 30 * ln), (40, dy + 8)]), True, 0.8),
-                        "#f1e3b5", "#141414", 4))
-    head = [(-150, -10), (-120, -40), (-40, -58), (30, -60), (80, -30), (90, 20), (40, 40), (-60, 20), (-140, 12)]
-    out.append(path(catmull(Q(head), True, 0.8), "#1aa36a", "#0b3d27", 6))
-    jaw = [(-130, 26), (-60, 34), (20, 48), (60, 60), (-20, 80), (-110, 62)]
-    out.append(path(catmull(Q(jaw), True, 0.8), "#169059", "#0b3d27", 6))
-    out.append(path(catmull(Q([(-140, 14), (-60, 24), (20, 40), (-60, 50), (-125, 40)]), True), "#7a0d12"))
-    for k in range(6):
-        out.append(poly(Q([(-128 + k * 22, 18), (-116 + k * 22, 18), (-122 + k * 22, 34)]), "#fbf6e8"))
-    out.append(ell(*Q([(-10, -30)])[0], 22 * sc, 13 * sc, "#ffd23f", 0, 'stroke="#141414" stroke-width="4"'))
-    out.append(ell(*Q([(-10, -30)])[0], 4 * sc, 11 * sc, "#141414"))
-    out.append(path(catmull(Q([(-150, -12), (-60, -46), (10, -55), (-60, -36)]), True), "#e8d27a"))
-    # Barteln
-    for dy, c in [(-6, -1), (10, 1)]:
-        pts = Q([(-140, dy), (-80, dy - 30 * c), (40, dy - 60 * c), (160, dy - 20 * c), (260, dy + 30 * c)])
-        out.append(path(catmull(pts, False), "none", "#e8d27a", 7))
-    return out
-
-
-def v_dragon():
-    side, top = [], []
-    defs = ""
-    sp = []
-    for k in range(40):
-        t = k / 39
-        sp.append((560 + 1500 * t, 250 + math.sin(t * 6.5 + 0.6) * 150 * (0.4 + 0.6 * t)))
-    wd = [lerp(130, 30, t) for t in [k / 39 for k in range(40)]]
-    wd[-1] = 0
-    body = ribbon(sp, wd)
-    defs += '<clipPath id="dg">%s</clipPath>' % path(body, "#000")
-    # Rückenstacheln
-    for k in range(2, 38, 2):
-        a, b = sp[k], sp[k + 1]
-        dx, dy = b[0] - a[0], b[1] - a[1]
-        ln = math.hypot(dx, dy)
-        nx, ny = dy / ln, -dx / ln
-        if ny > 0:
-            nx, ny = -nx, -ny
-        h = wd[k] * 0.55
-        base = (a[0] + nx * wd[k] * 0.45, a[1] + ny * wd[k] * 0.45)
-        side.append(poly([(base[0] - dx * 0.6, base[1] - dy * 0.6), (base[0] + nx * h + dx * 0.4, base[1] + ny * h + dy * 0.4),
-                          (base[0] + dx * 0.8, base[1] + dy * 0.8)], "#d7261e"))
-    side.append(path(body, "#1aa36a"))
-    scales = []
-    for k in range(1, 39):
-        a = sp[k]
-        b = sp[k + 1]
-        dx, dy = b[0] - a[0], b[1] - a[1]
-        ln = math.hypot(dx, dy)
-        nx, ny = -dy / ln, dx / ln
-        for j in (-0.25, 0.05, 0.3):
-            q = (a[0] + nx * wd[k] * j, a[1] + ny * wd[k] * j)
-            r_ = wd[k] * 0.16
-            scales.append(path("M%s %s A%s %s 0 0 1 %s %s" % (f(q[0] - nx * r_), f(q[1] - ny * r_), f(r_), f(r_), f(q[0] + nx * r_), f(q[1] + ny * r_)),
-                               "none", "#0b5a37", 4))
-    # Bauch
-    belly = [(p[0] + 0, p[1] + w * 0.32) for p, w in zip(sp, wd)]
-    scales.append(pl(belly, "#e8d27a", 30, 'stroke-opacity="0.95"'))
-    side.append(g(scales, 'clip-path="url(#dg)"'))
-    side.append(path(body, "none", "#0b3d27", 6))
-    # Klauen
-    for k in (9, 24):
-        p = sp[k]
-        leg = [(p[0], p[1] + wd[k] * 0.3), (p[0] - 40, p[1] + wd[k] * 0.3 + 70), (p[0] - 70, p[1] + wd[k] * 0.3 + 95)]
-        side.append(path(ribbon(leg, [36, 28, 20]), "#169059", "#0b3d27", 4))
-        for c in range(3):
-            tip = (leg[-1][0] - 30 + c * 22, leg[-1][1] + 34)
-            side.append(poly([(leg[-1][0] - 14 + c * 12, leg[-1][1]), (leg[-1][0] - 2 + c * 12, leg[-1][1]), tip], "#f1e3b5"))
-    side += dragon_head(470, 210, 1.15)
-    # Draufsicht: Leib schlängelt sich über die Mitte
-    tsp = [(150 + 1800 * t, TC + math.sin(t * 7.0) * 120) for t in [k / 39 for k in range(40)]]
-    twd = [lerp(110, 30, t) for t in [k / 39 for k in range(40)]]
-    twd[-1] = 0
-    tb = ribbon(tsp, twd)
-    defs += '<clipPath id="dt">%s</clipPath>' % path(tb, "#000")
-    for k in range(1, 38, 2):
-        a, b = tsp[k], tsp[k + 1]
-        dx, dy = b[0] - a[0], b[1] - a[1]
-        ln = math.hypot(dx, dy)
-        nx, ny = -dy / ln, dx / ln
-        for sg in (1, -1):
-            base = (a[0] + nx * sg * twd[k] * 0.45, a[1] + ny * sg * twd[k] * 0.45)
-            top.append(poly([(base[0] - dx * 0.5, base[1] - dy * 0.5), (base[0] + nx * sg * 30 + dx * 0.3, base[1] + ny * sg * 30 + dy * 0.3),
-                             (base[0] + dx * 0.7, base[1] + dy * 0.7)], "#d7261e"))
-    top.append(path(tb, "#1aa36a"))
-    tsc = []
-    for k in range(1, 38):
-        q = tsp[k]
-        r_ = twd[k] * 0.22
-        tsc.append(path("M%s %s A%s %s 0 0 1 %s %s" % (f(q[0]), f(q[1] - r_), f(r_), f(r_), f(q[0]), f(q[1] + r_)), "none", "#0b5a37", 4))
-    top.append(g(tsc, 'clip-path="url(#dt)"'))
-    top.append(path(tb, "none", "#0b3d27", 5))
-    return vinyl(side, top, defs)
-
-
 def feather(x, y, ang, ln, w, fill, edge):
     pts = petal_pts(x, y, math.radians(ang), ln, w)
     return [poly(pts, fill, 'stroke="%s" stroke-width="3"' % edge),
@@ -1284,54 +1065,6 @@ def v_unit07():
     return vinyl(side, top, defs)
 
 
-def mecha_head(cx, cy, sc):
-    def Q(pts):
-        return T(pts, cx, cy, sc)
-    out = []
-    gun, light, orange, cyan, dark = "#4a515e", "#c9ced6", "#ff7a00", "#3ff0ff", "#1a1d24"
-    # Helm
-    out.append(poly(Q(sym([(0, -150), (90, -140), (150, -70), (160, 30), (120, 120), (60, 160), (0, 165)])), gun, 'stroke="%s" stroke-width="6"' % dark))
-    out.append(poly(Q(sym([(0, -130), (70, -122), (120, -66), (60, -40), (0, -46)])), light))
-    # Klinge (ein Horn)
-    out.append(poly(Q([(-14, -120), (14, -120), (40, -270), (0, -215)]), orange, 'stroke="%s" stroke-width="5"' % dark))
-    # Visier
-    out.append(poly(Q(sym([(0, -30), (120, -40), (135, 5), (0, 15)])), dark))
-    for sgn in (1, -1):
-        out.append(poly(Q([(sgn * 20, -14), (sgn * 112, -24), (sgn * 118, -4), (sgn * 24, 2)]), cyan))
-        out.append(pl(Q([(sgn * 30, -10), (sgn * 104, -18)]), "#ffffff", 4 * sc))
-        out.append(poly(Q([(sgn * 135, -20), (sgn * 205, -60), (sgn * 215, 60), (sgn * 150, 80)]), light, 'stroke="%s" stroke-width="5"' % dark))
-        out.append(poly(Q([(sgn * 160, -10), (sgn * 200, -34), (sgn * 204, 30), (sgn * 166, 44)]), orange))
-    # Maske mit Schlitzen
-    out.append(poly(Q(sym([(0, 30), (70, 30), (90, 90), (50, 150), (0, 158)])), light, 'stroke="%s" stroke-width="5"' % dark))
-    for k in range(4):
-        out.append(pl(Q([(-40, 60 + k * 22), (40, 60 + k * 22)]), dark, 8 * sc))
-    return out
-
-
-def v_mecha():
-    side, top = [], []
-    gun, light, orange, cyan, dark = "#4a515e", "#c9ced6", "#ff7a00", "#3ff0ff", "#1a1d24"
-    # Panzerplatten nach hinten, Lüftungsschlitze, Leuchtbahnen
-    side.append(poly([(980, 60), (1900, 40), (2060, 120), (2060, 470), (1900, 500), (1000, 470), (1060, 260)], gun, 'stroke="%s" stroke-width="6"' % dark))
-    side.append(poly([(1100, 90), (1880, 75), (1960, 140), (1180, 160)], light, 'stroke="%s" stroke-width="5"' % dark))
-    side.append(poly([(1120, 380), (1860, 360), (1940, 420), (1150, 440)], light, 'stroke="%s" stroke-width="5"' % dark))
-    for k in range(8):
-        x = 1300 + k * 60
-        side.append(poly([(x, 200), (x + 34, 200), (x + 14, 320), (x - 20, 320)], dark))
-    side.append(pl([(1060, 260), (1300, 255), (1320, 340), (2060, 330)], cyan, 10))
-    side.append(pl([(1060, 260), (1300, 255), (1320, 340), (2060, 330)], cyan, 28, 'stroke-opacity="0.25"'))
-    side.append(poly([(1900, 40), (2060, 120), (2060, 160), (1880, 90)], orange))
-    side += stroke_text("MK-07", 1600, 170, 40, orange, 8, 0.4)
-    side += mecha_head(820, 270, 1.05)
-    # Draufsicht: Platten und Leuchtbahn
-    for sgn in (1, -1):
-        top.append(poly([(60, ty(sgn, 40)), (760, ty(sgn, 30)), (820, ty(sgn, 120)), (120, ty(sgn, 170))], gun, 'stroke="%s" stroke-width="5"' % dark))
-        top.append(pl([(80, ty(sgn, 190)), (800, ty(sgn, 150)), (W, ty(sgn, 150))], cyan, 8))
-    top.append(poly([(1000, TC - 120), (1360, TC - 110), (1380, TC + 110), (1000, TC + 120)], gun, 'stroke="%s" stroke-width="5"' % dark))
-    top.append(poly([(1020, TC - 20), (1360, TC - 14), (1360, TC + 14), (1020, TC + 20)], orange))
-    return vinyl(side, top)
-
-
 def octa(cx, cy, w, h, out):
     top_c, left_c, right_c, bot_l, bot_r = "#eafcff", "#9fe8ff", "#56c8ff", "#2a7cff", "#1b4fc4"
     pts = {"t": (cx, cy - h), "b": (cx, cy + h), "l": (cx - w, cy), "r": (cx + w, cy), "f": (cx - w * 0.15, cy + h * 0.06)}
@@ -1373,6 +1106,202 @@ def v_angel():
     return vinyl(side, top, defs)
 
 
+# --- Seit 2.36: einfarbige Flammen, ein Tribal und zwei Rennsport-Motive (alle tint) -----------------------------------
+# Die Gesichter (Kitsune- und Oni-Maske, Drachenkopf, Mecha-Kopf) sind seit 2.36 raus: sie wirkten auf dem Auto billig.
+
+SX = 0.58  # Flanke: ein Pixel in x ist auf dem Auto gut 1,7-mal so lang wie in y (4,4 m auf 2048, ~0,65 m auf 512)
+
+
+def lick(x0, y0, ln, w0, amp, ph, lam, curl, fan, n=30, pw=1.5):
+    """Flammenzunge nach hinten (x wächst): Welle (Amplitude amp, Wellenlänge lam, Phase ph), die zur Spitze hin
+    wächst; die Spitze rollt um curl Pixel ein, fan neigt die Zunge. Breit bis kurz vor der Spitze (1 - u^pw).
+    Liefert (Mittellinie, Breiten) für ribbon(). Benachbarte Zungen mit verschiedener Phase kreuzen sich: dazwischen
+    bleiben die typischen Flammen-Löcher."""
+    sp, wd = [], []
+    for k in range(n):
+        u = k / (n - 1)
+        x = x0 + ln * u
+        y = y0 + amp * math.sin(math.tau * (x - x0) / lam + ph) * u ** 0.6 + fan * ln * u
+        y += curl * max(0.0, u - 0.7) ** 2 / (0.3 ** 2)
+        sp.append((x, y))
+        wd.append(w0 * (1 - u ** pw))
+    wd[-1] = 0
+    return sp, wd
+
+
+FLAME_SIDE = [  # y0, Länge, Breite, Welle, Phase, Wellenlänge, Einrollen, Neigung
+    (70, 830, 92, 39, 0.2, 570, -60, -0.03), (155, 1210, 104, 49, 1.5, 615, 70, -0.03), (240, 1445, 112, 55, 3.0, 675, -75, 0.0),
+    (325, 1070, 104, 49, 0.9, 600, 70, 0.02), (410, 1290, 100, 52, 2.2, 645, -70, 0.03), (480, 765, 80, 36, 3.6, 525, 55, 0.02)]
+FLAME_HOOD = [(50, 520, 78, 24, 0.4, 430, -40, 0.0), (125, 680, 84, 28, 1.8, 470, 44, 0.03), (200, 470, 74, 22, 3.1, 410, -36, 0.06)]
+FLAME_HEAD = [(-30, 22), (140, 30), (230, 150), (200, 260), (230, 380), (140, 490), (-30, 498)]  # Flanke vorn: geschlossene Front
+
+
+def flame_shapes(s=0):
+    """Pfade der Feuerzungen: s = 0 die Flanke, s = ±1 eine Hälfte der Haube (Draufsicht)."""
+    if s == 0:
+        out = [ribbon(*lick(150, y0, ln, w0, amp, ph, lam, curl, fan)) for y0, ln, w0, amp, ph, lam, curl, fan in FLAME_SIDE]
+        return out + [catmull(FLAME_HEAD, True)]
+    out = [ribbon(*lick(60, ty(s, o), ln, w0, amp * s, ph, lam, curl * s, fan * s)) for o, ln, w0, amp, ph, lam, curl, fan in FLAME_HOOD]
+    return out + [catmull([(-30, ty(s, 0)), (100, ty(s, 0)), (150, ty(s, 130)), (100, ty(s, 262)), (-30, ty(s, 262))], True)]
+
+
+def v_flamelicks():
+    """Feuerzungen: klassische Hot-Rod-Flammen in einer Farbe, vom vorderen Kotflügel über die Tür; auf der Haube
+    von der Nase zur Scheibe."""
+    side = [path(d, "#fff") for d in flame_shapes()]
+    top = [path(d, "#fff") for d in flame_shapes(1) + flame_shapes(-1)]
+    return vinyl(side, top)
+
+
+def rot_lick(base, ang, ln, w0, amp, ph, lam, curl, sx=1.0):
+    """lick() in eine Richtung gedreht (ang in Grad, 0 = nach hinten, -90 = nach oben), danach x um sx gestaucht."""
+    sp, wd = lick(0, 0, ln, w0, amp, ph, lam, curl, 0.0)
+    c, s_ = math.cos(math.radians(ang)), math.sin(math.radians(ang))
+    return [(base[0] + (x * c - y * s_) * sx, base[1] + x * s_ + y * c) for x, y in sp], wd
+
+
+def v_inferno():
+    """Inferno: Flammen schlagen vom Schweller schräg nach oben und hinten über die Türen, als führe das Auto durchs
+    Feuer; auf der Haube züngeln sie von der Nase her."""
+    r = random.Random(5)
+    side, top = [], []
+    x, i = 560, 0
+    while x < 1560:
+        ln = r.uniform(300, 520) * (1.15 if i % 2 else 0.85)
+        sp, wd = rot_lick((x, 540), -62 + r.uniform(-6, 6), ln, r.uniform(60, 80), r.uniform(26, 36), r.uniform(0, 6.2),
+                          r.uniform(260, 330), (-1 if i % 2 else 1) * r.uniform(30, 50), SX * 1.25)
+        side.append(path(ribbon(sp, wd), "#fff"))
+        x += r.uniform(46, 62)
+        i += 1
+    side.append(rect(540, 470, 1040, 60, "#fff"))
+
+    def hood(s):
+        out = [path(ribbon(*lick(60, ty(s, o), ln * 0.8, w0 * 0.9, amp * s, ph, lam, curl * s, fan * s)), "#fff")
+               for o, ln, w0, amp, ph, lam, curl, fan in FLAME_HOOD]
+        out.append(path(catmull([(-30, ty(s, 0)), (90, ty(s, 0)), (130, ty(s, 130)), (90, ty(s, 262)), (-30, ty(s, 262))], True), "#fff"))
+        return out
+    top += mirror_top(hood)
+    return vinyl(side, top)
+
+
+def outline_mask(mid, shapes, t):
+    """Maske: nur der Umriss um die Vereinigung der Formen (t Pixel nach außen). Weißer Strich (2t) um jede Form, dann
+    alle Formen schwarz darüber: übrig bleibt die äußere Hälfte der Striche, Linien im Inneren verschwinden."""
+    ds = "".join('<path d="%s"/>' % d for d in shapes)
+    return ('<mask id="%s" maskUnits="userSpaceOnUse" x="-50" y="-50" width="%d" height="%d"><g fill="none" stroke="#fff" '
+            'stroke-width="%s" stroke-linejoin="miter" stroke-miterlimit="12">%s</g><g fill="#000">%s</g></mask>') % (
+        mid, W + 100, H + 100, f(2 * t), ds, ds)
+
+
+def v_ghostflames():
+    """Geisterflammen: die Feuerzungen nur als Umriss, innen ein Hauch Farbe (wie gepinselte Ghost Flames). Am
+    schönsten Ton in Ton: Schwarz auf Grau, Weiß auf Silber."""
+    side_d = flame_shapes()
+    top_d = flame_shapes(1) + flame_shapes(-1)
+    defs = outline_mask("gs", side_d, 14) + outline_mask("gt", top_d, 11)
+    side = ['<g opacity="0.34" fill="#fff">%s</g>' % "".join('<path d="%s"/>' % d for d in side_d),
+            rect(-50, -50, W + 100, 620, "#fff", 'mask="url(#gs)"')]
+    top = ['<g opacity="0.34" fill="#fff">%s</g>' % "".join('<path d="%s"/>' % d for d in top_d),
+           rect(-50, 500, W + 100, 600, "#fff", 'mask="url(#gt)"')]
+    return vinyl(side, top, defs)
+
+
+def on_spine(spine, t):
+    k = min(int(t * (len(spine) - 1)), len(spine) - 2)
+    return lerp2(spine[k], spine[k + 1], t * (len(spine) - 1) - k)
+
+
+def v_updraft():
+    """Aufwind: Tribal, das hinter dem Vorderrad unten ansetzt und über die Tür zum Heck hin aufsteigt; lange, gebogene
+    Klingen laufen mit dem Schwung nach hinten oben aus. Auf der Haube zwei Schwünge von der Scheibe zur Nase."""
+    side, top = [], []
+    spine = [(600, 470), (820, 440), (1040, 372), (1250, 272), (1450, 160), (1650, 92), (1850, 58), (2040, 38)]
+    side.append(path(ribbon(spine, [40, 120, 140, 120, 90, 60, 32, 0]), "#fff"))
+    for t, ang, ln, w, bend in [(0.08, -40, 520, 100, -150), (0.22, -36, 540, 96, -150), (0.37, -32, 470, 84, -130),
+                                (0.52, -26, 360, 66, -100), (0.16, 6, 420, 70, 90), (0.32, 2, 330, 56, 70)]:
+        side.append(poly(blade(on_spine(spine, t), w, ang, ln, bend), "#fff"))
+
+    def hood(s):
+        sp = [(730, ty(s, 236)), (560, ty(s, 190)), (360, ty(s, 120)), (170, ty(s, 56)), (30, ty(s, 18))]
+        out = [path(ribbon(sp, [40, 96, 84, 46, 0]), "#fff")]
+        for t, ang, ln, w, bend in [(0.12, 186, 330, 70, 110), (0.32, 190, 280, 60, 90)]:
+            out.append(poly(blade(on_spine(sp, t), w, ang * s, ln, bend * s), "#fff"))
+        return out
+    top += mirror_top(hood)
+    return vinyl(side, top)
+
+
+# Blockziffern der Startnummer (Feld 0..1 x 0..1, je ein Umriss ohne Löcher)
+DIGITS = {
+    "4": [(0, 0), (0.2, 0), (0.2, 0.5), (0.62, 0.5), (0.62, 0), (0.82, 0), (0.82, 0.5), (1, 0.5), (1, 0.68), (0.82, 0.68),
+          (0.82, 1), (0.62, 1), (0.62, 0.68), (0, 0.68)],
+    "2": [(0.1, 0), (0.9, 0), (1, 0.1), (1, 0.59), (0.2, 0.59), (0.2, 0.82), (1, 0.82), (1, 1), (0, 1), (0, 0.51), (0.1, 0.41),
+          (0.8, 0.41), (0.8, 0.18), (0, 0.18), (0, 0.1)],
+}
+
+
+def digits_d(text, x, y, h, w, gap):
+    """Umrisse der Ziffern als Pfad-Teile (mit evenodd in einer Fläche werden sie ausgestanzt)."""
+    out = []
+    for ch in text:
+        out.append("M" + " L".join("%s %s" % (f(x + px * w), f(y + py * h)) for px, py in DIGITS[ch]) + " Z")
+        x += w + gap
+    return " ".join(out)
+
+
+def circle_d(cx, cy, r):
+    return "M%s %s A%s %s 0 1 0 %s %s A%s %s 0 1 0 %s %s Z" % (f(cx - r), f(cy), f(r), f(r), f(cx + r), f(cy), f(r), f(r), f(cx - r), f(cy))
+
+
+def v_racenumber():
+    """Startnummer: runde Startnummer-Fläche mittig auf der Tür, die 42 ausgestanzt (dort scheint der Lack durch),
+    Doppellinie unter der Fensterlinie, feine Linie am Schweller; oben ein breiter Streifen links der Mitte mit
+    Begleitlinien. Mit Schrift, also rechts nicht gespiegelt: alles ist vorn und hinten gleich aufgebaut."""
+    side, top = [], []
+    cx, cy, r = 1024, 262, 196
+    d = circle_d(cx, cy, r) + " " + digits_d("42", cx - 132, cy - 105, 210, 118, 28)
+    # Kreis und Ziffern in Auto-Maß, dann in x gestaucht: auf dem Auto ein Kreis
+    side.append('<g transform="translate(%s %s) scale(%s 1) translate(%s %s)">%s</g>' % (
+        f(cx), f(cy), f(SX), f(-cx), f(-cy), path(d, "#fff", extra='fill-rule="evenodd"')))
+    side += [rect(-10, 22, W + 20, 30, "#fff"), rect(-10, 64, W + 20, 10, "#fff"), rect(-10, 452, W + 20, 18, "#fff")]
+    for a, b in [(ty(-1, 26), ty(-1, 116)), (ty(-1, 132), ty(-1, 146)), (ty(1, 10), ty(1, 18))]:
+        top.append(rect(-10, min(a, b), W + 20, abs(b - a), "#fff"))
+    return vinyl(side, top)
+
+
+def v_checkstripe():
+    """Karo-Streifen: Band unten über die Tür, das nach hinten in zwei Reihen Karos ausläuft (die Karos werden seltener
+    und kleiner), darüber eine feine Linie; oben zwei Streifen über Haube, Dach und Heck, die vorn auf der Haube als
+    Karoblock beginnen."""
+    r = random.Random(14)
+    side, top = [], []
+    y0, y1 = 296, 404
+    side.append(rect(540, y0, 520, y1 - y0, "#fff"))
+    side.append(rect(540, y0 - 28, 700, 10, "#fff"))
+    sq_h = (y1 - y0) / 2.0
+    sq_w = sq_h * SX
+    x, col = 1060.0, 0
+    while x < 1700:
+        t = (x - 1060) / 640.0
+        for row in range(2):
+            if (col + row) % 2 or (t > 0.25 and r.random() < (t - 0.25) * 1.3):
+                continue
+            k = 1.0 if t < 0.3 else max(0.45, 1.0 - (t - 0.3) * 0.9)
+            side.append(rect(x + sq_w * (1 - k) / 2, y0 + row * sq_h + sq_h * (1 - k) / 2, sq_w * k, sq_h * k, "#fff"))
+        x += sq_w
+        col += 1
+    q = 32.0  # Karo quer (y); längs gestreckt, denn in der Draufsicht ist ein Pixel quer gut 1,66-mal so lang
+    ql = q * 1.66
+    rows = int(round(270 / ql))
+    for i in range(rows):
+        for j in range(4):
+            if (i + j) % 2 == 0:
+                top.append(rect(i * ql, TC - 2 * q + j * q, ql, q, "#fff"))
+    for sgn in (1, -1):
+        top.append(rect(rows * ql, min(ty(sgn, 14), ty(sgn, 64)), W + 10 - rows * ql, 50, "#fff"))
+    return vinyl(side, top)
+
+
 VINYLS = {
     "speedlines": v_speedlines,
     "tribal": v_tribal,
@@ -1392,13 +1321,15 @@ VINYLS = {
     "glitch": v_glitch,
     "prism": v_prism,
     "koi": v_koi,
-    "kitsune": v_kitsune,
-    "oni": v_oni,
-    "dragon": v_dragon,
     "wings": v_wings,
     "unit07": v_unit07,
-    "mecha": v_mecha,
     "angel": v_angel,
+    "flamelicks": v_flamelicks,
+    "inferno": v_inferno,
+    "ghostflames": v_ghostflames,
+    "updraft": v_updraft,
+    "racenumber": v_racenumber,
+    "checkstripe": v_checkstripe,
 }
 
 

@@ -34,6 +34,7 @@ const AmbientSound := preload("res://scripts/ambient_sound.gd")
 const CityData := preload("res://scripts/city_data.gd")
 const People := preload("res://scripts/people.gd")
 const City := preload("res://scripts/city_builder.gd")
+const Design := preload("res://scripts/track_design.gd")  # entworfene Strecken (Driftberg-Pass, seit 2.36)
 
 const HALF_W := 9.0  # 4 Spuren à 4,5 m
 const AB_EXTRA := 4.5  # Open-World-Autobahn: eine Spur mehr je Richtung (3 + 3)
@@ -208,6 +209,8 @@ static func build(race: Dictionary) -> Dictionary:
 
 ## Planung (Mittellinie, Viertel, Abzweige, Tunnel ...): schnell. Gibt den Bauauftrag für step() zurück.
 static func begin(race: Dictionary) -> Dictionary:
+	if race.get("type", "") == "dreieck":
+		return load("res://scripts/interchange.gd").begin(race)  # Open World: Autobahndreieck (seit 2.36)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = race["seed"]
 	var root := Node3D.new()
@@ -224,12 +227,15 @@ static func begin(race: Dictionary) -> Dictionary:
 	var gen: Dictionary
 	if race.has("pts"):
 		gen = {"pts": race["pts"], "bulges": []}  # Open World: Autobahn-Stück mit vorgegebener Mittellinie
+	elif race.has("layout"):
+		gen = Design.centerline(race)  # entworfene Strecke: Stützpunkte von Hand (track_design.gd)
 	else:
 		gen = _city_centerline(city) if not city.is_empty() else (_loop_centerline(race, rng) if loop else _centerline(race, rng))
 	var pts: Array = gen["pts"]
 	var curve := Curve3D.new()
 	curve.bake_interval = 1.0
 	var n := pts.size()
+	var tk: float = gen.get("k", 0.17 if type == "drift" else 0.22)
 	for i in n:
 		var prev: Vector3 = pts[maxi(i - 1, 0)]
 		var nxt: Vector3 = pts[mini(i + 1, n - 1)]
@@ -237,7 +243,7 @@ static func begin(race: Dictionary) -> Dictionary:
 			prev = pts[n - 2]  # letzter Punkt = erster Punkt
 		elif loop and i == n - 1:
 			nxt = pts[1]
-		var t: Vector3 = (nxt - prev) * (0.17 if type == "drift" else 0.22)
+		var t: Vector3 = (nxt - prev) * tk
 		curve.add_point(pts[i], -t, t)
 	if loop:
 		curve.set_meta("loop", true)
@@ -295,6 +301,8 @@ static func begin(race: Dictionary) -> Dictionary:
 			arr[k] = seq[mini(k, seq.size() - 1)]
 	for b in gen["bulges"]:
 		_plan_shortcut(track, b, rng)
+	if race.has("layout"):
+		Design.plan(track, race)  # entworfene Strecke: Höhenprofil, Felstunnel, Berg (track_design.gd)
 	if not city.is_empty():
 		# echte Stadt: Flüsse mit Brücken, Hügel, Bahnübergang nur wo die Gleise wirklich kreuzen; keine Tunnel/Hochbahn
 		_plan_rivers(track)
@@ -306,18 +314,21 @@ static func begin(race: Dictionary) -> Dictionary:
 		_plan_medians(track, rng)
 	elif type == "autobahn":
 		_plan_autobahn(track, race)
-		# Open World: Kuppen auf den Diagonalen ([Anfang, Ende als Anteil der Länge, Höhe]), 170 m Anstieg
+		# Open World: Kuppen auf den Diagonalen ([Anfang, Ende als Anteil der Länge, Höhe]), 170 m Anstieg; Talbrücken
+		# (seit 2.36) mit eigenem, längerem Anstieg als viertem Wert
 		for cr in race.get("crests", []):
 			var a: float = cr[0] * length
 			var e: float = cr[1] * length
-			track["elev0"].append({"a": a, "b": a + 170.0, "c": e - 170.0, "e": e, "h": cr[2]})
+			var rl: float = cr[3] if cr.size() > 3 else 170.0
+			track["elev0"].append({"a": a, "b": a + rl, "c": e - rl, "e": e, "h": cr[2]})
 	elif type == "drag":
 		# Drag: vier freie Spuren geradeaus (kein Bahnübergang, keine Hochbahnstützen, kein Mittelstreifen)
 		_plan_tunnels(track, rng)
 		_plan_spurs(track, rng)
-	elif race.has("mountain"):
-		# Driftberg (seit 2.32): nur das Höhenprofil des Bergs, abgesperrt wie jeder Drift-Kurs
-		for m in race["mountain"]:
+	elif race.has("mountain") or track.has("mountain"):
+		# Driftberg (seit 2.32): nur das Höhenprofil des Bergs, abgesperrt wie jeder Drift-Kurs (seit 2.36 als
+		# entworfener Pass mit eigenem Profil, Design.plan)
+		for m in race.get("mountain", []):
 			track["elev0"].append({"a": m[0] * length, "b": m[1] * length, "c": m[2] * length, "e": m[3] * length, "h": m[4]})
 	elif race.get("forest", false):
 		# Waldstrecke (seit 2.29): Landstraße mit Bahnübergang und Tunnel, ohne Hochbahn, Mittelstreifen und
@@ -330,11 +341,15 @@ static func begin(race: Dictionary) -> Dictionary:
 			track["elev0"].append({"a": a, "b": a + 170.0, "c": e - 170.0, "e": e, "h": cr[2]})
 	elif type != "drift":
 		# Drift-Kurse sind abgesperrt: keine Seitenstraßen, Tunnel, Hochbahn, Mittelstreifen, Bahnübergang
-		_plan_crossing(track, rng)
-		_plan_tunnels(track, rng)
+		if not track.has("fixed_crossing"):
+			_plan_crossing(track, rng)  # Stadt-Entwürfe legen Bahnübergang und Tunnel selbst fest (Design.plan)
+		if not track.has("fixed_tunnels"):
+			_plan_tunnels(track, rng)
 		_plan_spurs(track, rng)
-		_plan_el(track, rng)
-		_plan_medians(track, rng)
+		if not track.has("fixed_el"):
+			_plan_el(track, rng)  # Stadt-Entwürfe: Hochbahn und Mittelstreifen nur, wo sie es wollen (Design.plan)
+		if not track.has("fixed_medians"):
+			_plan_medians(track, rng)
 	if not track["elev0"].is_empty():
 		curve.set_meta("elev", track["elev0"])
 	if race.get("world", false) and type != "autobahn":
@@ -344,6 +359,8 @@ static func begin(race: Dictionary) -> Dictionary:
 		_drop_spurs(track)
 		_plan_world_exit(track)
 		if (type == "sprint" or type == "circuit") and not race.get("forest", false):
+			if race.has("layout"):
+				Design.plan_cross(track, race)  # Querstraßen durch das Innere (entworfene Städte)
 			_plan_lanes(track, int(race["seed"]))
 	return {"race": race, "rng": rng, "root": root, "track": track, "city": city, "type": type, "loop": loop,
 		"occupied": [], "buildings": [], "i": 0, "us": []}
@@ -356,6 +373,8 @@ const STEP_W := [4.0, 2.0, 2.0, 10.0, 3.0, 3.0, 1.0, 1.0, 2.0, 72.0]
 ## Einen Bauschritt ausführen; gibt den Fortschritt 0..1 zurück (1 = fertig, job["track"] ist gebaut).
 ## Die Reihenfolge ist dieselbe wie früher in einem Stück: gleiche Zufallszahlen, gleiche Strecke.
 static func step(job: Dictionary) -> float:
+	if job.has("ix"):
+		return load("res://scripts/interchange.gd").step(job)
 	var race: Dictionary = job["race"]
 	var rng: RandomNumberGenerator = job["rng"]
 	var root: Node3D = job["root"]
@@ -369,7 +388,7 @@ static func step(job: Dictionary) -> float:
 		0:
 			_build_road(root, track)
 			for p in track["paths"]:
-				if p["id"] != 0:
+				if p["id"] != 0 and p["kind"] != "slip":
 					_build_branch(root, track, p, rng)
 		1:
 			_build_lakes(root, track, rng)
@@ -387,8 +406,21 @@ static func step(job: Dictionary) -> float:
 			if not city.is_empty():
 				_build_rivers(root, track)
 				_build_hills(root, track, rng)
+			elif not track["rivers"].is_empty():
+				_build_rivers(root, track)  # Stadt-Entwurf mit Fluss (Design.plan)
+			if track.has("design"):
+				Design.build_step1(root, track)  # Berg, Weinberg-Hang, Hochstraßen und Parkdecks der entworfenen Strecken
 		2:
-			var occupied: Array = _build_city_landmarks(root, track) if not city.is_empty() else _build_landmarks(root, track, rng)
+			var occupied: Array
+			if track.has("mountain"):
+				occupied = Design.landmarks(root, track, rng)  # Aussichtspunkt, Gasthof, Sendeturm, Klippen
+			else:
+				if race.has("layout") and not Design.random_landmarks(race):
+					occupied = Design.town_landmarks(root, track, race)  # eigene Wahrzeichen des Stadt-Entwurfs
+				else:
+					occupied = _build_city_landmarks(root, track) if not city.is_empty() else _build_landmarks(root, track, rng)
+					if race.has("layout"):
+						occupied.append_array(Design.town_landmarks(root, track, race))
 			occupied.append_array(_build_structures(root, track, rng))
 			# Open World: fremde Fahrbahnen (Ring, Auffahrten, Nachbarstädte) freihalten, world_layout._add_keepout
 			for ko in job["race"].get("keepout", []):
@@ -407,7 +439,9 @@ static func step(job: Dictionary) -> float:
 			if type != "drift":
 				_build_fences(root, track, job["buildings"] + job["occupied"])
 			_build_lamps(root, track)
-			if type == "drift":
+			if type == "drift" and track.has("mountain"):
+				Design.barriers(root, track, rng)  # Bergstraße: Leitplanke talseits, Betonwand bergseits
+			elif type == "drift":
 				_build_barriers(root, track, rng)
 			else:
 				_build_props(root, track, rng)
@@ -602,6 +636,8 @@ static func ground_holes(track: Dictionary) -> PackedVector3Array:
 	var curve: Curve3D = track["curve"]
 	var holes := PackedVector3Array()
 	for t in track["tunnels"]:
+		if t.get("rock", false):
+			continue  # Felstunnel: kein Trog im Boden
 		for span in [[t["r0"], t["from"] + 1.0], [t["to"] - 1.0, t["r1"]]]:
 			var d: float = span[0]
 			while d <= span[1]:
@@ -857,9 +893,16 @@ static func frame_at(curve: Curve3D, d: float) -> Dictionary:
 ## Höhenprofil eines Wegs (Meta "elev" an der Kurve): Liste von {a, b, c, e, h}. Zwischen a und b geht es weich
 ## auf h (negativ = Senke), bis c bleibt es dort, bis e geht es zurück auf 0.
 static func elev_at(curve: Curve3D, d: float) -> float:
-	if not curve.has_meta("elev"):
-		return 0.0
 	var y := 0.0
+	if curve.has_meta("prof"):
+		# entworfene Strecke (seit 2.36): Höhenprofil alle 1 m abgetastet (track_design.gd), Rundkurs über den Start hinweg
+		var pr: PackedFloat32Array = curve.get_meta("prof")
+		var L := curve.get_baked_length()
+		var u := (fposmod(d, L) if curve.has_meta("loop") else clampf(d, 0.0, L)) / Design.PROF_STEP
+		var pi := mini(int(u), pr.size() - 2)
+		y = lerpf(pr[pi], pr[pi + 1], u - pi)
+	if not curve.has_meta("elev"):
+		return y
 	for s in curve.get_meta("elev"):
 		if d <= s["a"] or d >= s["e"]:
 			continue
@@ -874,7 +917,7 @@ static func elev_at(curve: Curve3D, d: float) -> float:
 
 ## Steigung (Höhe pro Meter) bei d
 static func slope_at(curve: Curve3D, d: float) -> float:
-	if not curve.has_meta("elev"):
+	if not curve.has_meta("elev") and not curve.has_meta("prof"):
 		return 0.0
 	return (elev_at(curve, d + 1.0) - elev_at(curve, d - 1.0)) / 2.0
 
@@ -932,6 +975,8 @@ static func locate(track: Dictionary, pos: Vector3) -> Dictionary:
 		var score: float = dist - (hw(track, d) if p["id"] == 0 else p["half_w"])
 		if p["id"] != 0:
 			score += 0.5  # bei Überlappung (Einmündungen) gilt die Hauptstraße
+			if p["kind"] == "slip":
+				score += 6.0  # Schlupfweg eines Autobahndreiecks (seit 2.36): nur abseits der Ringfahrbahn, nie in ihrer Spur
 		if score < best_score:
 			best_score = score
 			best = {"path": p, "d": d, "lat": lat, "score": score}
@@ -1299,6 +1344,21 @@ static func _plan_autobahn(track: Dictionary, race: Dictionary) -> void:
 			"side": signf((end - f["pos"]).dot(f["right"])), "name": r.get("name", ""), "conn": r.has("c1")})
 		track["zones"].append({"from": d - 40.0, "to": d + 40.0})
 		gaps.append([d - 45.0, d + 45.0])
+	# Autobahndreiecke (seit 2.36, scripts/interchange.gd): wo eine Rampe neben dem Ring einfädelt oder abzweigt, ein
+	# Schlupfweg ohne eigene Fahrbahn (die baut das Dreieck): dort keine Randwand, kein Bankett, keine Laternen. Über dem
+	# ganzen Bauwerk keine Schilderbrücken, Plakate und Straßenbrücken (Zonen); der Mittelstreifen läuft durch.
+	for sl in race.get("slips", []):
+		var ssc := Curve3D.new()
+		ssc.bake_interval = 1.0
+		for q in sl:
+			ssc.add_point(q)
+		var sd := curve.get_closest_offset(sl[0])
+		track["paths"].append({"id": track["paths"].size(), "kind": "slip", "curve": ssc, "half_w": 5.5,
+			"length": ssc.get_baked_length(), "from": sd, "to": sd, "closed": false, "side": 0.0})
+	for xz in race.get("xzones", []):
+		var za := curve.get_closest_offset(xz[0])
+		var zb := curve.get_closest_offset(xz[1])
+		track["zones"].append({"from": minf(za, zb), "to": maxf(za, zb)})
 	# Diagonalen: an den Enden mündet eine Auffahrt, dort kein Mittelstreifen
 	if race.get("gap_start", false):
 		gaps.append([-300.0, 80.0])
@@ -1319,6 +1379,11 @@ static func _plan_autobahn(track: Dictionary, race: Dictionary) -> void:
 	for pc in pieces:
 		if pc[1] - pc[0] > 2.0 * MED_TAPER:
 			track["medians"].append({"from": pc[0], "to": pc[1]})
+	# Talbrücken (seit 2.36): auf diesen Kuppen steht der Ring oben auf Pfeilern statt auf einem Damm
+	for v in race.get("viaducts", []):
+		if not track.has("viaducts"):
+			track["viaducts"] = []
+		track["viaducts"].append([float(v[0]) * L, float(v[1]) * L])
 
 
 ## Open World: Ausfahrt der Stadt zur Autobahn. Sprint: die Straße geht hinter dem Start einfach weiter ("tail").
@@ -1874,7 +1939,8 @@ static func _build_road(root: Node3D, track: Dictionary) -> void:
 				# Damm: von der Gehwegkante schräg hinunter zum Boden (Böschung 1:1,6)
 				var ya: float = prev[side].y
 				var yb: float = cur[side].y
-				if (ya > 0.3 or yb > 0.3) and not in_tr:
+				if (ya > 0.3 or yb > 0.3) and not in_tr and not Design.no_bank(track, prev["d"], prev[side]) \
+						and not _in_viaduct(track, d, minf(ya, yb)):  # am Berg trägt das Gelände, auf der Talbrücke Pfeiler
 					var sd2 := -1.0 if side == "lw" else 1.0
 					var ga: Vector3 = prev[side] + prev["dir"] * sd2 * ya * 1.6
 					var gb: Vector3 = cur[side] + cur["dir"] * sd2 * yb * 1.6
@@ -3800,7 +3866,19 @@ static func _road_bridge(root: Node3D, track: Dictionary, b: Dictionary) -> void
 ## Open World (seit 2.33): wo Autobahn oder Auffahrt ein Flussbett einer Stadt quert (Loch im Boden, world_holes), eine
 ## schlichte Brücke wie in den Städten: Steinplatte unter der Fahrbahn, Brüstung, Pfeiler im Wasser. Vorher lag die
 ## Straße flach über dem Wasser (Würzburg: die Auffahrt quer über den Main).
+## Talbrücke (seit 2.36, Ring): liegt d auf einer und die Fahrbahn so hoch, dass sie auf Pfeilern steht (kein Damm)?
+static func _in_viaduct(track: Dictionary, d: float, y: float) -> bool:
+	if y < 5.5 or not track.has("viaducts"):
+		return false
+	for v in track["viaducts"]:
+		if d > v[0] and d < v[1]:
+			return true
+	return false
+
+
 static func _world_bridges(root: Node3D, track: Dictionary) -> void:
+	if track.has("viaducts"):
+		load("res://scripts/interchange.gd").viaducts(root, track)  # Talbrücken des Rings (seit 2.36)
 	var holes: PackedVector3Array = track["world_holes"]
 	if holes.is_empty():
 		return
@@ -4006,7 +4084,7 @@ static func _build_city_landmarks(root: Node3D, track: Dictionary) -> Array:
 			root.add_child(nf)
 			City.new(nf).make(kind, extra)
 			continue
-		if kind == "mainbruecke":
+		if kind == "mainbruecke" or kind == "hohenzollernbruecke":
 			# quer über den Fluss an der echten Stelle, Ufer bis Ufer
 			var best := {}
 			var bd := 1e9
@@ -5712,6 +5790,7 @@ static func _build_walkers(root: Node3D, track: Dictionary) -> void:
 ## Tag oder Nacht für die Passanten (day 0..1 wie in Moods)
 static func set_daytime(track: Dictionary, day: float) -> void:
 	City.set_far_daytime(day)
+	Design.set_daytime(day)
 	for h in track.get("walker_nodes", []):
 		if is_instance_valid(h):
 			(h as Node3D).visible = (day > 0.3) == (str(h.name) == "PassantenTag")
@@ -5727,7 +5806,7 @@ static func _build_mist(root: Node3D, track: Dictionary) -> void:
 	while d < track["length"] - 60.0:
 		var dist := _district_at(track, d)
 		var wet: bool = dist.has("containers") or not bridge_at(track, d).is_empty() or dist.get("forest", false)
-		if wet and rng.randf() < 0.6 and tunnel_at(track, d, 30.0).is_empty():
+		if wet and rng.randf() < 0.6 and tunnel_at(track, d, 30.0).is_empty() and not Design.no_mist(track, d):
 			var f := frame_at(curve, d)
 			var size := rng.randf_range(90.0, 150.0)
 			for layer in 2:
@@ -6055,6 +6134,8 @@ static func _plan_tunnels(track: Dictionary, rng: RandomNumberGenerator) -> void
 ## Trog/Tunnel bei d: 0 = nichts, 1 = offener Trog (Rampe), 2 = im Tunnel
 static func _trough_at(track: Dictionary, d: float) -> int:
 	for t in track["tunnels"]:
+		if t.get("rock", false):
+			continue  # Felstunnel am Berg (track_design.gd): kein Trog, eigene Röhre
 		if d >= t["from"] and d <= t["to"]:
 			return 2
 		if d > t["r0"] and d < t["r1"]:
@@ -6102,6 +6183,8 @@ static func _build_tunnels(root: Node3D, track: Dictionary, rng: RandomNumberGen
 	walls.name = "WallsTunnel"
 	root.add_child(walls)
 	for t in track["tunnels"]:
+		if t.get("rock", false):
+			continue  # Felstunnel: baut track_design.gd
 		var col: Color = Color(1.0, 0.6, 0.25) if t["sodium"] else Color(0.75, 0.9, 1.0)
 		var lamp_m := Builder.mat(col, 0.0, 0.3, col, 6.0)
 		var d0: float = t["from"]

@@ -1,11 +1,13 @@
 extends Node
-## Test der ganzen Welt (world.tscn -- --wtour[=ring|outer|cities|<Name>]): ein Autopilot fährt jede Straße ab, ohne
+## Test der ganzen Welt (world.tscn -- --wtour[=ring|outer|mitte|dreieck|cities|<Name>]): ein Autopilot fährt jede Straße ab, ohne
 ## Verkehr, und meldet alles, was auf einer freien Straße nicht passieren darf:
 ##   WAND   Berührung mit Wand oder Hindernis, obwohl er in der Spur fährt (mit dem Ding, woran er stieß)
 ##   FEST   steckt fest (unter 2 m/s für 3 s), wird 30 m weitergesetzt
 ##   FALL   fällt unter die Straße, wird zurückgesetzt
 ##   NEBEN  mehr als einen Gehweg neben der Fahrbahn
 ##   KIPPT  Überschlag
+##   HOCH   über der Straße, ohne zu springen (auf eine Brücke darüber gehoben, seit 2.36)
+## --wtour=dreieck: nur die Autobahndreiecke, jeder Weg hin und zurück
 ## Ablauf: innerer Ring einmal ganz, Außenring einmal ganz, dann jede Stadt: Auffahrt vom Ring, Ausfahrt der Stadt,
 ## Hauptstraße (Sprint bis hinter das Ziel und über die Verbindung zum Ring; Rundkurs eine Runde und wieder hinaus),
 ## dazu jede Abkürzung/Gabelung. Nacheinander liegende Stücke fährt er ohne Absetzen (Nahtstellen werden mitgeprüft).
@@ -45,6 +47,17 @@ func _ready() -> void:
 
 func _plan() -> void:
 	var rings: Array = w._rings
+	if only == "dreieck":
+		# nur die Autobahndreiecke (seit 2.36): Brücke und jede Rampe einmal hin, die Brücke auch zurück
+		for ri in range(2, rings.size()):
+			for e in rings[ri]:
+				if e["race"].get("type", "") != "dreieck":
+					continue
+				for pi in (e["race"]["links"] as Array).size():
+					for rv in [false, true]:
+						legs.append({"e": e, "find": func(_tr): return pi, "rev": rv, "place": true, "name": "%s %s%s" % [e["race"]["name"],
+							e["race"]["links"][pi]["name"], " zurück" if rv else ""]})
+		return
 	if only == "" or only == "ring":
 		for e in rings[0]:
 			legs.append({"e": e, "find": func(_tr): return 0, "rev": false, "name": "Ring %d" % e["seg_i"]})
@@ -55,6 +68,11 @@ func _plan() -> void:
 		for ri in range(2, rings.size()):
 			for e in rings[ri]:
 				legs.append({"e": e, "find": func(_tr): return 0, "rev": false, "name": "%s %d/%d" % [e["race"]["name"], ri, e["seg_i"]]})
+				if e["race"].get("type", "") == "dreieck":
+					# Autobahndreieck (seit 2.36): jede Rampe einmal, vom Abzweig bzw. von der Brücke bis in den Ring
+					for pi in range(1, (e["race"]["links"] as Array).size()):
+						legs.append({"e": e, "find": func(_tr): return pi, "rev": false, "name": "%s %s" % [e["race"]["name"],
+							e["race"]["links"][pi]["name"]]})
 		for e in rings[0]:
 			for k in 2:  # Auffahrten vom Ring zu den Diagonalen
 				legs.append({"e": e, "find": func(tr): return _wide_ramp(tr, k), "rev": false, "name": "Ring %d: Auffahrt Mitte %d" % [e["seg_i"], k], "optional": true})
@@ -207,7 +225,7 @@ func _physics_process(dt: float) -> void:
 			_to = _d + L - 4.0
 		# liegt der Anfang da, wo das Auto gerade ist (vorheriges Stück endete hier)? Dann einfach weiterfahren
 		var start_w: Vector3 = _xf * _pos(_d)
-		if pl.global_position.distance_to(start_w) > 25.0 or pl.velocity.length() < 3.0:
+		if _leg.get("place", false) or pl.global_position.distance_to(start_w) > 25.0 or pl.velocity.length() < 3.0:
 			var f := Track.frame_at(_path["curve"], fposmod(_d, L))
 			var lat := _lat(fposmod(_d, L))
 			var b := Basis.looking_at((_xf.basis * f["fwd"] * _dir).normalized(), Vector3.UP)
@@ -279,6 +297,10 @@ func _physics_process(dt: float) -> void:
 		_report("FALL", "Höhe %.1f, Straße %.1f" % [pl.global_position.y, road_y])
 		_reset_ahead(10.0)
 		return
+	if pl.global_position.y > road_y + 3.0 and not pl.airborne and _d * _dir - _last_off > 50.0:
+		# seit 2.36: auf eine Brücke darüber gehoben (falsche Strecke gewählt), statt unten weiterzufahren
+		_last_off = _d * _dir
+		_report("HOCH", "Höhe %.1f, Straße %.1f" % [pl.global_position.y, road_y])
 	if pl.tumbling:
 		_report("KIPPT", "")
 	if absf(pl.speed_fwd) < 2.0 and _t > 3.0:
@@ -309,7 +331,7 @@ func _lat(d: float) -> float:
 
 ## Spur: auf der Hauptstraße rechts (in Fahrtrichtung), auf Auffahrten und Abzweigen leicht rechts der Mitte
 func _lane() -> float:
-	if _path["id"] == 0 and _leg["e"]["kind"] == "seg":
+	if _path["id"] == 0 and _leg["e"]["kind"] == "seg" and not _track.get("dreieck", false):
 		return 6.75 * _dir
 	if _path["id"] == 0:
 		return 2.25 * _dir

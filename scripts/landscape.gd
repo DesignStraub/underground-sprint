@@ -79,6 +79,8 @@ var _meshes := {}
 ## bei a und b, Höhe der Fahrbahn bei a und b), _plan_corridors
 var _corr := {}
 var _trunk_shapes := {}
+## Einschnitte des Rings (seit 2.36, world_layout._plan_cuts): {c (Mittellinie), L, h, lo, hi (Umriss mit Rand)}
+var _cuts := []
 
 const VILLAGE_NAMES := ["Oberweiler", "Kirchheim", "Lindenau", "Birkenfeld", "Hohenstein", "Mühlbach", "Eichstetten", "Wiesental", "Rotenburg", "Sonnenberg", "Tannhausen", "Grünwald", "Steinach", "Haselbach", "Altdorf", "Buchholz", "Unterried", "Waldhausen", "Kleinfeld", "Bergrheinfeld", "Erlenbach", "Hirschau", "Fischbach", "Ahornhof", "Weidenstetten", "Lerchenau", "Rabenstein", "Moosbrunn", "Hagenau", "Kesselbach", "Ulmenhof", "Dornstetten", "Falkenried", "Brunnthal", "Eschenau", "Hüttenbach", "Kranichfeld", "Lauterbach", "Mittelweiler", "Neuhaus", "Ochsenfurt-Au", "Pfaffenhofen", "Quellbach", "Reichenau", "Schönwald", "Talheim", "Uhlenhorst", "Vogelsang", "Wolfsried", "Zellerau", "Amselfeld", "Bärental", "Dachsberg", "Eulenbach", "Fuchsstadt", "Gänsewies", "Hasenmühle", "Igelsbach", "Krähenwinkel", "Lindenhof", "Marderau", "Nesselried", "Otterbach", "Rehweiler"]
 
@@ -105,6 +107,8 @@ func setup(lay: Dictionary) -> void:
 			_add_line(_road, rd[0])
 	_ramp_lines = layout.get("ramp_lines", [])
 	for sg in layout["segments"]:
+		if sg["race"].get("type", "") == "dreieck":
+			continue  # Autobahndreiecke: alle ihre Wege stehen schon als Auffahrten in layout["roads"]
 		var pl := PackedVector2Array()
 		for q in sg["race"]["pts"]:
 			pl.append(Vector2(q.x, q.z))
@@ -135,6 +139,7 @@ func setup(lay: Dictionary) -> void:
 	_plan_sites()
 	_make_materials()
 	_make_mask()
+	_plan_cuts()
 
 
 func _add_line(grid: Dictionary, pl: PackedVector2Array) -> void:
@@ -159,6 +164,9 @@ func _plan_corridors() -> void:
 	var ab_half := Track.HALF_W + Track.AB_EXTRA + Track.MED + Track.WALK + 0.3
 	for sg in layout["segments"]:
 		var race: Dictionary = sg["race"]
+		if race.get("type", "") == "dreieck":
+			_corr_ix(cells, race)
+			continue
 		var pts: Array = race["pts"]
 		var c := Curve3D.new()
 		c.bake_interval = 1.0
@@ -169,10 +177,14 @@ func _plan_corridors() -> void:
 		var L := c.get_baked_length()
 		var elev := []
 		for cr in race.get("crests", []):
-			elev.append({"a": cr[0] * L, "b": cr[0] * L + 170.0, "c": cr[1] * L - 170.0, "e": cr[1] * L, "h": cr[2]})
+			var rl: float = cr[3] if cr.size() > 3 else 170.0  # Talbrücken (seit 2.36): längerer Anstieg
+			elev.append({"a": cr[0] * L, "b": cr[0] * L + rl, "c": cr[1] * L - rl, "e": cr[1] * L, "h": cr[2]})
 		if not elev.is_empty():
 			c.set_meta("elev", elev)
-		_corr_curve(cells, c, Transform3D.IDENTITY, func(_d: float) -> float: return ab_half)
+		if race.has("viaducts"):
+			_corr_via(cells, c, race, ab_half)
+		else:
+			_corr_curve(cells, c, Transform3D.IDENTITY, func(_d: float) -> float: return ab_half)
 		for r in race.get("ramps", []):
 			var rp: Array = r["pts"] if r.has("pts") else [r["from"], r["end"]]
 			var rh: float = Track.RAMP_HALF + (Track.AB_EXTRA if r.get("wide", false) else 0.0) + 0.3
@@ -198,6 +210,49 @@ func _plan_corridors() -> void:
 				_corr_curve(cells, p["curve"], xf, func(_d: float) -> float: return ph)
 	for k in cells:
 		_corr[k] = PackedFloat32Array(cells[k])
+
+
+## Ring mit Talbrücke (seit 2.36): wo er auf Pfeilern steht (über 5,5 m), zählt der Streifen auf Bodenhöhe und gut 3 m
+## breiter (unter der Brücke keine Bäume, daneben stehen sie unten im Tal statt auf einer gedachten Böschung)
+func _corr_via(cells: Dictionary, c: Curve3D, race: Dictionary, half: float) -> void:
+	var L := c.get_baked_length()
+	var spans := []
+	for v in race["viaducts"]:
+		spans.append([float(v[0]) * L, float(v[1]) * L])
+	var d := 0.0
+	var prev := Vector3.INF
+	var ph := 0.0
+	while true:
+		var f := Track.frame_at(c, d)
+		var q: Vector3 = f["pos"]
+		var y: float = f["y"]
+		var on_via := false
+		for sp in spans:
+			if d > sp[0] and d < sp[1] and y > 5.5:
+				on_via = true
+		var w := Vector3(q.x, 0.0 if on_via else y, q.z)
+		var hh := half + (3.5 if on_via else 0.0)
+		if prev.is_finite():
+			_corr_add(cells, prev, w, ph, hh)
+		prev = w
+		ph = hh
+		if d >= L:
+			break
+		d = minf(d + 6.0, L)
+
+
+## Autobahndreieck (seit 2.36): Rampen und Brücken stehen auf Stützmauern und Pfeilern, nicht auf Dämmen. Ihr Streifen
+## zählt daher auf Bodenhöhe (keine Bäume auf einer gedachten Böschung, die in der Luft schweben), unter erhöhten Stücken
+## gut 4 m breiter (Kronen ragten sonst durch die Platte).
+func _corr_ix(cells: Dictionary, race: Dictionary) -> void:
+	const IX := preload("res://scripts/interchange.gd")
+	for lk in race["links"]:
+		var flat := IX.smooth_curve(lk["pts"])  # ohne Höhenprofil: Streifen auf Bodenhöhe
+		var hc := IX.smooth_curve(lk["pts"])
+		if not (lk.get("elev", []) as Array).is_empty():
+			hc.set_meta("elev", lk["elev"])
+		_corr_curve(cells, flat, Transform3D.IDENTITY, func(d: float) -> float:
+			return IX.HALF + IX.EDGE + 0.6 + (4.5 if Track.elev_at(hc, d) > 2.0 else 0.0))
 
 
 ## Weg (Kurve in Streckenkoordinaten, Lage xf) alle 6 m in Abschnitte zerlegen; half(d): halbe Breite bis zur Randwand
@@ -389,10 +444,20 @@ func height_at(p: Vector2, free: float) -> float:
 				h = bowl
 			else:
 				h = lerpf(lk["level"] + 0.4, h, smoothstep(lr, lr + 180.0, dl))
-	return fade * h - (1.0 - fade) * 0.6
+	var r := fade * h - (1.0 - fade) * 0.6
+	if not _cuts.is_empty():
+		# Einschnitt: neben den Böschungen liegt das Gelände oben (knapp unter der Hochfläche aus _build_cuts)
+		var ct := _cut_at(p)
+		if ct.x >= 0.0 and ct.y > 0.05:
+			r = lerpf(r, maxf(r, ct.y - 0.4), 1.0 - smoothstep(120.0, 260.0, ct.x))
+	return r
 
 
 func _plan_sites() -> void:
+	# Seen unter den Talbrücken der Ringe (seit 2.36, world_layout._plan_viaducts): Wasser knapp über dem flachen Boden,
+	# am Ufer steigt das Gelände sanft an (height_at); zuerst, damit Dörfer und Windparks Abstand halten
+	for vl in layout.get("vlakes", []):
+		_lakes.append({"pos": vl["pos"], "r": vl["r"], "level": 0.17})
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 2029
 	var ext: float = layout["ring_r"] + 5200.0
@@ -880,6 +945,8 @@ func _trees(root: Node3D, o: Vector2, dr: PackedFloat32Array, rds: PackedFloat32
 			for lk in _lakes:
 				if p.distance_to(lk["pos"]) < lk["r"] + 12.0:
 					skip = true
+			if _in_cut(p):
+				skip = true
 			for m in _marks:
 				if p.distance_to(m["pos"]) < (160.0 if m["kind"] == "kraftwerk" else 70.0):
 					skip = true
@@ -945,7 +1012,7 @@ func _alley_trees(o: Vector2, xfs: Array, cols: Array, holes_here: bool, trunks:
 					var hq := absi(int(q.x * 7.0) * 31 + int(q.y * 3.0)) % 100
 					if hq < 12:
 						continue  # hier und da eine Lücke
-					if _dist(_ringg, q) < 100.0 or city_dist(q) < 70.0 or road_dist(q) < 12.0:
+					if _dist(_ringg, q) < 100.0 or city_dist(q) < 70.0 or road_dist(q) < 12.0 or _in_cut(q):
 						continue
 					if holes_here and _in_hole(q, 4.0):
 						continue
@@ -1594,3 +1661,136 @@ func _fog_banks(root: Node3D, o: Vector2, dr: PackedFloat32Array, hs: PackedFloa
 			q.position = Vector3(p.x, h + 0.8 + layer * 1.6, p.y)
 			q.visibility_range_end = 1800.0
 			root.add_child(q)
+
+
+
+# --- Einschnitte (seit 2.36) ------------------------------------------------------------------------------------------
+
+const CUT_FOOT := Track.HALF_W + Track.AB_EXTRA + Track.MED + Track.WALK + 0.7  # Fuß der Böschung, hinter der Leitplanke
+const CUT_TOP := 92.0  # so weit quer reicht die Hochfläche (darunter liegt das grobe Gelände)
+
+
+func _plan_cuts() -> void:
+	const IX := preload("res://scripts/interchange.gd")
+	for ct in layout.get("cuts", []):
+		var c := IX.smooth_curve(ct["pts"])
+		var lo := Vector2(1e9, 1e9)
+		var hi := Vector2(-1e9, -1e9)
+		for q in ct["pts"]:
+			lo = lo.min(Vector2(q.x, q.z))
+			hi = hi.max(Vector2(q.x, q.z))
+		_cuts.append({"c": c, "L": c.get_baked_length(), "h": float(ct["h"]), "lo": lo - Vector2(270, 270), "hi": hi + Vector2(270, 270)})
+	if not _cuts.is_empty():
+		_build_cuts()
+
+
+## Höhe der Hochfläche über dem Einschnitt an d (läuft an den Enden über 160 m aus)
+func _cut_h(ct: Dictionary, d: float) -> float:
+	return float(ct["h"]) * smoothstep(0.0, 160.0, d) * smoothstep(0.0, 160.0, float(ct["L"]) - d)
+
+
+## Lage zum nächsten Einschnitt: (Abstand quer zur Mitte, Höhe der Hochfläche dort, 1) oder x < 0, wenn keiner nah ist
+func _cut_at(p: Vector2) -> Vector3:
+	for ct in _cuts:
+		var lo: Vector2 = ct["lo"]
+		var hi: Vector2 = ct["hi"]
+		if p.x < lo.x or p.y < lo.y or p.x > hi.x or p.y > hi.y:
+			continue
+		var c: Curve3D = ct["c"]
+		var p3 := Vector3(p.x, 0.0, p.y)
+		var off := c.get_closest_offset(p3)
+		var q := c.sample_baked(off)
+		var dist := Vector2(q.x - p.x, q.z - p.y).length()
+		if dist > 270.0:
+			continue
+		return Vector3(dist, _cut_h(ct, off), 1.0)
+	return Vector3(-1.0, 0.0, 0.0)
+
+
+## Auf Böschung oder Hochfläche (dort keine Bäume: sie stünden unten im Hang oder ragten heraus)?
+func _in_cut(p: Vector2) -> bool:
+	if _cuts.is_empty():
+		return false
+	var ct := _cut_at(p)
+	return ct.x >= 0.0 and ct.x < CUT_TOP + 8.0 and ct.y > 0.6
+
+
+## Böschungen (1:1,5 von hinter der Leitplanke bis oben), Hochfläche bis CUT_TOP (darunter das grobe Gelände, das dort
+## knapp tiefer liegt, height_at) und in der Mitte ein Feldweg auf einer Brücke über die Autobahn
+func _build_cuts() -> void:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var path := SurfaceTool.new()
+	path.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var g := {}
+	for ct in _cuts:
+		var c: Curve3D = ct["c"]
+		var L: float = ct["L"]
+		var prev := []
+		var d := 0.0
+		while true:
+			var f := Track.frame_at(c, d)
+			var hc := _cut_h(ct, d)
+			var row := []
+			for side in [-1.0, 1.0]:
+				var r: Vector3 = (f["right"] as Vector3) * side
+				var base: Vector3 = f["pos"]
+				row.append([base + r * CUT_FOOT + Vector3(0, 0.12, 0), base + r * (CUT_FOOT + 1.5 * hc) + Vector3(0, hc, 0),
+					base + r * CUT_TOP + Vector3(0, hc, 0), base + r * (CUT_TOP + 6.0) + Vector3(0, hc - 0.45, 0)])
+			if not prev.is_empty():
+				for si in 2:
+					var a: Array = prev[si]
+					var b: Array = row[si]
+					for k in 3:
+						# von innen nach außen; rechts liegt außen rechts der Fahrtrichtung (Vorderseite oben)
+						if si == 1:
+							Track._strip(st, a[k], a[k + 1], b[k], b[k + 1], 0.0, 0.0)
+						else:
+							Track._strip(st, a[k + 1], a[k], b[k + 1], b[k], 0.0, 0.0)
+			prev = row
+			if d >= L:
+				break
+			d = minf(d + 6.0, L)
+		# Feldweg mit Brücke in der Mitte
+		var fm := Track.frame_at(c, L / 2.0)
+		var hm := _cut_h(ct, L / 2.0)
+		var rm: Vector3 = fm["right"]
+		var span := CUT_FOOT + 1.5 * hm + 4.0
+		var bas := Basis.looking_at(rm, Vector3.UP)  # Brücke quer zur Autobahn
+		var mid: Vector3 = fm["pos"]
+		Track._part(g, _concrete_mat, _cbox(Vector3(7.0, 1.3, span * 2.0)), Transform3D(bas, mid + Vector3(0, hm - 0.45, 0)))
+		for s2 in [-1.0, 1.0]:
+			Track._part(g, _concrete_mat, _cbox(Vector3(0.35, 1.0, span * 2.0)), Transform3D(bas, mid + Vector3(0, hm + 0.7, 0) + (fm["fwd"] as Vector3) * s2 * 3.3))
+			# Pfeiler hinter den Leitplanken
+			Track._part(g, _concrete_mat, _cbox(Vector3(5.0, hm, 1.3)), Transform3D(bas, mid + rm * s2 * (CUT_FOOT + 0.8) + Vector3(0, hm / 2.0 - 1.0, 0)))
+			# Schotterweg auf der Hochfläche, vom Brückenende nach außen
+			var w0: Vector3 = mid + rm * s2 * span
+			var w1: Vector3 = mid + rm * s2 * (CUT_TOP + 4.0)
+			var fw: Vector3 = (fm["fwd"] as Vector3) * 2.0
+			var y := Vector3(0, hm + 0.06, 0)
+			if s2 > 0.0:
+				Track._strip(path, w0 + fw + y, w0 - fw + y, w1 + fw + y, w1 - fw + y, 0.0, 0.0)
+			else:
+				Track._strip(path, w0 - fw + y, w0 + fw + y, w1 - fw + y, w1 + fw + y, 0.0, 0.0)
+	st.generate_normals()
+	var mi := MeshInstance3D.new()
+	mi.name = "Einschnitte"
+	mi.mesh = st.commit()
+	mi.material_override = land_mat
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(mi)
+	path.generate_normals()
+	var pm := MeshInstance3D.new()
+	pm.mesh = path.commit()
+	var gravel := StandardMaterial3D.new()
+	gravel.albedo_color = Color(0.42, 0.37, 0.3)
+	gravel.roughness = 0.95
+	pm.material_override = gravel
+	add_child(pm)
+	Track._bake(self, g)
+
+
+static func _cbox(size: Vector3) -> BoxMesh:
+	var b := BoxMesh.new()
+	b.size = size
+	return b

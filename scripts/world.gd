@@ -223,7 +223,7 @@ func _spawn_xf() -> Transform3D:
 						if int(parts[2]) == 0:
 							var sj := Track.begin(sg["race"])
 							(sj["root"] as Node).free()
-							var sxf := Track.xform_at(sj["track"]["curve"], float(parts[3]), 6.75, true)
+							var sxf := Track.xform_at(sj["track"]["curve"], float(parts[3]), 2.0 if sg["race"].get("type", "") == "dreieck" else 6.75, true)
 							sxf.origin.y += 0.5
 							return sxf
 						parts[2] = str(int(parts[2]) - 1)
@@ -487,7 +487,11 @@ func _update_streaming() -> void:
 func _score(e: Dictionary, p: Vector3) -> float:
 	var tr: Dictionary = e["track"]
 	var lp: Vector3 = (e["xf"] as Transform3D).affine_inverse() * p
-	return Track.locate(tr, lp)["score"]
+	var loc := Track.locate(tr, lp)
+	# Brücken (seit 2.36, Autobahndreiecke): eine Fahrbahn weit über oder unter dem Auto zählt nicht, sonst fiel man auf
+	# der Brücke auf den Ring darunter (und unter der Brücke hinauf auf sie)
+	var dy := absf(lp.y - Track.elev_at((loc["path"] as Dictionary)["curve"], loc["d"]))
+	return loc["score"] + maxf(dy - 4.0, 0.0) * 3.0
 
 
 func _best_track(p: Vector3) -> Dictionary:
@@ -510,7 +514,7 @@ func _set_active(e: Dictionary) -> void:
 	active = e
 	player.track = e["track"]
 	Track.apply_street_light(e["track"])
-	var name: String = "AUTOBAHN" if e["kind"] == "seg" else str(Catalog.RACES[e["race_index"]].get("town", "")).to_upper()
+	var name: String = str(e["race"].get("area", "AUTOBAHN")) if e["kind"] == "seg" else str(Catalog.RACES[e["race_index"]].get("town", "")).to_upper()
 	Music.city("" if e["kind"] == "seg" else str(Catalog.RACES[e["race_index"]].get("town", "")))
 	if name != _area_name and hud.has("area"):
 		_area_name = name
@@ -1560,7 +1564,8 @@ func _update_challenger(dt: float) -> void:
 		return
 	if challenger != null and not is_instance_valid(challenger):
 		_remove_challenger()  # mit seinem Autobahnstück entfernt
-	var on_ring: bool = not player.track.is_empty() and _entry_of(player.track).get("kind", "") == "seg"
+	var pe := _entry_of(player.track)
+	var on_ring: bool = not player.track.is_empty() and pe.get("kind", "") == "seg" and pe["race"].get("type", "") != "dreieck"
 	if challenger == null:
 		if on_ring and absf(player.speed_fwd) > 12.0:
 			_ch_t -= dt
@@ -1647,6 +1652,9 @@ func _spawn_challenger() -> void:
 	var cfg := {}
 	for cat in Catalog.PART_ORDER:
 		cfg[cat] = _trng.randi() % Catalog.PARTS[cat]["options"].size()
+		# entfernte Vinyls (seit 2.36 ausgeblendet) auf ein sichtbares umbiegen, ohne weitere Zufallszahl (Felder bleiben gleich)
+		while Catalog.PARTS[cat]["options"][cfg[cat]].get("hidden", false):
+			cfg[cat] = (cfg[cat] + 5) % Catalog.PARTS[cat]["options"].size()
 	var ch := Challenger.new()
 	ch.process_mode = Node.PROCESS_MODE_PAUSABLE
 	ch.curve = tr["curve"]
@@ -1795,8 +1803,8 @@ func _update_speed_fx(dt: float) -> void:
 ## neu eingesetzt.
 
 func _plan_traffic(e: Dictionary) -> void:
-	if not _ct.is_empty() or quiet:
-		return
+	if not _ct.is_empty() or quiet or e["race"].get("type", "") == "dreieck":
+		return  # Autobahndreiecke: Rampen ohne Verkehr (wie die Auffahrten)
 	var tr: Dictionary = e["track"]
 	var L: float = tr["length"]
 	# nachts weniger Verkehr (seit 2.29): die Abstände wachsen bis aufs 1,8-Fache

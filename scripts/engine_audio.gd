@@ -28,6 +28,9 @@ const CAR_BANK := {
 	"kaizen": ["i4_turbo", 1.0], "hachi": ["i4_hoch", 1.0], "sakura": ["i4_sauger", 1.04], "hayate": ["i4_turbo", 0.95],
 	"kitsune": ["i4_turbo", 1.07], "tsubame": ["i4_hoch", 1.06], "mirai": ["i4_sauger", 0.97], "tenshi": ["i4_hoch", 0.95],
 	"raijin": ["boxer", 1.0],
+	# seit 2.36: Yari mit rauem Turbo-Vierzylinder (etwas tiefer als die kleinen Turbos), Tatsumaki mit derselben
+	# Kreiskolben-Aufnahme wie der Ronin, aber höher gedreht (kleiner, leichter Motor ohne V8-Umbau)
+	"yari": ["i4_turbo", 0.9], "tatsumaki": ["wankel", 1.1],
 	"kumo": ["i6", 1.0], "vortex": ["f6", 0.96], "kaze": ["f6", 1.04], "kaido": ["i6", 0.94], "hakone": ["i6", 1.05],
 	"ryujin": ["f6", 0.9], "shiden": ["f6", 0.86], "falke": ["f6", 1.0],
 	"ronin": ["wankel", 1.0], "kagura": ["v10", 1.0], "furia": ["v12", 1.0], "raiden": ["f6", 1.12], "tengu": ["i6", 1.14],

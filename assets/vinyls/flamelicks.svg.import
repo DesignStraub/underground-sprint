@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://ccalflj1v1t8v"
-path="res://.godot/imported/mecha.svg-1152c6c173f25fbe3c05569894e045b8.ctex"
+uid="uid://n2psdhhq35wm"
+path="res://.godot/imported/flamelicks.svg-cc9ba0f731b59b40a2f8d89d990ca5fa.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/vinyls/mecha.svg"
-dest_files=["res://.godot/imported/mecha.svg-1152c6c173f25fbe3c05569894e045b8.ctex"]
+source_file="res://assets/vinyls/flamelicks.svg"
+dest_files=["res://.godot/imported/flamelicks.svg-cc9ba0f731b59b40a2f8d89d990ca5fa.ctex"]
 
 [params]
 

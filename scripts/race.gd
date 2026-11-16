@@ -186,6 +186,9 @@ func _ready() -> void:
 		for cat in Catalog.PART_ORDER:
 			if cat != "finish":  # Lackart ohne Zufallszahl: sonst änderten sich seit 2.19 alle Gegnerfelder
 				cfg[cat] = rng.randi() % Catalog.PARTS[cat]["options"].size()
+				# entfernte Vinyls (seit 2.36 ausgeblendet) auf ein sichtbares umbiegen, ohne weitere Zufallszahl (Felder bleiben gleich)
+				while Catalog.PARTS[cat]["options"][cfg[cat]].get("hidden", false):
+					cfg[cat] = (cfg[cat] + 5) % Catalog.PARTS[cat]["options"].size()
 		cfg["finish"] = (int(race["seed"]) + i * 3 + GameState.wins) % Catalog.PARTS["finish"]["options"].size()
 		var ai := AICar.new()
 		ai.process_mode = Node.PROCESS_MODE_PAUSABLE

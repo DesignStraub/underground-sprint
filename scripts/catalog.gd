@@ -94,6 +94,23 @@ const CARS := {
 		# Rauer Turbo-Vierzylinder mit Ladedruck-Zischen
 		"sound": {"cyl": 4, "harm": [1.0, 0.65, 0.4, 0.2], "sub": 0.6, "turbo": 0.9, "rough": 0.5},
 	},
+	# --- seit 2.36: Evo-Gefühl und Kreiskolben-Coupé ---
+	"yari": {
+		"drive": "awd", "name": "Yari Shinka VIII", "style": "sedan", "class": "A", "unlock": {"level": 12}, "drift": 0.3, "paint": Color(0.08, 0.27, 0.72),
+		"length": 4.49, "width": 1.77,
+		"accel": 12.3, "top_speed": 65.5, "grip": 30.0, "steer": 2.3,
+		"desc": "Kantige Rallye-Limousine mit Allrad, Turbo-Vierzylinder und hohem Flügel. Schießt aus jeder Kurve, auf jedem Belag.",
+		# Rauer Turbo-Vierzylinder, viel Ladedruck
+		"sound": {"cyl": 4, "harm": [1.0, 0.62, 0.38, 0.18], "sub": 0.55, "turbo": 0.95, "rough": 0.45},
+	},
+	"tatsumaki": {
+		"drive": "rwd", "name": "Tatsumaki RE", "style": "coupe", "class": "A", "unlock": {"level": 14}, "drift": 0.75, "paint": Color(0.62, 0.035, 0.05),
+		"length": 4.3, "width": 1.76,
+		"accel": 12.4, "top_speed": 69.0, "grip": 26.5, "steer": 2.5,
+		"desc": "Flaches Kreiskolben-Coupé mit Klappscheinwerfern und zwei Turbos. Dreht wie eine Turbine und lässt sich fein quer stellen.",
+		# Zwei-Scheiben-Kreiskolben mit Registeraufladung
+		"sound": {"cyl": 2, "harm": [1.0, 0.5, 0.3, 0.15], "sub": 0.3, "turbo": 0.85, "rough": 0.2},
+	},
 	"vortex": {
 		"drive": "awd", "name": "Vortex GT-R", "style": "sedan", "class": "S", "unlock": {"level": 15}, "drift": 0.3,
 		"length": 4.6, "width": 1.8,
@@ -222,7 +239,8 @@ const CARS := {
 
 ## Reihenfolge in der Garage = Reihenfolge des Freischaltens
 const CAR_ORDER := ["kaizen", "chibi", "hachi", "hotaru", "sakura", "kaido", "hayate", "kitsune", "tsubame", "hakone",
-	"mirai", "tanuki", "tenshi", "kumo", "raijin", "vortex", "ronin", "shiden", "ryujin", "kaze", "kagura", "falke", "furia", "raiden", "tengu"]
+	"mirai", "tanuki", "tenshi", "yari", "kumo", "raijin", "tatsumaki", "vortex", "ronin", "shiden", "ryujin", "kaze", "kagura", "falke", "furia",
+	"raiden", "tengu"]
 ## Exoten nur über hohe Level: fahren nicht als Gegner oder Herausforderer mit (bleiben etwas Besonderes)
 const EXOTICS := ["raiden", "tengu"]
 ## Bis 2.32 schalteten Siege die Autos frei (Rennsiege oder Driftsiege, eins reicht): was ein Spielstand damit schon
@@ -255,6 +273,8 @@ const FACTORY_RIMS := {
 	"tenshi": ["mesh", 8, Color(0.78, 0.79, 0.81), 15, 4],
 	"kumo": ["thin", 12, Color(0.8, 0.81, 0.84), 16, 5],
 	"raijin": ["rally", 6, Color(0.8, 0.62, 0.22), 17, 5],
+	"yari": ["thin", 10, Color(0.84, 0.85, 0.88), 17, 5],
+	"tatsumaki": ["ten", 10, Color(0.3, 0.31, 0.33), 17, 5],
 	"vortex": ["te", 6, Color(0.24, 0.25, 0.27), 18, 5],
 	"ronin": ["std", 5, Color(0.8, 0.81, 0.84), 17, 5],
 	"shiden": ["concave", 7, Color(0.78, 0.79, 0.82), 17, 5],
@@ -426,45 +446,67 @@ const PARTS := {
 	},
 	"vinyl": {
 		"label": "Folierung",
+		# Seit 2.36 Kategorien wie in NFS Underground (Garage > Tuning > Optik > Folierung: erst die Kategorie, dann
+		# die Motive darin). Vorn die einfarbigen (Farbe unter Folienfarbe), hinten Spezial und Unikate mit festen
+		# Farben. Jedes Motiv nennt seine Kategorie ("group"), darin stehen sie nach Level. "Keins" steht vor den
+		# Kategorien. hidden: ausgeblendet (nicht in der Garage, nicht in der Level-Liste); der Platz bleibt, weil
+		# Spielstände den Index speichern, und ohne "art" fährt ein Auto, das es noch trägt, ohne Folie.
+		"groups": [
+			{"id": "stripes", "label": "Streifen", "desc": "Klassische Streifen über Haube, Dach und Flanken."},
+			{"id": "flames", "label": "Flammen", "desc": "Flammen in einer Farbe: von vorn, vom Schweller oder nur als Umriss."},
+			{"id": "tribal", "label": "Tribal", "desc": "Geschwungene Klingen und Tigerstreifen."},
+			{"id": "racing", "label": "Rennsport", "desc": "Startnummer, Zielflagge und Tempo-Grafiken wie auf der Rennstrecke."},
+			{"id": "special", "label": "Spezial", "desc": "Muster und Effekte in eigenen Farben."},
+			{"id": "unique", "label": "Unikate", "desc": "Einzelstücke mit Motiv, in eigenen Farben."},
+		],
 		"options": [
 			{"name": "Keins", "wins": 0},
-			{"name": "Rennstreifen", "wins": 0},
-			{"name": "Seitenstreifen", "wins": 0},
-			{"name": "Mittelstreifen", "wins": 0},
-			{"name": "Zweifarbig", "wins": 0},
-			{"name": "Flankenband", "wins": 0},
-			{"name": "Haube und Heck", "wins": 0},
-			{"name": "Kontrastdach", "wins": 0},
-			{"name": "Rallye", "wins": 0},
+			{"name": "Rennstreifen", "wins": 0, "group": "stripes"},
+			{"name": "Seitenstreifen", "wins": 0, "group": "stripes"},
+			{"name": "Mittelstreifen", "wins": 0, "group": "stripes"},
+			{"name": "Zweifarbig", "wins": 0, "group": "stripes"},
+			{"name": "Flankenband", "wins": 0, "group": "stripes"},
+			{"name": "Haube und Heck", "wins": 0, "group": "stripes"},
+			{"name": "Kontrastdach", "wins": 0, "group": "stripes"},
+			{"name": "Rallye", "wins": 0, "group": "stripes"},
 			# Seit 2.33: Vinyls mit Motiv (assets/vinyls/<art>.svg, oben die Flanke, unten die Draufsicht). Sie liegen in
 			# Koordinaten relativ zu Länge, Breite und Gürtellinie des Autos und passen so auf jedes Auto (Shader
 			# car_paint). tint: einfarbige Maske in der Folienfarbe; mirror: rechts gespiegelt, damit das Motiv auf beiden
 			# Seiten nach hinten läuft (aus bei Schrift, die sonst rechts spiegelverkehrt stünde).
-			{"name": "Speedlines", "wins": 0, "level": 2, "art": "speedlines", "tint": true, "mirror": true},
-			{"name": "Tribal", "wins": 0, "level": 3, "art": "tribal", "tint": true, "mirror": true},
-			{"name": "Splitter", "wins": 0, "level": 4, "art": "splitter", "tint": true, "mirror": true},
-			{"name": "Sakura", "wins": 0, "level": 5, "art": "sakura", "mirror": true},
-			{"name": "Tiger", "wins": 0, "level": 6, "art": "tiger", "tint": true, "mirror": true},
-			{"name": "Zielflagge", "wins": 0, "level": 7, "art": "checker", "tint": true, "mirror": true},
-			{"name": "Flammen", "wins": 0, "level": 8, "art": "flames", "mirror": true},
-			{"name": "Pixeltarn", "wins": 0, "level": 9, "art": "camo", "mirror": true},
-			{"name": "Blitze", "wins": 0, "level": 10, "art": "bolts", "mirror": true},
-			{"name": "Welle", "wins": 0, "level": 11, "art": "wave", "mirror": true},
-			{"name": "Graffiti", "wins": 0, "level": 12, "art": "graffiti", "mirror": false},
-			{"name": "Hexgitter", "wins": 0, "level": 13, "art": "hex", "mirror": true},
-			{"name": "Platine", "wins": 0, "level": 14, "art": "circuit", "mirror": true},
-			{"name": "Farbbomben", "wins": 0, "level": 15, "art": "splatter", "mirror": true},
-			{"name": "Koi", "wins": 0, "level": 16, "art": "koi", "mirror": true},
-			{"name": "Rising Sun", "wins": 0, "level": 17, "art": "sunrays", "mirror": true},
-			{"name": "Glitch", "wins": 0, "level": 18, "art": "glitch", "mirror": true},
-			{"name": "Kitsune", "wins": 0, "level": 19, "art": "kitsune", "mirror": true},
-			{"name": "Oni", "wins": 0, "level": 20, "art": "oni", "mirror": true},
-			{"name": "Drache", "wins": 0, "level": 22, "art": "dragon", "mirror": true},
-			{"name": "Engelsflügel", "wins": 0, "level": 24, "art": "wings", "mirror": true},
-			{"name": "Einheit 07", "wins": 0, "level": 26, "art": "unit07", "mirror": false},
-			{"name": "Mecha", "wins": 0, "level": 28, "art": "mecha", "mirror": true},
-			{"name": "Lichtengel", "wins": 0, "level": 30, "art": "angel", "mirror": true},
-			{"name": "Prisma", "wins": 0, "level": 35, "art": "prism", "mirror": true},
+			{"name": "Speedlines", "wins": 0, "level": 2, "art": "speedlines", "tint": true, "mirror": true, "group": "racing"},
+			{"name": "Tribal", "wins": 0, "level": 3, "art": "tribal", "tint": true, "mirror": true, "group": "tribal"},
+			{"name": "Splitter", "wins": 0, "level": 4, "art": "splitter", "tint": true, "mirror": true, "group": "racing"},
+			{"name": "Sakura", "wins": 0, "level": 5, "art": "sakura", "mirror": true, "group": "unique"},
+			{"name": "Tiger", "wins": 0, "level": 6, "art": "tiger", "tint": true, "mirror": true, "group": "tribal"},
+			{"name": "Zielflagge", "wins": 0, "level": 7, "art": "checker", "tint": true, "mirror": true, "group": "racing"},
+			# bis 2.35 "Flammen": die bunten Flammen stehen seit 2.36 unter Unikate, die Kategorie Flammen ist einfarbig
+			{"name": "Hot Rod", "wins": 0, "level": 8, "art": "flames", "mirror": true, "group": "unique"},
+			{"name": "Pixeltarn", "wins": 0, "level": 9, "art": "camo", "mirror": true, "group": "special"},
+			{"name": "Blitze", "wins": 0, "level": 10, "art": "bolts", "mirror": true, "group": "special"},
+			{"name": "Welle", "wins": 0, "level": 11, "art": "wave", "mirror": true, "group": "unique"},
+			{"name": "Graffiti", "wins": 0, "level": 12, "art": "graffiti", "mirror": false, "group": "unique"},
+			{"name": "Hexgitter", "wins": 0, "level": 13, "art": "hex", "mirror": true, "group": "special"},
+			{"name": "Platine", "wins": 0, "level": 14, "art": "circuit", "mirror": true, "group": "special"},
+			{"name": "Farbbomben", "wins": 0, "level": 15, "art": "splatter", "mirror": true, "group": "special"},
+			{"name": "Koi", "wins": 0, "level": 16, "art": "koi", "mirror": true, "group": "unique"},
+			{"name": "Rising Sun", "wins": 0, "level": 17, "art": "sunrays", "mirror": true, "group": "special"},
+			{"name": "Glitch", "wins": 0, "level": 18, "art": "glitch", "mirror": true, "group": "special"},
+			# 26, 27, 28 und 31 (Kitsune, Oni, Drache, Mecha: Masken und Köpfe) seit 2.36 ausgeblendet, siehe oben
+			{"name": "Keins", "wins": 0, "hidden": true},
+			{"name": "Keins", "wins": 0, "hidden": true},
+			{"name": "Keins", "wins": 0, "hidden": true},
+			{"name": "Engelsflügel", "wins": 0, "level": 24, "art": "wings", "mirror": true, "group": "unique"},
+			{"name": "Einheit 07", "wins": 0, "level": 26, "art": "unit07", "mirror": false, "group": "unique"},
+			{"name": "Keins", "wins": 0, "hidden": true},
+			{"name": "Lichtengel", "wins": 0, "level": 30, "art": "angel", "mirror": true, "group": "unique"},
+			{"name": "Prisma", "wins": 0, "level": 35, "art": "prism", "mirror": true, "group": "special"},
+			# seit 2.36: einfarbige Flammen, ein Tribal und zwei Rennsport-Motive
+			{"name": "Feuerzungen", "wins": 0, "level": 2, "art": "flamelicks", "tint": true, "mirror": true, "group": "flames"},
+			{"name": "Startnummer", "wins": 0, "level": 4, "art": "racenumber", "tint": true, "mirror": false, "group": "racing"},
+			{"name": "Karo-Streifen", "wins": 0, "level": 9, "art": "checkstripe", "tint": true, "mirror": true, "group": "racing"},
+			{"name": "Inferno", "wins": 0, "level": 19, "art": "inferno", "tint": true, "mirror": true, "group": "flames"},
+			{"name": "Geisterflammen", "wins": 0, "level": 20, "art": "ghostflames", "tint": true, "mirror": true, "group": "flames"},
+			{"name": "Aufwind", "wins": 0, "level": 22, "art": "updraft", "tint": true, "mirror": true, "group": "tribal"},
 		],
 	},
 	# Folienfarbe: "Kontrast" = Weiß auf dunklem, Schwarz auf hellem Lack
@@ -607,32 +649,34 @@ static func rating(car_id: String, cfg: Dictionary) -> int:
 ## "fork" (echte Gabelung: kurz mit Gegenverkehr oder breiter Boulevard außen herum).
 ## districts: Gewichte der Stadtviertel. Rundkurse: corners = Eckpunkte, radius = ungefähre Größe.
 const RACES := [
-	{"name": "Bankenviertel-Sprint", "town": "Frankfurt am Main", "region": "Kreisfreie Stadt", "geo": Vector2(50.1109, 8.6821), "mood": "neon",  "type": "sprint", "tier": 1, "seed": 11, "segments": 18, "max_turn": 50.0,
-		"bulges": {4: "alley", 11: "lake"},
+	# seit 2.36 entworfen (track_design.gd, LAYOUTS["frankfurt"]): Hochhausschlucht, Theatertunnel, Mainufer, Brücke,
+	# Gasse durch Alt-Sachsenhausen
+	{"name": "Bankenviertel-Sprint", "town": "Frankfurt am Main", "region": "Kreisfreie Stadt", "geo": Vector2(50.1109, 8.6821), "mood": "neon",  "type": "sprint", "tier": 1, "seed": 11, "layout": "frankfurt",
 		"districts": {"downtown": 0.45, "shops": 0.3, "chinatown": 0.25}},
-	{"name": "Prachtallee-Sprint", "town": "München", "region": "Landeshauptstadt", "geo": Vector2(48.1351, 11.582), "mood": "daemmerung",  "type": "sprint", "tier": 1, "seed": 23, "segments": 20, "max_turn": 40.0,
-		"bulges": {5: "fork", 13: "fork"},
+	# seit 2.36 entworfen (LAYOUTS["muenchen"]): Ludwigstraße durchs Siegestor, Englischer Garten, Isar, Friedensengel
+	{"name": "Prachtallee-Sprint", "town": "München", "region": "Landeshauptstadt", "geo": Vector2(48.1351, 11.582), "mood": "daemmerung",  "type": "sprint", "tier": 1, "seed": 23, "layout": "muenchen",
 		"districts": {"boulevard": 0.45, "downtown": 0.25, "shops": 0.3}},
-	{"name": "Hafenrunde", "town": "Hamburg", "region": "Freie und Hansestadt Hamburg", "geo": Vector2(53.5459, 9.9665), "mood": "regen",  "type": "sprint", "tier": 2, "seed": 42, "segments": 24, "max_turn": 65.0,
-		"bulges": {5: "lake", 13: "fork", 19: "alley"},
+	# seit 2.36 entworfen (LAYOUTS["hafenrunde"]): Reeperbahn, Landungsbrücken, Speicherstadt, Köhlbrandbrücke
+	{"name": "Hafenrunde", "town": "Hamburg", "region": "Freie und Hansestadt Hamburg", "geo": Vector2(53.5459, 9.9665), "mood": "regen",  "type": "sprint", "tier": 2, "seed": 42, "layout": "hafenrunde",
 		"districts": {"industrial": 0.45, "shops": 0.35, "residential": 0.2}},
-	{"name": "Schnellstraßen-Sprint", "town": "Dortmund", "region": "Kreisfreie Stadt", "geo": Vector2(51.5136, 7.4653), "mood": "natrium",  "type": "sprint", "tier": 3, "seed": 7, "segments": 30, "max_turn": 30.0,
-		"bulges": {7: "alley", 17: "lake", 24: "fork"},
+	# seit 2.36 entworfen (LAYOUTS["dortmund"]): Hochofen, Schnellstraße mit Tunnel, Hochstraße übers Gleisfeld, Wall
+	{"name": "Schnellstraßen-Sprint", "town": "Dortmund", "region": "Kreisfreie Stadt", "geo": Vector2(51.5136, 7.4653), "mood": "natrium",  "type": "sprint", "tier": 3, "seed": 7, "layout": "dortmund",
 		"districts": {"highway": 0.4, "downtown": 0.2, "industrial": 0.2, "boulevard": 0.2}},
-	{"name": "Innenstadtring", "town": "Köln", "region": "Kreisfreie Stadt", "geo": Vector2(50.9375, 6.9603), "mood": "mitternacht",  "type": "circuit", "tier": 1, "laps": 2, "seed": 101, "corners": 9, "radius": 260.0,
-		"bulges": {3: "alley"},
+	# seit 2.36 entworfen (track_design.gd, LAYOUTS["koeln"]): Rheinufer mit Tunnel, Spitzkehre vor dem Dom, Ring
+	{"name": "Innenstadtring", "town": "Köln", "region": "Kreisfreie Stadt", "geo": Vector2(50.9375, 6.9603), "mood": "mitternacht",  "type": "circuit", "tier": 1, "laps": 2, "seed": 101, "layout": "koeln",
 		"districts": {"downtown": 0.35, "boulevard": 0.25, "chinatown": 0.4}},
-	{"name": "Hafenring", "town": "Bremen", "region": "Freie Hansestadt Bremen", "geo": Vector2(53.0793, 8.8017), "mood": "regen",  "type": "circuit", "tier": 2, "laps": 2, "seed": 202, "corners": 10, "radius": 300.0,
-		"bulges": {2: "fork", 6: "lake"},
+	# seit 2.36 entworfen (LAYOUTS["bremen"]): Schlachte an der Weser, Brücke über das Hafenbecken, Kai, Schnoor mit Roland
+	{"name": "Hafenring", "town": "Bremen", "region": "Freie Hansestadt Bremen", "geo": Vector2(53.0793, 8.8017), "mood": "regen",  "type": "circuit", "tier": 2, "laps": 2, "seed": 202, "layout": "bremen",
 		"districts": {"industrial": 0.5, "highway": 0.25, "shops": 0.25}},
-	{"name": "Nachtschicht", "town": "Stuttgart", "region": "Landeshauptstadt", "geo": Vector2(48.7758, 9.1829), "mood": "mitternacht",  "type": "circuit", "tier": 3, "laps": 2, "seed": 303, "corners": 11, "radius": 360.0,
-		"bulges": {2: "fork", 7: "alley"},
+	# seit 2.36 entworfen (LAYOUTS["stuttgart"]): Kulturmeile im Kessel, Weinsteige mit zwei Kehren, Kamm am Fernsehturm
+	{"name": "Nachtschicht", "town": "Stuttgart", "region": "Landeshauptstadt", "geo": Vector2(48.7758, 9.1829), "mood": "mitternacht",  "type": "circuit", "tier": 3, "laps": 2, "seed": 303, "layout": "stuttgart",
 		"districts": {"highway": 0.3, "boulevard": 0.3, "downtown": 0.4}},
-	{"name": "Hafen-Drift", "town": "Hamburg", "region": "Freie und Hansestadt Hamburg", "geo": Vector2(53.5459, 9.9665), "mood": "nebel",  "type": "drift", "tier": 2, "laps": 2, "seed": 502, "corners": 12, "radius": 155.0,
-		"bulges": {},
+	# seit 2.36 entworfen (LAYOUTS["hafen_drift"]): Containerterminal an der Elbe; corners bleibt für die Punkte-Ziele
+	{"name": "Hafen-Drift", "town": "Hamburg", "region": "Freie und Hansestadt Hamburg", "geo": Vector2(53.5459, 9.9665), "mood": "nebel",  "type": "drift", "tier": 2, "laps": 2, "seed": 502, "corners": 12, "layout": "hafen_drift",
 		"districts": {"industrial": 0.7, "highway": 0.3}},
-	{"name": "Stadion-Drift", "town": "Gelsenkirchen", "region": "Kreisfreie Stadt", "geo": Vector2(51.5177, 7.0857), "mood": "natrium",  "type": "drift", "tier": 3, "laps": 2, "seed": 603, "corners": 14, "radius": 175.0,
-		"bulges": {}, "stadium": true,
+	# seit 2.36 entworfen (LAYOUTS["stadion_drift"]): Bogen um die Arena, Parkplatzwechsel, Parkdeck mit Kehre oben;
+	# corners bleibt für die Punkte-Ziele
+	{"name": "Stadion-Drift", "town": "Gelsenkirchen", "region": "Kreisfreie Stadt", "geo": Vector2(51.5177, 7.0857), "mood": "natrium",  "type": "drift", "tier": 3, "laps": 2, "seed": 603, "corners": 14, "layout": "stadion_drift",
 		"districts": {"downtown": 0.4, "boulevard": 0.6}},
 	# --- neu: Drag-Rennen (geradeaus, Handschaltung) und weitere Strecken; hinten angehängt, damit gespeicherte
 	# Event-Nummern gültig bleiben
@@ -642,14 +686,14 @@ const RACES := [
 		"districts": {"downtown": 0.5, "shops": 0.5}},
 	{"name": "Schnellstraßen-Drag", "town": "Hockenheim", "region": "Rhein-Neckar-Kreis", "geo": Vector2(49.322, 8.547), "mood": "mitternacht",  "type": "drag", "tier": 3, "seed": 703, "segments": 13, "max_turn": 5.0,
 		"districts": {"highway": 0.6, "boulevard": 0.4}},
-	{"name": "Altstadt-Hügel", "town": "Heidelberg", "region": "Kreisfreie Stadt", "geo": Vector2(49.3988, 8.6724), "mood": "daemmerung",  "type": "sprint", "tier": 2, "seed": 61, "segments": 22, "max_turn": 55.0,
-		"bulges": {4: "fork", 11: "fork", 17: "alley"},
+	# seit 2.36 entworfen (LAYOUTS["heidelberg"]): Alte Brücke mit Brückentor, Altstadt, Schlossberg mit Kehre, Neckar
+	{"name": "Altstadt-Hügel", "town": "Heidelberg", "region": "Kreisfreie Stadt", "geo": Vector2(49.3988, 8.6724), "mood": "daemmerung",  "type": "sprint", "tier": 2, "seed": 61, "layout": "heidelberg",
 		"districts": {"residential": 0.45, "shops": 0.55}},
-	{"name": "Hafen-Sprint", "town": "Rostock", "region": "Hanse- und Universitätsstadt", "geo": Vector2(54.0924, 12.0991), "mood": "nebel",  "type": "sprint", "tier": 3, "seed": 77, "segments": 26, "max_turn": 70.0,
-		"bulges": {5: "lake", 12: "alley", 19: "fork"},
+	# seit 2.36 entworfen (LAYOUTS["rostock"]): Kröpeliner Tor, Stadthafen, Warnowtunnel, Überseehafen, Leuchtturm
+	{"name": "Hafen-Sprint", "town": "Rostock", "region": "Hanse- und Universitätsstadt", "geo": Vector2(54.0924, 12.0991), "mood": "nebel",  "type": "sprint", "tier": 3, "seed": 77, "layout": "rostock",
 		"districts": {"industrial": 0.5, "highway": 0.3, "residential": 0.2}},
-	{"name": "Altstadtring", "town": "Nürnberg", "region": "Kreisfreie Stadt", "geo": Vector2(49.4521, 11.0767), "mood": "mitternacht",  "type": "circuit", "tier": 2, "laps": 2, "seed": 131, "corners": 10, "radius": 290.0,
-		"bulges": {2: "fork", 6: "alley"},
+	# seit 2.36 entworfen (LAYOUTS["nuernberg"]): Ring an der Stadtmauer, Laufer Tor, Burgberg mit Kaiserburg, Pegnitz
+	{"name": "Altstadtring", "town": "Nürnberg", "region": "Kreisfreie Stadt", "geo": Vector2(49.4521, 11.0767), "mood": "mitternacht",  "type": "circuit", "tier": 2, "laps": 2, "seed": 131, "layout": "nuernberg",
 		"districts": {"residential": 0.5, "boulevard": 0.3, "downtown": 0.2}},
 	# --- Orts-Strecken: echte Straßenverläufe (OpenStreetMap, tools/osm_city.py), Wahrzeichen an ihrem Platz.
 	# city = Schlüssel in city_data.gd, town = Ortsschild, shops = Ladennamen der Stadt, station = Haltestelle am Bahnübergang
@@ -685,16 +729,16 @@ const RACES := [
 		"crests": [[0.12, 0.3, 8.0], [0.42, 0.58, 6.0], [0.68, 0.88, 10.0]],
 		"districts": {"wald": 1.0},
 		"desc": "Landstraße durch den Schwarzwald: enge Kurven zwischen Tannen, Kuppen mit Sprung, ein Bahnübergang. Nachts nur Scheinwerfer und Leitpfosten."},
-	# Driftberg (seit 2.32): Drift-Kurs im Wald über zwei Gipfel (je gut 12 m), viele Kehren. Dazwischen und am Start
-	# liegt die Straße am Boden: nur dort gehen die beiden Ausfahrten ab.
+	# Driftberg (seit 2.32, seit 2.36 als entworfene Passstraße statt Stern aus 16 gleichen Kehren): Start und Ziel im
+	# Tal, Kehrentreppe hinauf, Kamm, Gipfel mit Aussichtspunkt, Felstunnel, schnelle Abfahrt (track_design.gd,
+	# LAYOUTS["driftberg"]: Stützpunkte, Höhen, Berg). Beide Ausfahrten liegen unten im Tal.
 	# Außerhalb der Karriere, immer offen ("free"); in der Welt mit zwei Ausfahrten zum Durchfahren.
-	# mountain: Höhenprofil [Anfang, oben ab, oben bis, Ende (Anteile der Länge), Höhe], aufeinander gestapelt
+	# corners bleibt für die Punkte-Ziele (Catalog.drift_targets).
 	{"name": "Driftberg", "town": "Harz", "region": "Landkreis Goslar", "geo": Vector2(51.80, 10.62),
-		"mood": "nebel", "type": "drift", "tier": 2, "laps": 2, "seed": 1207, "corners": 16, "radius": 200.0, "free": true,
-		"forest": true, "mountain": [[0.05, 0.15, 0.28, 0.4, 7.0], [0.09, 0.18, 0.25, 0.36, 5.0],
-			[0.56, 0.66, 0.79, 0.91, 7.0], [0.6, 0.69, 0.76, 0.87, 5.0]],
+		"mood": "mitternacht", "type": "drift", "tier": 2, "laps": 2, "seed": 1207, "corners": 16, "free": true,
+		"forest": true, "layout": "driftberg",
 		"bulges": {}, "districts": {"wald": 1.0},
-		"desc": "Drift-Berg im Harz: Kehre um Kehre den Berg hinauf und wieder hinunter, zwischen Tannen und Leitplanken. Ketten über den Gipfel geben am meisten."},
+		"desc": "Passstraße im Harz: Kehrentreppe den Hang hinauf, Schlangenlinie über den Kamm, Aussichtspunkt am Gipfel, Felstunnel unter dem Sendeturm und eine schnelle Abfahrt ins Tal. Ketten durch die Kehren geben am meisten."},
 ]
 
 const EVENT_TYPES := {
@@ -795,7 +839,7 @@ static func level_rewards(l: int) -> Array:
 	for cat in PART_ORDER:
 		var opts: Array = PARTS[cat]["options"]
 		for i in opts.size():
-			if int(opts[i].get("level", 0)) == l:
+			if int(opts[i].get("level", 0)) == l and not opts[i].get("hidden", false):
 				out.append({"kind": "vinyl" if cat == "vinyl" else "part", "cat": cat, "index": i, "name": opts[i]["name"]})
 	return out
 
