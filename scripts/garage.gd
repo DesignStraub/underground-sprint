@@ -1,6 +1,6 @@
 extends Node3D
-## Hauptmenü in der Garage: dein Auto dreht sich im Neonlicht, links das Menü.
-## Tuning und Autowechsel zeigen gesperrte Teile als Vorschau, gespeichert wird nur Freigeschaltetes.
+## Hauptmenü in der Garage: dein Auto fährt auf einem Rollenprüfstand auf der Stelle (seit 2.38, vorher Drehteller),
+## links das Menü. Tuning und Autowechsel zeigen gesperrte Teile als Vorschau, gespeichert wird nur Freigeschaltetes.
 
 const Catalog := preload("res://scripts/catalog.gd")
 const Builder := preload("res://scripts/car_builder.gd")
@@ -8,13 +8,14 @@ const PixelView := preload("res://scripts/pixel_view.gd")
 const UI := preload("res://scripts/ui_style.gd")
 const I18n := preload("res://scripts/i18n.gd")
 const CareerMap := preload("res://scripts/career_map.gd")
+const GarageSet := preload("res://scripts/garage_set.gd")
 
 const Loading := preload("res://scripts/loading_screen.gd")
 ## Tipps wie auf den Ladebildschirmen von NFS Underground (stehen beim Ladebildschirm)
 const TIPS := Loading.TIPS
 
 var world: SubViewport
-var turntable: Node3D
+var stand: Node3D  # Stellplatz auf dem Laufband (Ursprung), daran hängen die Autos
 var car_node: Node3D
 var cam: Camera3D
 var menu: VBoxContainer
@@ -29,11 +30,14 @@ var _info_panel: PanelContainer
 var _keys: HBoxContainer
 var _xp_line: Control
 var _status_text := ""
+var _ui: Control  # Wurzel der Oberfläche (Größe in UI-Pixeln: freie Fläche fürs Auto)
+var _in_cars := false  # Autohaus offen (eigene Kamera, Auto fährt beim Blättern herein)
 var title: Label
 var info: InfoText
 var status: Label
 var section: Label
 var stats: VBoxContainer
+var _stats_card: PanelContainer
 var tip: Label
 var _tip_i := 0
 var _tip_t := 0.0
@@ -62,6 +66,11 @@ func _ready() -> void:
 		_show_driver()
 	else:
 		_show_main()
+	if car_node == null:
+		# Sprachwahl, aus der Welt direkt ins Autohaus oder zum Fahrer: das eigene Auto steht schon auf dem Band
+		preview_car = GameState.current_car
+		preview_cfg = GameState.get_config(preview_car).duplicate()
+		_show_car(preview_car, preview_cfg)
 
 
 func _build_scene() -> void:
@@ -99,47 +108,38 @@ func _build_scene() -> void:
 	we.environment = env
 	world.add_child(we)
 
-	# Seit 2.35 ein ruhiges Fotostudio statt Neonröhren und leuchtendem Bodenring: dunkler, matt glänzender Boden,
-	# ein Lichtkegel von oben auf das Auto, ein Wandstrahler malt ein weiches Lichtfeld auf die Rückwand, ein kühles
-	# Kantenlicht von hinten zeichnet Dach und Flanken nach. Das Auto ist der hellste Punkt im Bild.
-	var floor_m := Builder.mat(Color(0.05, 0.051, 0.056), 0.0, 0.34)
-	var floor_mi := MeshInstance3D.new()
-	var pm := PlaneMesh.new()
-	pm.size = Vector2(40, 40)
-	floor_mi.mesh = pm
-	floor_mi.material_override = floor_m
-	world.add_child(floor_mi)
-
-	var wall_m := Builder.mat(Color(0.13, 0.135, 0.145), 0.0, 0.92)
-	for w in [[Vector3(0, 4, -7), Vector3(30, 8, 0.4)], [Vector3(-8, 4, 0), Vector3(0.4, 8, 30)]]:
-		var mi := MeshInstance3D.new()
-		mi.mesh = Builder.box(w[1])
-		mi.material_override = wall_m
-		mi.position = w[0]
-		world.add_child(mi)
+	# Seit 2.38 eine Werkstatt mit Rollenprüfstand (garage_set.gd) statt des Fotostudios mit Drehteller: das Auto fährt
+	# auf einem Laufband auf der Stelle. Licht wie zuvor ruhig: ein Lichtkegel von oben auf das Auto, ein Wandstrahler
+	# auf Lochwand und Werkbank, ein kühles Kantenlicht von hinten links. Das Auto ist der hellste Punkt im Bild.
+	_hall = GarageSet.build(world)
 
 	var top := SpotLight3D.new()
-	top.position = Vector3(0, 6, 1)
-	top.rotation_degrees.x = -80
+	top.position = Vector3(0, 6, 0.4)
+	top.rotation_degrees.x = -84
 	top.spot_range = 10
-	top.spot_angle = 38
+	top.spot_angle = 40
 	top.spot_angle_attenuation = 0.6
 	top.light_energy = 3.2
 	top.light_color = Color(1.0, 0.97, 0.93)
 	top.shadow_enabled = true
+	if RenderingServer.get_current_rendering_method() == "gl_compatibility":
+		# Browser-Renderer: mit dem Standardabstand lagen wellige Streifen (Schattenakne) auf Dach und Haube, seit das
+		# Auto stillsteht und man oft aufs Dach schaut
+		top.shadow_bias = 0.12
+		top.shadow_normal_bias = 2.0
 	world.add_child(top)
-	# Wandstrahler: weiches Lichtfeld auf der Rückwand, genau dort, wo man sie hinter dem Auto sieht (statt Neonröhren)
+	# Wandstrahler: weiches Lichtfeld auf Lochwand und Werkbank, dort, wo man die Rückwand hinter dem Auto sieht
 	var wash := SpotLight3D.new()
-	wash.position = Vector3(-4.6, 6.8, -3.2)
+	wash.position = Vector3(-2.2, 6.4, -0.4)
 	world.add_child(wash)
-	wash.look_at_from_position(wash.position, Vector3(-5.6, 1.6, -6.8), Vector3.UP)
+	wash.look_at_from_position(wash.position, Vector3(GarageSet.BACK_X, 1.5, -0.6), Vector3.UP)
 	wash.spot_range = 12
-	wash.spot_angle = 44
+	wash.spot_angle = 48
 	wash.spot_angle_attenuation = 1.4
 	wash.spot_attenuation = 0.35  # kaum Abfall über die Entfernung: das Feld auf der Wand bleibt weich und gleichmäßig
-	wash.light_energy = 1.1
-	wash.light_color = Color(0.9, 0.93, 1.0)
-	# Kantenlicht von hinten links: Silhouette, Dachlinie, Glanz auf dem Lack, während das Auto sich dreht
+	wash.light_energy = 0.8
+	wash.light_color = Color(1.0, 0.95, 0.88)
+	# Kantenlicht von hinten links: Silhouette, Dachlinie, Glanz auf dem Lack
 	var rim := SpotLight3D.new()
 	rim.position = Vector3(-4.5, 3.4, -4.8)
 	world.add_child(rim)
@@ -148,38 +148,26 @@ func _build_scene() -> void:
 	rim.spot_angle = 26
 	rim.light_energy = 3.5
 	rim.light_color = Color(0.82, 0.88, 1.0)
+	# Aufhelllicht von rechts vorn oben (hoch genug, dass es keinen hellen Fleck auf den Boden vor der Kamera legt)
 	var fill := OmniLight3D.new()
-	fill.position = Vector3(4, 2, 4)
-	fill.light_energy = 0.7
+	fill.position = Vector3(4.2, 3.4, -2.2)
+	fill.light_energy = 0.6
 	fill.light_color = Color(1.0, 0.96, 0.9)
 	fill.omni_range = 10
 	world.add_child(fill)
 
-	turntable = Node3D.new()
-	world.add_child(turntable)
-	var disc := MeshInstance3D.new()
-	var cm := CylinderMesh.new()
-	cm.top_radius = 3.2
-	cm.bottom_radius = 3.2
-	cm.height = 0.06
-	cm.radial_segments = 64
-	disc.mesh = cm
-	disc.material_override = Builder.mat(Color(0.06, 0.062, 0.068), 0.55, 0.38)
-	disc.position.y = 0.03
-	turntable.add_child(disc)
-	# feine Metallkante statt des Leuchtrings: fängt nur Licht, leuchtet nicht selbst
-	var ring := MeshInstance3D.new()
-	var tm := TorusMesh.new()
-	tm.inner_radius = 3.17
-	tm.outer_radius = 3.23
-	tm.rings = 96
-	ring.mesh = tm
-	ring.material_override = Builder.mat(Color(0.32, 0.33, 0.36), 0.9, 0.22)
-	ring.position.y = 0.06
-	world.add_child(ring)
+	# Stellplatz um 180° gedreht: das Auto fährt nach +Z, die Kamera steht auf seiner linken Seite (_cam_goal)
+	stand = Node3D.new()
+	stand.position.y = 0.006  # Oberfläche des Bands
+	stand.rotation.y = PI
+	world.add_child(stand)
 
 	cam = Camera3D.new()
 	cam.fov = 50
+	# Bildausschnitt per Objektivverschiebung (frustum_offset) statt seitlich versetzter Kamera (h_offset): das Auto steht
+	# neben dem Menü bzw. über der Leiste, ohne dass sich der Blickwinkel ändert (Größe aus fov, _process)
+	cam.projection = Camera3D.PROJECTION_FRUSTUM
+	cam.size = 2.0 * cam.near * tan(deg_to_rad(cam.fov) * 0.5)
 	world.add_child(cam)
 	_work_light = OmniLight3D.new()
 	_work_light.light_color = Color(1.0, 0.95, 0.88)
@@ -198,6 +186,7 @@ func _build_ui() -> void:
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.theme = UI.theme()
 	layer.add_child(root)
+	_ui = root
 	# Vignette und weiche Abdunklung links (Menü), oben (Kopf) und unten (Hinweise); das Auto bleibt frei und hell
 	UI.vignette(root, 0.62)
 	var fade := UI.fade_rect(root, Color(0, 0, 0, 0.74))
@@ -287,13 +276,11 @@ func _build_ui() -> void:
 	tip.offset_right = -14.0
 	tip.offset_top = 27.0
 	tip.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	# Werte des Autos: links unter der Liste, im Tuning klein oben rechts (_place_stats), nie über dem Auto
 	var sp := PanelContainer.new()
-	sp.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	sp.offset_left = -226.0
-	sp.offset_right = -14.0
-	sp.offset_top = 54.0
-	sp.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	sp.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(sp)
+	_stats_card = sp
 	stats = VBoxContainer.new()
 	stats.add_theme_constant_override("separation", 2)
 	sp.add_child(stats)
@@ -425,15 +412,18 @@ class InfoText extends VBoxContainer:
 
 
 ## Wertekarte wie im Autohaus: Name, Klasse und Leistungsindex, vier Balken (10 Segmente), Motor-Tuning eingerechnet.
-## Segmente hell, in der Tuning-Vorschau der Zuwachs im Akzent und der Verlust rot.
+## Segmente hell, in der Tuning-Vorschau der Zuwachs im Akzent und der Verlust rot. Im Tuning (Leiste unten) knapp:
+## ohne Namen (steht oben in der Statuszeile), Endtempo in der Kopfzeile, schmalere Balken.
 func _show_stats(car_id: String, cfg: Dictionary, base := {}) -> void:
 	for c in stats.get_children():
 		stats.remove_child(c)
 		c.queue_free()
+	var compact := _strip_mode
 	var st := Catalog.stats(car_id, cfg)
 	var bs := Catalog.stats(car_id, base if not base.is_empty() else cfg)
-	var name_l := UI.label(stats, 12, "cond", UI.TEXT, 1)
-	name_l.text = str(Catalog.CARS[car_id]["name"]).to_upper()
+	if not compact:
+		var name_l := UI.label(stats, 12, "cond", UI.TEXT, 1)
+		name_l.text = str(Catalog.CARS[car_id]["name"]).to_upper()
 	var head := UI.label(stats, 7, "wide", UI.DIM, 1)
 	# Klasse und Leistungsindex: zeigt, dass die Autos der Klasse S gleich stark sind; Tuning-Vorschau mit Zuwachs
 	var pi := Catalog.rating(car_id, cfg)
@@ -442,8 +432,10 @@ func _show_stats(car_id: String, cfg: Dictionary, base := {}) -> void:
 	if pi != pi0:
 		head.text += "  (%+d)" % (pi - pi0)
 		head.label_settings.font_color = UI.ACCENT if pi > pi0 else UI.LOSS
+	elif compact:
+		head.text += "  ·  %d KM/H" % int(st["top"] * 3.6)
 	var gap := Control.new()
-	gap.custom_minimum_size = Vector2(0, 3)
+	gap.custom_minimum_size = Vector2(0, 2 if compact else 3)
 	stats.add_child(gap)
 	for row in [["BESCHLEUNIGUNG", "accel", 9.0, 17.0], ["TOPSPEED", "top", 54.0, 90.0], ["GRIP", "grip", 19.0, 38.0],
 			["DRIFT", "drift", 0.0, 1.0]]:
@@ -457,7 +449,7 @@ func _show_stats(car_id: String, cfg: Dictionary, base := {}) -> void:
 		var n0 := int(round(clampf((bs[row[1]] - row[2]) / (row[3] - row[2]), 0.05, 1.0) * 10.0))
 		for k in 10:
 			var seg := ColorRect.new()
-			seg.custom_minimum_size = Vector2(9, 3)
+			seg.custom_minimum_size = Vector2(7 if compact else 9, 3)
 			seg.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 			seg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			if k < mini(n, n0):
@@ -469,18 +461,44 @@ func _show_stats(car_id: String, cfg: Dictionary, base := {}) -> void:
 			else:
 				seg.color = Color(1, 1, 1, 0.1)
 			hb.add_child(seg)
-	var top := UI.label(stats, 7, "wide", UI.DIM, 1, HORIZONTAL_ALIGNMENT_RIGHT)
-	top.text = "%d KM/H" % int(st["top"] * 3.6)
+	if not compact:
+		var top := UI.label(stats, 7, "wide", UI.DIM, 1, HORIZONTAL_ALIGNMENT_RIGHT)
+		top.text = "%d KM/H" % int(st["top"] * 3.6)
 
 
 func _set_section(text: String, with_stats := false) -> void:
 	section.text = tr(text)
-	var card: Control = stats.get_parent()
+	var card := _stats_card
 	if with_stats and not card.visible:
 		_fade_in(card)
 	card.visible = with_stats
 	if with_stats:
 		_show_stats(preview_car, preview_cfg)
+		_place_stats()
+		_place_stats.call_deferred()  # unter der Liste: erst wenn alle Einträge stehen
+
+
+## Wertekarte so legen, dass sie das Auto nicht verdeckt: im Tuning klein oben rechts unter der Statuszeile, sonst
+## links unter den Einträgen der Liste (bis 2.37 oben rechts über dem Auto)
+func _place_stats() -> void:
+	var card := _stats_card
+	card.anchor_top = 0.0
+	card.anchor_bottom = 0.0
+	if _strip_mode:
+		card.anchor_left = 1.0
+		card.anchor_right = 1.0
+		card.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+		card.offset_left = -14.0 - 200.0
+		card.offset_right = -14.0
+		card.offset_top = 32.0
+	else:
+		card.anchor_left = 0.0
+		card.anchor_right = 0.0
+		card.grow_horizontal = Control.GROW_DIRECTION_END
+		card.offset_left = 14.0
+		card.offset_right = 14.0 + menu.custom_minimum_size.x
+		card.offset_top = menu_scroll.offset_top + menu.get_combined_minimum_size().y + 12.0
+	card.offset_bottom = card.offset_top
 
 
 ## Fläche weich einblenden (Wertekarte, Karte), statt sie hart erscheinen zu lassen
@@ -489,13 +507,23 @@ func _fade_in(c: CanvasItem) -> void:
 	create_tween().tween_property(c, "modulate:a", 1.0, 0.22).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 
 
-var _cam_view := ""  # "" = Drehteller kreist, sonst Kategorie, deren Teil die Kamera zeigt
-var _cam_pos := Vector3(4.6, 1.7, 5.6)
-var _cam_look := Vector3(-1.6, 0.55, 0)
+var _cam_view := ""  # "" = ganzes Auto (Garage, Autohaus, Tuning-Übersicht), sonst Kategorie, deren Teil die Kamera zeigt
+var _cam_pos := Vector3(5.0, 1.4, -4.0)
+var _cam_look := Vector3(0, 0.6, 0)
+var _cam_snap := true  # erstes Bild: Kamera gleich am Ziel statt heranzufliegen
+var _cam_shift := Vector2.ZERO  # Lage des Ziels im Bild (-1 … 1, y nach oben), über die Objektivverschiebung
 var _work_light: OmniLight3D  # Arbeitslicht an der Kamera für Nahaufnahmen (Felgen, Motor)
 
+## Ansichten mit dem ganzen Auto: [Azimut, Höhe] in Grad (Azimut 0 = von vorn, 90 = von der Seite, 180 = von hinten;
+## die Kamera steht links vom Auto, siehe _cam_goal). Die Kamera rahmt das Auto darin selbst ein (_fit_car): so groß wie
+## möglich, ohne dass Kopf, Leiste, Farbraster oder Infofeld es verdecken, bei jedem Auto gleich (Chibi wie Raiden).
+const FULL_VIEWS := {"paint": [40.0, 8.0], "finish": [52.0, 17.0], "vinyl": [80.0, 15.0], "vinylcol": [80.0, 15.0],
+	"tint": [58.0, 8.0], "neon": [66.0, 3.5], "bodykit": [32.0, 5.0]}
 
-## Kamerapunkt und Blickziel je Tuning-Kategorie (Auto in Grundstellung: vorn -Z, rechte Seite +X)
+
+## Kamerapunkt und Blickziel je Tuning-Kategorie für Nahansichten, am Auto gemessen (vorn -Z, rechte Seite +X; _cam_goal
+## spiegelt sie auf die linke Seite). Lack, Lackart, Folierung, Scheiben, Neon und Bodykit zeigen seit 2.38 das ganze Auto
+## (FULL_VIEWS).
 func _view_for(cat: String) -> Array:
 	var spec: Dictionary = Catalog.CARS[preview_car]
 	var L: float = spec["length"]
@@ -505,39 +533,208 @@ func _view_for(cat: String) -> Array:
 	if Builder.engine_rear(Builder.SHAPES.get(preview_car, {})) and cat in ["engine", "turbo", "nitro"]:
 		cat = "nitro" if cat != "nitro" else "engine"
 	match cat:
-		"paint":
-			return [Vector3(3.4, 1.35, -3.4), Vector3(0.2, 0.55, 0.0)]
-		"finish":
-			return [Vector3(4.1, 1.65, -3.8), Vector3(0.0, 0.55, 0.25)]
 		"rims", "rimcol", "rimsize", "tires":
 			return [Vector3(W / 2.0 + 1.3, 0.45, fz - 0.9), Vector3(W / 2.0, 0.32, fz)]
 		"spur":
-			# hinter dem rechten Hinterrad, flach an der Flanke entlang nach vorn: wie weit die Räder unter den Kotflügeln
-			# stehen (seit 2.37)
+			# hinter dem Hinterrad, flach an der Flanke entlang nach vorn: wie weit die Räder unter den Kotflügeln stehen
+			# (seit 2.37)
 			return [Vector3(W / 2.0 + 0.65, 0.42, -fz + 2.1), Vector3(W / 2.0 - 0.1, 0.34, -fz)]
 		"suspension":
 			return [Vector3(W / 2.0 + 1.6, 0.55, fz - 0.6), Vector3(W / 2.0 - 0.1, 0.42, fz + 0.1)]
 		"spoiler":
 			return [Vector3(1.7, 1.55, L / 2.0 + 1.7), Vector3(0.0, 0.95, L / 2.0 - 0.35)]
-		"bodykit":
-			return [Vector3(3.2, 0.55, -2.6), Vector3(0.2, 0.35, -0.3)]
-		"vinyl", "vinylcol":
-			return [Vector3(4.0, 2.0, -1.6), Vector3(0.0, 0.6, 0.0)]
 		"hood":
 			return [Vector3(1.6, 1.9, -L / 2.0 - 1.9), Vector3(0.0, 0.75, -L / 2.0 + 1.0)]
 		"exhaust":
 			return [Vector3(1.4, 0.6, L / 2.0 + 1.6), Vector3(0.0, 0.3, L / 2.0)]
 		"lights":
 			return [Vector3(2.0, 0.9, -L / 2.0 - 2.6), Vector3(0.0, 0.5, -L / 2.0)]
-		"neon":
-			return [Vector3(3.3, 0.32, -1.6), Vector3(0.0, 0.05, 0.0)]
-		"tint":
-			return [Vector3(2.8, 1.45, -2.2), Vector3(0.0, 1.0, -0.2)]
+		# Motor und Kofferraum seit 2.38 etwas weiter weg: die offene Haube bzw. Klappe steht zwischen Infofeld und Werten
 		"engine", "turbo":
-			return [Vector3(1.3, 1.95, -L / 2.0 - 1.4), Vector3(0.0, 0.8, -L / 2.0 + 0.85)]
+			return [Vector3(1.35, 2.1, -L / 2.0 - 1.7), Vector3(0.0, 0.8, -L / 2.0 + 0.85)]
 		"nitro":
-			return [Vector3(1.3, 1.95, L / 2.0 + 1.4), Vector3(0.0, 0.85, L / 2.0 - 0.6)]
+			return [Vector3(1.1, 2.45, L / 2.0 + 1.9), Vector3(0.0, 0.82, L / 2.0 - 0.7)]
 	return [Vector3(3.6, 1.6, -4.0), Vector3(0.0, 0.6, 0.0)]
+
+
+## Blickrichtung (vom Auto zur Kamera) für Ansichten mit dem ganzen Auto, sonst null (Nahansicht eines Teils).
+## Garage: langsam von schräg vorn über die Seite bis schräg hinten und zurück; Autohaus: schräg vorn, ein neues Auto
+## kommt von rechts herein; Tuning-Übersicht schräg vorn. Alles mit leichtem Pendeln.
+func _full_dir():
+	var az := 0.0
+	var el := 0.0
+	if _cam_view == "":
+		if _strip_mode:
+			az = 38.0 + 5.0 * sin(_t * 0.13)
+			el = 11.0
+		elif _in_cars:
+			az = 66.0 + 6.0 * sin(_t * 0.15)
+			el = 9.0
+		else:
+			az = 82.0 + 44.0 * sin(_t * 0.085)
+			el = 10.0 + 2.0 * sin(_t * 0.05)
+	elif FULL_VIEWS.has(_cam_view):
+		az = FULL_VIEWS[_cam_view][0] + 4.0 * sin(_t * 0.12)
+		el = FULL_VIEWS[_cam_view][1]
+	else:
+		return null
+	var a := deg_to_rad(az)
+	var e := deg_to_rad(el)
+	return Vector3(-sin(a) * cos(e), sin(e), -cos(a) * cos(e))  # linke Seite des Autos, siehe _cam_goal
+
+
+## Freie Fläche fürs Auto in UI-Pixeln. Tuning: zwischen Kopf (Titel und Infofeld links, Werte rechts) und Leiste bzw.
+## Farbraster; die oberen Ecken bleiben dem Text, dort ist ein Auto ohnehin niedriger als in der Mitte. Sonst rechts
+## neben der Liste, über dem Infofeld und links von der Deutschlandkarte.
+func _free_rect() -> Rect2:
+	var s := _ui_size()
+	if _strip_mode:
+		var bottom := s.y - 92.0
+		if color_grid and is_instance_valid(color_grid) and color_grid.size.y > 1.0:
+			bottom = minf(bottom, color_grid.position.y - 8.0)
+		return Rect2(26.0, 86.0, s.x - 52.0, maxf(bottom - 86.0, 60.0))
+	var x0 := menu_scroll.offset_right + 6.0
+	var x1 := s.x - 18.0
+	if career_map.visible:
+		x1 = minf(x1, s.x + career_map.offset_left - 8.0)
+	var bottom := s.y - 92.0
+	if _info_panel.visible and _info_panel.size.y > 1.0:
+		bottom = minf(bottom, _info_panel.position.y - 8.0)
+	return Rect2(x0, 60.0, maxf(x1 - x0, 60.0), maxf(bottom - 60.0, 60.0))
+
+
+func _ui_size() -> Vector2:
+	return _ui.size if _ui and _ui.size.x > 1.0 and _ui.size.y > 1.0 else Vector2(640, 360)
+
+
+## Sichtkegel und freie Fläche in Bildkoordinaten (-1 … 1, y nach oben): [tan_h, tan_v, u0, u1, v0, v1, halbe Breite,
+## halbe Höhe, Mitte u, Mitte v]
+func _frustum(rect: Rect2) -> Array:
+	var s := _ui_size()
+	var tv := tan(deg_to_rad(cam.fov) * 0.5)
+	var th := tv * s.x / s.y
+	var u0 := rect.position.x / s.x * 2.0 - 1.0
+	var u1 := rect.end.x / s.x * 2.0 - 1.0
+	var v0 := 1.0 - rect.end.y / s.y * 2.0
+	var v1 := 1.0 - rect.position.y / s.y * 2.0
+	return [th, tv, u0, u1, v0, v1, (u1 - u0) / 2.0, (v1 - v0) / 2.0, (u0 + u1) / 2.0, (v0 + v1) / 2.0]
+
+
+## Kamera, die das ganze Auto (Umriss _hull) in die freie Fläche setzt: der kleinste Abstand, bei dem das Bild des
+## Umrisses hineinpasst (Halbierungssuche, Start bei einer sicheren Lösung), dann per Objektivverschiebung mittig in die
+## Fläche geschoben (der Blickwinkel bleibt). dir zeigt vom Auto zur Kamera. Rückgabe [Kamerapunkt, Blickziel, Lage des
+## Ziels im Bild u, v]. Gerechnet wird nur, wenn sich Richtung, Fläche oder Auto merklich geändert haben.
+var _fit_key := []
+var _fit_out := []
+var _fit_hi := 4.0  # Abstand der letzten Rechnung
+
+
+func _fit_car(dir: Vector3, rect: Rect2) -> Array:
+	var z := dir.normalized()
+	var f := _frustum(rect)
+	var blocks := _blocks(f)
+	if not _fit_key.is_empty() and _fit_key[0] == _hull and (_fit_key[1] as Rect2).is_equal_approx(rect) \
+			and (_fit_key[2] as Vector3).dot(z) > 0.99995 and _fit_key[3] == blocks:
+		# Abstand und Verschiebung ändern sich mit der Richtung kaum, die Lage aber in jedem Bild (sonst bliebe die
+		# Kamera beim langsamen Schwenk in der Garage kurz stehen und spränge dann um gut ein halbes Grad)
+		return [_hull_c + z * _fit_hi, _hull_c, _fit_out[2], _fit_out[3]]
+	var x := Vector3.UP.cross(z).normalized()
+	var y := z.cross(x)
+	var th: float = f[0]
+	var tv: float = f[1]
+	var hw: float = f[6]
+	var hh: float = f[7]
+	var cs := PackedVector3Array()
+	var hi := 2.0
+	for p in _hull:
+		var r: Vector3 = p - _hull_c
+		var c := Vector3(r.dot(x), r.dot(y), r.dot(z))
+		cs.append(c)
+		hi = maxf(hi, maxf(absf(c.x) / (hw * th), absf(c.y) / (hh * tv)) + c.z)  # passt sicher (Ziel in der Mitte)
+	# Felder in den oberen Ecken (Infofeld links, Werte rechts): dort darf auch ein hoher Heckflügel nicht hineinragen
+	hi = minf(hi * (1.25 if not blocks.is_empty() else 1.0), 18.0)
+	var lo := hi * 0.35
+	for it in 13:
+		var d := (lo + hi) * 0.5
+		var e := _extent(cs, d, th, tv)
+		var ok := e.y - e.x <= 2.0 * hw and e.w - e.z <= 2.0 * hh
+		if ok and not blocks.is_empty():
+			ok = not _hits(cs, d, th, tv, Vector2(float(f[8]) - (e.x + e.y) * 0.5, float(f[9]) - (e.z + e.w) * 0.5), blocks)
+		if ok:
+			hi = d
+		else:
+			lo = d
+	var ex := _extent(cs, hi, th, tv)
+	_fit_key = [_hull, rect, z, blocks]
+	_fit_hi = hi
+	_fit_out = [_hull_c + z * hi, _hull_c, float(f[8]) - (ex.x + ex.y) * 0.5, float(f[9]) - (ex.z + ex.w) * 0.5]
+	return _fit_out
+
+
+## Flächen der Oberfläche, die über der freien Fläche liegen (Tuning: Infofeld oben links, Werte oben rechts), in
+## Bildkoordinaten (u0, v0, u1, v1), mit etwas Rand
+func _blocks(f: Array) -> Array:
+	var out := []
+	if not _strip_mode:
+		return out
+	var s := _ui_size()
+	for c in [_info_panel, _stats_card]:
+		var ctl := c as Control
+		if ctl.visible and ctl.size.y > 1.0:
+			var r := ctl.get_rect().grow(4.0)
+			out.append(Vector4(r.position.x / s.x * 2.0 - 1.0, 1.0 - r.end.y / s.y * 2.0, r.end.x / s.x * 2.0 - 1.0, 1.0 - r.position.y / s.y * 2.0))
+	return out
+
+
+## Liegt ein Punkt des Umrisses (bei Abstand d, Bild um shift verschoben) in einer der Flächen?
+static func _hits(cs: PackedVector3Array, d: float, th: float, tv: float, shift: Vector2, blocks: Array) -> bool:
+	for c in cs:
+		var w := 1.0 / maxf(d - c.z, 0.05)
+		var u := c.x * w / th + shift.x
+		var v := c.y * w / tv + shift.y
+		for b in blocks:
+			if u > b.x and u < b.z and v > b.y and v < b.w:
+				return true
+	return false
+
+
+## Ausdehnung des Umrisses im Bild (ohne Verschiebung) bei Abstand d: (u min, u max, v min, v max)
+static func _extent(cs: PackedVector3Array, d: float, th: float, tv: float) -> Vector4:
+	var e := Vector4(INF, -INF, INF, -INF)
+	for c in cs:
+		var w := 1.0 / maxf(d - c.z, 0.05)
+		var u := c.x * w / th
+		var v := c.y * w / tv
+		e.x = minf(e.x, u)
+		e.y = maxf(e.y, u)
+		e.z = minf(e.z, v)
+		e.w = maxf(e.w, v)
+	return e
+
+
+## Kamera im Abstand d vom Ziel in Richtung z, das Ziel erscheint in der Mitte der freien Fläche
+func _place(target: Vector3, z: Vector3, d: float, f: Array) -> Array:
+	return [target + z * d, target, float(f[8]), float(f[9])]
+
+
+## Ziel der Kamera in Hallenkoordinaten. Gerechnet wird am Auto (vorn -Z), und zwar auf seiner linken Seite: der
+## Stellplatz ist um 180° gedreht, das Auto zeigt mit der Front nach links zum Menü, ein neues kommt rechts von hinten
+## herein und das alte fährt links hinaus. Hinter dem Auto steht so die Werkzeugwand. Die Nahansichten aus _view_for
+## (für die rechte Seite beschrieben) werden dafür gespiegelt.
+func _cam_goal() -> Array:
+	var rect := _free_rect().grow(-6.0)
+	var dir = _full_dir()
+	var g: Array
+	if dir != null:
+		g = _fit_car(dir, rect).duplicate()
+	else:
+		var v := _view_for(_cam_view)
+		var m := Vector3(-1.0, 1.0, 1.0)
+		var to: Vector3 = (v[0] - v[1]) * m
+		g = _place(v[1] * m, to.normalized(), to.length(), _frustum(rect))
+	g[0] = stand.transform * (g[0] as Vector3)
+	g[1] = stand.transform * (g[1] as Vector3)
+	return g
 
 
 func _label(parent: Node, size: int, align := HORIZONTAL_ALIGNMENT_LEFT) -> Label:
@@ -556,31 +753,20 @@ func _process(dt: float) -> void:
 		tw.tween_property(tip, "modulate:a", 0.0, 0.25)
 		tw.tween_callback(func(): tip.text = tr("TIPP: ") + tr(TIPS[_tip_i]))
 		tw.tween_property(tip, "modulate:a", 1.0, 0.35)
-	var goal_pos := Vector3(4.6 + sin(_t * 0.2) * 0.2, 1.7 + sin(_t * 0.3) * 0.08, 5.6)
-	var goal_look := Vector3(-1.6, 0.55, 0)
-	var goal_off := 0.0
-	if _cam_view == "":
-		turntable.rotation.y += dt * 0.3
-	else:
-		# Tuning: Auto dreht in Grundstellung, Kamera fährt an das Teil heran (Ziel rechts vom Menü)
-		turntable.rotation.y = lerp_angle(turntable.rotation.y, 0.0, 1.0 - exp(-dt * 4.0))
-		var v := _view_for(_cam_view)
-		goal_pos = v[0] + Vector3(0, sin(_t * 0.4) * 0.02, 0)
-		goal_look = v[1]
-		goal_off = -0.2 * goal_pos.distance_to(goal_look)
-	var goal_v := 0.0
-	if _strip_mode:
-		# Leiste unten: Auto mittig und etwas höher im Bild
-		goal_off = 0.0
-		goal_v = -0.1 * goal_pos.distance_to(goal_look)
-	var k := 1.0 - exp(-dt * 3.5)
-	_cam_pos = _cam_pos.lerp(goal_pos, k)
-	_cam_look = _cam_look.lerp(goal_look, k)
-	cam.h_offset = lerpf(cam.h_offset, goal_off, k)
-	cam.v_offset = lerpf(cam.v_offset, goal_v, k)
+	_roll_road(dt)
+	# Kamera gleitet zur Ansicht (ganzes Auto oder Teil), das Auto bleibt dabei in der freien Fläche
+	var g := _cam_goal()
+	var k := 1.0 if _cam_snap else 1.0 - exp(-dt * 3.5)
+	_cam_snap = false
+	_cam_pos = _cam_pos.lerp(g[0], k)
+	_cam_look = _cam_look.lerp(g[1], k)
+	_cam_shift = _cam_shift.lerp(Vector2(g[2], g[3]), k)
+	var tv := tan(deg_to_rad(cam.fov) * 0.5)
+	cam.size = 2.0 * cam.near * tv
+	cam.frustum_offset = Vector2(-_cam_shift.x * tv * _ui_size().x / _ui_size().y, -_cam_shift.y * tv) * cam.near
 	cam.position = _cam_pos
 	cam.look_at(_cam_look)
-	_work_light.light_energy = lerpf(_work_light.light_energy, 0.0 if _cam_view == "" else 1.0, k)
+	_work_light.light_energy = lerpf(_work_light.light_energy, 0.0 if _full_dir() != null else 1.0, k)
 	var st := tr("LEVEL %d   ·   %s   ·   SIEGE %d   ·   %s") % [GameState.level(), GameState.title_name().to_upper(), GameState.wins + GameState.drift_wins,
 		Catalog.CARS[GameState.current_car]["name"].to_upper()]
 	if st != _status_text:
@@ -589,15 +775,321 @@ func _process(dt: float) -> void:
 		_xp_line.queue_redraw()
 
 
+# --- Rollenprüfstand (seit 2.38) --------------------------------------------------------------------------------------
+## Das Auto fährt auf einem Laufband auf der Stelle: die Räder drehen im Reisetempo, das Band läuft unter ihm nach hinten,
+## Spiegelungen ziehen über den Lack, die Federung arbeitet leicht. Wo man an den Rädern oder aus der Nähe an einem Teil
+## arbeitet (STOP_CATS), rollt es sanft aus und hält mit kurz aufleuchtenden Bremslichtern; zurück in einer Ansicht mit
+## dem ganzen Auto fährt es wieder an. Ein anderes Auto fährt hinten durchs Tor herein und bremst auf seinen Platz, das
+## bisherige fährt vorn hinaus.
+const CRUISE := 7.0  # m/s auf dem Band (gut 25 km/h)
+## Räder (Felgen, Felgenfarbe, Zoll, Spur, Reifen) und Arbeit aus der Nähe (Fahrwerk, Motor, Turbo, Nitro bei offener
+## Haube bzw. Klappe, Motorhaube, Auspuff, Spoiler, Scheinwerfer): hier steht das Auto still
+const STOP_CATS := ["rims", "rimcol", "rimsize", "spur", "tires", "suspension", "engine", "turbo", "nitro", "hood", "exhaust",
+	"spoiler", "lights"]
+const IN_FROM := 11.5  # Einfahrt beginnt am hinteren Tor (Mitte des Autos, m hinter dem Stellplatz)
+const IN_TIME := 1.25  # s bis zum Stillstand auf dem Platz (bei schnellem Wechsel kürzer)
+const OUT_ACC := 13.0  # m/s² beim Hinausfahren
+var _hall := {}  # GarageSet.build: belt, rotor, glints
+var _belt_v := 0.0  # Tempo des Bands (m/s)
+var _belt_a := 0.0
+var _belt_x := 0.0  # Weg des Bands (m), für das Muster
+var _roll: RollCar  # Auto auf dem Stellplatz bzw. auf dem Weg dorthin
+var _leaving: Array = []  # Autos, die vorn hinausfahren (höchstens zwei)
+var _shown_id := ""
+var _shown_cfg := {}
+var _switch_ms := -100000  # letzter Autowechsel (schnell hintereinander: kürzere Einfahrt)
+var _hull := PackedVector3Array()  # Umriss des Autos auf dem Platz (Kamera, _car_hull)
+var _hull_c := Vector3(0.0, 0.6, 0.0)  # seine Mitte
+
+
+## Ein Auto auf dem Prüfstand: Lage entlang des Bands (z, + hinten), Tempo gegenüber der Halle (v, vorwärts positiv),
+## Bremslichter, Nicken der Karosserie als gedämpfte Feder, leichtes Wippen beim Fahren
+class RollCar:
+	var node: Node3D
+	var body: Node3D
+	var body_y := 0.0
+	var lamps := []  # [Material, Grundhelligkeit] der roten Leuchten
+	var glow: StandardMaterial3D  # Leuchthof hinten
+	var glow_c := Color.BLACK
+	var spill: OmniLight3D  # roter Schein der Bremslichter auf dem Boden hinter dem Auto (auch von vorn zu sehen)
+	var phase := 0  # 0 auf dem Platz, 1 fährt herein, 2 fährt hinaus
+	var z := 0.0
+	var v := 0.0
+	var t := 0.0
+	var dur := 1.0
+	var z0 := 0.0
+	var pitch := 0.0
+	var pitch_v := 0.0
+	var brake := 0.0
+	var seed := 0.0
+
+	func _init(n: Node3D) -> void:
+		node = n
+		body = n.get_meta("body")
+		body_y = body.position.y
+		seed = randf() * 50.0
+		spill = OmniLight3D.new()
+		spill.light_color = Color(1.0, 0.07, 0.03)
+		spill.light_energy = 0.0
+		spill.light_specular = 0.2
+		spill.omni_range = 2.6
+		spill.light_cull_mask = 0xFFFFF & ~Builder.CAR_LAYER  # nur Band und Boden, nicht das Auto selbst
+		spill.position = Vector3(0, 0.3, float(n.get_meta("length")) / 2.0 + 0.45)
+		spill.visible = false
+		n.add_child(spill)
+		var seen := {}
+		var stack: Array = [n]
+		while not stack.is_empty():
+			var nd: Node = stack.pop_back()
+			stack.append_array(nd.get_children())
+			if not nd is MeshInstance3D:
+				continue
+			var mi := nd as MeshInstance3D
+			if mi.has_meta("glow") and float(mi.get_meta("glow")) > 0.0 and mi.material_override is StandardMaterial3D:
+				glow = mi.material_override
+				glow_c = glow.albedo_color
+			var ms := [mi.material_override]
+			if mi.mesh:
+				for si in mi.mesh.get_surface_count():
+					ms.append(mi.get_surface_override_material(si))
+					ms.append(mi.mesh.surface_get_material(si))
+			for m in ms:
+				# Rückleuchten, Bremsleuchte, Lichtbänder: rot leuchtend (Blinker sind orange, das Neon hat kein Leuchten)
+				if m is StandardMaterial3D and not seen.has(m) and m.emission_enabled and m.emission.r > 0.6 and m.emission.g < 0.2:
+					seen[m] = true
+					lamps.append([m, m.emission_energy_multiplier])
+
+	func arrive(from: float, time: float, delay: float) -> void:
+		phase = 1
+		z0 = from
+		dur = time
+		t = -delay
+		z = from
+		v = 2.0 * from / time
+		node.position.z = z
+		node.visible = delay <= 0.0
+
+	## Lage, Tempo und Federung eines Vorgängers übernehmen (gleiches Auto mit anderen Teilen)
+	func take(o: RollCar) -> void:
+		phase = o.phase
+		z = o.z
+		v = o.v
+		t = o.t
+		dur = o.dur
+		z0 = o.z0
+		pitch = o.pitch
+		pitch_v = o.pitch_v
+		brake = o.brake
+		node.position.z = z
+		node.visible = o.node.visible
+
+	func step(dt: float, belt: float, belt_a: float, now: float) -> void:
+		var acc := 0.0  # gegenüber der Halle, vorwärts positiv
+		if phase == 1:
+			t += dt
+			if t < 0.0:
+				return  # wartet hinter dem Tor, bis der Vorgänger Platz gemacht hat
+			node.visible = true
+			var u := minf(t / dur, 1.0)
+			z = z0 * (1.0 - u) * (1.0 - u)  # gleichmäßig gebremst bis zum Stillstand auf dem Platz
+			v = 2.0 * z0 * (1.0 - u) / dur
+			acc = -2.0 * z0 / (dur * dur)
+			if u >= 1.0:
+				phase = 0
+				z = 0.0
+				v = 0.0
+				acc = 0.0
+		elif phase == 2:
+			t += dt
+			acc = OUT_ACC
+			v += acc * dt
+			z -= v * dt
+		node.position.z = z
+		var wheel := belt + v
+		var braking := acc < -1.0 or belt_a < -0.8
+		brake = move_toward(brake, 1.0 if braking else 0.0, dt * (14.0 if braking else 3.0))
+		# Nicken: Feder (1,4 Hz, wenig gedämpft) zur Lage, die die Beschleunigung vorgibt: beim Bremsen geht der Bug runter,
+		# beim Anhalten federt er zurück
+		var target := clampf((acc + belt_a * 0.6) * 0.0024, -0.03, 0.03)
+		var w := 8.8
+		pitch_v += (-(pitch - target) * w * w - 2.0 * 0.3 * w * pitch_v) * dt
+		pitch += pitch_v * dt
+		var k := clampf(wheel / CRUISE, 0.0, 1.0)
+		Builder.animate(node, wheel, 0.0, 0.0, 0.0, false, dt)
+		body.rotation.x = pitch + 0.0016 * sin(now * 5.1 + seed) * k
+		body.rotation.z = 0.0014 * sin(now * 4.3 + seed * 1.3) * k
+		body.position.y = body_y + 0.0024 * (sin(now * 7.3 + seed) * 0.6 + sin(now * 12.1 + seed * 1.7) * 0.4) * k
+		for e in lamps:
+			(e[0] as StandardMaterial3D).emission_energy_multiplier = float(e[1]) * (1.0 + 1.6 * brake)
+		if glow:
+			var gm := 1.0 + 1.4 * brake
+			glow.albedo_color = Color(glow_c.r * gm, glow_c.g * gm, glow_c.b * gm, glow_c.a)
+		spill.visible = brake > 0.01
+		spill.light_energy = 1.6 * brake
+
+
+## Laufband, Gebläse, Spiegelungen und Autos je Bild. Das Band folgt seinem Ziel (Reisetempo oder Stillstand) als
+## kritisch gedämpfte Feder: weich anfahren, weich ausrollen, auch wenn das Ziel beim Blättern unterwegs wechselt.
+func _roll_road(dt: float) -> void:
+	var target := 0.0 if _cam_view in STOP_CATS else CRUISE
+	var w := 4.4 if target < _belt_v else 3.0  # Anhalten in gut einer Sekunde, Anfahren etwas gemächlicher
+	_belt_a += ((target - _belt_v) * w * w - 2.0 * w * _belt_a) * dt
+	_belt_v = maxf(_belt_v + _belt_a * dt, 0.0)
+	if absf(target - _belt_v) < 0.01 and absf(_belt_a) < 0.05:
+		_belt_v = target
+		_belt_a = 0.0
+	_belt_x = fmod(_belt_x + _belt_v * dt, 1320.0)  # Vielfaches beider Teilungen im Muster (1,2 m und 11 cm)
+	var bm: ShaderMaterial = _hall["belt"]
+	bm.set_shader_parameter("offset", _belt_x)
+	bm.set_shader_parameter("blur", _belt_v * dt / 0.11)
+	(_hall["rotor"] as Node3D).rotation.z -= _belt_v * dt * 2.4
+	# zwei Lichter, die nur das Auto treffen, ziehen mit dem Band von vorn nach hinten: Spiegelungen wandern über Dach,
+	# Haube und Flanke wie Lampen bei der Fahrt; im Stand blenden sie aus
+	var span := 9.0
+	var gl: Array = _hall["glints"]
+	for i in gl.size():
+		var l: OmniLight3D = gl[i]
+		var u := fposmod(_belt_x / span + i * 0.5, 1.0)
+		# auf der Seite der Kamera, von der Front (+Z in der Halle) zum Heck
+		l.position = Vector3(1.0 if i == 0 else 2.8, 2.4 if i == 0 else 1.0, span / 2.0 - u * span)
+		l.light_energy = 0.4 * sin(PI * u) * clampf(_belt_v / CRUISE, 0.0, 1.0)
+	if _roll:
+		_roll.step(dt, _belt_v, _belt_a, _t)
+	for i in range(_leaving.size() - 1, -1, -1):
+		var rc: RollCar = _leaving[i]
+		rc.step(dt, _belt_v, _belt_a, _t)
+		if rc.z < -16.0 or rc.t > 3.5:
+			rc.node.queue_free()
+			_leaving.remove_at(i)
+
+
+## Auto auf den Stand bringen. Gleiches Auto mit gleichen Teilen: bleibt stehen (nur Haube und Kofferraum zu); gleiches
+## Auto mit anderen Teilen: tauscht an Ort und Stelle (Lage, Tempo, Federung bleiben); anderes Auto: das bisherige fährt
+## vorn hinaus, das neue kommt hinten durchs Tor und bremst auf seinen Platz. Es wartet hinter dem Tor, bis der Vorgänger
+## weit genug weg ist (nie ineinander), bei schnellem Wechsel ist die Einfahrt kürzer, und mehr als zwei Autos fahren
+## nie zugleich hinaus.
 func _show_car(car_id: String, cfg: Dictionary) -> void:
+	if car_node and car_id == _shown_id and cfg == _shown_cfg:
+		Builder.showcase(car_node, car_id, cfg, "")
+		return
 	var t0 := Time.get_ticks_usec()
-	if car_node:
-		car_node.queue_free()
-	car_node = Builder.build(car_id, cfg, false, false, false)
-	turntable.add_child(car_node)
-	car_node.position.y = 0.06
+	var node := Builder.build(car_id, cfg, false, false, false)
+	stand.add_child(node)
+	var rc := RollCar.new(node)
+	var old := _roll
+	if old != null:
+		if car_id == _shown_id:
+			rc.take(old)
+			old.node.queue_free()
+		else:
+			var hurry := Time.get_ticks_msec() - _switch_ms < 1800
+			_switch_ms = Time.get_ticks_msec()
+			var from := IN_FROM * (0.8 if hurry else 1.0)
+			var time := IN_TIME * (0.75 if hurry else 1.0)
+			if old.phase == 1 and old.t < 0.0:
+				old.node.queue_free()  # wartete noch hinter dem Tor
+				var ahead: RollCar = _leaving.back() if not _leaving.is_empty() else null
+				rc.arrive(from, time, _arrival_delay(ahead, node, from, time))
+			else:
+				old.phase = 2
+				old.t = 0.0
+				_leaving.append(old)
+				while _leaving.size() > 2:
+					(_leaving.pop_front() as RollCar).node.queue_free()
+				rc.arrive(from, time, _arrival_delay(old, node, from, time))
+	car_node = node
+	_roll = rc
+	_shown_id = car_id
+	_shown_cfg = cfg.duplicate()
+	# Umriss je Auto und Form merken: beim Blättern durch Farben ändert sich nichts daran (das Lesen der Karosserie
+	# aus dem Grafikspeicher hält im Browser kurz an)
+	var hk := _hull_key(car_id, cfg)
+	if _hull_cache.has(hk):
+		_hull = _hull_cache[hk]
+	else:
+		_hull = _car_hull(node)
+		if _hull_cache.size() >= 32:
+			_hull_cache.clear()
+		_hull_cache[hk] = _hull
+	var hb := AABB(_hull[0], Vector3.ZERO)
+	for p in _hull:
+		hb = hb.expand(p)
+	_hull_c = hb.get_center()
 	if OS.get_cmdline_user_args().has("--loadlog"):
 		print("GARAGE build %s %.1f ms" % [car_id, (Time.get_ticks_usec() - t0) / 1000.0])
+
+
+## Wie lange das neue Auto hinter dem Tor wartet, damit es den hinausfahrenden Vorgänger nie berührt (Abstand der
+## Mitten mindestens halbe Längen beider plus 40 cm über die ganze Einfahrt)
+func _arrival_delay(prev: RollCar, node: Node3D, from: float, time: float) -> float:
+	if prev == null:
+		return 0.0
+	var need := (float(prev.node.get_meta("length")) + float(node.get_meta("length"))) / 2.0 + 0.4
+	var delay := 0.0
+	while delay < 1.0:
+		var ok := true
+		for i in 25:
+			var tt := delay + time * i / 24.0
+			var zo := prev.z - prev.v * tt - 0.5 * OUT_ACC * tt * tt
+			var u := (tt - delay) / time
+			if from * (1.0 - u) * (1.0 - u) - zo < need:
+				ok = false
+				break
+		if ok:
+			return delay
+		delay += 0.05
+	return delay
+
+
+## Umriss des Autos für die Kamera, in seinen eigenen Koordinaten: die konvexe Hülle (in C++, Mesh.create_convex_shape)
+## aus den Punkten der Karosserie (jeder vierte) und den Ecken aller übrigen Teile (Stoßfänger, Räder, Spoiler, Spiegel).
+## Leuchthöfe und Neon-Lichtfleck zählen nicht (werfen keinen Schatten). Ein Quader wäre zu grob: von schräg oben ragen
+## seine oberen Ecken weit über das Dach hinaus, das Auto stünde viel zu klein im Bild.
+## Teile, die nur Farbe oder Licht ändern, nicht die Form (für den Merkzettel der Umrisse)
+const LOOK_ONLY := ["paint", "finish", "rimcol", "vinyl", "vinylcol", "neon", "tint", "lights"]
+static var _hull_cache := {}
+
+
+static func _hull_key(car_id: String, cfg: Dictionary) -> String:
+	var k := car_id
+	for cat in Catalog.PART_ORDER:
+		if not cat in LOOK_ONLY:
+			k += ":%d" % int(cfg.get(cat, 0))
+	return k
+
+
+static func _car_hull(n: Node3D) -> PackedVector3Array:
+	var pts := PackedVector3Array()
+	var stack: Array = [[n, Transform3D.IDENTITY]]
+	while not stack.is_empty():
+		var e: Array = stack.pop_back()
+		var xf: Transform3D = e[1]
+		for c in (e[0] as Node).get_children():
+			if not c is Node3D:
+				continue
+			var cx := xf * (c as Node3D).transform
+			stack.append([c, cx])
+			var mi := c as MeshInstance3D
+			if mi == null or not mi.visible or mi.mesh == null or mi.cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_OFF:
+				continue
+			var bb := mi.mesh.get_aabb()
+			if bb.size.length() > 2.5 and mi.mesh is ArrayMesh:
+				for si in mi.mesh.get_surface_count():
+					var vs: PackedVector3Array = mi.mesh.surface_get_arrays(si)[Mesh.ARRAY_VERTEX]
+					for i in range(0, vs.size(), 4):
+						pts.append(cx * vs[i])
+			else:
+				for k in 8:
+					pts.append(cx * bb.get_endpoint(k))
+	if pts.size() < 4:
+		return PackedVector3Array([Vector3(-0.9, 0.0, -2.2), Vector3(0.9, 0.0, -2.2), Vector3(-0.9, 1.3, 2.2), Vector3(0.9, 1.3, 2.2)])
+	var arr := []
+	arr.resize(Mesh.ARRAY_MAX)
+	arr[Mesh.ARRAY_VERTEX] = pts
+	var am := ArrayMesh.new()
+	am.add_surface_from_arrays(Mesh.PRIMITIVE_POINTS, arr)
+	var hull: PackedVector3Array = am.create_convex_shape(true, false).points
+	return hull if hull.size() >= 4 else pts
 
 
 # --- Menüs ----------------------------------------------------------------
@@ -607,6 +1099,7 @@ func _clear_menu() -> void:
 		color_grid.queue_free()
 		color_grid = null
 	_info_panel.visible = true
+	_in_cars = false
 	_strip_on(false)
 	career_map.visible = false
 	menu_scroll.scroll_vertical = 0
@@ -1652,7 +2145,8 @@ func _show_color_grid(cat: String, group: String) -> void:
 	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	title.size_flags_vertical = Control.SIZE_FILL
 	var grid := GridContainer.new()
-	grid.columns = mini(8, opts.size())
+	# eine Reihe bis 11 Farben, sonst zwei (seit 2.38; vorher acht Spalten, beim Lack drei Reihen über dem Auto)
+	grid.columns = opts.size() if opts.size() <= 11 else ceili(opts.size() / 2.0)
 	grid.add_theme_constant_override("h_separation", 6)
 	grid.add_theme_constant_override("v_separation", 6)
 	vb.add_child(grid)
@@ -1809,22 +2303,34 @@ func _strip_on(on: bool) -> void:
 	strip.visible = on
 	menu_scroll.visible = not on
 	_fade_left.visible = not on
+	# Tuning: Infofeld klein oben links unter dem Titel (seit 2.38; vorher links über der Leiste, wo es Räder und Front
+	# verdeckte), Tipps aus, Werte klein oben rechts. Das Auto hat die Mitte für sich.
+	tip.visible = not on
 	if on:
 		_info_panel.anchor_left = 0.0
 		_info_panel.anchor_right = 0.0
+		_info_panel.anchor_top = 0.0
+		_info_panel.anchor_bottom = 0.0
+		_info_panel.grow_vertical = Control.GROW_DIRECTION_END
 		_info_panel.offset_left = 14.0
-		_info_panel.offset_right = 290.0
-		_info_panel.offset_top = -96.0  # wächst nach oben, so hoch wie der Text
-		_info_panel.offset_bottom = -96.0
+		_info_panel.offset_right = 14.0 + 232.0
+		_info_panel.offset_top = 80.0  # wächst nach unten, so hoch wie der Text
+		_info_panel.offset_bottom = 80.0
+		info.custom_minimum_size.x = 208.0
 		_set_keys(KEYS_STRIP)
 	else:
 		_info_panel.anchor_left = 1.0
 		_info_panel.anchor_right = 1.0
+		_info_panel.anchor_top = 1.0
+		_info_panel.anchor_bottom = 1.0
+		_info_panel.grow_vertical = Control.GROW_DIRECTION_BEGIN
 		_info_panel.offset_left = -300.0
 		_info_panel.offset_right = -14.0
 		_info_panel.offset_top = -82.0
 		_info_panel.offset_bottom = -28.0
+		info.custom_minimum_size.x = 258.0
 		_set_keys(KEYS_MENU)
+	_place_stats()
 
 
 func _clear_strip() -> void:
@@ -2117,9 +2623,17 @@ func _part_info(cat: String, idx: int) -> void:
 	info.text = t
 
 
+## Autohaus: jedes Auto zeigt sich mit der Optik, die es beim Wechsel bekäme (seit 2.38 kommt sie mit, siehe
+## GameState.switch_car). Ein anderes Auto fährt hinten herein, das bisherige vorn hinaus.
 func _show_cars() -> void:
 	_clear_menu()
 	_back = _show_main
+	_in_cars = true
+	if not Catalog.CARS.has(preview_car):
+		preview_car = GameState.current_car
+	preview_cfg = GameState.switch_config(preview_car)
+	if car_node == null or _shown_id != preview_car:
+		_show_car(preview_car, preview_cfg)
 	_set_section("AUTOHAUS", true)
 	var b := _button("", func(): _cycle_car(1))
 	b.set_meta("car", true)
@@ -2131,13 +2645,17 @@ func _show_cars() -> void:
 	_focus_first()
 
 
+## Blättern: Werte und Text sofort, das Auto erst, wenn man kurz stehen bleibt (_update_preview). Schnelles Blättern
+## baut so nicht jedes Auto (das kostete jedes Mal einen Ruckler), und es fahren nie mehrere Autos auf einmal herein.
 func _cycle_car(dir: int) -> void:
 	Sfx.ui("change")
 	var i := Catalog.CAR_ORDER.find(preview_car)
 	preview_car = Catalog.CAR_ORDER[posmod(i + dir, Catalog.CAR_ORDER.size())]
-	preview_cfg = GameState.get_config(preview_car).duplicate()
-	_show_car(preview_car, preview_cfg)
+	preview_cfg = GameState.switch_config(preview_car)
 	_refresh_car()
+	_pv_cat = ""
+	_pv_pending = true
+	_pv_t = 0.14
 
 
 ## Autowahl: "‹ NAME ›" links (Links/Rechts blättert), rechts Nummer und ggf. GESPERRT; die Wertekarte zeigt Name
@@ -2155,6 +2673,8 @@ func _refresh_car() -> void:
 		+ tr("\nAntrieb: ") + tr({"fwd": "Frontantrieb", "rwd": "Heckantrieb", "mr": "Mittelmotor, Heckantrieb", "rr": "Heckmotor, Heckantrieb", "awd": "Allrad"}[spec.get("drive", "rwd")])
 	if not unlocked:
 		info.text += tr("\nFreischalten: ") + GameState.unlock_text(preview_car)
+	elif preview_car != GameState.current_car and GameState.has_looks(GameState.current_car):
+		info.text += tr("\nDeine Optik kommt mit: Lack, Felgen, Folie und alle anderen Teile.")
 
 
 func _stars(v: float, lo: float, hi: float) -> String:
@@ -2162,10 +2682,11 @@ func _stars(v: float, lo: float, hi: float) -> String:
 	return "#".repeat(n) + ".".repeat(5 - n)
 
 
+## Auto übernehmen: die Optik kommt mit (GameState.switch_car), das Auto steht schon so auf dem Band
 func _choose_car() -> void:
 	if GameState.is_car_unlocked(preview_car):
 		Sfx.ui("install")
-		GameState.current_car = preview_car
+		GameState.switch_car(preview_car)
 		GameState.save_game()
 		_show_main()
 

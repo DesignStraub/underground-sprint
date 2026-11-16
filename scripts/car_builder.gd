@@ -1431,7 +1431,12 @@ static func vinyl_params(m: ShaderMaterial, car_id: String, cfg: Dictionary) -> 
 		if tree and not tree.process_frame.is_connected(_poll_vinyls):
 			tree.process_frame.connect(_poll_vinyls)
 	else:
-		m.set_shader_parameter("vinyl_tex", load(path))
+		# Bild fehlt (Projekt ohne Editor gestartet, neue Bilder nie importiert): ohne Motiv statt ganz weiß (2.38)
+		var tex: Texture2D = load(path)
+		if tex == null:
+			m.set_shader_parameter("vinyl_on", 0.0)
+			return
+		m.set_shader_parameter("vinyl_tex", tex)
 		m.set_shader_parameter("vinyl_on", 1.0)
 	m.set_shader_parameter("vinyl_box", Vector4(-L / 2.0, L, CLEARANCE + 0.05, float(S["belt"]) + 0.02))
 	m.set_shader_parameter("vinyl_hw", float(spec["width"]) / 2.0 + kit_flare(cfg) + 0.03)

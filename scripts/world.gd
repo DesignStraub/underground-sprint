@@ -21,6 +21,7 @@ const Traffic := preload("res://scripts/traffic_car.gd")
 const Challenger := preload("res://scripts/challenger_car.gd")
 const Builder := preload("res://scripts/car_builder.gd")
 const WorldTour := preload("res://scripts/world_tour.gd")
+const WorldIntro := preload("res://scripts/world_intro.gd")
 const DUEL_GAP := 300.0  # so viel Vorsprung entscheidet ein Duell
 
 const LOAD_PAD := 700.0  # Strecke bauen, wenn man so nah am Rand ihres Umkreises ist
@@ -38,6 +39,7 @@ static var has_return := false
 static var _tt_stage := 0  # Test --wtravel: 0 Karte öffnen, 1 Leertaste drücken, 2 gereist
 var _tt_t := 0.0
 static var target := -1  # auf der Karte gewähltes Ziel (Rennen), gilt für diese Sitzung
+static var _travel_arrival := false  # Schnellreise: beim Neuladen den kurzen Anflug zeigen
 
 var world: SubViewport
 var player: CharacterBody3D
@@ -97,6 +99,8 @@ var _ch_prompt := false
 var _off_ring_t := 0.0
 var _ch_log := 0.0
 var quiet := false  # Tests (--wtour): kein Verkehr, keine Herausforderer
+## Anflug von oben nach dem Laden (world_intro.gd); solange er läuft: nicht fahren, nichts nachbauen, HUD aus
+var _intro: Node = null
 
 
 func _ready() -> void:
@@ -135,6 +139,7 @@ func _ready() -> void:
 	Traffic.prewarm()
 	_setup_environment()
 
+	var returning := has_return  # Rückkehr aus Rennen oder Garage (_spawn_xf setzt es zurück)
 	var spawn := _spawn_xf()
 	# alles in der Nähe gleich bauen (hinter dem Ladebild)
 	var near := entries.filter(func(e): return _dist(e, spawn.origin) < LOAD_PAD * 0.6)
@@ -160,7 +165,8 @@ func _ready() -> void:
 	pc.accel *= 0.8 + 0.2 * GameState.pace()
 	pc.place(spawn)
 	pc.drift_mode = GameState.world_drift or OS.get_cmdline_user_args().has("--botdrift")
-	pc.controls_enabled = true
+	var zoom := _intro_kind(returning)
+	pc.controls_enabled = zoom == ""  # mit Anflug erst, wenn die Kamera hinter dem Auto ist
 	player = pc
 	land.target = pc
 	player.cam.make_current()
@@ -178,13 +184,25 @@ func _ready() -> void:
 	while not _tq.is_empty() and traffic.size() < TRAFFIC_MAX:
 		_spawn_queued(100)
 	_build_hud()
+	if zoom != "":
+		_intro = WorldIntro.new()
+		add_child(_intro)
+		_intro.setup(self, zoom)
 	# ab jetzt Vinyl-Bilder (Herausforderer mitten in der Fahrt) im Hintergrund laden, nicht im Bild
 	Builder.async_vinyls = true
 	world.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 	Music.world_go("" if active.is_empty() or active["kind"] == "seg" else str(Catalog.RACES[active["race_index"]].get("town", "")))
 	await get_tree().process_frame
+	if _intro and WorldIntro.covered(player):
+		_intro_done(true, false)  # im Tunnel: kein Anflug (von oben sähe man nur die Decke)
+	if _intro:
+		await _intro.prewarm()  # Ansichten von oben noch hinter dem Ladebild einmal zeichnen
 	cover.queue_free()
 	_ready_done = true
+	if _intro:
+		# HUD erst mit der Landung (hinter dem Ladebild war es sichtbar: so sind seine Shader schon übersetzt)
+		hud["root"].modulate.a = 0.0
+		_intro.start()
 	if OS.get_cmdline_user_args().has("--worldcheck"):
 		_world_check()
 	if OS.get_cmdline_user_args().has("--lvltest"):  # Test: Bild der Level-Anzeige
@@ -196,6 +214,38 @@ func _ready() -> void:
 			tour.w = self
 			tour.only = a.substr(8) if a.length() > 8 else ""
 			add_child(tour)
+
+
+## Anflug von oben (world_intro.gd): "start" nach Losfahren in der Garage, "short" (kürzer) nach Schnellreise und bei
+## der Rückkehr aus Rennen oder Garage. Aus bei Fahr- und Prüftests (--wtour, --wdrive, --ctest ...) und mit --nozoom.
+func _intro_kind(returning: bool) -> String:
+	var travel := _travel_arrival
+	_travel_arrival = false
+	var args := OS.get_cmdline_user_args()
+	for a in args:
+		if a.begins_with("--zkind="):  # Test: Art erzwingen
+			return a.substr(8)
+		if a in ["--nozoom", "--wdrive", "--worldcheck", "--wmap", "--lvltest"] or a.begins_with("--wtour") \
+				or a.begins_with("--drivebot") or a.begins_with("--ctest") or a.begins_with("--wcam"):
+			return ""
+	return "short" if travel or returning else "start"
+
+
+## Ende des Anflugs (world_intro.gd; played false: abgesagt, z. B. im Tunnel): fahren, HUD blendet ein, oben der Ort
+## (als _set_active ihn beim Laden setzte, gab es das HUD noch nicht)
+func _intro_done(skipped: bool, played := true) -> void:
+	if not played and _intro:
+		_intro.cancel()
+	_intro = null
+	player.controls_enabled = true
+	if not played:
+		hud["root"].modulate.a = 1.0
+		return
+	create_tween().tween_property(hud["root"], "modulate:a", 1.0, 0.25 if skipped else 0.4)
+	if not active.is_empty():
+		_area_name = _area_title(active)
+		hud["area"].text = _area_name
+		_area_t = 4.0
 
 
 func _exit_tree() -> void:
@@ -514,12 +564,17 @@ func _set_active(e: Dictionary) -> void:
 	active = e
 	player.track = e["track"]
 	Track.apply_street_light(e["track"])
-	var name: String = str(e["race"].get("area", "AUTOBAHN")) if e["kind"] == "seg" else str(Catalog.RACES[e["race_index"]].get("town", "")).to_upper()
+	var name := _area_title(e)
 	Music.city("" if e["kind"] == "seg" else str(Catalog.RACES[e["race_index"]].get("town", "")))
 	if name != _area_name and hud.has("area"):
 		_area_name = name
 		hud["area"].text = name
 		_area_t = 4.0
+
+
+## Name oben beim Wechsel der Strecke: Stadt oder Autobahn-Abschnitt
+func _area_title(e: Dictionary) -> String:
+	return str(e["race"].get("area", "AUTOBAHN")) if e["kind"] == "seg" else str(Catalog.RACES[e["race_index"]].get("town", "")).to_upper()
 
 
 func _physics_process(_dt: float) -> void:
@@ -763,7 +818,7 @@ func _setup_environment() -> void:
 	land = Landscape.new()
 	land.name = "Landschaft"
 	land.setup(layout)
-	land.hold = func() -> bool: return _task >= 0
+	land.hold = func() -> bool: return _task >= 0 or _intro != null  # beim Anflug von oben nichts nachbauen
 	world.add_child(land)
 	ground.material_override = land.land_mat
 	_ground_mat = land.land_mat
@@ -888,6 +943,7 @@ func _build_hud() -> void:
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	layer.add_child(root)
+	hud["root"] = root
 	var tacho := Control.new()
 	tacho.set_script(TACHO)
 	tacho.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1135,6 +1191,7 @@ func _open_map() -> void:
 func _fast_travel(ri: int) -> void:
 	GameState.world_start = ri
 	has_return = false
+	_travel_arrival = true  # kurzer Anflug von oben am Ziel
 	get_tree().paused = false
 	Music.set_paused(false)
 	Music.race_loading()  # leiser während des Ladens, world_go macht wieder voll
@@ -1148,8 +1205,8 @@ func _travel_test(dt: float) -> void:
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--wtravel="):
 			arg = a.substr(10)
-	if arg == "" or player == null:
-		return
+	if arg == "" or player == null or (_intro != null and _tt_stage < 2):
+		return  # erst nach dem Anflug die Karte öffnen (jede Taste überspringt ihn nur)
 	var ri := int(arg.split(":")[0])
 	_tt_t += dt
 	if _tt_stage == 0 and _tt_t > 1.5:
@@ -1220,8 +1277,8 @@ func _unpause() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if not _ready_done:
-		return
+	if not _ready_done or _intro != null:
+		return  # beim Anflug gehört jede Eingabe ihm (überspringen)
 	if map_view and map_view.visible:
 		map_view._handle(event)
 		return
@@ -1298,7 +1355,8 @@ func _process(dt: float) -> void:
 	_shot_check(dt)
 	_update_daylight(dt)
 	_prof_t = Time.get_ticks_usec()
-	_update_streaming()
+	if _intro == null:  # beim Anflug nichts nachbauen: kein Ruckler, keine Stadt taucht im Bild auf
+		_update_streaming()
 	_prof_mark("streaming")
 	_spawn_queued(3)
 	_prof_mark("spawn")
@@ -1323,6 +1381,8 @@ func _process(dt: float) -> void:
 		hud["area"].modulate.a = 0.85 * clampf(_area_t / 0.6, 0.0, 1.0)
 	else:
 		hud["area"].modulate.a = 0.0
+	if _intro != null:
+		_intro.step(dt)  # nach dem Tageslicht (setzt den Nebel nach Höhe), vor der Unschärfe
 	_update_speed_fx(dt)
 
 
@@ -1790,7 +1850,9 @@ func _update_speed_fx(dt: float) -> void:
 	_swing = lerpf(_swing, clampf(rate * 0.012, -0.03, 0.03), 1.0 - exp(-dt * 10.0))
 	var kmh: float = player.velocity.length() * 3.6
 	var sk := smoothstep(90.0, 235.0, kmh)
-	var blur := lvl * (0.115 * sk * sk + 0.075 * _nitro_fx)
+	# Anflug von oben: Zoom-Unschärfe nur während der Sprünge, Fluchtpunkt ist das Auto im Bild
+	var zb: float = _intro.blur * lvl if _intro != null else 0.0
+	var blur := lvl * (0.115 * sk * sk + 0.075 * _nitro_fx) + zb
 	var sw := lvl * _swing * smoothstep(0.2, 0.5, sk)
 	var nit := _nitro_fx if lvl > 0.0 else 0.0
 	_fx_rect.visible = blur + absf(sw) > 0.0004 or nit > 0.001
@@ -1798,7 +1860,9 @@ func _update_speed_fx(dt: float) -> void:
 		fx_mat.set_shader_parameter("blur", blur)
 		fx_mat.set_shader_parameter("swing", sw)
 		fx_mat.set_shader_parameter("nitro", nit)
-		fx_mat.set_shader_parameter("speed", sk * minf(lvl, 1.0) if blur > 0.0 else 0.0)
+		var trail: float = _intro.trail * minf(lvl, 1.0) if _intro != null else 0.0
+		fx_mat.set_shader_parameter("speed", maxf(sk * minf(lvl, 1.0), trail) if blur > 0.0 else 0.0)
+		fx_mat.set_shader_parameter("focus", _intro.focus if _intro != null else Vector2(0.5, 0.46))
 
 
 # --- Verkehr ----------------------------------------------------------------------

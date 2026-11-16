@@ -231,6 +231,68 @@ Außenring → nächste Stadt → Autobahn. Rundkurse und Drift-Kurse sind Schle
   beginnen erst im 2. Stock (verdeckten das Ladenschild).
 - Browser: der Web-Export startet, die Welt baut sich ohne Skriptfehler auf (gut 25 s). Noch offen: eine Testfahrt mit
   Bildrate im sichtbaren Browserfenster (Herausforderer, Nachladen, Verkehr).
+- **Anflug von oben wie in GTA** beim Laden der Welt, nach Schnellreise und bei der Rückkehr aus Rennen oder Garage
+  (seit 2.38, Einzelheiten dort).
+
+## Garage mit Rollenprüfstand, Optik kommt mit, Anflug von oben, Vinyl-Fehler behoben (2.38)
+- **Optik kommt mit wie in Underground** (`GameState.switch_car`): wer Lack, Felgen, Folie, Bodykit … anbaut und dann
+  das Auto wechselt, hat alles auch am neuen Auto. Das neue Auto übernimmt die Optik des bisherigen (seine eigene,
+  gespeicherte wird dabei ersetzt), Leistungsteile gelten wie bisher für alle. „Serie“ bleibt das Werksteil des jeweiligen
+  Autos (Werkslack, Werksfelge, Serien-Haube …). Feste Zoll-Größen rücken um den Unterschied der Werksfelgen: 17" am Hachi
+  (Werk 14") werden am Kagura (Werk 20") 23", höchstens 24" und nie kleiner, als über die Bremse passt; „Standard“ bleibt
+  Standard. Ausgeblendete alte Motive und noch gesperrte Teile kommen nicht mit, eine Folienfarbe nur mit Motiv. Kommt
+  vom bisherigen Auto gar nichts mit (alles Serie), behält das neue seine eigene Optik; sonst ersetzt die mitgenommene
+  die gespeicherte, auch eine je Auto gestaltete aus 2.25 bis 2.37 (so gewollt, wie in Underground).
+  Das Autohaus zeigt jedes Auto schon so, wie es nach dem Wechsel aussähe.
+- **Rollenprüfstand statt Drehteller** (`scripts/garage_set.gd`, `shaders/rolling_road.gdshader`, `garage_floor`,
+  `garage_wall`): eine Werkstatt mit Betonboden, weißer Linie und schraffierten Auffahrten, einer Rückwand aus gestrichenen
+  Steinen mit Lochwand und Werkzeug, Werkbank, rotem Werkzeugwagen, Reifenregal, Leuchtstoffröhren, offenen Rolltoren an
+  beiden Stirnseiten und einem Kühlgebläse vor dem Auto. Das Auto fährt auf einem Laufband auf der Stelle: die Räder drehen
+  im Reisetempo (gut 25 km/h, `Builder.animate` wie im Rennen), das Band läuft mit Querrillen und Randstrichen nach hinten
+  weg (schnell gezogen blenden die Rillen weich aus, kein Flimmern), das Gebläse dreht mit, zwei Lichter, die nur das Auto
+  treffen, ziehen als Spiegelung über Dach und Flanke, die Federung wippt leicht.
+- **Anhalten und Anfahren:** bei den Rädern (Felgen, Felgenfarbe, Zoll, Spur, Reifen) und überall, wo die Kamera nah an
+  ein Teil geht (Fahrwerk, Motor, Turbo, Nitro, Motorhaube, Auspuff, Spoiler, Scheinwerfer), rollt das Auto in gut einer
+  Sekunde aus: Bremslichter, ein roter Schein auf dem Band, der Bug nickt leicht. Bei Lack, Lackart, Folierung,
+  Folienfarbe, Scheiben, Neon, Bodykit, in der Tuning-Übersicht, im Autohaus und in der Garage fährt es (wieder) weich an.
+- **Neues Auto fährt herein:** im Autohaus (und wenn man ohne Wahl zurückgeht) fährt das bisherige Auto vorn hinaus, das
+  neue kommt von hinten durchs Tor, bremst mit Bremslichtern auf seinen Platz und federt nach (gut 1,2 s). Gebaut wird
+  erst, wenn man kurz auf einem Auto bleibt (0,14 s): schnelles Blättern ruckelt nicht und staut nichts. Das neue wartet
+  hinter dem Tor, bis der Vorgänger Platz gemacht hat (nie ineinander), bei schnellem Wechsel ist die Einfahrt kürzer, und
+  nie fahren mehr als zwei Autos zugleich hinaus. Eingaben gehen jederzeit.
+- **Das Auto im Mittelpunkt:** die Kamera rahmt das ganze Auto selbst ein (`_fit_car`: konvexe Hülle des Modells, der
+  kleinste Abstand, bei dem es ganz in die freie Fläche passt, dann per Objektivverschiebung hineingeschoben, der
+  Blickwinkel bleibt). Lack, Lackart, Folierung, Scheiben, Neon und Bodykit zeigen das ganze Auto, Räder, Motor, Spoiler,
+  Auspuff, Haube und Licht aus der Nähe. Das Auto steht mit der Front zum Menü, die Kamera auf seiner linken Seite, hinter
+  ihm die Werkzeugwand; ein neues Auto kommt von rechts. Im Tuning steht das Infofeld klein oben links unter dem Titel, die
+  Werte (Leistung und Übersicht) klein oben rechts, die Tipps sind aus; auch ein hoher Heckflügel ragt nicht in die beiden
+  Felder. In Garage und Autohaus steht die Wertekarte links unter der Liste. Bis 2.37 lag sie oben rechts und verdeckte in
+  der Tuning-Übersicht die Hälfte des Autos. Das Farbraster hat eine oder zwei Reihen statt drei.
+- **Kosten** (Garage in 2560 x 1440 mit 4x MSAA am M2 Pro, ohne V-Sync, Kaizen): Forward+ Hauptmenü 11,7 ms je Bild
+  (vorher 12,3 ms, Median 10,8), Tuning-Übersicht 11,6 statt 10,4 ms, Felgen 12,2 statt 11,6 ms; 116 statt 110 Draw Calls,
+  104 statt 110 im Schatten. Browser-Renderer (Compatibility): 6,9 statt 6,1 ms, Felgen 6,7 statt 6,6 ms, 294 statt 291
+  Draw Calls. Die Halle sind zehn Meshes (je Material verschmolzen, Kleinteile mit Vertexfarben, ohne Schatten), das
+  Skript der Garage kostet gut 0,1 ms je Bild, die Hülle fürs Einrahmen 4 ms je gebautem Auto (Bauen 45 bis 60 ms).
+- **Anflug von oben wie in GTA** (`scripts/world_intro.gd`): wenn das Ladebild verschwindet, steht die Kamera bis zu
+  380 m über dem Auto (Draufsicht wie ein Luftbild), dann geht es in drei schnellen Sprüngen hinunter (115 m, 26 m, im
+  Bogen hinter das Auto in die Verfolgerkamera), dazwischen kurze Halte: 2,8 s; nach Schnellreise und bei der Rückkehr
+  aus Rennen oder Garage 2,1 s. Jede Taste, jeder Knopf, Klick oder Fingertipp überspringt (Esc öffnet dabei nicht noch
+  das Menü); losfahren geht ab dem Ende der Landung, wer Gas hält, fährt dann sofort los. Damit es von oben stimmt:
+  während des Anflugs baut die Welt nichts nach (kein Ruckler, keine Stadt taucht auf), die Bildecken oben bleiben im
+  hinter dem Ladebild gebauten Umkreis (420 m), Nebel nach Abstand (sonst lägen aus 380 m 70 % Dunst über der Stadt),
+  die Höhen passen zur Detailstufe (Kleinteile wechseln nur in der Bewegung), das eigene Auto im vollen Modell; im
+  Tunnel gibt es keinen Anflug. Zoom-Unschärfe nur in den Sprüngen, etwas schwächer als beim Höchsttempo (Einstellung
+  Bewegungsunschärfe). Ohne Ton: das vorhandene Luftrauschen der Sprünge ist künstlich erzeugt, ein Rauschen käme nur
+  als echte Aufnahme. HUD und Musiktitel erst nach der Landung, dazu oben der Ort. Im Browser-Renderer zeichnen kleine
+  Kameras die Fahrt hinter dem Ladebild vor (beim ersten Laden gut 3 s länger; sonst hakte es in Sprüngen und Landung
+  bis knapp 500 ms, Shader-Übersetzung). Tests: `--nozoom`, `--zkind=start|short`, `--zshot=/pfad/pre`
+  (`--ztimes=0,0.3,…`), `--zskip=1.2` (drückt dann Enter), `--zlog`, `--zcovered`; aus bei `--wtour`, `--wdrive`,
+  `--ctest` und anderen Fahrtests.
+- **Vinyl-Fehler: ganz weißes Auto** (`shaders/car_paint.gdshader`, `Builder.vinyl_params`): fehlte das Bild eines
+  Motivs, nahm der Lack-Shader für die leere Textur Weiß und malte die ganze Folie weiß. Passiert ist das beim Start aus
+  dem Projektordner ohne Editor (Godot importiert neue Bilder dann nicht), nicht in den Exporten. Jetzt ist eine leere
+  Textur durchsichtig (`hint_default_transparent`), und ein fehlendes Bild schaltet das Vinyl ab. Nach `git pull` vor
+  dem Start einmal `godot --headless --import` laufen lassen.
 
 ## Echte Sportfelgen, Zoll bis 24, Spur bis extrabreit, Zuschauer wie Menschen (2.37)
 - **Zuschauer sehen aus wie Menschen** (`people.gd`, `people.gdshader`): eine durchgehende Haut aus Querschnitten statt
@@ -940,12 +1002,15 @@ Oben die alten Anzeigen, unten die neuen seit 2.10 (Minimap, Drehzahlmesser, Pla
   Kreis ab. Zeit und Tempo werden Zeichen für Zeichen ohne Textformung gezeichnet.
 
 ## Tuning wie in NFS
-**Leistung für die ganze Garage, Optik je Auto (seit 2.25):** Motor, Turbo, Nitro, Fahrwerk und Reifen passen auf
-alle eigenen Autos, beim Autowechsel bleiben sie dran. Lack, Lackart, Felgen, Zoll, Spur, Spoiler, Bodykit, Haube, Auspuff,
-Folie, Neon, Scheiben und Licht gestaltet man je Auto: ein Auto, das man zum ersten Mal wählt, ist blank (ab Werk, einfarbig).
-Bis 2.24 galt auch die Optik für alle Autos, eine einmal angebrachte Folie war so auf jedem Auto. Alte Spielstände
-behalten ihre Optik am zuletzt gefahrenen Auto (`GameState.looks`). Rücktaste und Esc gehen eine Ebene zurück (Teileliste → Kategorie → Optik/Leistung →
-Garage), der Fokus steht wieder auf dem Eintrag, aus dem man kam.
+**Leistung für die ganze Garage, Optik kommt beim Autowechsel mit (seit 2.38, wie in NFS Underground):** Motor, Turbo,
+Nitro, Fahrwerk und Reifen passen auf alle eigenen Autos. Lack, Lackart, Felgen, Zoll, Spur, Spoiler, Bodykit, Haube,
+Auspuff, Folie, Neon, Scheiben und Licht nimmt man zum nächsten Auto mit: das neue Auto übernimmt die Optik des bisherigen
+(„Serie“ bleibt das Werksteil des neuen Autos, feste Zoll-Größen rücken um den Unterschied der Werksfelgen, Grenzen 13"
+bis 24" und was über die Bremse passt). Das Autohaus zeigt jedes Auto schon mit der Optik, die es bekäme. Gespeichert wird
+weiter je Auto (`GameState.looks`), beim Wechsel wird kopiert (`GameState.switch_car`); ist am bisherigen Auto nichts
+angebaut, behält das neue seine eigene. 2.25 bis 2.37 gestaltete man die Optik je Auto und ein neu gewähltes Auto war
+blank, bis 2.24 galt sie für alle Autos zugleich. Rücktaste und Esc gehen eine Ebene zurück (Teileliste → Kategorie →
+Optik/Leistung → Garage), der Fokus steht wieder auf dem Eintrag, aus dem man kam.
 
 **Alles frei bis auf edle Lacke (seit 2.27):** alle Teile sind von Anfang an eingebaut-bereit, Leistung wie Optik;
 nur Metallic, Matt und Perlmutt (Lackart) und die Farben Mattschwarz, Mattgrau, Perlweiß, Gold und Chrom kommen mit
@@ -958,8 +1023,10 @@ erst, wenn man kurz auf einer Kachel stehen bleibt.
 der Liste links. Links/Rechts blättert (vom letzten geht es zum ersten), die gewählte Kachel rutscht in die Mitte,
 Pfeile zeigen, wo es weitergeht. Jede Kachel zeigt den Namen und darunter klein das eingebaute Teil, „Eingebaut“
 (grün) oder die nötigen Siege (rot, gesperrte Kacheln blasser); Lack, Felgenfarbe, Folie, Neon und Licht mit
-Farbfeld. Ganz links eine Kachel zum Zurückgehen (für Maus und Touch). Das Auto steht dabei mittig über der Leiste,
-das Infofeld links darüber.
+Farbfeld. Ganz links eine Kachel zum Zurückgehen (für Maus und Touch). Das Auto steht dabei groß über der Leiste, von der
+Kamera selbst eingerahmt; das Infofeld seit 2.38 klein oben links unter dem Titel (vorher links über der Leiste, wo es
+Räder und Front verdeckte), die Werte bei Leistung klein oben rechts. Das Auto fährt auf dem Rollenprüfstand und hält
+bei Rädern und Nahansichten an (siehe 2.38).
 
 Garage → Tuning → **Optik** oder **Leistung** (Motor, Turbo, Nitro, Fahrwerk, Reifen) → Teil wählen. Optik:
 - **Lack:** 21 Farben, einige mit eigener Oberfläche (Candyblau, Bronze und Gold metallic, Mattschwarz und Mattgrau
@@ -999,7 +1066,8 @@ Garage → Tuning → **Optik** oder **Leistung** (Motor, Turbo, Nitro, Fahrwerk
 - **Unterbodenneon** in acht Farben, **Scheiben** getönt bis verspiegelt, **Scheinwerfer** Serie, Xenon, Gelb,
   Eisblau (Lichtkegel in derselben Farbe).
 
-Beim Auswählen fährt die Kamera an das Teil (Felge, Heck, Haube, Auspuff, Unterboden …),
+Beim Auswählen fährt die Kamera an das Teil (Felge, Heck, Haube, Auspuff, Scheinwerfer …; Lack, Folie, Scheiben, Neon
+und Bodykit zeigen das ganze Auto),
 beim Motor und Turbo geht die Haube auf (Ventildeckel in der Farbe der Stufe, Pilzfilter, Turbolader, Domstrebe),
 beim Nitro der Kofferraum (Flaschen je nach Stufe). Vorschau beim Auswählen, Einbauen mit Enter, gesperrte Teile
 zeigen die nötigen Siege. Leistungsteile wirken wirklich (`Catalog.stats`): Motor und Turbo auf Schub und Endtempo,
@@ -1180,8 +1248,9 @@ ein, wie auf echten Aufnahmen. Kostet im Rennen etwa 4 % mehr Draw Calls und Dre
   in ihrer Farbe auf, im Tunnel stehen Autos im Tunnellicht. Vorher bekam ein Auto im hell erleuchteten Tunnel nur das
   stark gedimmte Umgebungslicht und war fast schwarz, während Wand und Straße leuchteten.
 - **Garage:** Ein unsichtbarer Studio-Himmel (`shaders/studio_sky.gdshader`) steht nur in den Spiegelungen: drei
-  Lichtbänder an der Decke und die Neonröhren der Wände. Vorher spiegelte der Lack nur die schwarze Halle, Glanz und
-  Matt sahen gleich aus.
+  Lichtbänder an der Decke, ein Lichtfeld an der Wand und eine hohe Softbox auf der Seite der Kamera (seit 2.38, sie
+  zieht eine klare Lichtkante über die Flanke, die man sieht). Vorher spiegelte der Lack nur die schwarze Halle, Glanz
+  und Matt sahen gleich aus.
 - **Kopfsteinpflaster:** kleine, gewölbte Steine in Reihen quer zur Fahrtrichtung, jede Reihe mit eigener Steinbreite
   und zufällig versetzt; in der Ferne geht das Muster in den mittleren Farbton über (kein Flimmern). Vorher waren es
   große Rechtecke im Ziegelverband, die im Dunkeln wie eine Hauswand aussahen.
@@ -1244,6 +1313,12 @@ Spiel). Die wichtigsten:
 - **2.19 – Tunnellicht:** links bis 2.18 (das Auto bekam im Tunnel kaum Licht und stand schwarz vor den hellen
   Wänden), rechts mit Laternenlicht aus der Lichtkarte auch auf dem Lack.
   <br><img src="update_bilder/tunnellicht_2_19.jpg" alt="Auto im Tunnel vorher und nachher" width="640">
+- **2.38 – Garage:** links bis 2.37 (Drehteller, die Wertekarte verdeckt das Auto), rechts die Werkstatt mit
+  Rollenprüfstand; oben die Garage, unten die Tuning-Übersicht.
+  <br><img src="update_bilder/garage_2_38.jpg" alt="Garage vorher und nachher" width="720">
+- **2.38 – Anflug von oben:** Aachen bei Nacht, etwa alle 0,3 s: Draufsicht aus 380 m, erster Sprung, Halt, zweiter
+  Sprung, Halt über dem Auto, Schwenk hinter das Auto, zuletzt die Landung mit Ortsnamen und HUD.
+  <br><img src="update_bilder/anflug_2_38.jpg" alt="Anflug von oben" width="720">
 - **2.37 – Zuschauer:** oben die Figuren bis 2.36 (Röhren, Kugelgelenke, flache Hände), unten die neuen mit
   durchgehender Haut, echten Proportionen, Händen, Gesichtern, Frisuren und Kleidung.
   <br><img src="update_bilder/zuschauer_2_37.jpg" alt="Zuschauer vorher und nachher" width="640">
@@ -1309,6 +1384,8 @@ Texte, Cover und Screenshots für die itch.io-Seite: `release/`.
 - `scripts/tire_fx.gd` – Reifenqualm, Reifenspuren, Staub und Splitter
 - `scripts/ai_car.gd` – Gegner
 - `scripts/garage.gd` / `scripts/race.gd` – Menü und Rennen
+- `scripts/garage_set.gd` – Werkstatt der Garage mit Rollenprüfstand (Band, Rahmen, Wände, Werkzeug, Gebläse),
+  `shaders/rolling_road.gdshader`, `garage_floor.gdshader`, `garage_wall.gdshader`
 - `scripts/intro.gd` – Studio-Intro
 - `scripts/traffic_car.gd` – Verkehr
 - `scripts/rail_crossing.gd` – Bahnübergang mit Bahnhof und Zug

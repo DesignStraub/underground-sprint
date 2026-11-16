@@ -24,7 +24,8 @@ uniform float street_car = 0.0;  // Anteil der Lichtkarte auf dem Lack (0 = Gara
 // Vinyl mit Motiv (seit 2.33, car_builder.vinyl_params): ein Bild, oben die Flanke (links Bug, rechts Heck, oben die
 // Gürtellinie, unten der Schweller), unten die Draufsicht (Haube, Dach, Heckdeckel; oben linke, unten rechte Seite).
 // Projiziert in Koordinaten relativ zum Auto (Länge, Breite, Gürtellinie): dasselbe Motiv passt auf jedes Auto.
-uniform sampler2D vinyl_tex : source_color, filter_linear_mipmap, repeat_disable;
+// ohne Bild durchsichtig (Godot nimmt sonst Weiß: das ganze Auto wurde weiß, wenn das Motiv nicht geladen war)
+uniform sampler2D vinyl_tex : source_color, hint_default_transparent, filter_linear_mipmap, repeat_disable;
 uniform float vinyl_on = 0.0;
 uniform vec4 vinyl_box = vec4(-2.2, 4.4, 0.2, 0.8);  // Bug (z), Länge, Unterkante, Gürtellinie (y)
 uniform float vinyl_hw = 0.9;  // halbe Breite

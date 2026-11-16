@@ -1,8 +1,9 @@
 extends Node
 ## Spielstand: Siege, aktuelles Auto, Tuning. Kein Geld, nur Freischalten über Siege.
 ## Leistungsteile gelten für alle eigenen Autos (ein Satz für die ganze Garage). Die Optik (Lack, Felgen, Folie, Bodykit
-## usw.) hat seit 2.25 jedes Auto für sich: ein Auto, das man zum ersten Mal wählt, ist blank (ab Werk, einfarbig).
-## Bis 2.24 galt auch die Optik für alle Autos, eine einmal angebrachte Folie tauchte so auf jedem Auto auf.
+## usw.) steht je Auto im Spielstand (looks, seit 2.25) und kommt seit 2.38 beim Autowechsel mit wie in NFS Underground:
+## das neue Auto übernimmt die Optik des Autos, von dem man kommt (switch_car). 2.25 bis 2.37 war ein neu gewähltes Auto
+## blank (ab Werk); bis 2.24 galt die Optik für alle Autos zugleich.
 
 const Catalog := preload("res://scripts/catalog.gd")
 const I18n := preload("res://scripts/i18n.gd")
@@ -89,7 +90,8 @@ signal level_up(lvl: int, lines: Array)
 var won_events: Array = []  # gewonnene Events (Karriere: genug Siege in einer Stufe öffnen die nächste)
 var test_cfg := {}  # --cfg (nur Tests)
 var tuning := {}  # Leistungsteile: category -> option_index, für alle Autos gemeinsam
-var looks := {}  # Optik je Auto: car_id -> {category: option_index}; fehlt ein Wert, gilt 0 (ab Werk)
+var looks := {}  # Optik je Auto: car_id -> {category: option_index}; fehlt ein Wert, gilt 0 (ab Werk). Beim Autowechsel
+# übernimmt das neue Auto die Optik des alten (switch_car, seit 2.38)
 var kept_cars: Array = []  # schon mit den alten Schwellen (bis 2.10, Siege bis 2.32) freigeschaltete Autos bleiben frei
 var kept_parts: Array = []  # "cat:index": bis 2.32 mit Siegen freigeschaltete Teile bleiben frei
 var kept_stages: Array = []  # bis 2.32 mit Siegen geöffnete Karriere-Stufen bleiben offen
@@ -560,7 +562,94 @@ func title_name() -> String:
 ## Eingebautes Tuning eines Autos (neues Dictionary): Leistung für alle gleich, Optik je Auto (fehlt: ab Werk)
 func get_config(car_id := "") -> Dictionary:
 	var id := car_id if car_id != "" else current_car
-	var lk: Dictionary = looks.get(id, {})
+	return _config_with(looks.get(id, {}))
+
+
+## Tuning, das das Auto to_id nach einem Wechsel vom jetzigen Auto hätte (Vorschau im Autohaus): Leistung wie immer,
+## Optik vom jetzigen Auto mitgenommen (carried_looks)
+func switch_config(to_id: String) -> Dictionary:
+	return _config_with(carried_looks(current_car, to_id))
+
+
+## Autowechsel (seit 2.38 wie in NFS Underground): was man angebaut hat, ist auch am neuen Auto dran. Das neue Auto
+## übernimmt die Optik des bisherigen (seine eigene, gespeicherte wird dabei ersetzt), Leistungsteile gelten ohnehin für
+## alle Autos.
+func switch_car(to_id: String) -> void:
+	if to_id == current_car or not Catalog.CARS.has(to_id):
+		return
+	var lk := carried_looks(current_car, to_id)
+	if lk.is_empty():
+		looks.erase(to_id)
+	else:
+		looks[to_id] = lk
+	current_car = to_id
+
+
+## Optik, die das Auto to_id beim Wechsel vom Auto from_id bekommt. Dieselben Nummern: "Serie" (Platz 0) heißt am neuen
+## Auto dessen eigenes Werksteil (Werkslack, Werksfelge, Serien-Haube …). Feste Zoll-Größen (13" bis 24") rücken um den
+## Unterschied der Werksfelgen beider Autos (2 Zoll über Werk bleiben 2 Zoll über Werk), höchstens 24" und nicht unter
+## das, was am neuen Auto über die Bremse passt; "Standard" bleibt Standard. Ausgeblendete Motive (alte Vinyls ohne Bild)
+## und noch gesperrte Teile kommen nicht mit (Serie). Kommt vom bisherigen Auto nichts mit (alles Serie, oder nur eine
+## Folienfarbe ohne Motiv, ein ausgeblendetes altes Motiv), behält das neue seine eigene Optik. Sonst ersetzt die
+## mitgenommene Optik die gespeicherte des neuen Autos (Spielstände von 2.25 bis 2.37 mit je Auto gestalteter Optik:
+## so gewollt, wie in Underground).
+func carried_looks(from_id: String, to_id: String) -> Dictionary:
+	var src := _carry_src(from_id) if from_id != to_id else {}
+	if src.is_empty():
+		return (looks.get(to_id, {}) as Dictionary).duplicate()  # bleibt, wie es ist
+	var out := {}
+	for cat in src:
+		var v: int = src[cat]
+		if cat == "rimsize":
+			v = carry_rimsize(v, from_id, to_id)
+		if v != 0:
+			out[cat] = v
+	return out
+
+
+## Was von diesem Auto beim Wechsel mitkäme (Zoll noch nicht umgerechnet): ohne Serie, ausgeblendete alte Motive und
+## gesperrte Teile, die Folienfarbe nur mit einem Motiv (allein sieht man sie nicht)
+func _carry_src(car_id: String) -> Dictionary:
+	var src: Dictionary = looks.get(car_id, {})
+	var out := {}
+	for cat in Catalog.PART_GROUPS["optik"]:
+		var opts: Array = Catalog.PARTS[cat]["options"]
+		var v := clampi(int(src.get(cat, 0)), 0, opts.size() - 1)
+		if v == 0:
+			continue
+		if cat == "vinyl" and opts[v].get("hidden", false):
+			continue
+		if not is_part_unlocked(cat, v):
+			continue
+		out[cat] = v
+	if not out.has("vinyl"):
+		out.erase("vinylcol")
+	return out
+
+
+## Käme von diesem Auto beim Wechsel etwas mit (sichtbar angebaut, nicht alles Serie)? Gleiche Regel wie carried_looks,
+## damit der Hinweis im Autohaus stimmt.
+func has_looks(car_id: String) -> bool:
+	return not _carry_src(car_id).is_empty()
+
+
+## Feste Felgengröße beim Autowechsel: gleicher Abstand zur Werksgröße (Catalog.FACTORY_RIMS), in den Grenzen des neuen
+## Autos (13" bis 24", mindestens min_in aus car_builder.rim_spec). Standard und die alten relativen Größen (bis 2.36,
+## gelten ohnehin relativ zur Felge) bleiben, wie sie sind.
+static func carry_rimsize(idx: int, from_id: String, to_id: String) -> int:
+	var opts: Array = Catalog.PARTS["rimsize"]["options"]
+	if idx <= 0 or idx >= opts.size() or not opts[idx].has("abs"):
+		return idx
+	var fallback := ["std", 7, Color(0.62, 0.63, 0.66), 16, 5]
+	var d := int(Catalog.FACTORY_RIMS.get(to_id, fallback)[3]) - int(Catalog.FACTORY_RIMS.get(from_id, fallback)[3])
+	# car_builder erst hier laden (hängt selbst an GameState, siehe _migrate_rimsize)
+	var builder: GDScript = load("res://scripts/car_builder.gd")
+	var lo := maxi(13, int(builder.rim_spec(to_id, {})["min_in"]))
+	var inch := clampi(int(opts[idx]["abs"]) + d, lo, 24)
+	return maxi(Catalog.rimsize_index(inch), 0)
+
+
+func _config_with(lk: Dictionary) -> Dictionary:
 	var cfg := {}
 	for cat in Catalog.PART_ORDER:
 		cfg[cat] = int((tuning if cat in Catalog.PART_GROUPS["leistung"] else lk).get(cat, 0))
@@ -571,7 +660,7 @@ func get_config(car_id := "") -> Dictionary:
 	return cfg
 
 
-## Teil einbauen: Leistung für alle Autos, Optik nur für dieses Auto
+## Teil einbauen: Leistung für alle Autos, Optik an diesem Auto (beim Autowechsel kommt sie mit, switch_car)
 func set_part(car_id: String, cat: String, idx: int) -> void:
 	if cat in Catalog.PART_GROUPS["leistung"]:
 		tuning[cat] = idx
@@ -734,8 +823,8 @@ func load_game() -> void:
 	for cat in Catalog.PART_GROUPS["leistung"]:
 		var n: int = Catalog.PARTS[cat]["options"].size()
 		tuning[cat] = clampi(int(src.get(cat, 0)), 0, n - 1)
-	# Optik je Auto (seit 2.25). Ältere Spielstände: die gemeinsame Optik bleibt am zuletzt gefahrenen Auto, alle
-	# anderen Autos sind blank
+	# Optik je Auto (seit 2.25). Ältere Spielstände: die gemeinsame Optik bleibt am zuletzt gefahrenen Auto (seit 2.38
+	# kommt sie von dort beim Autowechsel mit)
 	looks = {}
 	var lsrc: Dictionary = data.get("looks", {})
 	if not data.has("looks"):

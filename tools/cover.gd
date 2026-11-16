@@ -24,7 +24,7 @@ func _ready() -> void:
 			c.visible = false
 	var cfg := {"paint": 5, "rims": 2, "spoiler": 2, "bodykit": 2, "vinyl": 1, "neon": 2, "engine": 3, "nitro": 2}
 	garage._show_car("vortex", cfg)
-	garage.turntable.rotation_degrees.y = 215.0
+	garage.stand.rotation_degrees.y = 215.0  # seit 2.38 Laufband statt Drehteller
 	garage.cam.fov = 38.0
 	garage.cam.position = Vector3(5.6, 1.7, 6.4)
 	garage.cam.look_at(Vector3(0.0, 1.15, 0.0))

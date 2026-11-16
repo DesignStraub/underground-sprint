@@ -127,7 +127,8 @@ const EN := {
 	"Gib kurz vor LOS Gas: Drehzahl im grünen Bereich gibt einen perfekten Start.": "Hit the throttle just before GO: revs in the green zone give a perfect start.",
 	"Knapp am Verkehr vorbei gibt Punkte und füllt dein Nitro ein Stück.": "Near misses with traffic give points and top up your nitro a little.",
 	"Im Drag schaltest du von Hand: S hoch, X runter. A/D wechselt die Spur.": "In drag races you shift by hand: S up, X down. A/D changes lanes.",
-	"Leistungsteile passen auf alle deine Autos, die Optik gestaltest du für jedes Auto einzeln.": "Performance parts fit all your cars, the looks you design for each car on its own.",
+	"Leistungsteile passen auf alle deine Autos, und deine Optik nimmst du beim Autowechsel mit.":
+		"Performance parts fit all your cars, and your looks come with you when you switch cars.",
 	"Driften, knapp vorbei und Sprünge geben Punkte, die Nitro etwas nachfüllen.": "Drifts, near misses and jumps give points that top up your nitro a little.",
 	"Im Drag im grünen Bereich schalten: perfekter Schaltvorgang, mehr Schub.": "In drag races, shift in the green zone for a perfect shift and extra push.",
 	"Abkürzungen sparen Zeit, aber dort kommt dir Verkehr entgegen.": "Shortcuts save time, but traffic comes the other way.",
@@ -281,6 +282,9 @@ const EN := {
 	"Tief und breit: die Räder bekommen negativen Sturz.": "Low and wide: the wheels get negative camber.",
 	"Damit sie Platz haben, liegt das Auto %d mm höher.": "To make room, the car sits %d mm higher.",
 	"Mit dem Breitbau-Kit rücken die Räder in die Verbreiterungen.": "With the widebody kit the wheels move out into the flares.",
+	# --- Garage mit Laufband, Optik wandert mit (2.38) ---
+	"\nDeine Optik kommt mit: Lack, Felgen, Folie und alle anderen Teile.":
+		"\nYour looks come along: paint, rims, vinyl and every other part.",
 	"Passend": "Matching", "Wagenfarbe": "Body colour", "Neongrün": "Neon Green",
 	"Entenbürzel": "Ducktail", "Street-Flügel": "Street Wing", "Schwanenhals": "Swan Neck", "Doppeldecker": "Double Deck",
 	"Dachspoiler": "Roof Spoiler", "Bügelflügel": "Hoop Wing",
