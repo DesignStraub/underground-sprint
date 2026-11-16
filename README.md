@@ -159,7 +159,8 @@ Außenring → nächste Stadt → Autobahn. Rundkurse und Drift-Kurse sind Schle
   ihre Meshes im Hauptbild hoch), und 50–110 ms im Bild, in dem sie fertig in die Welt kommt. Ein eigener Render-Thread
   (`--render-thread separate`) glättete das, machte das Bauen aber 3–7-mal langsamer (Würzburg 17 statt 5,5 s): bei
   hohem Tempo käme man vor der Stadt an.
-- **Nebenstraßen zwischen den Häusern** (`track_builder._plan_lanes`, nur in der Welt): in den Städten zweigen
+- **Nebenstraßen zwischen den Häusern** (bis 2.38, seit 2.39 ersetzt durch `street_net.gd`, siehe dort;
+  `track_builder._plan_lanes`, nur in der Welt): in den Städten zweigen
   Nebenstraßen rechtwinklig ab, laufen gut 26 m hinter der Gehwegkante (hinter der ersten Häuserreihe) parallel zur
   Hauptstraße und münden 75–160 m weiter wieder ein: ein Block zum Drumherumfahren. Zwei Spuren (10 m), Ecken mit
   18 m Radius, an beiden Seiten Häuser, wo keins steht ein Zaun, eigene Laternen; die Wände dahinter halten einen auf
@@ -233,6 +234,95 @@ Außenring → nächste Stadt → Autobahn. Rundkurse und Drift-Kurse sind Schle
   Bildrate im sichtbaren Browserfenster (Herausforderer, Nachladen, Verkehr).
 - **Anflug von oben wie in GTA** beim Laden der Welt, nach Schnellreise und bei der Rückkehr aus Rennen oder Garage
   (seit 2.38, Einzelheiten dort).
+- **Städte mit Hinterland, Straßennetz mit Kreuzungen, Gelände zum Austoben** (seit 2.39, Einzelheiten dort).
+
+## Städte mit Hinterland, Kreuzungen, Gelände zum Austoben, kürzere Hauben (2.39)
+Rückmeldung zu 2.38: in den Städten viele leere Flächen, Abzweige „bam um die Kurve“, alle Straßen gleich breit,
+nirgends Erde unter den Rädern, Hauben „unglaublich lang“, das Laufband der Garage zu sehen.
+
+- **Städte mit Hinterland** (`scripts/city_fill.gd`, neu): bis 2.38 standen in den erfundenen Städten hinter der
+  Straßenfront zwei Häuserreihen, danach kamen gleich Felder (Frankfurt: Hochhäuser, direkt dahinter Raps), in den
+  Rundkursen lag innen eine große graue Fläche. Jetzt wachsen Häuserblöcke in Bändern entlang der Hauptstraße und der
+  langen Querstraßen bis 170–260 m hinter die Gehwegkante (zwei bis drei Bänder je Viertel, außen als Stadtrand), in
+  Rundkursen bis zur Mitte; Lücken in Ecken und im Inneren füllen kleinere Blöcke, wo selbst die nicht passen Höfe
+  (Rasen mit Bäumen und Bank, Pflaster mit Autos, Schotter mit Garagenzeile, große als kleiner Park). Um jeden Block
+  eine Erschließungsstraße (nicht befahrbar) mit parkenden Autos, Bäumen und Laternen.
+  - **Nach Viertel und Abstand:** Blockrand mit Innenhof, Büro- und Hochhäuser auf Sockel, enge Altstadt, Zeilen,
+    Reihen- und Einfamilienhäuser, Stadtvillen mit Gärten, Hallen, Lager, Containerflächen mit Portalkran; dazu Parks
+    (Wege, Teich oder Spielplatz), Plätze mit Brunnen (im Marktviertel Marktstände), Parkplätze und Parkhäuser, Schule
+    mit Sportfeld, Kirche, Sportplatz mit Flutlicht, Kleingärten, Brachen. Dicht und hoch an der Straße, dahinter
+    niedriger, am Stadtrand Gärten. Tagsüber Leute in Parks, auf Plätzen und Schulhöfen, nachts Licht in den Fenstern.
+  - **Nie auf Straßen, nie ineinander:** jede Zelle hält Abstand zu allen Wegen der Strecke, Flüssen, Seen, Bahn,
+    Hügeln, Wahrzeichen und den Sperrflächen der Welt (die seit 2.39 eine Art haben: zur Nachbarstadt nur bis zur
+    Mitte, von den Autobahnringen 110 m); jedes neue Haus wird gegen die schon gebauten geprüft (Anstoßen ja,
+    Hineinragen nein).
+  - **Stadt geht in Land über** (`landscape.gd`): die Welt plant die Blöcke schon beim Laden, um sie bleibt das
+    Gelände flach und als Stadt gefärbt; Felder, Hügel, Wälder und Dörfer erst hinter dem Stadtrand.
+  - **Kosten:** Häuser im Häuser-Batch der Strecke, Böden ein Mesh je 240-m-Zelle, Bäume, Autos und Leuchten als
+    MultiMesh mit Sichtweite; im Browser in Schritten zu 6 ms. Bauzeit je Stadt +110–230 ms, Planen beim Laden der
+    Welt +0,6 s, Zeichenaufrufe gut 2 % mehr, keine neuen Ruckler. Die echten Stadtpläne (Aachen bis Kreuzberg) bleiben,
+    wie sie waren; Rennen ohne Füllung (`race.tscn -- --racefill` baut sie trotzdem).
+  - Testen: `world.tscn -- --wspawn=exit:0:320 --nozoom --tod=13 --wcam=0:260:1 --wshot=/pfad.png:9` (von oben),
+    `--nofill` (Vergleich).
+- **Straßennetz der freien Fahrt neu** (`scripts/street_net.gd`, statt `track_builder._plan_lanes`; nur in der Welt, die
+  Rennen bauen ihre Strecken wie bisher, Fingerabdruck aller 23 Rennstrecken gleich). Bis 2.38 bog jede Nebenstraße
+  rechtwinklig mit 18 m Radius ab, lief als genaue Parallele hinter der Häuserreihe und kam rechtwinklig zurück, immer
+  10 m breit. Jetzt:
+  - **Schräge Einmündungen und weite Bögen:** unter 55–90° aus der Hauptstraße, dann Bögen mit 22–46 m Radius; die
+    Straße schwingt und wechselt den Abstand zur Hauptstraße (21–43 m hinter deren Gehweg).
+  - **Breiten je Viertel:** Gasse (eine Spur, 6,6 m; in Altstadt und Chinatown Kopfsteinpflaster), Straße (zwei Spuren,
+    9,2 m mit Gehwegen), breite Straße (vier Spuren, 14 m; Bankenviertel, Hafen, Prachtallee, Campus). Bordsteine auch
+    in der Fahrphysik. Die Hauptstraßen behalten ihre Breite.
+  - **Ränder abwechslungsreich:** Parkbuchten mit parkenden Autos oder Grünstreifen mit Bäumen; wo kein Haus steht,
+    wechselt der Rand je nach Viertel zwischen Zaun, Hecke, niedriger Mauer und Pollern (`_border_style`, auch an den
+    Hauptstraßen der Welt), Wand und sichtbarer Rand passen zusammen.
+  - **Kreuzungen und zweite Wege:** gegenüber einer Einmündung beginnt oft eine Straße in derselben Flucht; Kreuzungen
+    mit Ampeln (Haupt- und Querstraße abwechselnd grün) und Zebrastreifen, Einmündungen mit „Vorfahrt gewähren“. Lange
+    Parallelstraßen haben in der Mitte eine Verbindung zur Hauptstraße. Querverbindungen quer durch Rundkurse und
+    zwischen nahen Teilen derselben Strecke (in den echten Städten Wegsuche durch die Lücken zwischen den Häusern, bisher
+    eine in Tauberbischofsheim). **Plätze** auf Fahrbahnhöhe zum Hineinfahren: Parkplatz oder Marktplatz.
+  - Zahlen (16 Städte): 102 neue Straßen und Gassen, 17 Durchfahrten, 22 Plätze, 14 Kreuzungen mit Ampeln, 194
+    Einmündungen (bis 2.38: 69 Nebenstraßen, 34 Durchfahrten, keine Kreuzung). Verkehr fährt weiter nur auf den
+    Hauptstraßen. Minikarte und große Karte zeigen das Netz. Kreuzberg: die East Side Gallery hat Lücken für die
+    Nebenstraßen.
+  - Rundfahrt `--wtour=cities`: vorher 92,8 km, 72 Wandkontakte (fast alle an den 90°-Ecken); nachher 100,4 km,
+    10 leichte Schrammer des Autopiloten. `--oldlanes`: Nebenstraßen wie bis 2.38 (Vergleich).
+- **Gelände zum Austoben** (`scripts/offroad.gd`, `scripts/offroad_build.gd`, `shaders/offroad.gdshader`): zwei
+  umzäunte Flächen an der nördlichen Querspange, je mit eigener Ausfahrt (Wegweiser „GOLFPLATZ“ bzw. „KIESWERK“ 260 m
+  vorher, Lücke in Wand und Leitplanke), Name beim Hineinfahren, auf Minikarte und großer Karte:
+  - **Golfclub Eichenhain** (520 × 330 m): vier Bahnen mit Fairway, Grün mit Fahne und Sandbunkern, zwei Teiche, Hügel
+    und drei Kuppen zum Abheben, Clubhaus mit Terrasse und Parkplatz, Golfcarts und Fahnen, die wegfliegen, drei Rampen
+    (Erde, Holz, Stahl über den kleinen Teich), gut 100 Bäume mit festem Stamm, Hecke und Zaun.
+  - **Kiesgrube Moosbrunn** (380 × 300 m): ringsum ein 11 m hoher Wall (man kann hinauffahren), Kies- und Sandhaufen,
+    Erdwall, Buckelpiste, Baggersee, vier Rampen (eine über den See), Findlinge, Bagger, Radlader, Muldenkipper,
+    Förderband, Container, Dixi-Klo, Bauzaun und am Tor „Baustelle – Betreten verboten! Eltern haften für ihre Kinder“.
+  - **Fahren im Gelände** (`player_car._update_vertical`, `_update_surface`): Höhe und Neigung längs und quer aus dem
+    Gelände, Kuppen und Rampen mit der Sprunglogik und Sprungkamera der Straße (21–28 m weit bei 95 km/h); wer in einen
+    Hang fliegt, setzt auf. Je Untergrund weniger Grip (Gras 66 %, Kies 60 %, Sand 52 %), unter Gas kommt das Heck
+    (Driftwinkel mit Vollgas: Asphalt gut 10°, Gras 20°, Kies gut 30°), Sand bremst. Staub in der Farbe des Bodens
+    statt weißem Qualm, Erdbrocken, Spuren und Fahrrinnen (`tire_fx.gd`, `skid.gdshader`).
+  - **Nie durch Häuser:** Zaun mit Wand, Bäume, Findlinge, Gebäude und Maschinen fest; Teich: Spritzer, trocken an der
+    letzten sicheren Stelle neu; R oder Überschlag stellt das Auto an Ort und Stelle wieder auf. Keine Herausforderer
+    im Gelände. Gebaut im Hintergrund, wenn man in die Nähe kommt (gut 0,3 s, ohne Ruckler).
+  - Testen: `world.tscn -- --wspawn=gelaende:<0|1> --otest=ein:<0|1>` (hinein, Runde, hinaus; auch `rampen`, `kuppen`,
+    `baum`, `zaun`, `wasser`, `drift`), Draufsicht `tools/gelaende_karte.tscn -- --png=/pfad.png`, `--nooffroad`.
+- **Kürzere Hauben** (`scripts/car_builder.gd`, `SHAPES`): bei 24 der 27 Autos sitzt die Frontscheibe 2 bis 9 % der
+  Länge weiter vorn, nah an den Vorbildern; bis 2.38 waren die Hauben bis 1,95 m lang, die Kabine kurz und weit hinten.
+  Jetzt z. B. Sakura 1,38 statt 1,63 m Haube, Hayate 1,31 statt 1,62 m, Kitsune 1,41 statt 1,82 m, Tsubame 1,56 statt
+  1,91 m. Dach und Türen rücken mit (Scheibe so steil wie vorher), Sakura, Mirai, Ronin und Tatsumaki bekommen dadurch
+  ein kleines hinteres Seitenfenster. Lange Hauben bleiben im Verhältnis lang (Hakone, Kagura, Tsubame, Mirai, Kaze),
+  Kaizen, Chibi und Tanuki bleiben, wie sie waren. Hutzen und Lamellen auf der Haube wandern mit. Achsen, Fahrphysik
+  und Kollision unverändert. Neu: `tools/car_shots.tscn -- --props` (Proportionen je Auto).
+- **Garage: Laufband unsichtbar, längere Brennweite** (`garage_set.gd`, `garage_floor.gdshader`, `garage.gd`): das Band
+  liegt bündig im Hallenboden aus demselben Beton und läuft unter beiden Toren durch, ohne Rahmen, Striche und
+  Schraffur; mit ihm wandert nur das feine Korn, das bei Tempo zu kaum sichtbaren Längsstreifen wird. Das Auto fährt
+  einfach in der Halle, man sieht es an Rädern, Spiegelungen und Federung (`rolling_road.gdshader` entfällt). Kamera mit
+  30° statt 50° senkrecht (etwa 45 statt 26 mm Kleinbild): der Weitwinkel aus der Nähe streckte die Front; die Kamera
+  bleibt in der Halle (`_hall_room`), nur in der Karriere wird der Bildwinkel bei Platzmangel weiter. Behoben: wer
+  zweimal schnell blätterte, ließ das hereinfahrende Auto dem hinausfahrenden ins Heck fahren.
+- **Tests:** `--worldcheck` 0 Überschneidungen (57 Strecken), Häuserprüfung aller erfundenen Städte ohne Befund,
+  Rennen unverändert (`ftall`), Rundfahrten `--wtour=cities` und `--wtour=mitte`, Ruckler (`--hitch`) ohne neue,
+  Compatibility-Renderer am Rechner. Nicht getestet: der echte Browser.
 
 ## Garage mit Rollenprüfstand, Optik kommt mit, Anflug von oben, Vinyl-Fehler behoben (2.38)
 - **Optik kommt mit wie in Underground** (`GameState.switch_car`): wer Lack, Felgen, Folie, Bodykit … anbaut und dann
@@ -244,7 +334,8 @@ Außenring → nächste Stadt → Autobahn. Rundkurse und Drift-Kurse sind Schle
   vom bisherigen Auto gar nichts mit (alles Serie), behält das neue seine eigene Optik; sonst ersetzt die mitgenommene
   die gespeicherte, auch eine je Auto gestaltete aus 2.25 bis 2.37 (so gewollt, wie in Underground).
   Das Autohaus zeigt jedes Auto schon so, wie es nach dem Wechsel aussähe.
-- **Rollenprüfstand statt Drehteller** (`scripts/garage_set.gd`, `shaders/rolling_road.gdshader`, `garage_floor`,
+- **Rollenprüfstand statt Drehteller** (seit 2.39 liegt das Band unsichtbar im Hallenboden, siehe dort;
+  `scripts/garage_set.gd`, bis 2.38 `shaders/rolling_road.gdshader`, `garage_floor`,
   `garage_wall`): eine Werkstatt mit Betonboden, weißer Linie und schraffierten Auffahrten, einer Rückwand aus gestrichenen
   Steinen mit Lochwand und Werkzeug, Werkbank, rotem Werkzeugwagen, Reifenregal, Leuchtstoffröhren, offenen Rolltoren an
   beiden Stirnseiten und einem Kühlgebläse vor dem Auto. Das Auto fährt auf einem Laufband auf der Stelle: die Räder drehen
@@ -1026,7 +1117,8 @@ Pfeile zeigen, wo es weitergeht. Jede Kachel zeigt den Namen und darunter klein 
 Farbfeld. Ganz links eine Kachel zum Zurückgehen (für Maus und Touch). Das Auto steht dabei groß über der Leiste, von der
 Kamera selbst eingerahmt; das Infofeld seit 2.38 klein oben links unter dem Titel (vorher links über der Leiste, wo es
 Räder und Front verdeckte), die Werte bei Leistung klein oben rechts. Das Auto fährt auf dem Rollenprüfstand und hält
-bei Rädern und Nahansichten an (siehe 2.38).
+bei Rädern und Nahansichten an (siehe 2.38; seit 2.39 liegt das Band unsichtbar im Hallenboden, die Kamera hat 30° statt
+eines Weitwinkels).
 
 Garage → Tuning → **Optik** oder **Leistung** (Motor, Turbo, Nitro, Fahrwerk, Reifen) → Teil wählen. Optik:
 - **Lack:** 21 Farben, einige mit eigener Oberfläche (Candyblau, Bronze und Gold metallic, Mattschwarz und Mattgrau
@@ -1313,6 +1405,19 @@ Spiel). Die wichtigsten:
 - **2.19 – Tunnellicht:** links bis 2.18 (das Auto bekam im Tunnel kaum Licht und stand schwarz vor den hellen
   Wänden), rechts mit Laternenlicht aus der Lichtkarte auch auf dem Lack.
   <br><img src="update_bilder/tunnellicht_2_19.jpg" alt="Auto im Tunnel vorher und nachher" width="640">
+- **2.39 – Städte mit Hinterland:** Frankfurt, links bis 2.38 (hinter den Hochhäusern gleich Felder), rechts mit
+  Häuserblöcken, Höfen, Parks und Sportplatz; oben von oben, unten schräg.
+  <br><img src="update_bilder/stadt_2_39.jpg" alt="Städte mit Hinterland" width="720">
+- **2.39 – Straßennetz:** Kreuzberg und Würzburg, links bis 2.38, rechts mit schrägen Einmündungen, Kreuzungen und
+  Zebrastreifen.
+  <br><img src="update_bilder/strassen_2_39.jpg" alt="Straßennetz" width="720">
+- **2.39 – Gelände:** Golfclub Eichenhain, Golfcarts am Clubhaus, Kiesgrube Moosbrunn, große Karte mit beiden Flächen.
+  <br><img src="update_bilder/gelaende_2_39.jpg" alt="Gelände zum Austoben" width="720">
+- **2.39 – Kürzere Hauben:** je Zeile ein Auto von der Seite, links bis 2.38, rechts mit der Scheibe weiter vorn.
+  <br><img src="update_bilder/hauben_2_39.jpg" alt="Kürzere Hauben" width="720">
+- **2.39 – Garage:** links 2.38 (Laufband mit Rahmen und Strichen, Weitwinkel), rechts 2.39 (Band im Hallenboden,
+  30°-Kamera, neue Form; oben in einer anderen Schwenkstellung von der Seite).
+  <br><img src="update_bilder/garage_2_39.jpg" alt="Garage 2.39" width="720">
 - **2.38 – Garage:** links bis 2.37 (Drehteller, die Wertekarte verdeckt das Auto), rechts die Werkstatt mit
   Rollenprüfstand; oben die Garage, unten die Tuning-Übersicht.
   <br><img src="update_bilder/garage_2_38.jpg" alt="Garage vorher und nachher" width="720">
@@ -1378,14 +1483,20 @@ Texte, Cover und Screenshots für die itch.io-Seite: `release/`.
   Wind, Abrollen, Schrammen
 - `scripts/loading_screen.gd` – Ladebildschirm vor dem Rennen
 - `scripts/track_builder.gd` – prozedurale Stadtstrecke
+- `scripts/street_net.gd` – Straßennetz der Städte in der freien Fahrt (Nebenstraßen, Gassen, Kreuzungen mit Ampeln,
+  Querverbindungen, Plätze, Ränder)
+- `scripts/city_fill.gd` – Hinterland der erfundenen Städte (Häuserblöcke, Höfe, Parks, Plätze, parkende Autos)
+- `scripts/offroad.gd`, `scripts/offroad_build.gd`, `shaders/offroad.gdshader` – Gelände zum Austoben (Golfplatz,
+  Kiesgrube: Planung, Bodenhöhe und Untergrund, Bau), Tests in `scripts/offroad_test.gd`, Draufsicht
+  `tools/gelaende_karte.tscn`
 - `scripts/track_design.gd` – handgezeichnete Strecken (Verlauf, Höhenprofil, Gelände, Tunnel, Wahrzeichen, Querstraßen)
   für Driftberg und die entworfenen Städte, `shaders/mountain.gdshader` – Waldboden, Fels, Weinberg
 - `scripts/interchange.gd` – Autobahndreiecke der offenen Welt (Gabelung, Rampen, Brücke, Schilder) und Talbrücken
 - `scripts/tire_fx.gd` – Reifenqualm, Reifenspuren, Staub und Splitter
 - `scripts/ai_car.gd` – Gegner
 - `scripts/garage.gd` / `scripts/race.gd` – Menü und Rennen
-- `scripts/garage_set.gd` – Werkstatt der Garage mit Rollenprüfstand (Band, Rahmen, Wände, Werkzeug, Gebläse),
-  `shaders/rolling_road.gdshader`, `garage_floor.gdshader`, `garage_wall.gdshader`
+- `scripts/garage_set.gd` – Werkstatt der Garage mit Rollenprüfstand (Band im Hallenboden, Wände, Werkzeug, Gebläse),
+  `shaders/garage_floor.gdshader`, `garage_wall.gdshader`
 - `scripts/intro.gd` – Studio-Intro
 - `scripts/traffic_car.gd` – Verkehr
 - `scripts/rail_crossing.gd` – Bahnübergang mit Bahnhof und Zug

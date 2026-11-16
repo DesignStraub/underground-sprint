@@ -35,6 +35,8 @@ const CityData := preload("res://scripts/city_data.gd")
 const People := preload("res://scripts/people.gd")
 const City := preload("res://scripts/city_builder.gd")
 const Design := preload("res://scripts/track_design.gd")  # entworfene Strecken (Driftberg-Pass, seit 2.36)
+const CityFill := preload("res://scripts/city_fill.gd")  # Stadtfüllung hinter der Straßenfront (seit 2.39)
+const Streets := preload("res://scripts/street_net.gd")  # Straßennetz der freien Fahrt (seit 2.39)
 
 const HALF_W := 9.0  # 4 Spuren à 4,5 m
 const AB_EXTRA := 4.5  # Open-World-Autobahn: eine Spur mehr je Richtung (3 + 3)
@@ -361,7 +363,10 @@ static func begin(race: Dictionary) -> Dictionary:
 		if (type == "sprint" or type == "circuit") and not race.get("forest", false):
 			if race.has("layout"):
 				Design.plan_cross(track, race)  # Querstraßen durch das Innere (entworfene Städte)
-			_plan_lanes(track, int(race["seed"]))
+			if OS.get_cmdline_user_args().has("--oldlanes"):
+				_plan_lanes(track, int(race["seed"]))  # Vergleich: Nebenstraßen wie bis 2.38
+			else:
+				Streets.plan(track, race)
 	return {"race": race, "rng": rng, "root": root, "track": track, "city": city, "type": type, "loop": loop,
 		"occupied": [], "buildings": [], "i": 0, "us": []}
 
@@ -386,10 +391,18 @@ static func step(job: Dictionary) -> float:
 	var t0 := Time.get_ticks_usec()
 	match i:
 		0:
+			if track.get("net", false):
+				Streets.make_grid(track)  # schnelle Abstände für den Bau (seit 2.39)
+				job["srng"] = RandomNumberGenerator.new()
+				job["srng"].seed = int(race["seed"]) * 17 + 3
 			_build_road(root, track)
 			for p in track["paths"]:
-				if p["id"] != 0 and p["kind"] != "slip":
+				if p.has("net"):
+					Streets.build_street(root, track, p, job["srng"])
+				elif p["id"] != 0 and p["kind"] != "slip":
 					_build_branch(root, track, p, rng)
+			if track.get("net", false):
+				Streets.build_junctions(root, track, job["srng"])
 		1:
 			_build_lakes(root, track, rng)
 			_build_ramps(root, track)
@@ -435,6 +448,10 @@ static func step(job: Dictionary) -> float:
 				_box_tag = "osm"
 				job["buildings"].append_array(_build_osm_buildings(root, track, rng, job["occupied"] + job["buildings"]))
 				_box_tag = ""
+			elif CityFill.wanted(track, race) and not CityFill.step(root, track, job):
+				# Stadtfüllung hinter der Front (seit 2.39, city_fill.gd): in Stücken, eigener Zufall
+				job["us"].append(Time.get_ticks_usec() - t0)
+				return (_steps_done(3) + STEP_W[4] * CityFill.progress(job)) / _steps_done(STEP_W.size() - 1)
 		5:
 			if type != "drift":
 				_build_fences(root, track, job["buildings"] + job["occupied"])
@@ -545,7 +562,7 @@ static func _auto_box(mi: MeshInstance3D, xf: Transform3D, track: Dictionary, bo
 	var c := wb.get_center()
 	var loc := locate(track, Vector3(c.x, 0.0, c.z))
 	var p: Dictionary = loc["path"]
-	var reach: float = (hw(track, loc["d"]) + WALK if p["id"] == 0 else p["half_w"] + (3.0 if p["kind"] == "fork" else 0.0)) + 0.2
+	var reach: float = (hw(track, loc["d"]) + WALK if p["id"] == 0 else (Streets.reach(p) if p.has("net") else p["half_w"] + (3.0 if p["kind"] == "fork" else 0.0))) + 0.2
 	var ground := elev_at(p["curve"], loc["d"])
 	if absf(loc["lat"]) > reach or wb.position.y - ground > 1.2:
 		return
@@ -999,6 +1016,8 @@ static func ground_path(track: Dictionary, path_id: int, d: float, lat: float, s
 	var on_ramp := false
 	if path_id == 0 and (score > 0.2 or absf(lat) < median_at(track, d) - 0.2):
 		h = CURB_H  # Gehweg oder Mittelstreifen
+	elif path_id != 0 and score > -0.45 and track["paths"][path_id].has("net") and Streets.curb(track["paths"][path_id], lat):
+		h = CURB_H  # Gehweg und Grünstreifen der neuen Straßen (seit 2.39)
 	for r in track["ramps"]:
 		if r["path"] == path_id and d >= r["d0"] and d <= r["d1"] and lat >= r["lat0"] and lat <= r["lat1"]:
 			var k: float = (d - r["d0"]) / (r["d1"] - r["d0"])
@@ -1035,7 +1054,10 @@ static func _in_zone(track: Dictionary, d: float, margin: float) -> bool:
 
 ## Abstand zur nächsten Nebenstraße (Abkürzung/Seitenstraße) minus deren halbe Breite
 ## skip_spurs: Sackgassen ignorieren (deren Einmündung ist abgesperrt, die Randmauer läuft dort durch)
-static func _branch_clearance(track: Dictionary, pos: Vector3, skip_spurs := false) -> float:
+## to_edge: bei neuen Straßen (2.39) bis zur Hauskante statt zur Fahrbahnkante (dort endet die Wand der Hauptstraße)
+static func _branch_clearance(track: Dictionary, pos: Vector3, skip_spurs := false, to_edge := false) -> float:
+	if track.has("sgrid"):
+		return Streets.branch_clear(track, pos, skip_spurs, to_edge)
 	var best := 1e9
 	for p in track["paths"]:
 		if p["id"] == 0 or (skip_spurs and p["kind"] == "spur"):
@@ -1049,6 +1071,8 @@ static func _branch_clearance(track: Dictionary, pos: Vector3, skip_spurs := fal
 ## Abstand zum nächsten anderen Abzweig (ohne Sackgassen und ohne den Weg own) minus dessen halbe Breite: wo eine
 ## Durchfahrt in eine Nebenstraße mündet, bleibt dort keine Wand stehen
 static func _other_branch_clear(track: Dictionary, pos: Vector3, own: int) -> float:
+	if track.has("sgrid"):
+		return Streets.branch_clear(track, pos, true, true, own)
 	var best := 1e9
 	for p in track["paths"]:
 		if p["id"] == 0 or p["id"] == own or p["kind"] == "spur":
@@ -1339,9 +1363,10 @@ static func _plan_autobahn(track: Dictionary, race: Dictionary) -> void:
 		else:
 			sc.add_point(f["pos"])
 			sc.add_point(Vector3(end.x, 0.0, end.z))
-		track["paths"].append({"id": track["paths"].size(), "kind": "ramp", "curve": sc, "half_w": RAMP_HALF + (AB_EXTRA if r.get("wide", false) else 0.0),
+		# Ausfahrt zu einem Gelände (seit 2.39, offroad.gd): schmal (zwei Spuren), endet am Tor im Zaun
+		track["paths"].append({"id": track["paths"].size(), "kind": "ramp", "curve": sc, "half_w": r.get("half", RAMP_HALF + (AB_EXTRA if r.get("wide", false) else 0.0)),
 			"length": sc.get_baked_length(), "from": d, "to": d, "closed": false,
-			"side": signf((end - f["pos"]).dot(f["right"])), "name": r.get("name", ""), "conn": r.has("c1")})
+			"side": signf((end - f["pos"]).dot(f["right"])), "name": r.get("name", ""), "conn": r.has("c1"), "gelaende": r.get("gelaende", false)})
 		track["zones"].append({"from": d - 40.0, "to": d + 40.0})
 		gaps.append([d - 45.0, d + 45.0])
 	# Autobahndreiecke (seit 2.36, scripts/interchange.gd): wo eine Rampe neben dem Ring einfädelt oder abzweigt, ein
@@ -1934,7 +1959,7 @@ static func _build_road(root: Node3D, track: Dictionary) -> void:
 					_strip(walk, prev["r"] + up, prev["ro"] + up, cur["r"] + up, cur["ro"] + up, prev["d"], d)
 					_strip_v(walk, prev["r"], cur["r"], CURB_H, false)
 			for side in ["lw", "rw"]:
-				if _branch_clearance(track, (prev[side] + cur[side]) / 2, true) > 1.0 and not (cur["tr"] == 2 and prev["tr"] == 2):
+				if _branch_clearance(track, (prev[side] + cur[side]) / 2, true, true) > 1.0 and not (cur["tr"] == 2 and prev["tr"] == 2):
 					_wall_shape(walls, prev[side], cur[side])
 				# Damm: von der Gehwegkante schräg hinunter zum Boden (Böschung 1:1,6)
 				var ya: float = prev[side].y
@@ -2701,6 +2726,10 @@ static func _build_fences(root: Node3D, track: Dictionary, blockers: Array) -> v
 	var mesh_panels := []
 	var guard := []
 	var guard_posts := []
+	var hedges := []
+	var low_walls := []
+	var caps := []
+	var bollards := []
 	var lines := []  # [Weg, Querabstand-Funktion, Bedingung]
 	var bgrid := {}  # Rasterzelle -> Häuser/Wahrzeichen (nur die nahen prüfen)
 	var bmax := 0.0
@@ -2734,15 +2763,15 @@ static func _build_fences(root: Node3D, track: Dictionary, blockers: Array) -> v
 		while d < len - 1.5:
 			var f := frame_at(c, d)
 			for side in [-1.0, 1.0]:
-				var lat: float = (hw(track, d) + WALK + 0.3) if main else (p["half_w"] + (3.3 if p["kind"] == "fork" else 0.3))
+				var lat: float = (hw(track, d) + WALK + 0.3) if main else (Streets.edge(p, side) + 0.3 if p.has("net") else p["half_w"] + (3.3 if p["kind"] == "fork" else 0.3))
 				var pos: Vector3 = f["pos"] + f["right"] * side * lat
 				if main:
 					if not bridge_at(track, d).is_empty():
 						continue
-					if _branch_clearance(track, pos) <= 1.0 or not tunnel_at(track, d, 3.0).is_empty() \
+					if _branch_clearance(track, pos, false, true) <= 1.0 or not tunnel_at(track, d, 3.0).is_empty() \
 							or (_district_at(track, d).has("soundwall") and _lift(track, d) <= 1.0) or _rail_clearance(track, pos) < 1.0:
 						continue
-				elif _main_clearance(track, pos) < WALK + 0.4 or ((p["kind"] == "lane" or p["kind"] == "passage") \
+				elif (Streets.main_clear(track, pos) if p.has("net") else _main_clearance(track, pos)) < WALK + 0.4 or ((p["kind"] == "lane" or p["kind"] == "passage") \
 						and _other_branch_clear(track, pos, p["id"]) < 0.3):
 					continue
 				var hidden := false
@@ -2769,7 +2798,8 @@ static func _build_fences(root: Node3D, track: Dictionary, blockers: Array) -> v
 						var dd := d + fan_rng.randf_range(-2.5, 4.5)
 						var ff := frame_at(c, dd)
 						var q: Vector3 = ff["pos"] + ff["right"] * side * (hw(track, dd) + WALK + fan_rng.randf_range(0.9, 2.6))
-						if free.call(q, 1.0):
+						# Open World (seit 2.39): nicht in der Einmündung einer Nebenstraße samt Gehweg (dort standen sie im Weg)
+						if free.call(q, 1.0) and (not track["world"] or _branch_clearance(track, q, false, true) > 1.0):
 							q.y = 0.0
 							track["spectators"].append([Transform3D(face.rotated(Vector3.UP, fan_rng.randf_range(-0.5, 0.5)), q), d])
 					next_fans[side] = d + fan_rng.randf_range(45.0, 110.0)
@@ -2777,6 +2807,21 @@ static func _build_fences(root: Node3D, track: Dictionary, blockers: Array) -> v
 					# Autobahn über Land: Leitplanke statt Stadtgeländer (Pfosten alle 3 m, Schutzplanke in 0,6 m Höhe)
 					guard_posts.append(Transform3D(bf, base + Vector3(0, 0.38, 0)))
 					guard.append(Transform3D(bf, base + Vector3(0, 0.6, -side * 0.12)))
+					continue
+				# Open World (seit 2.39): Ränder je Abschnitt verschieden (Zaun, Hecke, niedrige Mauer, Poller), passend zum Viertel
+				var style := _border_style(track, p, d, side) if track["world"] else 0
+				# Innenseite genau auf der Linie der Wand (nach außen versetzt), sonst ragte die Hecke in die Fahrbahn
+				if style == 1:
+					hedges.append(Transform3D(bf, base + Vector3(0, 0.65, 0) + f["right"] * side * 0.45))
+					continue
+				if style == 2:
+					low_walls.append(Transform3D(bf, base + Vector3(0, 0.45, 0) + f["right"] * side * 0.23))
+					caps.append(Transform3D(bf, base + Vector3(0, 0.95, 0) + f["right"] * side * 0.23))
+					continue
+				if style == 3:
+					# Poller alle 1,5 m: dazwischen kommt man zu Fuß durch, mit dem Auto nicht (die Wand steht auf der Linie)
+					for o in [-0.75, 0.75]:
+						bollards.append(Transform3D(bf, base + Vector3(0, 0.45, 0) + f["fwd"] * o + f["right"] * side * 0.13))
 					continue
 				posts.append(Transform3D(bf, base + Vector3(0, 0.6, 0)))
 				for ry in [0.45, 1.05]:
@@ -2790,10 +2835,40 @@ static func _build_fences(root: Node3D, track: Dictionary, blockers: Array) -> v
 	_multi(root, Builder.box(Vector3(0.07, 1.2, 0.07)), metal, posts)
 	_multi(root, Builder.box(Vector3(0.05, 0.05, 3.05)), metal, rails)
 	_multi(root, Builder.box(Vector3(0.01, 1.05, 3.0)), mesh_m, mesh_panels)
+	if not hedges.is_empty():
+		_multi(root, Builder.box(Vector3(0.9, 1.3, 3.05)), Builder.mat(Color(0.05, 0.2, 0.07), 0.0, 0.9), hedges)
+	if not bollards.is_empty():
+		var bm := CylinderMesh.new()
+		bm.top_radius = 0.11
+		bm.bottom_radius = 0.13
+		bm.height = 0.9
+		bm.radial_segments = 8
+		_multi(root, bm, Builder.mat(Color(0.16, 0.17, 0.18), 0.5, 0.5), bollards)
+	if not low_walls.is_empty():
+		_multi(root, Builder.box(Vector3(0.45, 0.9, 3.02)), Builder.mat(Color(0.47, 0.43, 0.38), 0.0, 0.9), low_walls)
+		_multi(root, Builder.box(Vector3(0.58, 0.1, 3.04)), Builder.mat(Color(0.56, 0.53, 0.5), 0.0, 0.8), caps)
 	if not guard.is_empty():
 		var steel := Builder.mat(Color(0.62, 0.64, 0.66), 0.85, 0.32)
 		_multi(root, Builder.box(Vector3(0.12, 0.76, 0.12)), metal, guard_posts)
 		_multi(root, Builder.box(Vector3(0.06, 0.32, 3.02)), steel, guard)
+
+
+## Rand an der Wand, wo kein Haus davor steht (Open World, seit 2.39): 0 Zaun, 1 Hecke, 2 niedrige Mauer, 3 Poller.
+## Wechselt alle 30-60 m, je nach Viertel (Altstadt und Vorstadt Hecken und Mauern, Hafen und Schnellstraße Zaun,
+## Bankenviertel Mauer und Poller); fest aus Lage und Weg, ohne Zufallszahlen. Die unsichtbare Wand bleibt an derselben
+## Stelle.
+static func _border_style(track: Dictionary, p: Dictionary, d: float, side: float) -> int:
+	var key: String = track["districts"][clampi(int((d if p["id"] == 0 else float(p["from"])) / DISTRICT_LEN), 0, track["districts"].size() - 1)]
+	var w: Array = {"residential": [3, 4, 3, 0], "altstadt_de": [3, 3, 3, 1], "vorstadt_de": [3, 5, 2, 0], "kurviertel_de": [2, 5, 3, 0],
+		"shops": [4, 2, 2, 2], "innenstadt_de": [3, 3, 2, 2], "kiez_de": [5, 2, 1, 2], "chinatown": [5, 1, 3, 1], "downtown": [3, 2, 3, 2],
+		"campus_de": [3, 4, 2, 1], "boulevard": [3, 4, 2, 1], "industrial": [8, 0, 2, 0]}.get(key, [1, 0, 0, 0])
+	var seg := int(floor(d / (30.0 + float(posmod(int(p["id"]) * 7 + int(side), 4)) * 10.0)))
+	var h: float = posmod(hash([int(p["id"]), int(side), seg, int(track["length"])]), 1000) / 1000.0 * float(w[0] + w[1] + w[2] + w[3])
+	for k in 4:
+		h -= float(w[k])
+		if h < 0.0:
+			return k
+	return 0
 
 
 ## Kollisionsform für ein wegfliegendes Teil
@@ -4245,6 +4320,10 @@ static func _east_side_gallery(root: Node3D, track: Dictionary) -> void:
 			var f := frame_at(curve, d + 0.6)
 			var bf := Basis.looking_at(f["fwd"], Vector3.UP)
 			var base: Vector3 = f["pos"] + f["right"] * side * (hw(track, d) + WALK + 2.0)
+			# Open World (seit 2.39): Lücke, wo eine Nebenstraße samt Gehweg hindurchführt (wie die echten Lücken)
+			if track["world"] and _branch_clearance(track, base, true, true) < 1.0:
+				d += 1.2
+				continue
 			# Mauersegment (1,2 m breit, 3,6 m hoch) mit rundem Kopf, Wandbild aus Farbfeldern
 			_part(groups, concrete, Builder.box(Vector3(0.25, 3.6, 1.18)), Transform3D(bf, base + Vector3(0, 1.8, 0)))
 			_part(groups, concrete, Builder.box(Vector3(0.4, 0.3, 1.18)), Transform3D(bf, base + Vector3(0, 3.65, 0)))
@@ -4454,7 +4533,7 @@ static func _build_city(root: Node3D, track: Dictionary, rng: RandomNumberGenera
 	for p in track["paths"]:
 		if p["kind"] == "alley" or p["kind"] == "lake" or p["kind"] == "fork" or p["kind"] == "lane":
 			for side in [-1.0, 1.0]:
-				frontages.append({"path": p, "side": side, "edge": p["half_w"] + (3.5 if p["kind"] == "fork" else 0.8)})
+				frontages.append({"path": p, "side": side, "edge": Streets.edge(p, side) + 0.8 if p.has("net") else p["half_w"] + (3.5 if p["kind"] == "fork" else 0.8)})
 	for fr in frontages:
 		var p: Dictionary = fr["path"]
 		var c: Curve3D = p["curve"]
@@ -4664,8 +4743,11 @@ static func _lot_free(track: Dictionary, foot: Array, grid: Dictionary, walk: fl
 				pts.append(Vector3(q.x, 0, q.y))
 	pts.append(c)
 	var curve: Curve3D = track["curve"]
-	var d0 := curve.get_closest_offset(c)
-	if _flat(c - curve.sample_baked(d0)).length() - hw(track, d0) < r + walk + 1.0:
+	# Open World (seit 2.39): erst über das Raster prüfen, ob die Hauptstraße überhaupt nahe ist (spart die Suche über
+	# die ganze Kurve bei den vielen Häusern an den Nebenstraßen)
+	var near_main: bool = not track.has("sgrid") or Streets.main_clear(track, c, r + walk + 2.0) < r + walk + 1.5
+	var d0 := curve.get_closest_offset(c) if near_main else 0.0
+	if near_main and _flat(c - curve.sample_baked(d0)).length() - hw(track, d0) < r + walk + 1.0:
 		var corner := [0, 4, 5, 9]  # Ecken: Suche über die ganze Strecke (falls ein anderer Teil der Straße nahe kommt)
 		var L: float = curve.get_baked_length()
 		for i in pts.size():
@@ -4682,7 +4764,12 @@ static func _lot_free(track: Dictionary, foot: Array, grid: Dictionary, walk: fl
 					dq = clampf(dq + _flat(q - curve.sample_baked(dq)).dot(tg), 0.0, L)
 			if _flat(q - curve.sample_baked(dq)).length() - hw(track, dq) < walk:
 				return false
-	if _branch_clearance(track, c) < r + 4.0:
+	if track.has("sgrid"):
+		# Open World: alle Wege über das Raster, der ganze Grundriss gegen jeden Wegpunkt (alle 1 m; die Randpunkte
+		# allein übersahen eine schräg querende Gasse), Abstand je Art wie unten (neue Straßen bis zur Hauskante)
+		if Streets.lot_hit(track, foot):
+			return false
+	elif _branch_clearance(track, c) < r + 4.0:
 		for pth in track["paths"]:
 			if pth["id"] == 0:
 				continue
@@ -5230,10 +5317,15 @@ static func _build_lamps(root: Node3D, track: Dictionary) -> void:
 		var sd := 1.0
 		while dl < p["length"] - 8.0:
 			var fl := frame_at(c, dl)
-			var bl: Vector3 = fl["pos"] + fl["right"] * sd * (p["half_w"] + 0.8) - Vector3(0, CURB_H, 0)
-			if _main_clearance(track, bl) > WALK + 4.0:
+			var lo: float = p["half_w"] + 0.8
+			if p.has("net") and p["walk"] > 0.0:
+				lo = p["half_w"] + p["strip"][0 if sd < 0.0 else 1] + 0.6  # auf dem Gehweg an der Bordsteinkante (seit 2.39)
+			var bl: Vector3 = fl["pos"] + fl["right"] * sd * lo - Vector3(0, 0.0 if p.has("net") and p["walk"] > 0.0 else CURB_H, 0)
+			# neue Straßen: nicht auf einer einmündenden Straße (Kreuzungen, Verbindungen, Plätze)
+			if (Streets.main_clear(track, bl) if p.has("net") else _main_clearance(track, bl)) > WALK + 4.0 \
+					and (not p.has("net") or Streets.branch_clear(track, bl, true, false, p["id"]) > 1.0):
 				_lamp(root, dist, fl, sd, bl, mats)
-			dl += 27.0
+			dl += 34.0 if p.has("net") else 27.0  # neue Straßen (2.39): wie an der Hauptstraße etwas weiter auseinander
 			sd = -sd
 
 
@@ -5772,6 +5864,9 @@ static func _build_walkers(root: Node3D, track: Dictionary) -> void:
 				face = -fwd  # Paar im Gespräch
 			var b := Basis.looking_at(face.rotated(Vector3.UP, rng.randf_range(-0.4, 0.4)), Vector3.UP)
 			var t := Transform3D(b, Vector3(pos.x, CURB_H, pos.z))
+			# Open World (seit 2.39): neben einer Einmündung reicht die Gruppe nicht auf die Nebenstraße (Zufall wie bisher)
+			if track["world"] and _branch_clearance(track, pos, false, true) < 0.5:
+				continue
 			day.append(t)
 			if night_ok and i < 2:
 				night.append(t)
@@ -5791,7 +5886,7 @@ static func _build_walkers(root: Node3D, track: Dictionary) -> void:
 static func set_daytime(track: Dictionary, day: float) -> void:
 	City.set_far_daytime(day)
 	Design.set_daytime(day)
-	for h in track.get("walker_nodes", []):
+	for h in track.get("walker_nodes", []) + track.get("fill_people", []):
 		if is_instance_valid(h):
 			(h as Node3D).visible = (day > 0.3) == (str(h.name) == "PassantenTag")
 

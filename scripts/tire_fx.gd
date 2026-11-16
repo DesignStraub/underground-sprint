@@ -10,8 +10,14 @@ extends Node3D
 ## schattiert (Kugel-Normale), Laternen beleuchten sie, und die Lichtkarte der Straße hellt sie unter Laternen auf.
 ## Eigene Sichtebene (SMOKE_LAYER): Unterbodenneon, Lichtteppiche und Scheinwerfer der Autos (car_builder) lassen sie
 ## aus; bis 2.35 färbte das Neon den Qualm in einem scharf begrenzten Kasten (Decal) ein.
+## Gelände (seit 2.39, offroad.gd): auf Gras, Sand, Kies und Erde statt weißem Qualm Staub in der Farbe des Bodens
+## (dezent, schon beim schnellen Fahren ein leichter Schleier auf Kies und Sand), dazu Erdbrocken, wenn die Räder
+## durchdrehen oder das Auto rutscht; Spuren dunkel im Gras, im Sand und in der Erde immer (Fahrrinnen), etwas breiter,
+## am Hang auf der Höhe des Bodens unter jedem Rad.
 
 const Builder := preload("res://scripts/car_builder.gd")
+## Spuren je Untergrund: Nummer der Farbe im Spur-Shader (skid.gdshader, INSTANCE_CUSTOM.z)
+const MARK_IDX := {"asphalt": 0.0, "gras": 1.0, "rasen": 2.0, "gruen": 2.0, "sand": 3.0, "kies": 4.0, "erde": 5.0, "schotter": 4.0}
 
 const SEG_MAX := 2000  # Teilstücke je Rad (Ringpuffer, das älteste wird überschrieben)
 const SEG_LEN := 0.8  # m je Teilstück
@@ -35,6 +41,12 @@ var _wheels: Array = []  # Hinterräder im Auto (x, z)
 var _street_tex: Texture2D = null  # zuletzt gesetzte Lichtkarte (Open World wechselt sie je Strecke)
 var _street_set := false
 var _smoking := false  # der Stoff ist geteilt: beim ersten Takt immer setzen (sonst bliebe die Karte des letzten Rennens)
+var _dust: Array = []  # Staub im Gelände (je Hinterrad)
+var _clods: Array = []  # Erdbrocken im Gelände (je Hinterrad)
+var _dusting := false
+var _surf := "asphalt"
+var day := 1.0  # Tageslicht (world.gd): Spuren im Gelände sind nachts so dunkel wie der Boden
+var _day_set := -1.0
 
 static var _puff: Texture2D
 static var _smoke_mat: ShaderMaterial
@@ -116,6 +128,55 @@ func setup(c: CharacterBody3D, half_w: float, rear_z: float) -> void:
 		p.layers = Builder.SMOKE_LAYER
 		add_child(p)
 		_smoke.append(p)
+		# Staub: derselbe weiche Stoff, flacher und breiter, in der Farbe des Bodens (color), weniger dicht
+		var d := p.duplicate() as CPUParticles3D
+		d.name = "Staub"
+		d.amount = 40
+		d.lifetime = 2.2
+		d.direction = Vector3(0, 0.25, 1)
+		d.spread = 70.0
+		d.initial_velocity_min = 0.6
+		d.initial_velocity_max = 2.0
+		d.gravity = Vector3(0.0, 0.12, 0.0)
+		var dr := Gradient.new()
+		dr.set_color(0, Color(1, 1, 1, 0.0))
+		dr.set_color(1, Color(1, 1, 1, 0.0))
+		dr.add_point(0.06, Color(1, 1, 1, 0.42))
+		dr.add_point(0.35, Color(1, 1, 1, 0.26))
+		dr.add_point(0.75, Color(1, 1, 1, 0.09))
+		d.color_ramp = dr
+		add_child(d)
+		_dust.append(d)
+		# Erdbrocken: kleine dunkle Stücke, fliegen nach hinten oben weg und fallen schnell
+		var cl := CPUParticles3D.new()
+		cl.name = "Erdbrocken"
+		cl.amount = 14
+		cl.lifetime = 0.9
+		cl.local_coords = false
+		cl.emitting = false
+		cl.position = w + Vector3(0.0, 0.3, 0.3)
+		cl.direction = Vector3(0, 0.8, 1)
+		cl.spread = 28.0
+		cl.initial_velocity_min = 2.5
+		cl.initial_velocity_max = 5.5
+		cl.gravity = Vector3(0, -16.0, 0)
+		cl.angle_min = -180.0
+		cl.angle_max = 180.0
+		cl.angular_velocity_min = -540.0
+		cl.angular_velocity_max = 540.0
+		cl.particle_flag_rotate_y = true
+		cl.scale_amount_min = 0.5
+		cl.scale_amount_max = 1.2
+		var cm := BoxMesh.new()
+		cm.size = Vector3(0.09, 0.06, 0.08)
+		var cmat := StandardMaterial3D.new()
+		cmat.vertex_color_use_as_albedo = true
+		cmat.roughness = 1.0
+		cm.material = cmat
+		cl.mesh = cm
+		cl.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(cl)
+		_clods.append(cl)
 
 
 ## Staubwolke (Unfall, umgefahrene Teile, seit 2.36): ein paar Qualmwolken auf einmal an einer Stelle, dezent, räumt
@@ -343,8 +404,10 @@ static func _puff_texture() -> Texture2D:
 	return _puff
 
 
-## Je Physik-Takt vom Auto: Rutsch-Stärke 0..1 (wie das Quietschen), am Boden?
-func step(dt: float, slip: float, on_ground: bool, speed: float) -> void:
+## Je Physik-Takt vom Auto: Rutsch-Stärke 0..1 (wie das Quietschen), am Boden?, Tempo, Untergrund (Name und Werte aus
+## offroad.gd SURF: lose, Staub- und Spurfarbe; kein preload hier, offroad.gd hängt über die Strecke an diesem Skript)
+## und wie stark die Antriebsräder durchdrehen (0..1)
+func step(dt: float, slip: float, on_ground: bool, speed: float, surf := "asphalt", spin := 0.0, sf: Dictionary = {}) -> void:
 	if _now == 0.0:
 		# Drift-Event (race.gd setzt drift_mode erst nach setup): die Spur der letzten Runde soll noch zu sehen sein
 		var scene := get_tree().current_scene
@@ -353,15 +416,29 @@ func step(dt: float, slip: float, on_ground: bool, speed: float) -> void:
 			_mat.set_shader_parameter("life", life)
 	_now += dt
 	_mat.set_shader_parameter("now", _now)
+	if day != _day_set:
+		_day_set = day
+		_mat.set_shader_parameter("day", day)
 	_sync_street()
 	var pos := car.global_position
 	if _prev_pos.is_finite() and pos.distance_to(_prev_pos) > 4.0:
 		_last = [Vector3.INF, Vector3.INF]  # zurückgesetzt oder versetzt: Spur nicht quer durchs Bild ziehen
 	_prev_pos = pos
-	var marking := on_ground and slip > MARK_FROM and speed > 2.0
+	var loose: float = sf.get("loose", 0.0)
+	var off := surf != "asphalt" and not sf.is_empty()
+	if surf != _surf:
+		_surf = surf
+		_last = [Vector3.INF, Vector3.INF]  # neue Spur auf neuem Boden (andere Farbe)
+	# Spuren: auf Asphalt erst im Rutschen; im Gelände früher, in Sand, Erde und Kies immer (Fahrrinnen, im Kies schwächer)
+	var mark_from := lerpf(MARK_FROM, 0.18, loose)
+	var ruts := surf == "sand" or surf == "erde" or surf == "kies"
+	var marking := on_ground and speed > 2.0 and (slip > mark_from or (ruts and speed > 3.0))
+	var mk := clampf((slip - mark_from) / 0.3, 0.25, 1.0)
+	if ruts:
+		mk = maxf(mk, 0.4 if surf == "kies" else 0.55)
 	for i in 2:
 		var wp: Vector3 = car.global_transform * _wheels[i]
-		wp.y = pos.y + 0.03
+		wp.y = (car.ground_y(wp) if off and car.has_method("ground_y") else pos.y) + (0.05 if off else 0.03)
 		if not marking:
 			_last[i] = Vector3.INF
 			continue
@@ -371,14 +448,36 @@ func step(dt: float, slip: float, on_ground: bool, speed: float) -> void:
 		var seg: Vector3 = wp - _last[i]
 		if seg.length() < SEG_LEN:
 			continue
-		_add_segment(_last[i], wp, clampf((slip - MARK_FROM) / 0.3, 0.25, 1.0))
+		_add_segment(_last[i], wp, mk, MARK_IDX.get(surf, 0.0), 0.32 if off else MARK_W)
 		_last[i] = wp
 	# mit etwas Nachlauf (erst unter SMOKE_FROM - 0.12 wieder aus): kein Stottern der Wolke um die Schwelle herum
-	var smoking := on_ground and speed > 3.0 and (slip > SMOKE_FROM or (_smoking and slip > SMOKE_FROM - 0.12))
+	var smoking := not off and on_ground and speed > 3.0 and (slip > SMOKE_FROM or (_smoking and slip > SMOKE_FROM - 0.12))
 	_smoking = smoking
 	for p in _smoke:
 		if (p as CPUParticles3D).emitting != smoking:
 			p.emitting = smoking
+	# Staub im Gelände: beim Rutschen und Durchdrehen kräftiger, auf losem Boden schon beim schnellen Fahren ein Schleier
+	var dust_k := 0.0
+	if off and on_ground:
+		dust_k = maxf(maxf(slip, spin) * (0.4 + 0.6 * loose), loose * smoothstep(9.0, 28.0, speed) * 0.55)
+	var dusting := dust_k > (0.12 if _dusting else 0.18) and speed > 1.0
+	_dusting = dusting
+	var dc: Color = sf.get("dust", Color(0.6, 0.6, 0.6))
+	for p in _dust:
+		var dp := p as CPUParticles3D
+		if dusting:
+			dp.color = Color(dc.r, dc.g, dc.b, clampf(dust_k * 1.2, 0.3, 1.0))
+		if dp.emitting != dusting:
+			dp.emitting = dusting
+	# Erdbrocken: nur wenn die Räder wühlen (Durchdrehen, starkes Rutschen) auf weichem Boden
+	var clods := off and on_ground and loose > 0.3 and (spin > 0.3 or slip > 0.6) and speed > 1.0
+	var cc: Color = (sf.get("mark", Color.BLACK) as Color) * 0.85  # dunkle Erd- bzw. Steinbrocken
+	for c in _clods:
+		var cp := c as CPUParticles3D
+		if clods:
+			cp.color = cc
+		if cp.emitting != clods:
+			cp.emitting = clods
 
 
 ## Lichtkarte der Straße (car_builder.street, von track_builder gesetzt) an den Qualm-Stoff geben, wenn sie wechselt
@@ -398,15 +497,15 @@ func _sync_street() -> void:
 	m.set_shader_parameter("street_gain", float(st["gain"]))
 
 
-func _add_segment(a: Vector3, b: Vector3, k: float) -> void:
+func _add_segment(a: Vector3, b: Vector3, k: float, surf_i := 0.0, width := MARK_W) -> void:
 	var along := b - a
 	var ln := along.length()
 	var z := along / ln
 	var x := Vector3.UP.cross(z).normalized()
 	var y := z.cross(x)
-	var xf := Transform3D(Basis(x * MARK_W, y, z * (ln + 0.04)), (a + b) * 0.5)
+	var xf := Transform3D(Basis(x * width, y, z * (ln + 0.04)), (a + b) * 0.5)
 	_mm.set_instance_transform(_next, xf)
-	_mm.set_instance_custom_data(_next, Color(_now, k, 0.0, 0.0))
+	_mm.set_instance_custom_data(_next, Color(_now, k, surf_i, 0.0))
 	_next = (_next + 1) % _mm.instance_count
 	_used = mini(_used + 1, _mm.instance_count)
 	_mm.visible_instance_count = _used

@@ -13,6 +13,8 @@ extends RefCounted
 const Catalog := preload("res://scripts/catalog.gd")
 const Track := preload("res://scripts/track_builder.gd")
 const Interchange := preload("res://scripts/interchange.gd")
+const Offroad := preload("res://scripts/offroad.gd")  # Gelände zum Austoben (seit 2.39)
+const CityFill := preload("res://scripts/city_fill.gd")  # Stadtfüllung hinter der Straßenfront (seit 2.39)
 
 const GEO_CENTER := Vector2(10.4, 51.1)  # Länge, Breite: ungefähr die Mitte Deutschlands
 const GAP_MIN := 150.0  # Mittellinie Autobahn bis Ausfahrt der Stadt (Platz für Lärmschutzwand und Häuser am Ring)
@@ -91,6 +93,9 @@ static func build() -> Dictionary:
 			"phi": atan2(gz, gx) + i * 1e-4, "start_local": Track.frame_at(tr["curve"], tr["start"])["pos"], "polys_local": polys,
 			"holes_local": Track.ground_holes(tr), "bld_local": _building_points(tr),
 			"exit2_local": tr["world_exit2"], "hills_local": tr.get("hills", [])})
+		# Stadtfüllung (seit 2.39): Planung aufheben, die Blöcke kommen nach den Sperrflächen (fill_world)
+		if CityFill.wanted(tr, world_race(i)):
+			cities[-1]["plan_track"] = tr
 	cities.sort_custom(func(a, b): return a["phi"] < b["phi"])
 	# Platz am Ring: zwischen zwei Nachbarn rechte Kante des einen + linke Kante des anderen (am Ring gemessen)
 	var n := cities.size()
@@ -285,8 +290,13 @@ static func build() -> Dictionary:
 			l2.append(Vector2(lp[-1].x, lp[-1].z))
 			roads.append([l2, 1])
 			ix_lines.append(lp)
-	_add_keepout(cities, ring, ramps + oramps, oring, osegs, ix_lines)
+	_add_keepout(cities, ring, ramps + oramps, oring, osegs, ix_lines, spokes)
 	_middle_keepout(msegs, ring, mid)
+	# Gelände zum Austoben (seit 2.39, offroad.gd): Golfplatz und Kiesgrube an der nördlichen Querspange, je mit eigener
+	# Ausfahrt (race["ramps"] des Stücks) und als Sperrfläche für Häuser; Ausfahrt auf die Karten und in die flache Zone
+	var offroad := [] if OS.get_cmdline_user_args().has("--nooffroad") else Offroad.plan(segments)
+	for a in offroad:
+		roads.append([a["access"], 1])
 	# Löcher im Boden (Tunneltröge, Flussbetten) aller Städte in Weltkoordinaten an jede Strecke: ihr Boden darf sie
 	# nicht zudecken, auch nicht den Trog der Nachbarstadt
 	var holes := PackedVector3Array()
@@ -299,8 +309,21 @@ static func build() -> Dictionary:
 		c["race"]["world_holes"] = holes
 	for sg in segments:
 		sg["race"]["world_holes"] = holes
+	# Stadtfüllung (seit 2.39, city_fill.gd): Blöcke hinter der Straßenfront der erfundenen Städte schon hier planen
+	# (mit Sperrflächen und Löchern der Nachbarn), damit die Landschaft dort flach bleibt und Stadtboden hat
+	var tf := Time.get_ticks_msec()
+	for c in cities:
+		if c.has("plan_track"):
+			var ptr: Dictionary = c["plan_track"]
+			ptr["keepout"] = c["race"]["keepout"]
+			ptr["world_holes"] = holes
+			ptr["xf"] = c["xf"]
+			c["fill_world"] = CityFill.world_points(ptr, int(c["race"]["seed"]), c["xf"])
+			c.erase("plan_track")
+	if OS.get_cmdline_user_args().has("--worldlog"):
+		print("WELT Stadtfüllung geplant in %d ms" % (Time.get_ticks_msec() - tf))
 	_cache = {"cities": cities, "segments": segments, "ring_r": R, "ring": ring, "oring": oring, "roads": roads, "holes": holes,
-		"urban": urban, "center": rbc, "ramp_lines": ramp_lines, "ixs": ixs, "vlakes": vlakes, "cuts": cuts}
+		"urban": urban, "center": rbc, "ramp_lines": ramp_lines, "ixs": ixs, "vlakes": vlakes, "cuts": cuts, "offroad": offroad}
 	if OS.get_cmdline_user_args().has("--worldlog"):
 		for j in ixs:
 			var jp: Vector3 = j["J"]
@@ -925,28 +948,33 @@ static func _near_ramp(ramp_k: Dictionary, k: int, m: int, w: int) -> bool:
 ## Sperrflächen: jede Stadt bekommt die fremden Fahrbahnen in ihrer Nähe (Ring, alle Auffahrten, Straßen der
 ## Nachbarstädte) als Kreise in ihren eigenen Koordinaten (race["keepout"]); der Streckenbau stellt dort keine Häuser
 ## hin (track_builder Schritt 2: wie belegte Flächen). Sonst ragen Häuser aus echten Stadtplänen auf die Autobahn.
-static func _add_keepout(cities: Array, ring: Array, ramps: Array, oring: Array, osegs: Array, ix_lines := []) -> void:
+## Seit 2.39 mit Art ("w": ring, ramp, city, ix, spoke), danach richtet sich die Stadtfüllung (city_fill.gd); die Spangen
+## kommen nur für sie dazu (die übrige Bebauung bleibt ohnehin 230 m weg, _plan_spokes).
+static func _add_keepout(cities: Array, ring: Array, ramps: Array, oring: Array, osegs: Array, ix_lines := [], spokes := []) -> void:
 	var ring_r: float = Track.HALF_W + Track.AB_EXTRA + Track.MED + Track.WALK + 5.0  # 2.32: +2 m (Bad Kissingen stand knapp drauf)
-	var lines := []  # [Weltpunkte, Radius, Stadt (eigene Straßen auslassen) oder -1]
+	var lines := []  # [Weltpunkte, Radius, Stadt (eigene Straßen auslassen) oder -1, Art]
 	for pl in ix_lines:
-		lines.append([pl, Interchange.HALF + 9.0, -1])  # Rampen und Brücken der Autobahndreiecke (seit 2.36)
+		lines.append([pl, Interchange.HALF + 9.0, -1, "ix"])  # Rampen und Brücken der Autobahndreiecke (seit 2.36)
 	var rl := []
 	for q in ring:
 		rl.append(q)
 	rl.append(ring[0])
-	lines.append([rl, ring_r, -1])
+	lines.append([rl, ring_r, -1, "ring"])
 	var orl := oring.duplicate()
 	orl.append(oring[0])
-	lines.append([orl, ring_r, -2])
+	lines.append([orl, ring_r, -2, "ring"])
+	for sp in spokes:
+		lines.append([sp, ring_r, -3, "spoke"])
 	for r in ramps:
 		# Bögen zu den Ziel-Ausfahrten: etwas mehr Platz (die Kreise sitzen auf den Sehnen des Bogens)
-		lines.append([_ramp_pts(r), Track.HALF_W + Track.WALK + (8.0 if r.has("c1") else 2.0) + (Track.AB_EXTRA + 3.0 if r.get("wide", false) else 0.0), -1])
+		lines.append([_ramp_pts(r), Track.HALF_W + Track.WALK + (8.0 if r.has("c1") else 2.0) + (Track.AB_EXTRA + 3.0 if r.get("wide", false) else 0.0), -1, "ramp"])
 	for c in cities:
 		for road in c["roads"]:
 			var pl := []
 			for q in road[0]:
 				pl.append(Vector3(q.x, 0.0, q.y))
-			lines.append([pl, Track.HALF_W + Track.WALK + 2.0 if road[1] == 0 else 12.0, c["race_index"]])
+			# Nebenwege seit 2.39 bis 12,6 m breit bis zur Hauskante (breite Straße mit Grünstreifen), Plätze 13 m: 18 m
+			lines.append([pl, Track.HALF_W + Track.WALK + 2.0 if road[1] == 0 else 18.0, c["race_index"], "city"])
 	for c in cities:
 		var inv: Transform3D = (c["xf"] as Transform3D).affine_inverse()
 		var ctr: Vector3 = c["center"]
@@ -963,7 +991,7 @@ static func _add_keepout(cities: Array, ring: Array, ramps: Array, oring: Array,
 				for j in n:
 					var q := a.lerp(b, float(j) / n)
 					if Vector2(q.x - ctr.x, q.z - ctr.z).length() < reach:
-						ko.append({"pos": inv * q, "r": ln[1], "ko": true})
+						ko.append({"pos": inv * q, "r": ln[1], "ko": true, "w": ln[3]})
 		c["race"]["keepout"] = ko
 	# Außenring: seine Häuser dürfen nicht auf die Straßen der Städte (der innere Ring liegt weit genug weg)
 	for sg in osegs:
@@ -971,7 +999,7 @@ static func _add_keepout(cities: Array, ring: Array, ramps: Array, oring: Array,
 		var reach2: float = sg["radius"] + 300.0
 		var ko2 := []
 		for ln in lines:
-			if ln[2] == -2:
+			if ln[2] == -2 or ln[2] == -3:
 				continue
 			var pts2: Array = ln[0]
 			for k in pts2.size() - 1:

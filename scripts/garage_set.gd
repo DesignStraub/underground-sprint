@@ -1,63 +1,49 @@
 extends RefCounted
 ## Garage mit Rollenprüfstand (seit 2.38, für garage.gd): eine Werkstatthalle statt des Fotostudios mit Drehteller. Das
-## Auto steht in der Mitte auf einem Laufband und fährt auf der Stelle, das Band läuft unter ihm nach hinten. Rundherum
-## Betonboden mit Markierung, eine Rückwand aus gestrichenen Steinen mit Lochwand, Werkbank, Werkzeugwagen und
-## Reifenregal, an beiden Stirnseiten ein offenes Rolltor (dort fahren die Autos herein und hinaus), vor dem Auto ein
-## Kühlgebläse wie an echten Prüfständen. Das Auto steht mit der Front nach +Z (garage.gd dreht den Stellplatz), die
-## Kamera auf der Seite +X, die Werkzeugwand dahinter bei -X.
+## Auto steht in der Mitte und fährt auf der Stelle. Seit 2.39 sieht man kein Laufband mehr: es liegt bündig im Boden,
+## läuft von Tor zu Tor unter beiden Toren durch und sieht aus wie der Beton daneben (garage_floor.gdshader), ohne
+## Rahmen, Anfang oder Ende; seine Ränder sind Plattenfugen wie alle anderen, weiter außen markieren zwei weiße Linien
+## die Fahrspur durch die Halle.
+## Rundherum eine Rückwand aus gestrichenen Steinen mit Lochwand, Werkbank, Werkzeugwagen und Reifenregal, an beiden
+## Stirnseiten ein offenes Rolltor (dort fahren die Autos herein und hinaus), vor dem Auto ein Kühlgebläse wie an
+## echten Prüfständen. Das Auto steht mit der Front nach +Z (garage.gd dreht den Stellplatz), die Kamera auf der Seite
+## +X, die Werkzeugwand dahinter bei -X.
 ## Sparsam: alles Feste ist je Material zu einem Mesh verschmolzen, Kleinteile tragen ihre Farbe als Vertexfarbe, nichts
 ## davon wirft Schatten. Zusammen rund zehn Draw Calls.
 
 const Builder := preload("res://scripts/car_builder.gd")
 const FLOOR_SHADER := preload("res://shaders/garage_floor.gdshader")
 const WALL_SHADER := preload("res://shaders/garage_wall.gdshader")
-const BELT_SHADER := preload("res://shaders/rolling_road.gdshader")
 
-const BELT := Vector2(2.7, 6.6)  # Laufband: Breite (x), Länge (z)
-const DECK := Vector2(3.1, 7.0)  # Rahmen außen
+const LANE_HALF := 1.4  # halbe Breite des Laufbands im Boden (es reicht von Tor zu Tor und weiter)
 const BACK_X := -6.5  # Rückwand (Innenseite)
 const END_Z := 9.5  # Stirnwände (Innenseite), darin die Tore
 const DOOR := Vector2(4.4, 3.6)  # Torbreite, Torhöhe
 const FAN_POS := Vector3(-2.05, 0.0, 4.75)  # Kühlgebläse vor dem Auto, von der Kamera aus dahinter, bläst auf die Front
 
 
-## Baut die Halle in parent. Rückgabe: belt (Material des Bands: offset, blur), rotor (Flügelrad des Gebläses, dreht um
-## seine z-Achse), glints (zwei Lichter, die nur das Auto treffen: wandernde Spiegelungen beim Fahren)
+## Baut die Halle in parent. Rückgabe: belt (Material des Bodens, darin das Band: offset, blur), rotor (Flügelrad des
+## Gebläses, dreht um seine z-Achse), glints (zwei Lichter, die nur das Auto treffen: wandernde Spiegelungen beim Fahren)
 static func build(parent: Node) -> Dictionary:
 	var out := {}
 	var off := GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
-	# Boden: Beton mit Linie um den Prüfstand und Schraffur an den Auffahrten
+	# Boden: Beton mit Plattenfugen, in der Mitte das Band (das Muster darauf wandert im Shader), weiße Linien der
+	# Fahrspur. Bis 2.38 lag das Band als eigene Fläche mit Stahlrahmen, Randstrichen und schraffierten Auffahrten auf
+	# dem Boden: man sah Anfang und Ende.
 	var fm := ShaderMaterial.new()
 	fm.shader = FLOOR_SHADER
-	fm.set_shader_parameter("bay_half", Vector2(DECK.x / 2.0 + 0.7, DECK.y / 2.0 + 0.9))
-	fm.set_shader_parameter("deck_half", DECK / 2.0)
+	fm.set_shader_parameter("lane_half", LANE_HALF)
+	fm.set_shader_parameter("line_x", 2.3)
 	var pm := PlaneMesh.new()
 	pm.size = Vector2(34, 34)
-	_mi(parent, pm, fm, Vector3.ZERO)
+	_mi(parent, pm, fm, Vector3.ZERO).cast_shadow = off  # unter ihm liegt nichts, das er beschatten könnte
+	out["belt"] = fm
 
-	# Laufband (das Muster wandert im Shader) und Stahlrahmen drumherum
-	var bm := ShaderMaterial.new()
-	bm.shader = BELT_SHADER
-	bm.set_shader_parameter("half_size", BELT / 2.0)
-	var bp := PlaneMesh.new()
-	bp.size = BELT
-	# gedreht wie der Stellplatz (garage.gd): das Auto fährt nach +Z, das Muster läuft nach -Z unter ihm weg
-	_mi(parent, bp, bm, Vector3(0, 0.006, 0)).rotation.y = PI
-	out["belt"] = bm
-
+	# Rolltore: Führungsschienen links und rechts, aufgerollter Panzer oben
 	var steel := Builder.mat(Color(0.36, 0.37, 0.39), 0.8, 0.36)
 	var parts := []
-	var hx := BELT.x / 2.0
-	var hz := BELT.y / 2.0
-	var rim_w := (DECK.x - BELT.x) / 2.0
 	for s in [-1.0, 1.0]:
-		# Seitenbleche, Führungsleiste, Endbleche mit Kante über der Umlenkrolle
-		parts.append([Builder.box(Vector3(rim_w, 0.014, DECK.y)), Transform3D(Basis(), Vector3(s * (hx + rim_w / 2.0), 0.007, 0))])
-		parts.append([Builder.box(Vector3(0.03, 0.03, BELT.y)), Transform3D(Basis(), Vector3(s * (hx + 0.03), 0.022, 0))])
-		parts.append([Builder.box(Vector3(BELT.x, 0.014, (DECK.y - BELT.y) / 2.0)), Transform3D(Basis(), Vector3(0, 0.007, s * (hz + (DECK.y - BELT.y) / 4.0)))])
-		parts.append([Builder.box(Vector3(BELT.x, 0.02, 0.05)), Transform3D(Basis(), Vector3(0, 0.01, s * (hz + 0.02)))])
-		# Rolltor: Führungsschienen links und rechts, aufgerollter Panzer oben
 		for side in [-1.0, 1.0]:
 			parts.append([Builder.box(Vector3(0.14, DOOR.y, 0.16)), Transform3D(Basis(), Vector3(side * (DOOR.x / 2.0 + 0.07), DOOR.y / 2.0, s * (END_Z - 0.1)))])
 		var drum := CylinderMesh.new()

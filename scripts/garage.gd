@@ -148,6 +148,9 @@ func _build_scene() -> void:
 	rim.spot_angle = 26
 	rim.light_energy = 3.5
 	rim.light_color = Color(0.82, 0.88, 1.0)
+	# nur auf die Autos: es wirft keinen Schatten, auf dem glatten Hallenboden lag sein Glanz sonst hell unter dem Auto
+	# (bis 2.38 verschluckte das dunkle Gummiband ihn)
+	rim.light_cull_mask = Builder.CAR_LAYER
 	# Aufhelllicht von rechts vorn oben (hoch genug, dass es keinen hellen Fleck auf den Boden vor der Kamera legt)
 	var fill := OmniLight3D.new()
 	fill.position = Vector3(4.2, 3.4, -2.2)
@@ -158,12 +161,12 @@ func _build_scene() -> void:
 
 	# Stellplatz um 180° gedreht: das Auto fährt nach +Z, die Kamera steht auf seiner linken Seite (_cam_goal)
 	stand = Node3D.new()
-	stand.position.y = 0.006  # Oberfläche des Bands
+	stand.position.y = 0.0  # Boden: das Band liegt bündig darin (seit 2.39)
 	stand.rotation.y = PI
 	world.add_child(stand)
 
 	cam = Camera3D.new()
-	cam.fov = 50
+	cam.fov = CAM_FOV
 	# Bildausschnitt per Objektivverschiebung (frustum_offset) statt seitlich versetzter Kamera (h_offset): das Auto steht
 	# neben dem Menü bzw. über der Leiste, ohne dass sich der Blickwinkel ändert (Größe aus fov, _process)
 	cam.projection = Camera3D.PROJECTION_FRUSTUM
@@ -172,8 +175,9 @@ func _build_scene() -> void:
 	_work_light = OmniLight3D.new()
 	_work_light.light_color = Color(1.0, 0.95, 0.88)
 	_work_light.light_energy = 0.0
-	_work_light.omni_range = 5.0
+	_work_light.omni_range = 5.0 * CLOSE_K  # Nahansichten stehen seit 2.39 weiter weg (längere Brennweite)
 	_work_light.position = Vector3(0.3, 0.3, 0.0)
+	_work_light.light_cull_mask = Builder.CAR_LAYER  # leuchtet das Teil aus, nicht den Boden vor der Kamera
 	cam.add_child(_work_light)
 	cam.make_current()
 
@@ -513,6 +517,15 @@ var _cam_look := Vector3(0, 0.6, 0)
 var _cam_snap := true  # erstes Bild: Kamera gleich am Ziel statt heranzufliegen
 var _cam_shift := Vector2.ZERO  # Lage des Ziels im Bild (-1 … 1, y nach oben), über die Objektivverschiebung
 var _work_light: OmniLight3D  # Arbeitslicht an der Kamera für Nahaufnahmen (Felgen, Motor)
+## Brennweite: 30° senkrecht (wie ein 45-mm-Normalobjektiv) statt 50° bis 2.38 (26-mm-Weitwinkel). Der Weitwinkel aus
+## der Nähe zog die Front in die Länge, von schräg vorn wirkte jede Haube viel zu lang. Die Kamera steht dafür gut
+## 1,7-mal so weit weg (_fit_car rechnet den Abstand) und bleibt dabei in der Halle (_hall_room).
+const CAM_FOV := 30.0
+## Nahansichten (_view_for) sind für 50° gemessen: tan(25°) / tan(15°) = 1,74-mal so weit weg zeigen sie das Teil gleich
+## groß. Gut 8 % weniger, damit Felgen, Haube, Auspuff und Licht groß im Bild bleiben.
+const CLOSE_K := 1.6
+const WORK_LIGHT := 1.7  # Arbeitslicht in Nahansichten (1.0 bis 2.38, die Kamera stand nur gut halb so weit weg)
+var _cam_fov := CAM_FOV  # Bildwinkel gerade (nur größer, wenn die Halle für den Abstand nicht reicht, _fit_car)
 
 ## Ansichten mit dem ganzen Auto: [Azimut, Höhe] in Grad (Azimut 0 = von vorn, 90 = von der Seite, 180 = von hinten;
 ## die Kamera steht links vom Auto, siehe _cam_goal). Die Kamera rahmt das Auto darin selbst ein (_fit_car): so groß wie
@@ -607,11 +620,11 @@ func _ui_size() -> Vector2:
 	return _ui.size if _ui and _ui.size.x > 1.0 and _ui.size.y > 1.0 else Vector2(640, 360)
 
 
-## Sichtkegel und freie Fläche in Bildkoordinaten (-1 … 1, y nach oben): [tan_h, tan_v, u0, u1, v0, v1, halbe Breite,
-## halbe Höhe, Mitte u, Mitte v]
-func _frustum(rect: Rect2) -> Array:
+## Sichtkegel (Bildwinkel fov senkrecht) und freie Fläche in Bildkoordinaten (-1 … 1, y nach oben): [tan_h, tan_v, u0,
+## u1, v0, v1, halbe Breite, halbe Höhe, Mitte u, Mitte v]
+func _frustum(rect: Rect2, fov: float) -> Array:
 	var s := _ui_size()
-	var tv := tan(deg_to_rad(cam.fov) * 0.5)
+	var tv := tan(deg_to_rad(fov) * 0.5)
 	var th := tv * s.x / s.y
 	var u0 := rect.position.x / s.x * 2.0 - 1.0
 	var u1 := rect.end.x / s.x * 2.0 - 1.0
@@ -623,7 +636,9 @@ func _frustum(rect: Rect2) -> Array:
 ## Kamera, die das ganze Auto (Umriss _hull) in die freie Fläche setzt: der kleinste Abstand, bei dem das Bild des
 ## Umrisses hineinpasst (Halbierungssuche, Start bei einer sicheren Lösung), dann per Objektivverschiebung mittig in die
 ## Fläche geschoben (der Blickwinkel bleibt). dir zeigt vom Auto zur Kamera. Rückgabe [Kamerapunkt, Blickziel, Lage des
-## Ziels im Bild u, v]. Gerechnet wird nur, wenn sich Richtung, Fläche oder Auto merklich geändert haben.
+## Ziels im Bild u, v, Bildwinkel]. Gerechnet wird nur, wenn sich Richtung, Fläche oder Auto merklich geändert haben.
+## Reicht die Halle für den Abstand nicht (seit 2.39 mit 30° statt 50°: in der Karriere ist zwischen Liste und Karte nur
+## eine schmale Lücke), wird der Bildwinkel gerade so weit größer, dass das Auto trotzdem ganz hineinpasst.
 var _fit_key := []
 var _fit_out := []
 var _fit_hi := 4.0  # Abstand der letzten Rechnung
@@ -631,13 +646,31 @@ var _fit_hi := 4.0  # Abstand der letzten Rechnung
 
 func _fit_car(dir: Vector3, rect: Rect2) -> Array:
 	var z := dir.normalized()
-	var f := _frustum(rect)
-	var blocks := _blocks(f)
+	var blocks := _blocks()
 	if not _fit_key.is_empty() and _fit_key[0] == _hull and (_fit_key[1] as Rect2).is_equal_approx(rect) \
 			and (_fit_key[2] as Vector3).dot(z) > 0.99995 and _fit_key[3] == blocks:
 		# Abstand und Verschiebung ändern sich mit der Richtung kaum, die Lage aber in jedem Bild (sonst bliebe die
 		# Kamera beim langsamen Schwenk in der Garage kurz stehen und spränge dann um gut ein halbes Grad)
-		return [_hull_c + z * _fit_hi, _hull_c, _fit_out[2], _fit_out[3]]
+		return [_hull_c + z * _fit_hi, _hull_c, _fit_out[2], _fit_out[3], _fit_out[4]]
+	var fov := CAM_FOV
+	var r := _fit_at(z, rect, blocks, fov)
+	for it in 2:
+		# Platz in der Halle: Abstand bis zur Wand (bzw. Grenze) auf der Linie zur Kamera, gemessen in der Halle
+		var room := _hall_room(stand.transform * _hull_c, stand.transform * (_hull_c + z * float(r[0])))
+		if room >= 0.995:
+			break
+		# Abstand und tan(Bildwinkel / 2) gehen umgekehrt: um so viel weiter muss der Bildwinkel werden
+		fov = minf(rad_to_deg(2.0 * atan(tan(deg_to_rad(fov) * 0.5) / maxf(room, 0.2))), 60.0)
+		r = _fit_at(z, rect, blocks, fov)
+	_fit_key = [_hull, rect, z, blocks]
+	_fit_hi = r[0]
+	_fit_out = [_hull_c + z * float(r[0]), _hull_c, r[1], r[2], fov]
+	return _fit_out
+
+
+## Halbierungssuche für _fit_car bei Bildwinkel fov: [Abstand, Lage des Ziels im Bild u, v]
+func _fit_at(z: Vector3, rect: Rect2, blocks: Array, fov: float) -> Array:
+	var f := _frustum(rect, fov)
 	var x := Vector3.UP.cross(z).normalized()
 	var y := z.cross(x)
 	var th: float = f[0]
@@ -652,7 +685,7 @@ func _fit_car(dir: Vector3, rect: Rect2) -> Array:
 		cs.append(c)
 		hi = maxf(hi, maxf(absf(c.x) / (hw * th), absf(c.y) / (hh * tv)) + c.z)  # passt sicher (Ziel in der Mitte)
 	# Felder in den oberen Ecken (Infofeld links, Werte rechts): dort darf auch ein hoher Heckflügel nicht hineinragen
-	hi = minf(hi * (1.25 if not blocks.is_empty() else 1.0), 18.0)
+	hi = minf(hi * (1.25 if not blocks.is_empty() else 1.0), 30.0)
 	var lo := hi * 0.35
 	for it in 13:
 		var d := (lo + hi) * 0.5
@@ -665,15 +698,12 @@ func _fit_car(dir: Vector3, rect: Rect2) -> Array:
 		else:
 			lo = d
 	var ex := _extent(cs, hi, th, tv)
-	_fit_key = [_hull, rect, z, blocks]
-	_fit_hi = hi
-	_fit_out = [_hull_c + z * hi, _hull_c, float(f[8]) - (ex.x + ex.y) * 0.5, float(f[9]) - (ex.z + ex.w) * 0.5]
-	return _fit_out
+	return [hi, float(f[8]) - (ex.x + ex.y) * 0.5, float(f[9]) - (ex.z + ex.w) * 0.5]
 
 
 ## Flächen der Oberfläche, die über der freien Fläche liegen (Tuning: Infofeld oben links, Werte oben rechts), in
 ## Bildkoordinaten (u0, v0, u1, v1), mit etwas Rand
-func _blocks(f: Array) -> Array:
+func _blocks() -> Array:
 	var out := []
 	if not _strip_mode:
 		return out
@@ -714,7 +744,7 @@ static func _extent(cs: PackedVector3Array, d: float, th: float, tv: float) -> V
 
 ## Kamera im Abstand d vom Ziel in Richtung z, das Ziel erscheint in der Mitte der freien Fläche
 func _place(target: Vector3, z: Vector3, d: float, f: Array) -> Array:
-	return [target + z * d, target, float(f[8]), float(f[9])]
+	return [target + z * d, target, float(f[8]), float(f[9]), CAM_FOV]
 
 
 ## Ziel der Kamera in Hallenkoordinaten. Gerechnet wird am Auto (vorn -Z), und zwar auf seiner linken Seite: der
@@ -731,10 +761,30 @@ func _cam_goal() -> Array:
 		var v := _view_for(_cam_view)
 		var m := Vector3(-1.0, 1.0, 1.0)
 		var to: Vector3 = (v[0] - v[1]) * m
-		g = _place(v[1] * m, to.normalized(), to.length(), _frustum(rect))
+		g = _place(v[1] * m, to.normalized(), to.length() * CLOSE_K, _frustum(rect, CAM_FOV))
 	g[0] = stand.transform * (g[0] as Vector3)
 	g[1] = stand.transform * (g[1] as Vector3)
+	# Sicherheitsnetz: was trotzdem hinter einer Wand läge, rückt auf der Linie zum Blickziel heran
+	g[0] = (g[1] as Vector3) + ((g[0] as Vector3) - (g[1] as Vector3)) * _hall_room(g[1], g[0])
 	return g
+
+
+## Wie weit die Kamera auf der Linie vom Blickziel look zu pos in der Halle bleibt (1 = ganz, 0,5 = nur bis zur Hälfte):
+## vor den Stirnwänden mit den Toren, vor der Rückwand, unter 5,6 m; zur offenen Seite der Halle (dort steht keine
+## Wand, die Kamera schaut immer zur Werkzeugwand) bis 16 m
+static func _hall_room(look: Vector3, pos: Vector3) -> float:
+	var d := pos - look
+	var s := 1.0
+	var lim := Vector3(16.0, 5.6, GarageSet.END_Z - 0.6)
+	if absf(d.z) > 0.001:
+		s = minf(s, (signf(d.z) * lim.z - look.z) / d.z)
+	if d.x > 0.001:
+		s = minf(s, (lim.x - look.x) / d.x)
+	elif d.x < -0.001:
+		s = minf(s, (GarageSet.BACK_X + 0.6 - look.x) / d.x)
+	if d.y > 0.001:
+		s = minf(s, (lim.y - look.y) / d.y)
+	return clampf(s, 0.2, 1.0)
 
 
 func _label(parent: Node, size: int, align := HORIZONTAL_ALIGNMENT_LEFT) -> Label:
@@ -761,12 +811,14 @@ func _process(dt: float) -> void:
 	_cam_pos = _cam_pos.lerp(g[0], k)
 	_cam_look = _cam_look.lerp(g[1], k)
 	_cam_shift = _cam_shift.lerp(Vector2(g[2], g[3]), k)
+	_cam_fov = lerpf(_cam_fov, g[4], k)
+	cam.fov = _cam_fov
 	var tv := tan(deg_to_rad(cam.fov) * 0.5)
 	cam.size = 2.0 * cam.near * tv
 	cam.frustum_offset = Vector2(-_cam_shift.x * tv * _ui_size().x / _ui_size().y, -_cam_shift.y * tv) * cam.near
 	cam.position = _cam_pos
 	cam.look_at(_cam_look)
-	_work_light.light_energy = lerpf(_work_light.light_energy, 0.0 if _full_dir() != null else 1.0, k)
+	_work_light.light_energy = lerpf(_work_light.light_energy, 0.0 if _full_dir() != null else WORK_LIGHT, k)
 	var st := tr("LEVEL %d   ·   %s   ·   SIEGE %d   ·   %s") % [GameState.level(), GameState.title_name().to_upper(), GameState.wins + GameState.drift_wins,
 		Catalog.CARS[GameState.current_car]["name"].to_upper()]
 	if st != _status_text:
@@ -777,10 +829,11 @@ func _process(dt: float) -> void:
 
 # --- Rollenprüfstand (seit 2.38) --------------------------------------------------------------------------------------
 ## Das Auto fährt auf einem Laufband auf der Stelle: die Räder drehen im Reisetempo, das Band läuft unter ihm nach hinten,
-## Spiegelungen ziehen über den Lack, die Federung arbeitet leicht. Wo man an den Rädern oder aus der Nähe an einem Teil
-## arbeitet (STOP_CATS), rollt es sanft aus und hält mit kurz aufleuchtenden Bremslichtern; zurück in einer Ansicht mit
-## dem ganzen Auto fährt es wieder an. Ein anderes Auto fährt hinten durchs Tor herein und bremst auf seinen Platz, das
-## bisherige fährt vorn hinaus.
+## Spiegelungen ziehen über den Lack, die Federung arbeitet leicht. Seit 2.39 liegt das Band bündig im Boden und reicht
+## von Tor zu Tor (garage_set.gd): man sieht es nicht, das Auto fährt einfach in der Halle. Wo man an den Rädern oder aus
+## der Nähe an einem Teil arbeitet (STOP_CATS), rollt es sanft aus und hält mit kurz aufleuchtenden Bremslichtern; zurück
+## in einer Ansicht mit dem ganzen Auto fährt es wieder an. Ein anderes Auto fährt hinten durchs Tor herein und bremst
+## auf seinen Platz, das bisherige fährt vorn hinaus: beide auf dem Band, das durch beide Tore läuft.
 const CRUISE := 7.0  # m/s auf dem Band (gut 25 km/h)
 ## Räder (Felgen, Felgenfarbe, Zoll, Spur, Reifen) und Arbeit aus der Nähe (Fahrwerk, Motor, Turbo, Nitro bei offener
 ## Haube bzw. Klappe, Motorhaube, Auspuff, Spoiler, Scheinwerfer): hier steht das Auto still
@@ -792,7 +845,8 @@ const OUT_ACC := 13.0  # m/s² beim Hinausfahren
 var _hall := {}  # GarageSet.build: belt, rotor, glints
 var _belt_v := 0.0  # Tempo des Bands (m/s)
 var _belt_a := 0.0
-var _belt_x := 0.0  # Weg des Bands (m), für das Muster
+var _belt_x := 0.0  # Weg des Bands (m), für das Muster (wiederholt sich nach 32 m, garage_floor.gdshader)
+var _glint_u := 0.0  # Lage der wandernden Spiegelungen (0 … 1)
 var _roll: RollCar  # Auto auf dem Stellplatz bzw. auf dem Weg dorthin
 var _leaving: Array = []  # Autos, die vorn hinausfahren (höchstens zwei)
 var _shown_id := ""
@@ -813,6 +867,7 @@ class RollCar:
 	var glow_c := Color.BLACK
 	var spill: OmniLight3D  # roter Schein der Bremslichter auf dem Boden hinter dem Auto (auch von vorn zu sehen)
 	var phase := 0  # 0 auf dem Platz, 1 fährt herein, 2 fährt hinaus
+	var leave_after := false  # fährt noch herein, soll danach gleich wieder hinaus (schnelles Blättern)
 	var z := 0.0
 	var v := 0.0
 	var t := 0.0
@@ -895,7 +950,8 @@ class RollCar:
 			v = 2.0 * z0 * (1.0 - u) / dur
 			acc = -2.0 * z0 / (dur * dur)
 			if u >= 1.0:
-				phase = 0
+				phase = 2 if leave_after else 0
+				t = 0.0
 				z = 0.0
 				v = 0.0
 				acc = 0.0
@@ -927,6 +983,21 @@ class RollCar:
 		spill.visible = brake > 0.01
 		spill.light_energy = 1.6 * brake
 
+	## Lage nach tt Sekunden (für die Einfahrt des Nachfolgers): beim Hinausfahren gleichmäßig schneller, ein Auto, das
+	## noch hereinfährt und danach gleich wieder hinaus soll, erst bis auf seinen Platz, dann von dort hinaus
+	func z_at(tt: float) -> float:
+		if phase == 2:
+			return z - v * tt - 0.5 * OUT_ACC * tt * tt
+		if phase != 1:
+			return z
+		var ta := t + tt
+		if ta < dur:
+			var u := maxf(ta, 0.0) / dur
+			return z0 * (1.0 - u) * (1.0 - u)
+		if not leave_after:
+			return 0.0
+		return -0.5 * OUT_ACC * (ta - dur) * (ta - dur)
+
 
 ## Laufband, Gebläse, Spiegelungen und Autos je Bild. Das Band folgt seinem Ziel (Reisetempo oder Stillstand) als
 ## kritisch gedämpfte Feder: weich anfahren, weich ausrollen, auch wenn das Ziel beim Blättern unterwegs wechselt.
@@ -938,18 +1009,19 @@ func _roll_road(dt: float) -> void:
 	if absf(target - _belt_v) < 0.01 and absf(_belt_a) < 0.05:
 		_belt_v = target
 		_belt_a = 0.0
-	_belt_x = fmod(_belt_x + _belt_v * dt, 1320.0)  # Vielfaches beider Teilungen im Muster (1,2 m und 11 cm)
+	_belt_x = fmod(_belt_x + _belt_v * dt, 32.0)
 	var bm: ShaderMaterial = _hall["belt"]
 	bm.set_shader_parameter("offset", _belt_x)
-	bm.set_shader_parameter("blur", _belt_v * dt / 0.11)
+	bm.set_shader_parameter("blur", _belt_v * dt)
 	(_hall["rotor"] as Node3D).rotation.z -= _belt_v * dt * 2.4
 	# zwei Lichter, die nur das Auto treffen, ziehen mit dem Band von vorn nach hinten: Spiegelungen wandern über Dach,
 	# Haube und Flanke wie Lampen bei der Fahrt; im Stand blenden sie aus
 	var span := 9.0
+	_glint_u = fmod(_glint_u + _belt_v * dt / span, 1.0)
 	var gl: Array = _hall["glints"]
 	for i in gl.size():
 		var l: OmniLight3D = gl[i]
-		var u := fposmod(_belt_x / span + i * 0.5, 1.0)
+		var u := fposmod(_glint_u + i * 0.5, 1.0)
 		# auf der Seite der Kamera, von der Front (+Z in der Halle) zum Heck
 		l.position = Vector3(1.0 if i == 0 else 2.8, 2.4 if i == 0 else 1.0, span / 2.0 - u * span)
 		l.light_energy = 0.4 * sin(PI * u) * clampf(_belt_v / CRUISE, 0.0, 1.0)
@@ -991,8 +1063,14 @@ func _show_car(car_id: String, cfg: Dictionary) -> void:
 				var ahead: RollCar = _leaving.back() if not _leaving.is_empty() else null
 				rc.arrive(from, time, _arrival_delay(ahead, node, from, time))
 			else:
-				old.phase = 2
-				old.t = 0.0
+				if old.phase == 1:
+					# fährt gerade herein: erst auf den Platz, dann gleich wieder vorn hinaus. Bis 2.38 fuhr es mit seiner
+					# Einfahrt-Geschwindigkeit weiter und holte den Vordermann ein (zweimal schnell geblättert: zwei Autos
+					# ineinander)
+					old.leave_after = true
+				else:
+					old.phase = 2
+					old.t = 0.0
 				_leaving.append(old)
 				while _leaving.size() > 2:
 					(_leaving.pop_front() as RollCar).node.queue_free()
@@ -1020,17 +1098,18 @@ func _show_car(car_id: String, cfg: Dictionary) -> void:
 
 
 ## Wie lange das neue Auto hinter dem Tor wartet, damit es den hinausfahrenden Vorgänger nie berührt (Abstand der
-## Mitten mindestens halbe Längen beider plus 40 cm über die ganze Einfahrt)
+## Mitten mindestens halbe Längen beider plus 1,2 m über die ganze Einfahrt; der Vorgänger fährt dabei wie in z_at).
+## Bis 2.38 waren es 40 cm: beim schnellen Blättern sah das aus, als führe das neue Auto dem alten fast hinten drauf.
 func _arrival_delay(prev: RollCar, node: Node3D, from: float, time: float) -> float:
 	if prev == null:
 		return 0.0
-	var need := (float(prev.node.get_meta("length")) + float(node.get_meta("length"))) / 2.0 + 0.4
+	var need := (float(prev.node.get_meta("length")) + float(node.get_meta("length"))) / 2.0 + 1.2
 	var delay := 0.0
-	while delay < 1.0:
+	while delay < 3.0:
 		var ok := true
 		for i in 25:
 			var tt := delay + time * i / 24.0
-			var zo := prev.z - prev.v * tt - 0.5 * OUT_ACC * tt * tt
+			var zo := prev.z_at(tt)
 			var u := (tt - delay) / time
 			if from * (1.0 - u) * (1.0 - u) - zo < need:
 				ok = false

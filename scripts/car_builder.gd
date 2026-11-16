@@ -37,6 +37,14 @@ static var _mesh_cache := {}  # Reifen, Speichen, Flügel, Kennzeichen: einmal g
 ##   bis 23 cm breiter als angegeben (Tengu 2,18 m statt 1,95 m, Raiden 2,18 m, Falke 2,04 m) und wirkten zu breit; dazu
 ##   waren die Hüften kräftiger (z. B. Tengu 0,115, Raiden 0,1, Falke 0,095 je Seite).
 ## arch_r (nur zur Laufzeit, build): Radius der Radläufe, wenn ein großes Rad mehr Platz braucht (wheel_fit)
+## Scheibenansatz (cowl) seit 2.39 nah an den Vorbildern (Haube von Bug bis Scheibe als Anteil der Länge, ungefähr:
+##   Silvia, AE86, Integra, Evo und Chaser 0,29 bis 0,31, Skyline, 180SX, RX-7 und Z32 0,32 bis 0,35, Supra, 350Z, S2000
+##   und LFA 0,36 bis 0,38, S30 0,41). Bis 2.38 lag er 2 bis 9 % der Länge weiter hinten (Haube bis 1,95 m, Vorderachse
+##   bis Scheibe bis 1,23 m): die Autos wirkten von der Haube her viel zu lang, die Kabine kurz und weit hinten. Das Dach
+##   (rf) rückte gleich weit mit (die Scheibe ist so steil wie vorher), die Türen mit, das Dachende (rr) kaum: das Dach ist
+##   dadurch etwas länger. Lange Hauben (Hakone, Kagura, Mirai, Kaze, Tsubame) bleiben im Verhältnis lang. Die Achsen
+##   blieben (Fahrphysik): bei den Autos mit 0,78 m Überhang ist der Radstand weiter meist gut 10 % länger als beim
+##   Vorbild, die Überhänge kürzer.
 const SHAPES := {
 	"kaizen": {  # JDM-Fließheck (Civic-EG-Gefühl): rundliche flache Nase, schmale breite Scheinwerfer, große Scheiben,
 		# langes Dach, steile Heckscheibe, fast senkrechte Klappe mit umlaufenden Rückleuchten, dicker Endtopf
@@ -47,112 +55,112 @@ const SHAPES := {
 		"drop": 0.035,  # ab Werk etwas tiefer
 	},
 	"mirai": {  # 350Z: lange Haube, Dachbogen fließt ins kurze Heck, breite Hüften
-		"nose": 0.6, "hood": 0.86, "cowl": 0.42, "rf": 0.56, "rr": 0.64, "ge": 0.89, "cp": 0.71,
+		"nose": 0.6, "hood": 0.86, "cowl": 0.37, "rf": 0.51, "rr": 0.625, "ge": 0.89, "cp": 0.71,
 		"roof": 1.22, "deck": 0.95, "tail": 0.96, "belt": 0.85, "fender": 0.04, "hips": 0.035,
 		"round_f": 0.14, "round_r": 0.12, "tumble": 0.21, "hl": {6: 0.14, 5: 0.05}, "tl": {},
-		"doors": [0.435, 0.68], "intake": Vector2(0.5, 0.12),
+		"doors": [0.385, 0.655], "intake": Vector2(0.5, 0.12),
 	},
 	"sakura": {  # Silvia-Coupé: schmale Scheinwerfer, Stufenheck mit kurzem Kofferraum
-		"nose": 0.6, "hood": 0.84, "cowl": 0.38, "rf": 0.54, "rr": 0.67, "ge": 0.81, "cp": 0.69,
+		"nose": 0.6, "hood": 0.84, "cowl": 0.32, "rf": 0.48, "rr": 0.66, "ge": 0.81, "cp": 0.69,
 		"roof": 1.22, "deck": 0.93, "tail": 0.94, "belt": 0.84, "fender": 0.02, "hips": 0.025,
 		"round_f": 0.12, "round_r": 0.07, "tumble": 0.16, "hl": {6: 0.09, 5: 0.035}, "tl": {},
-		"doors": [0.395, 0.67], "intake": Vector2(0.56, 0.09),
+		"doors": [0.335, 0.61], "intake": Vector2(0.56, 0.09),
 	},
 	"vortex": {  # GT-R-Limousine: kantiger, höheres Dach, Stufenheck, vier Türen
-		"nose": 0.66, "hood": 0.88, "cowl": 0.36, "rf": 0.5, "rr": 0.71, "ge": 0.82, "cp": 0.72,
+		"nose": 0.66, "hood": 0.88, "cowl": 0.315, "rf": 0.455, "rr": 0.7, "ge": 0.82, "cp": 0.72,
 		"roof": 1.27, "deck": 0.98, "tail": 0.99, "belt": 0.87, "fender": 0.02, "hips": 0.025,
 		"round_f": 0.07, "round_r": 0.05, "tumble": 0.13, "hl": {6: 0.075, 5: 0.05}, "tl": {},
-		"doors": [0.375, 0.55, 0.715], "intake": Vector2(0.66, 0.13),
+		"doors": [0.33, 0.53, 0.715], "intake": Vector2(0.66, 0.13),
 	},
 	"ronin": {  # RX-7: sehr flach, runde Formen, hohe Kotflügel, Glaskuppel, langes gewölbtes Heckfenster
-		"nose": 0.54, "hood": 0.8, "cowl": 0.39, "rf": 0.55, "rr": 0.61, "ge": 0.87, "cp": 0.68,
+		"nose": 0.54, "hood": 0.8, "cowl": 0.355, "rf": 0.515, "rr": 0.6, "ge": 0.87, "cp": 0.68,
 		"roof": 1.18, "deck": 0.92, "tail": 0.93, "belt": 0.82, "fender": 0.06, "hips": 0.035,
 		"round_f": 0.2, "round_r": 0.15, "tumble": 0.22, "hl": {}, "tl": {},
-		"doors": [0.405, 0.655], "intake": Vector2(0.58, 0.13), "pipes": [0.0],
+		"doors": [0.37, 0.635], "intake": Vector2(0.58, 0.13), "pipes": [0.0],
 	},
 	"kaze": {  # Supra-Gefühl: lang und rund, lange Nase, Kuppeldach, Bügelflügel, vier runde Rückleuchten
-		"nose": 0.55, "hood": 0.83, "cowl": 0.41, "rf": 0.565, "rr": 0.645, "ge": 0.85, "cp": 0.73,
+		"nose": 0.55, "hood": 0.83, "cowl": 0.365, "rf": 0.52, "rr": 0.63, "ge": 0.85, "cp": 0.73,
 		"roof": 1.19, "deck": 0.95, "tail": 0.95, "belt": 0.83, "fender": 0.035, "hips": 0.04,
 		"round_f": 0.23, "round_r": 0.17, "tumble": 0.25, "hl": {6: 0.11, 5: 0.075}, "tl": {},
-		"doors": [0.43, 0.69], "intake": Vector2(0.6, 0.12), "pipes": [0.46], "pipe_r": 0.068,
+		"doors": [0.38, 0.655], "intake": Vector2(0.6, 0.12), "pipes": [0.46], "pipe_r": 0.068,
 	},
 	"raijin": {  # Rallye-Limousine (Evo/Impreza): kantig, breite Backen, Hutze, riesiger Flügel, Schmutzfänger
-		"nose": 0.66, "hood": 0.9, "cowl": 0.355, "rf": 0.495, "rr": 0.685, "ge": 0.825, "cp": 0.745,
+		"nose": 0.66, "hood": 0.9, "cowl": 0.3, "rf": 0.44, "rr": 0.675, "ge": 0.825, "cp": 0.745,
 		"roof": 1.28, "deck": 0.99, "tail": 1.0, "belt": 0.88, "fender": 0.055, "hips": 0.035,
 		"round_f": 0.06, "round_r": 0.04, "tumble": 0.12, "hl": {6: 0.075, 5: 0.06}, "tl": {},
-		"doors": [0.37, 0.545, 0.725], "intake": Vector2(0.62, 0.17), "pipes": [0.42], "pipe_r": 0.072,
+		"doors": [0.315, 0.525, 0.725], "intake": Vector2(0.62, 0.17), "pipes": [0.42], "pipe_r": 0.072,
 	},
 	"yari": {  # Allrad-Rallye-Limousine (seit 2.36, Evo-Gefühl): hohes kantiges Glashaus, riesiges Maul mit Ladeluftkühler,
 		# große Seiteneinlässe mit Nebelscheinwerfern, Haube mit Luftauslässen, ausgestellte Backen, klare Rückleuchten,
 		# hoher Flügel, ein dickes Endrohr
-		"nose": 0.68, "hood": 0.9, "cowl": 0.36, "rf": 0.49, "rr": 0.69, "ge": 0.815, "cp": 0.75,
+		"nose": 0.68, "hood": 0.9, "cowl": 0.3, "rf": 0.43, "rr": 0.68, "ge": 0.815, "cp": 0.75,
 		"roof": 1.31, "deck": 1.0, "tail": 1.0, "belt": 0.89, "fender": 0.065, "hips": 0.045,
 		"round_f": 0.06, "round_r": 0.04, "tumble": 0.11, "hl": {}, "tl": {},
-		"doors": [0.36, 0.545, 0.725], "intake": Vector2(0.56, 0.15), "pipes": [0.44], "pipe_r": 0.06,
+		"doors": [0.305, 0.525, 0.725], "intake": Vector2(0.56, 0.15), "pipes": [0.44], "pipe_r": 0.06,
 		"axle": 0.9, "wheel_r": 0.325, "tire_w": 0.235, "edge_f": 0.055, "edge_r": 0.05,
 	},
 	"tatsumaki": {  # Kreiskolben-Coupé (seit 2.36, FD-Gefühl): sehr flach und rund, Klappscheinwerfer, Kotflügel höher als
 		# die Haube, Doppelbuckel-Dach (bubble), lange gewölbte Heckscheibe, schmales Leuchtenband, Bügelflügel
-		"nose": 0.54, "hood": 0.79, "cowl": 0.405, "rf": 0.55, "rr": 0.625, "ge": 0.885, "cp": 0.7,
+		"nose": 0.54, "hood": 0.79, "cowl": 0.355, "rf": 0.5, "rr": 0.615, "ge": 0.885, "cp": 0.7,
 		"roof": 1.16, "deck": 0.93, "tail": 0.95, "belt": 0.8, "fender": 0.085, "hips": 0.045,
 		"round_f": 0.24, "round_r": 0.16, "tumble": 0.25, "hl": {}, "tl": {},
-		"doors": [0.415, 0.665], "intake": Vector2(0.38, 0.115), "pipes": [0.3, 0.405], "pipe_r": 0.045,
+		"doors": [0.37, 0.64], "intake": Vector2(0.38, 0.115), "pipes": [0.3, 0.405], "pipe_r": 0.045,
 		"axle": 0.92, "tire_w": 0.235, "edge_f": 0.09, "edge_r": 0.075, "bubble": 0.014,
 	},
 	"tsubame": {  # Roadster (S2000/MX-5): lange Haube, kleines Stoffverdeck weit hinten, kurzes Heck
-		"nose": 0.57, "hood": 0.8, "cowl": 0.465, "rf": 0.585, "rr": 0.655, "ge": 0.765, "cp": 0.71,
+		"nose": 0.57, "hood": 0.8, "cowl": 0.38, "rf": 0.5, "rr": 0.62, "ge": 0.74, "cp": 0.69,
 		"roof": 1.1, "deck": 0.9, "tail": 0.92, "belt": 0.82, "fender": 0.05, "hips": 0.035,
 		"round_f": 0.19, "round_r": 0.13, "tumble": 0.27, "hl": {6: 0.125, 5: 0.045}, "tl": {},
-		"doors": [0.47, 0.695], "intake": Vector2(0.42, 0.1), "pipes": [-0.32, 0.32], "softtop": true,
+		"doors": [0.39, 0.66], "intake": Vector2(0.42, 0.1), "pipes": [-0.32, 0.32], "softtop": true,
 	},
 	"hachi": {  # 80er-Fließheck (AE86): kantig, Klappscheinwerfer, schwarze Stoßfänger, breites Leuchtenband
-		"nose": 0.63, "hood": 0.84, "cowl": 0.37, "rf": 0.52, "rr": 0.665, "ge": 0.9, "cp": 0.75,
+		"nose": 0.63, "hood": 0.84, "cowl": 0.31, "rf": 0.46, "rr": 0.66, "ge": 0.9, "cp": 0.75,
 		"roof": 1.22, "deck": 0.96, "tail": 0.95, "belt": 0.87, "fender": 0.0, "hips": 0.015,
 		"round_f": 0.05, "round_r": 0.04, "tumble": 0.15, "hl": {}, "tl": {},
-		"doors": [0.385, 0.66], "intake": Vector2(0.7, 0.05), "pipes": [-0.46], "pipe_r": 0.04,
+		"doors": [0.325, 0.6], "intake": Vector2(0.7, 0.05), "pipes": [-0.46], "pipe_r": 0.04,
 		"tire_w": 0.2,
 	},
 	"hayate": {  # 90er-Coupé (Integra-Gefühl): flache Nase mit vier runden Scheinwerfern, lange schräge
 		# Heckklappe, Eckleuchten, hoher Flügel auf der Klappe
-		"nose": 0.6, "hood": 0.83, "cowl": 0.37, "rf": 0.51, "rr": 0.62, "ge": 0.9, "cp": 0.79,
+		"nose": 0.6, "hood": 0.83, "cowl": 0.3, "rf": 0.44, "rr": 0.61, "ge": 0.9, "cp": 0.79,
 		"roof": 1.25, "deck": 0.97, "tail": 0.96, "belt": 0.81, "fender": 0.01, "hips": 0.03,
 		"round_f": 0.17, "round_r": 0.07, "tumble": 0.17, "hl": {}, "tl": {},
-		"doors": [0.375, 0.64], "intake": Vector2(0.56, 0.1), "pipes": [0.44], "pipe_r": 0.062,
+		"doors": [0.305, 0.575], "intake": Vector2(0.56, 0.1), "pipes": [0.44], "pipe_r": 0.062,
 	},
 	"kitsune": {  # Fließheck-Coupé mit Klappscheinwerfern (180SX-Gefühl): lange flache Haube, flaches Dach, Heckscheibe bis
 		# fast ans Ende, Leuchten über die ganze Klappe, kleiner Bürzel
-		"nose": 0.58, "hood": 0.8, "cowl": 0.4, "rf": 0.53, "rr": 0.61, "ge": 0.925, "cp": 0.75,
+		"nose": 0.58, "hood": 0.8, "cowl": 0.31, "rf": 0.44, "rr": 0.59, "ge": 0.925, "cp": 0.75,
 		"roof": 1.22, "deck": 0.96, "tail": 0.95, "belt": 0.8, "fender": 0.015, "hips": 0.03,
 		"round_f": 0.15, "round_r": 0.06, "tumble": 0.19, "hl": {}, "tl": {},
-		"doors": [0.405, 0.665], "intake": Vector2(0.62, 0.08), "pipes": [0.42], "pipe_r": 0.07,
+		"doors": [0.32, 0.585], "intake": Vector2(0.62, 0.08), "pipes": [0.42], "pipe_r": 0.07,
 	},
 	"tenshi": {  # Mittelmotor (MR2-Gefühl): kurze flache Nase mit Klappscheinwerfern, Kabine weit vorn, steiles kleines
 		# Heckfenster, lange Motorhaube hinten, breite Hüften mit Lufteinlässen, Bürzel
-		"nose": 0.56, "hood": 0.76, "cowl": 0.335, "rf": 0.47, "rr": 0.575, "ge": 0.665, "cp": 0.65,
+		"nose": 0.56, "hood": 0.76, "cowl": 0.31, "rf": 0.445, "rr": 0.57, "ge": 0.665, "cp": 0.65,
 		"roof": 1.18, "deck": 0.99, "tail": 0.97, "belt": 0.8, "fender": 0.03, "hips": 0.045,
 		"round_f": 0.2, "round_r": 0.1, "tumble": 0.21, "hl": {}, "tl": {},
-		"doors": [0.355, 0.58], "intake": Vector2(0.45, 0.07), "pipes": [-0.36, 0.36], "mid": true,
+		"doors": [0.33, 0.575], "intake": Vector2(0.45, 0.07), "pipes": [-0.36, 0.36], "mid": true,
 	},
 	"kumo": {  # Viertürer mit Heckantrieb (Chaser-Gefühl): lange Haube, hohes Glashaus, langer Kofferraum, große eckige
 		# Leuchten, Chrom
-		"nose": 0.66, "hood": 0.86, "cowl": 0.35, "rf": 0.485, "rr": 0.69, "ge": 0.805, "cp": 0.75,
+		"nose": 0.66, "hood": 0.86, "cowl": 0.315, "rf": 0.45, "rr": 0.68, "ge": 0.805, "cp": 0.75,
 		"roof": 1.33, "deck": 0.99, "tail": 0.99, "belt": 0.87, "fender": 0.0, "hips": 0.015,
 		"round_f": 0.07, "round_r": 0.05, "tumble": 0.12, "hl": {}, "tl": {},
-		"doors": [0.365, 0.545, 0.725], "intake": Vector2(0.6, 0.11), "pipes": [-0.45, 0.45], "pipe_r": 0.055,
+		"doors": [0.33, 0.535, 0.725], "intake": Vector2(0.6, 0.11), "pipes": [-0.45, 0.45], "pipe_r": 0.055,
 	},
 	"shiden": {  # Mittelmotor-Supersportler (NSX-Gefühl): sehr flach, Kanzel weit vorn, lange flache Heckpartie,
 		# Klappscheinwerfer, schwarzes Band über das ganze Heck, Flügel aus einem Stück mit den Flanken
-		"nose": 0.54, "hood": 0.72, "cowl": 0.33, "rf": 0.455, "rr": 0.585, "ge": 0.72, "cp": 0.7,
+		"nose": 0.54, "hood": 0.72, "cowl": 0.31, "rf": 0.435, "rr": 0.58, "ge": 0.72, "cp": 0.7,
 		"roof": 1.14, "deck": 0.97, "tail": 0.99, "belt": 0.79, "fender": 0.035, "hips": 0.035,
 		"round_f": 0.21, "round_r": 0.07, "tumble": 0.24, "hl": {}, "tl": {},
-		"doors": [0.36, 0.6], "intake": Vector2(0.55, 0.07), "pipes": [-0.3, -0.2, 0.2, 0.3], "pipe_r": 0.045, "mid": true,
+		"doors": [0.34, 0.595], "intake": Vector2(0.55, 0.07), "pipes": [-0.3, -0.2, 0.2, 0.3], "pipe_r": 0.045, "mid": true,
 	},
 	"ryujin": {  # Breites Biturbo-Coupé (300ZX-Gefühl): flache Keilnase mit schmalen liegenden Scheinwerfern, Glasdach mit
 		# Mittelsteg, kurzes hohes Heck mit Leuchtenband über die ganze Breite
-		"nose": 0.57, "hood": 0.8, "cowl": 0.39, "rf": 0.525, "rr": 0.62, "ge": 0.845, "cp": 0.72,
+		"nose": 0.57, "hood": 0.8, "cowl": 0.345, "rf": 0.48, "rr": 0.61, "ge": 0.845, "cp": 0.72,
 		"roof": 1.2, "deck": 0.96, "tail": 0.98, "belt": 0.82, "fender": 0.03, "hips": 0.04,
 		"round_f": 0.17, "round_r": 0.06, "tumble": 0.23, "hl": {6: 0.13}, "tl": {},
-		"doors": [0.42, 0.67], "intake": Vector2(0.4, 0.07), "pipes": [-0.42, 0.42], "pipe_r": 0.06,
+		"doors": [0.36, 0.63], "intake": Vector2(0.4, 0.07), "pipes": [-0.42, 0.42], "pipe_r": 0.06,
 	},
 	# --- Kleinwagen: kleinere Räder (wheel_r) und kurze Überhänge (axle) ---
 	"chibi": {  # Kei-Turbo (Alto-Works-Gefühl): kurz, schmal, hoch, kurze Haube mit Hutze, langes Dach, senkrechte Klappe
@@ -163,10 +171,10 @@ const SHAPES := {
 		"wheel_r": 0.275, "axle": 0.56, "tire_w": 0.17,
 	},
 	"hotaru": {  # Kei-Mittelmotor-Roadster (Beat-Gefühl): winzig, flach, Stoffverdeck, Kabine in der Mitte, flaches Heck
-		"nose": 0.57, "hood": 0.77, "cowl": 0.37, "rf": 0.5, "rr": 0.57, "ge": 0.66, "cp": 0.63,
+		"nose": 0.57, "hood": 0.77, "cowl": 0.33, "rf": 0.46, "rr": 0.55, "ge": 0.655, "cp": 0.625,
 		"roof": 1.16, "deck": 0.9, "tail": 0.91, "belt": 0.79, "fender": 0.03, "hips": 0.03,
 		"round_f": 0.17, "round_r": 0.11, "tumble": 0.2, "hl": {6: 0.1, 5: 0.035}, "tl": {},
-		"doors": [0.39, 0.62], "intake": Vector2(0.36, 0.06), "pipes": [0.34], "pipe_r": 0.04, "softtop": true, "mid": true,
+		"doors": [0.35, 0.6], "intake": Vector2(0.36, 0.06), "pipes": [0.34], "pipe_r": 0.04, "softtop": true, "mid": true,
 		"wheel_r": 0.27, "axle": 0.52, "tire_w": 0.165,
 	},
 	"tanuki": {  # Allrad-Turbo-Kleinwagen (GR-Yaris-Gefühl): kurz und breit, flaches Dach, riesige Hüften, großes Gitter vorn
@@ -181,57 +189,57 @@ const SHAPES := {
 		# Scheinwerfer, aufgeschraubte Kotflügelverbreiterungen (overfenders), vier runde Rückleuchten
 		# 2.25: flacher und runder (vorher Dach 1,37 m, Gürtel 0,86 m, kaum Rundung: wirkte wie eine Kiste aus Klötzchen),
 		# größere Räder
-		"nose": 0.72, "hood": 0.84, "cowl": 0.36, "rf": 0.5, "rr": 0.69, "ge": 0.8, "cp": 0.74,
+		"nose": 0.72, "hood": 0.84, "cowl": 0.34, "rf": 0.48, "rr": 0.685, "ge": 0.8, "cp": 0.74,
 		"roof": 1.3, "deck": 0.93, "tail": 0.92, "belt": 0.82, "fender": 0.02, "hips": 0.025,
 		"round_f": 0.08, "round_r": 0.065, "tumble": 0.15, "hl": {}, "tl": {},
-		"doors": [0.375, 0.655], "intake": Vector2(0.3, 0.04), "pipes": [0.4], "pipe_r": 0.042,
+		"doors": [0.355, 0.64], "intake": Vector2(0.3, 0.04), "pipes": [0.4], "pipe_r": 0.042,
 		"wheel_r": 0.315, "axle": 0.74, "tire_w": 0.225, "chrome_bumpers": true, "overfenders": true,
 	},
 	"hakone": {  # 70er-Fließheck (S30-Gefühl): sehr lange Haube, Scheinwerfer in Mulden vorn in den Kotflügeln, kleines
 		# Maul, Dach fließt bis ans Heck, Leuchten in einem schwarzen Feld
-		"nose": 0.6, "hood": 0.83, "cowl": 0.47, "rf": 0.585, "rr": 0.655, "ge": 0.93, "cp": 0.83,
+		"nose": 0.6, "hood": 0.83, "cowl": 0.415, "rf": 0.53, "rr": 0.63, "ge": 0.93, "cp": 0.81,
 		"roof": 1.27, "deck": 0.96, "tail": 0.93, "belt": 0.82, "fender": 0.045, "hips": 0.03,
 		"round_f": 0.16, "round_r": 0.06, "tumble": 0.18, "hl": {}, "tl": {},
-		"doors": [0.49, 0.71], "intake": Vector2(0.42, 0.09), "pipes": [0.4], "pipe_r": 0.045,
+		"doors": [0.43, 0.675], "intake": Vector2(0.42, 0.09), "pipes": [0.4], "pipe_r": 0.045,
 		"wheel_r": 0.3, "axle": 0.72, "tire_w": 0.21, "chrome_bumpers": true,
 	},
 	# --- Exoten: größere Räder, lange Überhänge ---
 	"kagura": {  # V10-Supersportler (LFA-Gefühl): lange Haube, Kabine weit hinten, nach hinten gezogene Scheinwerfer,
 		# dreieckige Rückleuchten, drei Endrohre in der Mitte
-		"nose": 0.56, "hood": 0.8, "cowl": 0.41, "rf": 0.555, "rr": 0.635, "ge": 0.86, "cp": 0.74,
+		"nose": 0.56, "hood": 0.8, "cowl": 0.38, "rf": 0.525, "rr": 0.625, "ge": 0.86, "cp": 0.74,
 		"roof": 1.2, "deck": 0.98, "tail": 0.99, "belt": 0.84, "fender": 0.04, "hips": 0.045,
 		"round_f": 0.18, "round_r": 0.07, "tumble": 0.25, "hl": {6: 0.13, 5: 0.06}, "tl": {},
-		"doors": [0.43, 0.68], "intake": Vector2(0.5, 0.12), "pipes": [-0.085, 0.0, 0.085], "pipe_r": 0.042,
+		"doors": [0.395, 0.665], "intake": Vector2(0.5, 0.12), "pipes": [-0.085, 0.0, 0.085], "pipe_r": 0.042,
 		"wheel_r": 0.335, "axle": 0.84, "tire_w": 0.27,
 	},
 	"falke": {  # Heckmotor-Sportwagen (911-Gefühl): runde Scheinwerfer oben auf den Kotflügeln, flache Haube dazwischen,
 		# Dach fällt in einem Bogen zum Heck, breite Hüften, Leuchtenband über das ganze Heck, Entenbürzel
-		"nose": 0.56, "hood": 0.74, "cowl": 0.36, "rf": 0.5, "rr": 0.59, "ge": 0.8, "cp": 0.73,
+		"nose": 0.56, "hood": 0.74, "cowl": 0.32, "rf": 0.46, "rr": 0.58, "ge": 0.8, "cp": 0.73,
 		"roof": 1.27, "deck": 0.97, "tail": 0.95, "belt": 0.83, "fender": 0.085, "hips": 0.06,
 		"round_f": 0.23, "round_r": 0.19, "tumble": 0.25, "hl": {}, "tl": {},
-		"doors": [0.375, 0.655], "intake": Vector2(0.6, 0.1), "pipes": [-0.11, 0.11], "pipe_r": 0.05,
+		"doors": [0.335, 0.61], "intake": Vector2(0.6, 0.1), "pipes": [-0.11, 0.11], "pipe_r": 0.05,
 		"wheel_r": 0.33, "axle": 0.92, "tire_w": 0.26, "rear_engine": true,
 	},
 	"furia": {  # V12-Keil (Countach-Gefühl): sehr flach und breit, spitze Nase, Kanzel weit vorn, hoher Motordeckel mit
 		# Lamellen, Y-Leuchten, sechseckige Einlässe, Endrohre in der Mitte
-		"nose": 0.5, "hood": 0.71, "cowl": 0.32, "rf": 0.465, "rr": 0.55, "ge": 0.63, "cp": 0.66,
+		"nose": 0.5, "hood": 0.71, "cowl": 0.3, "rf": 0.445, "rr": 0.545, "ge": 0.63, "cp": 0.66,
 		"roof": 1.13, "deck": 1.0, "tail": 1.0, "belt": 0.8, "fender": 0.03, "hips": 0.045,
 		"round_f": 0.06, "round_r": 0.04, "tumble": 0.27, "hl": {6: 0.07}, "tl": {},
-		"doors": [0.33, 0.6], "intake": Vector2(0.74, 0.12), "pipes": [-0.075, 0.075], "pipe_r": 0.058, "mid": true,
+		"doors": [0.31, 0.59], "intake": Vector2(0.74, 0.12), "pipes": [-0.075, 0.075], "pipe_r": 0.058, "mid": true,
 		"wheel_r": 0.345, "axle": 1.0, "tire_w": 0.3,
 	},
 	"raiden": {  # Allrad-GT (seit 2.32, Level 10): langes, flaches Coupé, Kabine in der Mitte, breite Hüften, vier Endrohre
-		"nose": 0.53, "hood": 0.77, "cowl": 0.39, "rf": 0.52, "rr": 0.6, "ge": 0.8, "cp": 0.71,
+		"nose": 0.53, "hood": 0.77, "cowl": 0.35, "rf": 0.48, "rr": 0.59, "ge": 0.8, "cp": 0.71,
 		"roof": 1.18, "deck": 0.99, "tail": 0.98, "belt": 0.82, "fender": 0.055, "hips": 0.055,
 		"round_f": 0.12, "round_r": 0.06, "tumble": 0.27, "hl": {6: 0.1}, "tl": {},
-		"doors": [0.38, 0.64], "intake": Vector2(0.66, 0.12), "pipes": [-0.12, -0.075, 0.075, 0.12], "pipe_r": 0.04,
+		"doors": [0.36, 0.625], "intake": Vector2(0.66, 0.12), "pipes": [-0.12, -0.075, 0.075, 0.12], "pipe_r": 0.04,
 		"wheel_r": 0.34, "axle": 0.95, "tire_w": 0.29,
 	},
 	"tengu": {  # Drift-Monster (seit 2.32, Level 16): kurzer Überhang hinten, breite Backen, großes Mittelrohr
-		"nose": 0.55, "hood": 0.79, "cowl": 0.41, "rf": 0.53, "rr": 0.62, "ge": 0.84, "cp": 0.72,
+		"nose": 0.55, "hood": 0.79, "cowl": 0.36, "rf": 0.48, "rr": 0.605, "ge": 0.84, "cp": 0.72,
 		"roof": 1.2, "deck": 0.97, "tail": 0.96, "belt": 0.83, "fender": 0.075, "hips": 0.07,
 		"round_f": 0.15, "round_r": 0.08, "tumble": 0.24, "hl": {6: 0.1}, "tl": {},
-		"doors": [0.4, 0.66], "intake": Vector2(0.6, 0.13), "pipes": [0.0], "pipe_r": 0.065,
+		"doors": [0.37, 0.64], "intake": Vector2(0.6, 0.13), "pipes": [0.0], "pipe_r": 0.065,
 		"wheel_r": 0.335, "axle": 0.9, "tire_w": 0.3,
 	},
 }
@@ -906,20 +914,24 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 		var ym := maxf((yl + yr) / 2.0, _top_y(sec_w, clampf(absf(wx) / half_w, 0.0, 1.0)))
 		var wp := _near(_add(body, box(Vector3(blade, 0.012, 0.016)), wiper_m, Vector3(wx, ym + 0.012, zf + t_wb * L)))
 		wp.rotation = Vector3(-w_slope, 0.0, atan2(yr - yl, blade))
+	# Teile auf der Haube stehen seit 2.39 im Abstand zum Scheibenansatz (cowl): rückt die Scheibe, rücken sie mit
 	if car_id == "vortex":
 		# Luftauslässe auf der Haube
-		var vs: PackedVector2Array = _section(S, 0.27, W, L, flare)["p"]
+		var vt: float = float(S["cowl"]) - 0.09
+		var vs: PackedVector2Array = _section(S, vt, W, L, flare)["p"]
 		for s in [-1, 1]:
-			_add(body, box(Vector3(0.22, 0.01, 0.16)), dark, Vector3(s * 0.32, _top_y(vs, 0.32 / vs[7].x) + 0.003, zf + 0.27 * L))
+			_add(body, box(Vector3(0.22, 0.01, 0.16)), dark, Vector3(s * 0.32, _top_y(vs, 0.32 / vs[7].x) + 0.003, zf + vt * L))
 	elif car_id == "raijin" and hood != 1 and hood != 4 and hood != 6:
 		# Hutze auf der Haube, Luftauslässe vorn, Finnen an der Dachkante, Schmutzfänger hinter den Rädern
-		var hz := 0.21 * L
-		var hp: PackedVector2Array = _section(S, 0.21, W, L, flare)["p"]
+		var ht: float = float(S["cowl"]) - 0.115
+		var hz := ht * L
+		var hp: PackedVector2Array = _section(S, ht, W, L, flare)["p"]
 		_add(body, rtapered_box(Vector2(0.52, 0.46), Vector2(0.44, 0.34), 0.075, 0.05, 0.025), paint, Vector3(0, hp[10].y - 0.01, zf + hz))
 		_add(body, box(Vector3(0.4, 0.045, 0.05)), dark, Vector3(0, hp[10].y + 0.03, zf + hz - 0.19))
-		var vp: PackedVector2Array = _section(S, 0.12, W, L, flare)["p"]
+		var vt: float = float(S["cowl"]) - 0.19
+		var vp: PackedVector2Array = _section(S, vt, W, L, flare)["p"]
 		for s in [-1, 1]:
-			_add(body, box(Vector3(0.2, 0.01, 0.13)), dark, Vector3(s * 0.38, _top_y(vp, 0.38 / vp[7].x) + 0.004, zf + 0.12 * L))
+			_add(body, box(Vector3(0.2, 0.01, 0.13)), dark, Vector3(s * 0.38, _top_y(vp, 0.38 / vp[7].x) + 0.004, zf + vt * L))
 		var rp: PackedVector2Array = _section(S, S["rr"], W, L, flare)["p"]
 		for k in 7:
 			var x := -0.36 + k * 0.12
@@ -931,7 +943,7 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 	elif car_id == "yari" and hood == 0:
 		# Haube mit großem Luftauslass vorn in der Mitte (Lamellen in Wagenfarbe über dunkler Öffnung) und je Seite einer
 		# Reihe Kiemen
-		var vt := 0.15
+		var vt: float = float(S["cowl"]) - 0.16
 		var q := _top_pt(S, vt, 0.0, W, L, flare)
 		var slope := atan2(_top_c(S, vt + 0.02) - _top_c(S, vt - 0.02), 0.04 * L)
 		var pv := Node3D.new()
@@ -943,7 +955,7 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 			_add(pv, box(Vector3(0.47, 0.016, 0.014)), paint, Vector3(0, 0.004, -0.09 + k * 0.045))
 		for s in [-1, 1]:
 			for k in 4:
-				var t := 0.22 + k * 0.012
+				var t: float = float(S["cowl"]) - 0.1 + k * 0.012
 				var sq := _top_pt(S, t, s * 0.37, W, L, flare)
 				var sl := _add(body, box(Vector3(0.17, 0.008, 0.018)), dark, (sq[0] as Vector3) + Vector3(0, 0.004, 0))
 				sl.rotation.x = -slope
@@ -951,7 +963,9 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 	if hood != 0:
 		_hood(body, S, W, L, flare, hood, dark, mats["carbon"] if hood == 6 else paint)
 	elif int(cfg.get("engine", 0)) >= 3 and car_id not in ["vortex", "raijin", "falke", "furia", "yari"]:
-		var lt: float = (S["ge"] + 1.0) / 2.0 - 0.03 if engine_rear(S) else 0.24  # Mittel-/Heckmotor: Lamellen hinten
+		# Mittel-/Heckmotor: Lamellen hinten; vorn im hinteren Teil der Haube (seit 2.39 am Scheibenansatz gemessen, bis 2.38
+		# fest bei 0,24: beim Chibi berührten sie den Windlauf)
+		var lt: float = (S["ge"] + 1.0) / 2.0 - 0.03 if engine_rear(S) else float(S["cowl"]) * 0.75
 		var hv: PackedVector2Array = _section(S, lt, W, L, flare)["p"]
 		for sx in [-1, 1]:
 			for k in 4:

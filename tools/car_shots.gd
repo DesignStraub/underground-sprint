@@ -6,6 +6,7 @@ extends Node3D
 ##   --label   Auto und Ausstattung oben links ins Bild schreiben (Kontaktbögen)
 ##   --bench   Kosten der Räder messen statt Bilder: Garage (ein Auto unverschmolzen wie garage._show_car) und Rennen
 ##             (fünf verschmolzene Autos mit Fernansicht in 6 bis 150 m), Ausgabe "WBENCH ..."
+##   --props   Proportionen je Auto (Haube, Abstand Vorderachse bis Scheibe, Scheibe, Dach, Tür, Radstand), "PROP ..."
 
 const Catalog := preload("res://scripts/catalog.gd")
 const Builder := preload("res://scripts/car_builder.gd")
@@ -38,6 +39,10 @@ func _ready() -> void:
 			bench = true
 		elif a == "--measure":
 			_measure()
+			get_tree().quit()
+			return
+		elif a == "--props":
+			_props()
 			get_tree().quit()
 			return
 		elif a == "--checkfit":
@@ -299,6 +304,22 @@ func _measure() -> void:
 		print("MEASURE %s %.2f %.2f %.3f %.3f %.3f %.3f %.3f %.2f %.3f" % [id, L, W, mx * 2.0, mf * 2.0, mr * 2.0, out_x * 2.0,
 			L - 2.0 * Builder.axle(S), S["roof"], car.get_meta("wheel_r")])
 		car.free()
+
+
+## --props (headless): Proportionen je Auto aus SHAPES (seit 2.39): Haube (Bug bis Scheibenansatz) als Anteil und in m,
+## Abstand Vorderachse bis Scheibenansatz, Länge und Neigung der Frontscheibe, Dachlänge, Türlänge, Radstand. Zum
+## Vergleich mit den Vorbildern (Ausgabe "PROP ...").
+func _props() -> void:
+	for id in cars:
+		var S: Dictionary = Builder.SHAPES.get(id, Builder.SHAPES["kaizen"])
+		var L: float = Catalog.CARS[id]["length"]
+		var ax: float = Builder.axle(S)
+		var d: Array = S["doors"]
+		var ws: float = (float(S["rf"]) - float(S["cowl"])) * L
+		print("PROP %-9s L %.2f Achse %.2f Radstand %.2f (%.3f) | Haube %.3f = %.2f m, Achse-Scheibe %.2f m | Scheibe %.2f m %2.0f° | Dach %.2f m | Tür %.2f m | rf %.3f rr %.3f ge %.3f cp %.3f Türen %s" % [
+			id, L, ax, L - 2.0 * ax, (L - 2.0 * ax) / L, S["cowl"], float(S["cowl"]) * L, float(S["cowl"]) * L - ax, ws,
+			rad_to_deg(atan2(float(S["roof"]) - float(S["hood"]), ws)), (float(S["rr"]) - float(S["rf"])) * L,
+			(float(d[1]) - float(d[0])) * L, S["rf"], S["rr"], S["ge"], S["cp"], str(d)])
 
 
 ## --checkfit (headless): Sitz der Räder für alle Autos, Zoll-Größen, Spur, Bodykit und Fahrwerk nachrechnen (Radlauf unter

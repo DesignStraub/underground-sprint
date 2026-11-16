@@ -108,7 +108,7 @@ func _plan() -> void:
 			var seg3 := _seg_with_ramp(town, true)
 			if not seg3.is_empty():
 				legs.append({"e": seg3, "find": _ramp_finder(town, true), "rev": true, "name": nm + ": Verbindung"})
-		for k in 24:  # Abkürzungen, Gabelungen, Nebenstraßen und Durchfahrten (Kreuzberg hat gut 20)
+		for k in 64:  # Abkürzungen, Gabelungen, Nebenstraßen, Durchfahrten, Querverbindungen, Plätze (seit 2.39 bis gut 40)
 			legs.append({"e": e, "find": func(tr): return _city_path(tr, "branch%d" % k), "rev": false, "name": nm + ": Abzweig %d" % k,
 				"optional": true})
 

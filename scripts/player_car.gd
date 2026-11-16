@@ -17,6 +17,7 @@ const EngineAudio := preload("res://scripts/engine_audio.gd")
 const Track := preload("res://scripts/track_builder.gd")
 const Knockable := preload("res://scripts/knockable.gd")
 const TireFx := preload("res://scripts/tire_fx.gd")
+const Offroad := preload("res://scripts/offroad.gd")  # Gelände zum Austoben (seit 2.39)
 
 ## Ende von Gang 1..5 als Anteil der Höchstgeschwindigkeit; der 6. reicht bis über Topspeed
 const GEARS := [0.0, 0.16, 0.31, 0.47, 0.63, 0.81, 1.3]
@@ -246,6 +247,15 @@ const CRASH_SLOW_TIME := 0.9
 var _jc_light: OmniLight3D  # Aufhelllicht auf der Kameraseite: nachts von vorn wäre das Auto sonst fast schwarz
 var _respawn_xf := Transform3D.IDENTITY
 var _last_prog := 0.0
+## Gelände (seit 2.39, offroad.gd): Fläche, in der das Auto gerade fährt (leer: auf der Straße), ihr Untergrund und
+## seine Wirkung (Haftung, Rollwiderstand, Bremse, Zug, lose), weich nachgeführt: kein Ruck an der Grenze Gras/Fairway
+var offroad := {}
+var surface := "asphalt"
+var _sf := {"grip": 1.0, "roll": 0.0, "brake": 1.0, "trac": 1.0, "loose": 0.0}
+var _safe_xf := Transform3D.IDENTITY  # letzte sichere Stelle im Gelände (fern vom Wasser), fürs Zurücksetzen
+var _safe_ok := false
+var _safe_t := 0.0
+var _rough_t := 0.0
 
 
 func setup(car_id: String, cfg: Dictionary) -> void:
@@ -396,6 +406,7 @@ func _physics_process(dt: float) -> void:
 	stun = maxf(stun - dt, 0.0)
 	_crash_cooldown = maxf(_crash_cooldown - dt, 0.0)
 	_wall_cool = maxf(_wall_cool - dt, 0.0)
+	_update_surface(dt)
 	if sinking > 0.0:
 		_update_sinking(dt)
 		return
@@ -589,9 +600,12 @@ func _physics_process(dt: float) -> void:
 		elif _launch_t < 0.0:
 			drive *= 0.75  # durchdrehende Räder
 		drive += accel * 0.6 * _shift_boost / 0.5  # über eine halbe Sekunde etwa so viel wie früher der Sprung (+1,6 m/s)
+		drive *= _sf["trac"]  # Gelände: lose Räder greifen schlechter (Gras, Kies, Sand)
 		_drive_a = maxf(drive, 0.0)
 		a += drive
 		a -= drag_k * speed_fwd * absf(speed_fwd)
+		# Rollwiderstand im Gelände (Sand bremst deutlich, Gras kaum); im Stand nicht (kein Zurückrollen)
+		a -= _sf["roll"] * signf(speed_fwd) * clampf(absf(speed_fwd) / 3.0, 0.0, 1.0)
 		if thr < 0.05 and brk < 0.05:
 			a -= signf(speed_fwd) * 1.6  # Motorbremse
 		_holding = false
@@ -599,9 +613,9 @@ func _physics_process(dt: float) -> void:
 			if brk > 0.0 and speed_fwd > 1.0:
 				a -= BRAKE * brk
 		else:
-			a += _brake_and_reverse(thr, brk, dt)
+			a += _brake_and_reverse(thr, brk, dt) * _sf["brake"]
 		if hb:
-			a -= signf(speed_fwd) * 4.0
+			a -= signf(speed_fwd) * 4.0 * _sf["brake"]
 		# Bergauf etwas zäher, bergab etwas Schwung (abgeschwächt, damit es nicht frustriert)
 		a -= 6.0 * sin(_slope_pitch)
 	if speed_fwd > eff_top:
@@ -619,7 +633,7 @@ func _physics_process(dt: float) -> void:
 	steer = move_toward(steer, steer_in, dt * steer_speed)
 	var low_speed := clampf(spd / 2.0, 0.0, 1.0)
 	# Drehrate: langsam begrenzt durch den Wendekreis (Lenkgeometrie), bei Tempo durch die Querbeschleunigung
-	var lat_eff := lat_acc * (1.0 - 0.12 * sf0)  # bei Topspeed etwas weniger wendig
+	var lat_eff := lat_acc * (1.0 - 0.12 * sf0) * float(_sf["grip"])  # bei Topspeed etwas weniger wendig; Gelände: weniger Halt
 	var high_speed := minf(1.0, minf(lat_eff / maxf(spd, 0.1), spd / MIN_RADIUS) / steer_rate)
 	var l2 := 0.0
 	if drag_mode and not airborne and not loc.is_empty() and loc["path"]["id"] == 0 and (controls_enabled or finished):
@@ -642,11 +656,16 @@ func _physics_process(dt: float) -> void:
 			var corner := smoothstep(0.35, 0.9, absf(steer))
 			po = _thr_s * corner * smoothstep(6.0, 12.0, spd) \
 				* (1.0 - smoothstep(top_speed * 0.4, top_speed * 0.7, spd)) * dt_k["oversteer"]
+			# lose (Kies, Sand, Gras): unter Gas kommt das Heck leichter, bei jedem Antrieb (wie auf Schotter)
+			po += float(_sf["loose"]) * _thr_s * corner * smoothstep(5.0, 10.0, spd) * 0.9
 			push = _thr_s * corner * smoothstep(8.0, 20.0, spd) * dt_k["understeer"]
 			if drive_type == "fwd" and not drift_mode and thr < 0.05 and spd > 12.0:
 				push = -0.06 * corner  # Lastwechsel: Heck wird leicht
 		if hb and spd > 8.0 and not airborne:
 			_slip_hold = move_toward(_slip_hold, 1.0, dt * 5.0)
+		elif _sf["loose"] > 0.05 and _thr_s > 0.4 and absf(steer) > 0.4 and spd > 8.0 and not airborne:
+			# Gelände: Gas und Einlenken lassen das Heck kommen (Drift auf Gras und Kies auch ohne Handbremse)
+			_slip_hold = move_toward(_slip_hold, float(_sf["loose"]) * 0.7 * absf(steer) * _thr_s, dt * 2.0)
 		elif brk > 0.3 and absf(steer) > 0.5 and spd > 18.0 and not airborne:
 			# Anbremsen in die Kurve: das Heck wird leicht und kommt ein Stück (wie in NFSU reinbremsen und rutschen)
 			_slip_hold = move_toward(_slip_hold, 0.35 * brk * absf(steer), dt * 3.0)
@@ -683,6 +702,7 @@ func _physics_process(dt: float) -> void:
 			# schräg in der Kurve und radiert, wie in NFSU, ohne zu driften (bleibt unter der Drift-Schwelle). Der
 			# Kurvenradius bleibt gleich, die Drehrate gibt weiter die Lenkung vor.
 			gk *= 1.0 - 0.5 * smoothstep(0.5, 1.0, absf(steer)) * smoothstep(14.0, 24.0, spd) * (1.0 - _slip_hold)
+			gk *= float(_sf["grip"]) * float(_sf["grip"])  # Gelände: die Fahrtrichtung folgt der Achse langsamer (mehr Rutschen)
 			if hb:
 				gk *= lerpf(0.45, 0.35, drift_k)
 			if drift_mode:
@@ -739,6 +759,14 @@ func _physics_process(dt: float) -> void:
 	_roll_s += _roll_sv * dt
 	_pitch_sv += (w0 * w0 * (pitch - _pitch_s) - 2.0 * 0.5 * w0 * _pitch_sv) * dt
 	_pitch_s += _pitch_sv * dt
+	if not offroad.is_empty() and not airborne and spd > 3.0:
+		# Gelände: feines Rütteln der Karosserie (Kies und Erde mehr als Rasen), dezent: Bruchteile eines Grads
+		_rough_t -= dt
+		if _rough_t <= 0.0:
+			_rough_t = randf_range(0.05, 0.12)
+			var rk := float(_sf["loose"]) * clampf(spd / 25.0, 0.2, 1.0)
+			_pitch_sv += randf_range(-1.0, 1.0) * 0.06 * rk
+			_roll_sv += randf_range(-1.0, 1.0) * 0.05 * rk
 	Builder.animate(model, speed_fwd, steer, _roll_s, _pitch_s, nitro_on, dt, _wheel_speeds(thr, brk, hb, spd, dt), _backfire)
 	# Ganzes Auto in die Steigung neigen (Trog, Bergstraße)
 	if not airborne:
@@ -778,9 +806,14 @@ func _physics_process(dt: float) -> void:
 			tire = maxf(tire, 0.7)
 	if _launch_t < 0.0 and _thr_s > 0.5:
 		tire = maxf(tire, 0.7)
-	audio.slip = tire
+	# Gelände: kein Quietschen auf Gras, Kies und Sand (nur noch leises Schrubben)
+	audio.slip = tire * lerpf(1.0, 0.3, float(_sf["loose"]))
 	audio.speed = spd
-	tire_fx.step(dt, tire, not airborne and sinking <= 0.0, Vector3(velocity.x, 0.0, velocity.z).length())
+	var dw: float = _wheel_v.x if drive_type == "fwd" else _wheel_v.y
+	var spin_k := clampf((dw - absf(speed_fwd)) / 8.0, 0.0, 1.0)  # Antriebsräder drehen durch (Staub, Erdbrocken)
+	var sname := surface if not offroad.is_empty() else "asphalt"
+	tire_fx.step(dt, tire, not airborne and sinking <= 0.0, Vector3(velocity.x, 0.0, velocity.z).length(), sname, spin_k,
+		Offroad.SURF.get(sname, {}))
 	_scrape_hold = maxf(_scrape_hold - dt, 0.0)
 	if _scrape_hold <= 0.0:
 		_scrape = move_toward(_scrape, 0.0, dt * 6.0)
@@ -1117,7 +1150,7 @@ func _dyn_physics(dt: float, thr: float, brk: float, hb: bool, eff_top: float) -
 	var wf: float = {"mr": 0.45, "rr": 0.4}.get(drive_type, 0.53)  # Gewichtsanteil vorn
 	var la := wb * (1.0 - wf)  # Schwerpunkt bis Vorderachse
 	var lb := wb * wf  # Schwerpunkt bis Hinterachse
-	var g_tot := lat_acc * (0.6 if drift_mode else 0.85)
+	var g_tot := lat_acc * (0.6 if drift_mode else 0.85) * float(_sf["grip"])
 	var d_f := g_tot * wf * (1.0 + 0.15 * brk)
 	# Fahr-Modus: hinten mehr Halt, sobald die Handbremse los ist (das Auto fängt sich nach der Kehre)
 	var d_r := g_tot * (1.0 - wf) * ((0.95 - 0.15 * drift_k) if drift_mode else (1.0 if hb else 1.2)) * (1.0 - 0.3 * brk)
@@ -1274,25 +1307,48 @@ func _update_vertical(dt: float) -> void:
 			lap -= 1
 		_last_prog = progress
 	total = lap * track["length"] + progress
-	var g := Track.ground(track, loc, _txi * global_position)
+	# Gelände (seit 2.39): in einer umzäunten Fläche kommen Höhe, Neigung und Untergrund aus ihr (offroad.gd), nicht
+	# von der Strecke; die Strecke bleibt für Fortschritt und Verkehr die aktive
+	var p2 := Vector2(global_position.x, global_position.z)
+	var area: Dictionary = Offroad.find(p2) if not Offroad.areas.is_empty() else {}
+	if area.is_empty() != offroad.is_empty() and _on_walk:
+		_on_walk = false  # kein Bordstein-Ruck beim Hineinfahren
+	offroad = area
+	var g: Dictionary
+	var crest := false
+	if area.is_empty():
+		surface = "asphalt"
+		g = Track.ground(track, loc, _txi * global_position)
+		# Fahrbahnneigung in Fahrtrichtung des Autos
+		var pc: Curve3D = loc["path"]["curve"]
+		var sl := Track.slope_at(pc, loc["d"])
+		var tf: Vector3 = _txf.basis * Track.frame_at(pc, loc["d"])["fwd"]
+		_slope_pitch = atan(sl * (-global_basis.z).dot(tf))
+		_slope_roll = atan(sl * global_basis.x.dot(tf))
+		# Kuppe: die Straße krümmt sich nach unten stärker, als die Schwerkraft das Auto bei diesem Tempo mitnimmt
+		# (v² · Krümmung > g). Seit 2.35 aus dem Höhenprofil selbst; vorher aus der Änderung der Höhe von Bild zu Bild,
+		# und jedes Zittern der Streckenposition (Kehren am Berg) ließ das Auto alle paar Meter kurz abheben und ruckeln.
+		var v_al := Vector3(velocity.x, 0.0, velocity.z).dot(tf)
+		if _base_ok and absf(v_al) > 15.0:
+			var e0 := Track.elev_at(pc, loc["d"])
+			var curv := (Track.elev_at(pc, loc["d"] + 3.0) - 2.0 * e0 + Track.elev_at(pc, loc["d"] - 3.0)) / 9.0
+			crest = -curv * v_al * v_al > GRAVITY * 1.05
+	else:
+		g = Offroad.ground(area, p2)
+		surface = g["surf"]
+		# Neigung längs und quer aus dem Gelände (auf einer Rampe deren Steigung), Kuppen aus der Krümmung entlang der
+		# Fahrtrichtung wie auf der Straße: über Hügel, Kieshaufen und Wallkronen hebt man mit Tempo ab
+		var grad := Offroad.gradient(area, p2, g.get("ramp_r"))
+		var f2 := Vector2(-global_basis.z.x, -global_basis.z.z).normalized()
+		var r2 := Vector2(global_basis.x.x, global_basis.x.z).normalized()
+		_slope_pitch = atan(grad.dot(f2))
+		_slope_roll = atan(grad.dot(r2))
+		var vh := Vector2(velocity.x, velocity.z)
+		if _base_ok and vh.length() > 9.0 and not g["ramp"]:
+			crest = -Offroad.curvature(area, p2, vh.normalized(), 1.5) * vh.length_squared() > GRAVITY * 1.05
 	var gh: float = g["h"]
 	var base: float = g["base"]
-	# Fahrbahnneigung in Fahrtrichtung des Autos
-	var pc: Curve3D = loc["path"]["curve"]
-	var sl := Track.slope_at(pc, loc["d"])
-	var tf: Vector3 = _txf.basis * Track.frame_at(pc, loc["d"])["fwd"]
-	_slope_pitch = atan(sl * (-global_basis.z).dot(tf))
-	_slope_roll = atan(sl * global_basis.x.dot(tf))
 	var bvy := (base - _base_y) / maxf(dt, 0.0001)
-	# Kuppe: die Straße krümmt sich nach unten stärker, als die Schwerkraft das Auto bei diesem Tempo mitnimmt
-	# (v² · Krümmung > g). Seit 2.35 aus dem Höhenprofil selbst; vorher aus der Änderung der Höhe von Bild zu Bild, und
-	# jedes Zittern der Streckenposition (Kehren am Berg) ließ das Auto alle paar Meter kurz abheben und ruckeln.
-	var v_al := Vector3(velocity.x, 0.0, velocity.z).dot(tf)
-	var crest := false
-	if _base_ok and absf(v_al) > 15.0:
-		var e0 := Track.elev_at(pc, loc["d"])
-		var curv := (Track.elev_at(pc, loc["d"] + 3.0) - 2.0 * e0 + Track.elev_at(pc, loc["d"] - 3.0)) / 9.0
-		crest = -curv * v_al * v_al > GRAVITY * 1.05
 	_base_ok = true
 	_base_vy = bvy
 	_base_y = base
@@ -1303,10 +1359,15 @@ func _update_vertical(dt: float) -> void:
 		if g["water"] and position.y <= base - 0.5 and vy < 0.0:
 			_land(position.y, true)  # taucht durch die Wasseroberfläche (auf Straßenhöhe gezeichnet)
 			return
-		if position.y <= gh and vy < 0.0:
+		# Gelände: auch im Steigflug aufsetzen, wenn der Boden schneller steigt (Flug in einen Hang, Haufen, Wall);
+		# sonst flog das Auto durch den Hang hindurch und tauchte dahinter wieder auf
+		# (erst nach gut 0,1 s Flug und deutlich unter dem Boden: beim Abheben an einer Kuppe liegt das Auto im ersten
+		# Takt rechnerisch ein paar Zentimeter tief, das ist kein Aufprall)
+		var into_slope := not offroad.is_empty() and air_time > 0.12 and bvy > vy and position.y < gh - 0.04
+		if position.y <= gh and (vy < 0.0 or into_slope):
 			_curb_y = gh - base
 			vy -= bvy  # Aufprall relativ zur Fahrbahn (bergab landet es sich weicher)
-			_land(gh, g["water"])
+			_land(gh, g["water"], bvy > 1.0 and not offroad.is_empty())
 		return
 	var prev := position.y
 	var drop := gh - base < _curb_y - 0.8
@@ -1334,8 +1395,8 @@ func _update_vertical(dt: float) -> void:
 	if g["water"]:
 		_splash()
 		return
-	# Bordstein: mit Puffer, sonst ruckelt es, wenn man genau an der Kante fährt
-	var on_walk: bool = path_id == 0 and loc["score"] > (0.05 if _on_walk else 0.35)
+	# Bordstein: mit Puffer, sonst ruckelt es, wenn man genau an der Kante fährt (im Gelände gibt es keinen)
+	var on_walk: bool = offroad.is_empty() and path_id == 0 and loc["score"] > (0.05 if _on_walk else 0.35)
 	if on_walk != _on_walk:
 		_on_walk = on_walk
 		var s := velocity.length()
@@ -1349,9 +1410,82 @@ func _update_vertical(dt: float) -> void:
 		_curb_y = move_toward(_curb_y, gh - base, dt * 3.0)
 	position.y = base + _curb_y
 	_ground_vy = (position.y - prev) / maxf(dt, 0.0001)
+	if not offroad.is_empty():
+		_note_safe(g)
 
 
-func _land(gh: float, water: bool) -> void:
+## Gelände: letzte sichere Stelle merken (eben genug, nicht auf einer Rampe, weit vom Wasser), dorthin kommt man nach
+## einem Sprung ins Wasser zurück
+func _note_safe(g: Dictionary) -> void:
+	_safe_t -= get_physics_process_delta_time()
+	if _safe_t > 0.0 or g["ramp"] or tumbling or absf(_slope_pitch) > 0.3 or absf(_slope_roll) > 0.3:
+		return
+	_safe_t = 0.4
+	if Offroad.water_dist(offroad, g["l"]) < 14.0:
+		return
+	_safe_xf = Transform3D(Basis(Vector3.UP, global_rotation.y), global_position)
+	_safe_ok = true
+
+
+## Untergrund weich nachführen (in der Luft gilt der letzte, beim Aufsetzen geht es weiter)
+func _update_surface(dt: float) -> void:
+	if airborne:
+		return
+	var want: Dictionary = Offroad.SURF.get(surface if not offroad.is_empty() else "asphalt", Offroad.SURF["asphalt"])
+	var k := 1.0 - exp(-dt * 6.0)
+	for key in ["grip", "roll", "brake", "trac", "loose"]:
+		_sf[key] = lerpf(float(_sf[key]), float(want[key]), k)
+
+
+## Im Gelände aufrecht hinstellen, wo das Auto gerade ist (im Wasser: an der letzten sicheren Stelle, vom Teich weg)
+func _offroad_upright() -> Transform3D:
+	var p2 := Vector2(global_position.x, global_position.z)
+	var a: Dictionary = offroad if not offroad.is_empty() else Offroad.find(p2)
+	if a.is_empty():
+		return global_transform
+	var l := Offroad.local(a, p2)
+	if not Offroad.pond_at(a, l).is_empty() or Offroad.area_sd(a, l) > -2.0:
+		return _offroad_respawn(a)
+	return Transform3D(Basis(Vector3.UP, global_rotation.y), Vector3(p2.x, Offroad.base_h(a, l) + float(Offroad.ramp_at(a, l)[0]), p2.y))
+
+
+## Neustart im Gelände nach dem Wasser: letzte sichere Stelle, Blick vom nächsten Teich weg; sonst hinter dem Tor
+func _offroad_respawn(a: Dictionary) -> Transform3D:
+	if _safe_ok and not Offroad.find(Vector2(_safe_xf.origin.x, _safe_xf.origin.z)).is_empty():
+		var sp := Vector2(_safe_xf.origin.x, _safe_xf.origin.z)
+		var best := 1e9
+		var away := -_safe_xf.basis.z
+		for pd in a["ponds"]:
+			var c := Offroad.world(a, pd["c"])
+			if c.distance_to(sp) < best:
+				best = c.distance_to(sp)
+				var d := (sp - c).normalized()
+				away = Vector3(d.x, 0.0, d.y)
+		return Transform3D(Basis.looking_at(away, Vector3.UP), _safe_xf.origin)
+	var gl := Vector2(float(a["gate_s"]), 10.0)
+	var gw := Offroad.world(a, gl)
+	var v: Vector2 = a["v"]
+	return Transform3D(Basis.looking_at(Vector3(v.x, 0.0, v.y), Vector3.UP), Vector3(gw.x, Offroad.base_h(a, gl), gw.y))
+
+
+## Taste R im Gelände (world.gd): aufrecht an Ort und Stelle statt zurück auf die Straße. false: nicht im Gelände
+func offroad_reset() -> bool:
+	if offroad.is_empty() and Offroad.find(Vector2(global_position.x, global_position.z)).is_empty():
+		return false
+	place(_offroad_upright())
+	return true
+
+
+## Bodenhöhe unter einem Weltpunkt (Reifenspuren am Hang): im Gelände aus der Fläche, sonst die Höhe des Autos
+func ground_y(p: Vector3) -> float:
+	if offroad.is_empty():
+		return global_position.y
+	var h := Offroad.height_at(Vector2(p.x, p.z))
+	return global_position.y if is_nan(h) else h
+
+
+## soft: in einen steigenden Hang im Gelände gesetzt (kein Nachfedern: sonst hüpfte das Auto den Hang hinauf)
+func _land(gh: float, water: bool, soft := false) -> void:
 	var impact := -vy
 	_jc_landed = true
 	position.y = gh
@@ -1377,13 +1511,15 @@ func _land(gh: float, water: bool) -> void:
 	landings += 1
 	if _vlog:
 		print("VLOG landung stoss=%.2f flug=%.2fs v=%.1f" % [impact, air_time, absf(speed_fwd)])
-	Sfx.play("thud", linear_to_db(clampf(impact / 14.0, 0.3, 1.0)), randf_range(0.9, 1.05))
-	audio.crash(clampf(impact / 30.0, 0.1, 0.4))
+	# Gelände: ein kurzes Abheben über eine sanfte Kuppe setzt leise auf (sonst polterte jeder Hügel)
+	if offroad.is_empty() or air_time > 0.2 or impact > 3.0:
+		Sfx.play("thud", linear_to_db(clampf(impact / 14.0, 0.3, 1.0)), randf_range(0.9, 1.05))
+		audio.crash(clampf(impact / 30.0, 0.1, 0.4))
 	_shake = minf(_shake + impact * 0.025, 0.7)
 	# schief aufgesetzt kostet mehr Tempo als sauber auf allen vier Rädern
 	velocity *= (0.97 if impact < 10.0 else 0.92) * (1.0 - 0.3 * clampf(nose + roll * 0.5, 0.0, 1.0))
 	model.get_meta("body").rotation.x = -clampf(impact * 0.012, 0.05, 0.16)  # Federn tauchen ein
-	if impact > 9.0:
+	if impact > 9.0 and not soft:
 		# hart gelandet: federt noch einmal kurz ab
 		airborne = true
 		vy = impact * 0.18
@@ -1472,6 +1608,11 @@ func _update_tumble(dt: float) -> void:
 				_air_roll = lerp_angle(_air_roll, flat, 1.0 - exp(-dt * 8.0))
 				_tumble_rest += dt
 				if _tumble_rest > 1.3:
+					if not offroad.is_empty():
+						# Gelände: an Ort und Stelle wieder auf die Räder (vorher hätte es einen auf die Straße gesetzt)
+						place(_offroad_upright())
+						stun = 0.3
+						return
 					var p: Dictionary = loc["path"]
 					if str(p.get("kind", "")) == "spur" or float(loc.get("score", 0.0)) > 6.0:
 						# über eine Mauer in eine Sackgasse oder neben die Strecke geflogen (seit 2.35): zurück auf die
@@ -1530,6 +1671,9 @@ func _splash() -> void:
 	Sfx.play("splash")
 	audio.crash(0.4)
 	_shake = 0.6
+	if not offroad.is_empty():
+		_respawn_xf = _offroad_respawn(offroad)  # Teich im Gelände: zurück an die letzte sichere Stelle
+		return
 	# Zurücksetzen vor die Rampe, mit Anlauf
 	var p: Dictionary = loc["path"]
 	var d := maxf(loc["d"] - 55.0, 2.0)
@@ -1930,9 +2074,9 @@ func _jump_cam_check() -> void:
 	var f := _predict_flight()
 	if OS.get_cmdline_user_args().has("--jumplog"):
 		print("SPRUNG vorhergesagt t=%.2f s höhe=%.1f m v=%.0f km/h" % [f["time"], f["peak"], velocity.length() * 3.6])
-	if f["peak"] < JUMP_CAM_PEAK or f["time"] < JUMP_CAM_TIME or f["loc"].is_empty():
+	if f["peak"] < JUMP_CAM_PEAK or f["time"] < JUMP_CAM_TIME or (f["loc"].is_empty() and f["area"].is_empty()):
 		return
-	var spot = _jump_cam_spot(f)
+	var spot = _jump_cam_spot_off(f) if not f["area"].is_empty() else _jump_cam_spot(f)
 	if OS.get_cmdline_user_args().has("--jumplog"):
 		print("SPRUNGKAMERA %s" % (str(spot) if spot != null else "kein freier Standort"))
 	if spot == null:
@@ -1980,15 +2124,65 @@ func _predict_flight() -> Dictionary:
 		v -= GRAVITY * step
 		p += hv * step
 		p.y += v * step
-		var l := Track.locate(track, _txi * p)
-		var g := Track.ground(track, l, _txi * p)
+		var g := _floor_at(p)
 		var floor_y: float = g["base"] - 0.5 if g["water"] else g["h"]
 		if p.y <= floor_y and v < 0.0:
-			return {"time": t, "peak": peak, "apex": apex, "land": Vector3(p.x, floor_y, p.z), "loc": l}
+			return {"time": t, "peak": peak, "apex": apex, "land": Vector3(p.x, floor_y, p.z), "loc": g.get("loc", {}),
+				"area": g.get("area", {})}
 		if p.y - g["h"] > peak:
 			peak = p.y - g["h"]
 			apex = p
-	return {"time": t, "peak": peak, "apex": apex, "land": p, "loc": {}}
+	return {"time": t, "peak": peak, "apex": apex, "land": p, "loc": {}, "area": {}}
+
+
+## Boden unter p (Welt): im Gelände aus der Fläche ("area"), sonst von der Strecke ("loc")
+func _floor_at(p: Vector3) -> Dictionary:
+	if not Offroad.areas.is_empty():
+		var a := Offroad.find(Vector2(p.x, p.z))
+		if not a.is_empty():
+			var og := Offroad.ground(a, Vector2(p.x, p.z))
+			og["area"] = a
+			return og
+	var l := Track.locate(track, _txi * p)
+	var g := Track.ground(track, l, _txi * p)
+	g["loc"] = l
+	return g
+
+
+## Sprungkamera im Gelände: hinter der Landestelle, seitlich versetzt, knapp über dem Boden. Das Gelände hat keine
+## Kollision: die Sicht über Hügel wird gegen die Bodenhöhe geprüft, Bäume und Gebäude wie auf der Straße.
+func _jump_cam_spot_off(f: Dictionary) -> Variant:
+	var a: Dictionary = f["area"]
+	var land: Vector3 = f["land"]
+	var hv := Vector3(velocity.x, 0.0, velocity.z)
+	var fwd := hv.normalized() if hv.length() > 1.0 else -global_basis.z
+	var side := Vector3(-fwd.z, 0.0, fwd.x)
+	var space := get_world_3d().direct_space_state
+	for c2 in [[JC_SIDE, JC_HEIGHT], [-JC_SIDE, JC_HEIGHT], [JC_SIDE, 2.6], [-JC_SIDE, 2.6], [JC_SIDE * 0.6, JC_HEIGHT], [-JC_SIDE * 0.6, JC_HEIGHT]]:
+		var q: Vector3 = land + fwd * JC_AHEAD + side * float(c2[0])
+		var l := Offroad.local(a, Vector2(q.x, q.z))
+		if Offroad.area_sd(a, l) > -3.0 or not Offroad.pond_at(a, l).is_empty():
+			continue
+		var pos := Vector3(q.x, Offroad.base_h(a, l) + float(c2[1]), q.z)
+		var targets := [global_position + Vector3(0, 1.0, 0), (f["apex"] as Vector3) + Vector3(0, 0.6, 0), land + Vector3(0, 1.0, 0)]
+		var ok := _free(space, pos)
+		for tg in targets:
+			ok = ok and _ground_sight(a, pos, tg) and _sight(space, pos, tg)
+		if OS.get_cmdline_user_args().has("--jumplog"):
+			print("  gelände seitlich %.1f höhe %.1f: %s" % [c2[0], c2[1], "frei" if ok else "verdeckt"])
+		if ok:
+			return pos
+	return null
+
+
+## Sichtlinie über dem Boden des Geländes (alle 3 m, 0,3 m Luft)
+func _ground_sight(a: Dictionary, from: Vector3, to: Vector3) -> bool:
+	var n := int(from.distance_to(to) / 3.0) + 1
+	for k in range(1, n):
+		var p := from.lerp(to, float(k) / n)
+		if Offroad.base_h(a, Offroad.local(a, Vector2(p.x, p.z))) > p.y - 0.3:
+			return false
+	return true
 
 
 ## Kamerastandort: ein Stück hinter der Landestelle, seitlich versetzt (zur Straßenmitte hin, sonst zur anderen

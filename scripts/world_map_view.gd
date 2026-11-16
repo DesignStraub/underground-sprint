@@ -20,6 +20,7 @@ var sel := 0  # gewählte Stadt (towns)
 
 var relief: Texture2D  # Reliefkarte der Landschaft (Landscape.map_texture)
 var villages: Array = []  # [Lage, Name]
+var areas: Array = []  # Gelände (seit 2.39, world._offroad_map): [Umriss, Farbe, Name, Teiche]
 var center_town: Array = []  # [Lage, Name] der Stadt in der Mitte
 var _lo := Vector2.ZERO
 var _hi := Vector2.ZERO
@@ -169,6 +170,21 @@ func _draw() -> void:
 		var vp := _to_screen(v[0])
 		draw_rect(Rect2(vp - Vector2(1.5, 1.5), Vector2(3, 3)), Color(UI.DIM.r, UI.DIM.g, UI.DIM.b, 0.6))
 		draw_string(_small, vp + Vector2(5, 3), v[1], HORIZONTAL_ALIGNMENT_LEFT, -1, 7, Color(UI.DIM.r, UI.DIM.g, UI.DIM.b, 0.55))
+	# Gelände: getönte Fläche mit Namen (wie die Dörfer, etwas heller)
+	for ar in areas:
+		var pl := PackedVector2Array()
+		var mid := Vector2.ZERO
+		for q in ar[0]:
+			pl.append(_to_screen(q))
+			mid += q / float((ar[0] as PackedVector2Array).size())
+		draw_colored_polygon(pl, ar[1])
+		for pd in ar[3]:
+			var pp := PackedVector2Array()
+			for q in pd:
+				pp.append(_to_screen(q))
+			draw_colored_polygon(pp, Color(0.12, 0.35, 0.75, 0.75))
+		var mp := _to_screen(mid)
+		draw_string(_small, mp + Vector2(8, 3), str(ar[2]), HORIZONTAL_ALIGNMENT_LEFT, -1, 7, Color(UI.TEXT.r, UI.TEXT.g, UI.TEXT.b, 0.7))
 	if not center_town.is_empty():
 		var cp := _to_screen(center_town[0])
 		draw_circle(cp, 18.0, Color(1, 1, 1, 0.05))

@@ -4,8 +4,13 @@ extends "res://scripts/minimap.gd"
 ## Ziel als Flagge (außer Sicht am Rand: zeigt die Richtung).
 
 
-## roads: [[Linienzug (Welt x, z), Art 0 Haupt / 1 Auffahrt / 2 Nebenweg], ...]; pins: Node3D mit meta "hud_col"
-func setup_world(roads: Array, player_: Node3D, pins: Array) -> void:
+var _areas := []  # Gelände (seit 2.39): [Umriss, Farbe, Name, Teiche]
+
+
+## roads: [[Linienzug (Welt x, z), Art 0 Haupt / 1 Auffahrt / 2 Nebenweg], ...]; pins: Node3D mit meta "hud_col";
+## areas: Gelände (world._offroad_map) als Flächen unter den Straßen
+func setup_world(roads: Array, player_: Node3D, pins: Array, areas := []) -> void:
+	_areas = areas
 	player = player_
 	cars = pins
 	edge_dots = false
@@ -23,3 +28,16 @@ func setup_world(roads: Array, player_: Node3D, pins: Array) -> void:
 func set_target(p: Vector3, on: bool) -> void:
 	_finish = Vector2(p.x, p.z)
 	show_flag = on
+
+
+## Gelände als getönte Flächen mit Rand und Teichen unter den Straßen (seit 2.39)
+func _draw_world() -> void:
+	for ar in _areas:
+		var pl: PackedVector2Array = ar[0]
+		_world.draw_colored_polygon(pl, ar[1])
+		var closed := pl.duplicate()
+		closed.append(pl[0])
+		_world.draw_polyline(closed, Color(ar[1].r * 1.4, ar[1].g * 1.4, ar[1].b * 1.4, 0.8), 1.2 * PX, true)
+		for pd in ar[3]:
+			_world.draw_colored_polygon(pd, COL_WATER)
+	super()

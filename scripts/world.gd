@@ -22,6 +22,9 @@ const Challenger := preload("res://scripts/challenger_car.gd")
 const Builder := preload("res://scripts/car_builder.gd")
 const WorldTour := preload("res://scripts/world_tour.gd")
 const WorldIntro := preload("res://scripts/world_intro.gd")
+const Offroad := preload("res://scripts/offroad.gd")  # Gelände zum Austoben (seit 2.39)
+const OffroadBuild := preload("res://scripts/offroad_build.gd")
+const OffroadTest := preload("res://scripts/offroad_test.gd")
 const DUEL_GAP := 300.0  # so viel Vorsprung entscheidet ein Duell
 
 const LOAD_PAD := 700.0  # Strecke bauen, wenn man so nah am Rand ihres Umkreises ist
@@ -101,12 +104,16 @@ var _ch_log := 0.0
 var quiet := false  # Tests (--wtour): kein Verkehr, keine Herausforderer
 ## Anflug von oben nach dem Laden (world_intro.gd); solange er läuft: nicht fahren, nichts nachbauen, HUD aus
 var _intro: Node = null
+## Gelände (seit 2.39): Golfplatz und Kiesgrube, gebaut und nachgeladen von offroad_build.gd
+var offroad_node: Node3D
+var _offroad_shown := ""
 
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	GameState.in_world = true
-	quiet = Array(OS.get_cmdline_user_args()).any(func(a): return a.begins_with("--wtour") or a.begins_with("--drivebot"))
+	quiet = Array(OS.get_cmdline_user_args()).any(func(a): return a.begins_with("--wtour") or a.begins_with("--drivebot") \
+		or a.begins_with("--otest"))
 	# headless (Tests): der Ersatz-Renderer ist nicht threadsicher, Meshes aus dem Bau-Thread zerschießen dort die RIDs
 	_hitch = OS.get_cmdline_user_args().has("--hitch")
 	_threads = not OS.has_feature("web") and OS.get_processor_count() > 1 and not OS.get_cmdline_user_args().has("--nothreads") \
@@ -156,6 +163,7 @@ func _ready() -> void:
 	cover.get_meta("label").text = tr("Welt wird gebaut … Landschaft")
 	await get_tree().process_frame
 	land.build_near(spawn.origin)
+	offroad_node.build_near(spawn.origin)
 	var pc := PlayerCar.new()
 	pc.process_mode = Node.PROCESS_MODE_PAUSABLE
 	pc.track = _best_track(spawn.origin)
@@ -169,6 +177,7 @@ func _ready() -> void:
 	pc.controls_enabled = zoom == ""  # mit Anflug erst, wenn die Kamera hinter dem Auto ist
 	player = pc
 	land.target = pc
+	offroad_node.target = pc
 	player.cam.make_current()
 	var pw := Track.poster_warm()  # Plakat-Stoff gleich übersetzen, nicht erst an der ersten Plakatwand (seit 2.34)
 	if pw:
@@ -214,6 +223,11 @@ func _ready() -> void:
 			tour.w = self
 			tour.only = a.substr(8) if a.length() > 8 else ""
 			add_child(tour)
+		if a.begins_with("--otest="):  # Test im Gelände (offroad_test.gd): Fahrten, Sprünge, Bäume, Zaun, Wasser
+			var ot := OffroadTest.new()
+			ot.w = self
+			ot.case = a.substr(8)
+			add_child(ot)
 
 
 ## Anflug von oben (world_intro.gd): "start" nach Losfahren in der Garage, "short" (kürzer) nach Schnellreise und bei
@@ -226,7 +240,7 @@ func _intro_kind(returning: bool) -> String:
 		if a.begins_with("--zkind="):  # Test: Art erzwingen
 			return a.substr(8)
 		if a in ["--nozoom", "--wdrive", "--worldcheck", "--wmap", "--lvltest"] or a.begins_with("--wtour") \
-				or a.begins_with("--drivebot") or a.begins_with("--ctest") or a.begins_with("--wcam"):
+				or a.begins_with("--drivebot") or a.begins_with("--ctest") or a.begins_with("--wcam") or a.begins_with("--otest"):
 			return ""
 	return "short" if travel or returning else "start"
 
@@ -250,6 +264,7 @@ func _intro_done(skipped: bool, played := true) -> void:
 
 func _exit_tree() -> void:
 	Builder.async_vinyls = false
+	Offroad.areas = []  # im Rennen gibt es kein Gelände
 	if GameState.xp_dirty:
 		GameState.save_game()
 	if _task >= 0:
@@ -267,6 +282,12 @@ func _spawn_xf() -> Transform3D:
 			if parts[0] == "xy":  # --wspawn=xy:x:z:grad (Blickrichtung, 0 = Norden/-Z)
 				var yaw := deg_to_rad(float(parts[3]) if parts.size() > 3 else 0.0)
 				return Transform3D(Basis(Vector3.UP, -yaw), Vector3(float(parts[1]), 0.5, float(parts[2])))
+			if parts[0] == "gelaende":  # --wspawn=gelaende:i[:t[:s[:grad]]]  im Gelände i, t m hinter dem Tor (Flächenkoordinaten)
+				var ar: Dictionary = layout["offroad"][int(parts[1])]
+				var gl := Vector2(float(ar["gate_s"]) + (float(parts[3]) if parts.size() > 3 else 0.0), float(parts[2]) if parts.size() > 2 else 12.0)
+				var gdir := Offroad.wdir(ar, Vector2(0, 1).rotated(deg_to_rad(float(parts[4]) if parts.size() > 4 else 0.0)))
+				var gw := Offroad.world(ar, gl)
+				return Transform3D(Basis.looking_at(Vector3(gdir.x, 0.0, gdir.y), Vector3.UP), Vector3(gw.x, Offroad.base_h(ar, gl), gw.y))
 			if parts[0] == "seg":  # --wspawn=seg:ring:stück:meter  auf einem Autobahnstück (Ring 2 Kreisel, 3-6 Diagonalen)
 				for sg in layout["segments"]:
 					if sg.get("ring", 0) == int(parts[1]):
@@ -422,6 +443,8 @@ func _hitch_frame(dt: float) -> void:
 		var parts := []
 		if land and land.last_event != "":
 			parts.append(land.last_event)
+		if offroad_node and offroad_node.last_event != "":
+			parts.append(offroad_node.last_event)
 		for k in _prof:
 			if _prof[k] > 1500:
 				parts.append("%s=%.1f" % [k, _prof[k] / 1000.0])
@@ -754,6 +777,10 @@ func _update_daylight(dt: float, force := false) -> void:
 		# Nebelbänke: nachts, am stärksten im Morgengrauen (5-8 Uhr), tagsüber weg
 		var dawn := sin(PI * clampf((tod - 4.5) / 4.0, 0.0, 1.0))
 		land.set_daylight(day, clampf((1.0 - day) * 0.45 + dawn * 0.5, 0.0, 0.75))
+	if offroad_node:
+		offroad_node.set_daylight(day)
+	if player and player.tire_fx:
+		player.tire_fx.day = day
 
 
 func _setup_environment() -> void:
@@ -820,6 +847,14 @@ func _setup_environment() -> void:
 	land.setup(layout)
 	land.hold = func() -> bool: return _task >= 0 or _intro != null  # beim Anflug von oben nichts nachbauen
 	world.add_child(land)
+	# Gelände (seit 2.39): Flächen der Welt für Auto und Landschaft, Bau und Nachladen wie die Landschaft
+	Offroad.areas = layout.get("offroad", [])
+	offroad_node = OffroadBuild.new()
+	offroad_node.name = "Gelaende"
+	offroad_node.setup(land, GameState.view_distance())
+	# nicht zugleich mit einer Strecke bauen (im Browser baut die Welt Schritt für Schritt in _job)
+	offroad_node.hold = func() -> bool: return _task >= 0 or not _job.is_empty() or _intro != null
+	world.add_child(offroad_node)
 	ground.material_override = land.land_mat
 	_ground_mat = land.land_mat
 	Track.land_mat = land.land_mat  # Böschungen der Autobahn tragen dieselben Felder wie das Gelände
@@ -1063,7 +1098,7 @@ func _build_hud() -> void:
 	world.add_child(_ch_pin)
 	open_pins.append(_ch_pin)
 	_ch_t = 3.0 if OS.get_cmdline_user_args().has("--challenger") else randf_range(70.0, 160.0)
-	minimap.setup_world(layout["roads"], player, open_pins)
+	minimap.setup_world(layout["roads"], player, open_pins, _offroad_map())
 	minimap.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
 	minimap.offset_left = 8.0
 	minimap.offset_right = 8.0 + WorldMinimap.SIZE
@@ -1127,6 +1162,7 @@ func _build_hud() -> void:
 	map_view.visible = false
 	map_layer.add_child(map_view)
 	map_view.setup(layout["roads"], layout["cities"], player)
+	map_view.areas = _offroad_map()
 	if land:
 		map_view.relief = land.map_texture(map_view._lo, map_view._hi)
 		map_view.villages = land.villages().filter(func(v): return v[0].x > map_view._lo.x and v[0].x < map_view._hi.x \
@@ -1137,6 +1173,22 @@ func _build_hud() -> void:
 	map_view.target_chosen.connect(_set_target)
 	map_view.fast_travel.connect(_fast_travel)
 	map_view.closed.connect(_close_map)
+
+
+## Gelände für die Karten: [Umriss (Welt x, z), Farbe, Name, Teiche als Umrisse]
+func _offroad_map() -> Array:
+	var out := []
+	for a in layout.get("offroad", []):
+		var ponds := []
+		for pd in a["ponds"]:
+			var pl := PackedVector2Array()
+			for k in 24:
+				var t := TAU * k / 24.0
+				var q: Vector2 = pd["c"] + Vector2(cos(t) * pd["r"].x, sin(t) * pd["r"].y).rotated(pd["a"])
+				pl.append(Offroad.world(a, q))
+			ponds.append(pl)
+		out.append([a["outline"], Color(0.16, 0.4, 0.2, 0.55) if a["kind"] == "golf" else Color(0.55, 0.47, 0.33, 0.55), a["name"], ponds])
+	return out
 
 
 func _build_pause(root: Control) -> void:
@@ -1308,6 +1360,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("camera") and not get_tree().paused:
 		player.toggle_camera()
 	elif event.is_action_pressed("reset_car") and not get_tree().paused and not player.track.is_empty():
+		if player.offroad_reset():
+			return  # Gelände: aufrecht an Ort und Stelle statt zurück auf die Straße
 		var xf: Transform3D = player.track["xf"]
 		var loc := Track.locate(player.track, xf.affine_inverse() * player.global_position)
 		var p: Dictionary = loc["path"]
@@ -1393,6 +1447,15 @@ var _vill := []
 
 
 func _update_district() -> void:
+	# Gelände (seit 2.39): Name beim Hineinfahren, wie bei Vierteln und Dörfern
+	var on: String = str(player.offroad.get("name", "")) if not player.offroad.is_empty() else ""
+	if on != _offroad_shown:
+		_offroad_shown = on
+		if on != "":
+			hud["area"].text = on.to_upper()
+			_area_t = 4.0
+	if on != "":
+		return
 	# Autobahn über Land: Name des nächsten Dorfes einblenden, wenn man vorbeifährt (wie die Gebietsnamen in NFS)
 	if not active.is_empty() and active["kind"] == "seg" and land:
 		var pp := Vector2(player.global_position.x, player.global_position.z)
@@ -1625,7 +1688,8 @@ func _update_challenger(dt: float) -> void:
 	if challenger != null and not is_instance_valid(challenger):
 		_remove_challenger()  # mit seinem Autobahnstück entfernt
 	var pe := _entry_of(player.track)
-	var on_ring: bool = not player.track.is_empty() and pe.get("kind", "") == "seg" and pe["race"].get("type", "") != "dreieck"
+	var on_ring: bool = not player.track.is_empty() and pe.get("kind", "") == "seg" and pe["race"].get("type", "") != "dreieck" \
+		and player.offroad.is_empty()
 	if challenger == null:
 		if on_ring and absf(player.speed_fwd) > 12.0:
 			_ch_t -= dt
@@ -2182,6 +2246,13 @@ func _world_check() -> void:
 				continue  # Sperrfläche selbst
 			var p: Vector3 = xa * Vector3(o["pos"].x, 0.0, o["pos"].z)
 			var r: float = Vector2(o["foot"][3], o["foot"][4]).length() if o.has("foot") else float(o.get("r", 5.0))
+			# Gelände (seit 2.39): kein Haus im Zaun und nicht auf seinem Randstreifen
+			if Offroad.land_free(Vector2(p.x, p.z), r) < 0.0:
+				total += 1
+				var gk := "GELAENDE %s" % _wc_name(a)
+				pairs[gk] = pairs.get(gk, 0) + 1
+				if pairs[gk] <= 3:
+					print("WC %s steht im Gelände bei (%.0f, %.0f) r=%.0f" % [_wc_name(a), p.x, p.z, r])
 			for b in entries:
 				if b == a or _dist(b, p) > r:
 					continue

@@ -17,6 +17,7 @@ const WATER_SHADER := preload("res://shaders/water.gdshader")
 const Layout := preload("res://scripts/world_layout.gd")
 const Catalog := preload("res://scripts/catalog.gd")
 const Track := preload("res://scripts/track_builder.gd")
+const Offroad := preload("res://scripts/offroad.gd")  # Gelände zum Austoben (seit 2.39)
 const CORR_CELL := 50.0
 const TRUNK_REACH := 6.0  # Bäume bis so weit hinter der Randwand bekommen einen festen Stamm
 
@@ -28,7 +29,7 @@ const ROAD_CELL := 100.0
 const ROAD_FLAT := 55.0  # bis hier neben einer Straße ist das Gelände flach
 const RISE := 330.0  # dann steigt es auf dieser Strecke an
 const FOREST_FLAT := 30.0  # Waldstrecke: schmal flach, dann gleich Hang
-const CITY_FLAT := 150.0  # neben Stadtstraßen flach (dort stehen zwei, drei Häuserreihen)
+const CITY_FLAT := 150.0  # neben Stadtstraßen und um die Blöcke der Stadtfüllung flach (seit 2.39, city_fill.gd)
 const HILL_H := 115.0
 
 var layout: Dictionary
@@ -53,7 +54,9 @@ var _hole_reach := 0
 var _center := Vector2.ZERO
 var _has_center := false  # Waldstrecken: Landstraße ohne Häuser, der Wald reicht bis ans Bankett
 var _urban := []
+var _fill := []  # Blöcke der Stadtfüllung (seit 2.39): Vector3(x, z, halbe Diagonale) für die Stadtmaske
 var _villages := []  # {pos, r, level, seed, name}
+var _offroad := []  # Gelände (seit 2.39, offroad.gd): dort flach und ohne Bäume, Dörfer, Seen, Masten der Landschaft
 var _parks := []  # {pos, seed, dir}
 var _lakes := []  # {pos, r, level}
 var _lines := []  # Hochspannungsleitungen: Masten [Vector2] je Leitung
@@ -87,6 +90,7 @@ const VILLAGE_NAMES := ["Oberweiler", "Kirchheim", "Lindenau", "Birkenfeld", "Ho
 
 func setup(lay: Dictionary) -> void:
 	layout = lay
+	_offroad = lay.get("offroad", [])
 	# Die Kamera sieht nur so weit wie die Sichtweite (600-1400 m); weiter draußen stehen die Hügel im Himmel
 	VIEW = maxf(GameState.view_distance() + 700.0, 1300.0)
 	_tree_step = [13.0, 11.0, 9.5, 9.0][clampi(int(GameState.gfx.get("detail", 2)), 0, 3)]
@@ -126,7 +130,14 @@ func setup(lay: Dictionary) -> void:
 		var forest: bool = c.get("forest", false) or Catalog.RACES[c["race_index"]].get("forest", false) if c.has("race_index") else c.get("forest", false)
 		for rd in c["roads"]:
 			_add_line(_froad if forest else _croad, rd[0])
-		for q in c.get("bld_world", PackedVector2Array()):
+		# Häuser echter Städte und Blöcke der Stadtfüllung (seit 2.39): dort flach, keine Wälder, Dörfer, Seen
+		# Kopie: das Layout ist ein statischer Cache (Layout._cache); ohne duplicate() hinge jedes Laden der Welt die
+		# Füllpunkte noch einmal an bld_world an, die Abstandsabfragen würden mit jedem Neuladen langsamer
+		var bpts: PackedVector2Array = (c.get("bld_world", PackedVector2Array()) as PackedVector2Array).duplicate()
+		for fb in c.get("fill_world", PackedVector3Array()):
+			bpts.append(Vector2(fb.x, fb.y))
+			_fill.append(fb)
+		for q in bpts:
 			var cell := Vector2i(floori(q.x / ROAD_CELL), floori(q.y / ROAD_CELL))
 			var arr: PackedVector2Array = _croad.get(cell, PackedVector2Array())
 			arr.append(q)
@@ -520,7 +531,7 @@ func _plan_sites() -> void:
 		var t := -ext
 		while t < ext:
 			var p := off + dir * t
-			var ok := free_dist(p) > 40.0
+			var ok := free_dist(p) > 40.0 and not in_offroad(p, 40.0)
 			for v in _villages:
 				if p.distance_to(v["pos"]) < v["r"] + 60.0:
 					ok = false
@@ -561,6 +572,11 @@ func _plan_sites() -> void:
 	if not urb.is_empty():
 		rbc = urb[urb.size() - 1]
 	_marks.append({"kind": "turm", "pos": Vector2(rbc.x, rbc.z)})
+
+
+## Liegt p im Gelände (offroad.gd) samt Randstreifen und margin? Dort hat die Landschaft nichts zu suchen.
+func in_offroad(p: Vector2, margin: float) -> bool:
+	return not _offroad.is_empty() and Offroad.land_free(p, margin, _offroad) < 0.0
 
 
 ## Abstand zu Dörfern, Seen, Windparks und anderen Wahrzeichen
@@ -623,6 +639,9 @@ func _make_materials() -> void:
 	var box := BoxMesh.new()
 	_meshes["box"] = box
 	_meshes["roof"] = _roof_mesh()
+	# vorab im Hauptthread (seit 2.39): der Bau-Thread des Geländes liest _meshes, während der Landschafts-Thread sonst
+	# den Kühlturm beim ersten Kraftwerk eintrüge (Dictionaries sind nicht threadsicher)
+	_meshes["cooling"] = _cooling_tower()
 
 
 ## Stadtboden als Maske für den Bodenshader (seit 2.29 haben Städte in der Open World keinen eigenen dunklen Boden
@@ -645,6 +664,9 @@ func _make_mask() -> void:
 	for arr in _croad.values():
 		for q in arr:
 			paint.call(q, 62.0)
+	# Stadtfüllung (seit 2.39): ganze Blöcke samt Straßen als Stadt, damit zwischen ihnen keine Felder liegen
+	for fb in _fill:
+		paint.call(Vector2(fb.x, fb.y), fb.z * 0.85 + 12.0)
 	for arr in _road.values():
 		for q in arr:
 			if Layout.is_urban(Vector3(q.x, 0, q.y), _urban, -150.0):
@@ -815,6 +837,8 @@ func build_chunk(key: Vector2i) -> Node3D:
 			rds[j * (N + 1) + i] = rdv
 			cds[j * (N + 1) + i] = cdv
 			var d := _free_from(p, rdv, cdv)
+			if not _offroad.is_empty():
+				d = minf(d, Offroad.land_free(p, 20.0, _offroad))  # Gelände: eigener Boden, die Landschaft liegt darunter
 			dr[j * (N + 1) + i] = d
 			var h := height_at(p, d)
 			hs[j * (N + 1) + i] = h
@@ -823,17 +847,17 @@ func build_chunk(key: Vector2i) -> Node3D:
 		_terrain(root, o, hs)
 	_trees(root, o, dr, rds, cds, rng)
 	for v in _villages:
-		if _in_chunk(v["pos"], o):
+		if _in_chunk(v["pos"], o) and not in_offroad(v["pos"], float(v["r"])):
 			_village(root, v)
 	for pk in _parks:
-		if _in_chunk(pk["pos"], o):
+		if _in_chunk(pk["pos"], o) and not in_offroad(pk["pos"], 300.0):
 			_windpark(root, pk)
 	for lk in _lakes:
-		if _in_chunk(lk["pos"], o):
+		if _in_chunk(lk["pos"], o) and not in_offroad(lk["pos"], float(lk["r"])):
 			_lake(root, lk)
 	_power_lines(root, o)
 	for m in _marks:
-		if _in_chunk(m["pos"], o):
+		if _in_chunk(m["pos"], o) and not in_offroad(m["pos"], 150.0):
 			_landmark(root, m)
 	_fog_banks(root, o, dr, hs, rng)
 	return root
@@ -931,6 +955,8 @@ func _trees(root: Node3D, o: Vector2, dr: PackedFloat32Array, rds: PackedFloat32
 				continue  # dort stehen Häuser an der Autobahn
 			if holes_here and _in_hole(p, 4.0):
 				continue
+			if d < 400.0 and in_offroad(p, 6.0):
+				continue  # Gelände: eigene Bäume (offroad_build.gd); hier stünden sie mitten auf dem Fairway
 			if f < 0.17 and not single and rng.randf() < 0.6:
 				continue  # Waldrand lichter
 			if f < 0.1 and single and rng.randf() < 0.7:
@@ -1420,7 +1446,7 @@ func _village_road(root: Node3D, v: Dictionary) -> void:
 	for k in n + 1:
 		var t := float(k) / n
 		var p: Vector2 = c.lerp(q, t) + side * sin(t * PI) * bend
-		if p.distance_to(q) < 28.0:
+		if p.distance_to(q) < 28.0 or in_offroad(p, 4.0):
 			break
 		pts.append(p)
 	if pts.size() < 2:
@@ -1466,6 +1492,9 @@ func _windpark(root: Node3D, pk: Dictionary) -> void:
 	var rotors := []
 	for k in pk["n"]:
 		var p: Vector2 = c + along * (k - int(pk["n"]) / 2.0) * 280.0 + along.orthogonal() * rng.randf_range(-60, 60)
+		if in_offroad(p, 40.0):
+			rng.randf()  # Rotorstellung verbrauchen: die übrigen Anlagen bleiben, wie sie waren
+			continue  # keine Windkraftanlage im Gelände (offroad.gd, seit 2.39)
 		var h := maxf(height_at(p, free_dist(p)), 0.0)
 		var base := Vector3(p.x, h - 1.0, p.y)
 		var tower := MeshInstance3D.new()
