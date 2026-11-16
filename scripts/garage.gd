@@ -511,6 +511,10 @@ func _view_for(cat: String) -> Array:
 			return [Vector3(4.1, 1.65, -3.8), Vector3(0.0, 0.55, 0.25)]
 		"rims", "rimcol", "rimsize", "tires":
 			return [Vector3(W / 2.0 + 1.3, 0.45, fz - 0.9), Vector3(W / 2.0, 0.32, fz)]
+		"spur":
+			# hinter dem rechten Hinterrad, flach an der Flanke entlang nach vorn: wie weit die Räder unter den Kotflügeln
+			# stehen (seit 2.37)
+			return [Vector3(W / 2.0 + 0.65, 0.42, -fz + 2.1), Vector3(W / 2.0 - 0.1, 0.34, -fz)]
 		"suspension":
 			return [Vector3(W / 2.0 + 1.6, 0.55, fz - 0.6), Vector3(W / 2.0 - 0.1, 0.42, fz + 0.1)]
 		"spoiler":
@@ -1361,12 +1365,28 @@ func _show_parts(cat: String, group: String) -> void:
 	var installed: int = GameState.get_config(preview_car).get(cat, 0)
 	var opts: Array = Catalog.PARTS[cat]["options"]
 	_tile(tr("Zurück"), "", _back, {"back": true})
+	var focus_i := 1
 	for i in opts.size():
+		if not _part_listed(cat, i):
+			continue
 		var idx := i
 		var b := _tile("", "", func(): _install(cat, idx, group), {"part": idx, "swatch": _swatch(cat, idx), "quiet": true})
 		b.focus_entered.connect(func(): _preview_part(cat, idx))
+		if idx == installed:
+			focus_i = strip_box.get_child_count() - 1
 	_refresh_parts(cat)
-	_strip_ready("", installed + 1)
+	_strip_ready("", focus_i)
+
+
+## Steht das Teil in der Leiste? Ausgeblendete (alte Zoll-Angaben bis 2.36) nicht, Zoll-Größen, die bei diesem Auto nicht
+## über die Bremse passen (mehr als zwei Zoll unter Werk), auch nicht
+func _part_listed(cat: String, idx: int) -> bool:
+	var opt: Dictionary = Catalog.PARTS[cat]["options"][idx]
+	if opt.get("hidden", false):
+		return false
+	if cat == "rimsize" and opt.has("abs"):
+		return int(opt["abs"]) >= int(Builder.rim_spec(preview_car, GameState.get_config(preview_car))["min_in"])
+	return true
 
 
 # --- Folierung in Kategorien wie in NFS Underground (seit 2.36) -------------------------------------------------------
@@ -1736,6 +1756,8 @@ func _refresh_parts(cat: String) -> void:
 			sub = tr("AB LEVEL %d") % int(opt.get("level", 1))
 		var c2 := GameState.get_config(preview_car).duplicate()
 		c2[cat] = i
+		if sub == "" and (cat == "rimsize" or cat == "spur"):
+			sub = Builder.rim_spec(preview_car, c2)["tire"]
 		_tile_text(b, tr(opt["name"]) + _inch_suffix(cat, c2), sub)
 		b.set_meta("installed", i == installed)
 		b.set_meta("locked", locked)
@@ -2024,9 +2046,12 @@ func _install(cat: String, idx: int, group: String) -> void:
 	_part_info(cat, idx)
 
 
-## Felgen und Zoll: Größe in Zoll hinter dem Namen (z. B. 18"), je Auto verschieden
+## Felgen und Zoll: Größe in Zoll hinter dem Namen (z. B. 18"), je Auto verschieden. Feste Größen (seit 2.37) tragen sie
+## schon im Namen.
 func _inch_suffix(cat: String, cfg: Dictionary) -> String:
 	if cat != "rims" and cat != "rimsize":
+		return ""
+	if cat == "rimsize" and Catalog.part_of(cfg, "rimsize").has("abs"):
 		return ""
 	return "  %d\"" % Builder.rim_spec(preview_car, cfg)["inch"]
 
@@ -2063,15 +2088,28 @@ func _part_info(cat: String, idx: int) -> void:
 				if idx == 0:
 					t += "\n" + tr("Wie die Farbe: %s") % tr({"gloss": "Glanz", "metal": "Metallic", "matt": "Matt", "pearl": "Perlmutt"}[fk])
 				t += "\n" + tr(desc[fk])
-		"rims", "rimsize":
+		"rims", "rimsize", "spur":
 			var c2 := GameState.get_config(preview_car).duplicate()
 			c2[cat] = idx
-			var rs := Builder.rim_spec(preview_car, c2)
-			t += "\n" + tr("Felge %d Zoll   ·   Reifen %s") % [rs["inch"], rs["tire"]]
-			if cat == "rimsize" and rs["inch"] == rs["max_in"] and rs["std_in"] + int(opt["inch"]) > rs["max_in"]:
-				t += "\n" + tr("Größer passt bei diesem Auto nicht unter den Reifen.")
-			elif cat == "rimsize":
+			var fi := Builder.fit_info(preview_car, c2)
+			t += "\n" + tr("Felge %d Zoll   ·   Reifen %s") % [fi["inch"], fi["tire"]]
+			if cat == "rimsize" and float(fi["lift"]) > 0.004:
+				t += "\n" + tr("Größer als der Radlauf: das ganze Rad wächst mit, das Auto steht %d mm höher.") % roundi(float(fi["lift"]) * 1000.0)
+			elif cat == "rimsize" and int(fi["inch"]) > int(fi["std_in"]):
 				t += "\n" + tr("Nur Optik: der Reifen behält seinen Durchmesser, die Flanke wird flacher.")
+			elif cat == "rimsize" and int(fi["inch"]) < int(fi["std_in"]):
+				t += "\n" + tr("Nur Optik: der Reifen behält seinen Durchmesser, die Flanke wird höher.")
+			if cat == "spur" and float(opt.get("wide", 0.0)) > 0.0:
+				t += "\n" + tr("Reifen %d mm breiter, Räder je Seite %d mm weiter außen.") % [roundi(float(opt["wide"]) * 1000.0),
+					roundi(float(opt["spacer"]) * 1000.0)]
+			elif cat == "spur" and idx > 0:
+				t += "\n" + tr("Räder je Seite %d mm weiter außen.") % roundi(float(opt["spacer"]) * 1000.0)
+			if cat == "spur" and float(fi["camber"]) > 0.001:
+				t += "\n" + tr("Tief und breit: die Räder bekommen negativen Sturz.")
+				if float(fi["drop"]) < float(fi["drop_in"]) - 0.003:
+					t += " " + tr("Damit sie Platz haben, liegt das Auto %d mm höher.") % roundi((float(fi["drop_in"]) - float(fi["drop"])) * 1000.0)
+			elif cat == "spur" and idx > 0 and Builder.kit_flare(c2) == 0.0:
+				t += "\n" + tr("Mit dem Breitbau-Kit rücken die Räder in die Verbreiterungen.")
 	if not GameState.is_part_unlocked(cat, idx):
 		t += "\n" + tr("Gesperrt: kommt mit Fahrer-Level %d (du bist Level %d).") % [int(opt.get("level", 1)), GameState.level()]
 	elif idx != (_vinyl_installed() if cat == "vinyl" else GameState.get_config(preview_car).get(cat, 0)):

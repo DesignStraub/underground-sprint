@@ -232,6 +232,71 @@ Außenring → nächste Stadt → Autobahn. Rundkurse und Drift-Kurse sind Schle
 - Browser: der Web-Export startet, die Welt baut sich ohne Skriptfehler auf (gut 25 s). Noch offen: eine Testfahrt mit
   Bildrate im sichtbaren Browserfenster (Herausforderer, Nachladen, Verkehr).
 
+## Echte Sportfelgen, Zoll bis 24, Spur bis extrabreit, Zuschauer wie Menschen (2.37)
+- **Zuschauer sehen aus wie Menschen** (`people.gd`, `people.gdshader`): eine durchgehende Haut aus Querschnitten statt
+  Röhren und Kugeln. Rumpf mit Brust, Taille, Hüfte und abfallenden Schultern, Hals, Kopf mit Kinn, Kiefer, Nase und
+  Ohren; Arme in einem Stück bis zur Hand mit Daumen, Beine mit Oberschenkel, Knie und Wade, Schuhe mit Ferse, Spitze
+  und Sohle. 7,5 Kopflängen, Männer 1,61 bis 1,88 m, Frauen 6 % kleiner. Der Shader biegt eine Gelenkkette (Becken,
+  Wirbelsäule, Kopf, Schultern, Ellbogen, Hüften, Knie, Knöchel), Punkte nahe am Gelenk drehen nur teilweise mit: weiche
+  Ellbogen und Knie, die Füße bleiben beim Wippen und Hocken flach am Boden.
+  - **Vielfalt:** Mann und Frau, schmal bis kräftig (Schultern, Taille, Hüfte, Bauch, Brust, Arme, Hals). Kurze und
+    lange Haare, Zopf, Dutt, Glatze, Kappe (manchmal verkehrt herum), Mütze; Hoodie mit Kapuze, offene Jacke mit
+    Kragen, Rock, Rucksack, Umhängetasche; Brillen und Bärte. Säume, Ärmel, Hosenbeine, Ausschnitte, Sohlen,
+    Hoodie-Tasche und Kordeln, Jeansnähte, Gesäßtaschen, Gürtel, Jackentaschen, Aufdrucke und Rockfalten malt der
+    Shader. Gesichter mit weichen Augenhöhlen, kleinen dunklen Augen (kein weißer Starrblick), Brauen und Lippen; feine
+    Muster blenden mit der Entfernung aus, damit nichts flimmert. Farben gedeckter, passend zur Nacht.
+  - **Haltungen:** Standbein, Umschauen, Arme verschränkt, Hände in den Taschen oder in der Hüfte, Blick aufs Handy,
+    Filmen, Telefonieren; Jubeln mit angewinkelten Armen und Fäusten, Springen, Winken aus dem Unterarm, Klatschen
+    (die Hände treffen sich), echtes Laufen, drei Tanzstile, jede Figur in ihrem eigenen Takt.
+  - **Fernansicht** neu gebaut mit denselben Proportionen, Farben, Haaren, Kappen, Röcken, Jacken und Rucksäcken: der
+    Wechsel fällt kaum auf.
+  - **Behoben:** Die Starterin hob beim Countdown nie die Arme, die Fans im Ziel liefen und tanzten falsch. Godot
+    rechnet eine Farbe als Shader-Wert von sRGB nach linear um, aus „Arme hoch“ wurde „klatschen“. Einzelne Figuren
+    bekommen ihre Bewegung jetzt als Vector4 (`People.set_single_mode`).
+  - Kosten: im Rennen 0,1 bis 0,3 ms mehr je Bild. Im Compatibility-Renderer (Browser) liegen die Formdaten als 32-Bit-
+    Zahlen vor, mit halber Genauigkeit verzogen sich dort die Flächen.
+- **Echte Sportfelgen** (`car_builder.gd`): 25 Bauarten nach dem Vorbild typischer Sportfelgen (ohne Marken):
+  Kreuzgitter Gold mit poliertem Stufenbett und Nieten, geschmiedeter Rennsport-Sechs, Doppelspeichen, Tiefbett
+  Schwarz und Stern (dreiteilig), Dreiteilig mit Y-Gitter und polierter Lippe, Fünfblatt mit schwarzen Taschen,
+  Turbofächer, neu Cup-Stern und Konkav Zehn. Die Nabe sitzt gut 4 cm tief (Speichen konkav), runde Lippe, sichtbares
+  Felgenbett mit Tiefbett, mehrteilige Felgen mit 20 bis 36 Nieten, Radmuttern in dunklen Taschen, Nabendeckel ohne
+  Emblem, Ventil. Innenbelüftete Bremsscheibe, die große Bremse gelocht, runder Sattel mit Schrauben. Felgen mit
+  Laufrichtung sind links gespiegelt. Felgen in Wagenfarbe tragen nicht mehr die Folie. Ein Rad besteht aus drei
+  gemeinsamen Teilen (Reifen, Felge mit Scheibe, Sattel) statt 37 bis 85 Einzelteilen: in der Garage kostet ein Auto im
+  Browser 130 statt bis zu 377 zusätzliche Zeichenaufrufe. Der Zwischenspeicher behält die zuletzt genutzten 64 Teile.
+- **Reifen wie echte:** flache, leicht gewölbte Lauffläche mit drei bis vier Längsrillen, runde Schulter, leicht
+  ausgebeulte Flanke, bei flachen Reifen eine Felgenschutzkante. Querblöcke, Lamellen und eine (unlesbare) erhabene
+  Schrift auf der Außenflanke kommen aus einem gemeinsamen Shader und blenden in der Ferne aus; die linken Reifen sind
+  gespiegelt, die Schrift zeigt auf beiden Seiten nach außen.
+- **Zoll von 13 bis 24** (Garage > Tuning > Optik > Zoll): feste Größen statt -1 bis +4, die Kachel zeigt die
+  Reifengröße („275/20 R24“). Der Reifen behält seinen Außendurchmesser, solange mindestens ein 20er-Querschnitt (4 cm)
+  bleibt; darüber wächst das ganze Rad, die Radläufe werden größer (bis 5 cm unter die Gürtellinie) und das Auto steht
+  höher, die Garage sagt um wie viel. Mehr als zwei Zoll unter Werk passt nicht über die Bremse und steht nicht in der
+  Liste. Je Zoll über Werk wird der Reifen 5 mm breiter. Alte Spielstände rechnet `GameState._migrate_rimsize` auf die
+  Größe um, die das Auto hatte; bei Tengu, Raiden, Falke, Furia und Yari mit sehr großen Felgen steht das Auto dadurch
+  5 bis 13 mm höher (der Reifen braucht jetzt mehr Flanke).
+- **Neue Kategorie Spur** (Optik, nach Zoll): Serie (Reifen 2 cm innerhalb der Kotflügelkante), Spurplatten 15 mm
+  (Level 3), Spurplatten 30 mm (Level 6), Breit (Level 9: Reifen 30 mm breiter, 25 mm je Seite weiter außen, gut 2 cm
+  über der Kante) und Extrabreit (Level 12: Reifen 50 mm breiter, 45 mm je Seite, gut 5 cm über der Kante, wie ein
+  Breitbau für die Räder; in Kurven auch in der Verfolgerkamera zu sehen, genau von hinten verdeckt das Heck die
+  Hinterräder). Mit dem Breitbau-Kit füllen die Räder die Verbreiterungen aus. Tief und breit gibt negativen Sturz (bis
+  10°), die Radlaufkante wird bis 4 cm ausgestellt; reicht das nicht, liegt das Auto nur so tief, wie die Räder es
+  zulassen (die Garage nennt die Millimeter). Die Kamera schaut dabei von hinten an der Flanke entlang. Nur Optik.
+- **Schlankere Autos:** Die Breite im Katalog galt für die Grundform, die Backen kamen obendrauf: manche Autos waren 10
+  bis 23 cm zu breit. Jetzt ist sie die größte Breite, die Backen sind darin enthalten (Tengu 2,18 → 1,95 m wie ein
+  Supra mit Breitbau, Raiden 2,18 → 1,98, Falke 2,04 → 1,85 wie ein 911, Tanuki 1,98 → 1,80, Kagura 2,05 → 1,90,
+  Tatsumaki 1,91 → 1,76 wie ein FD). Die Spur ergibt sich je Achse aus der Kotflügelkante. Fahrverhalten und
+  Kollision bleiben gleich, die Kollisionsbox passt jetzt zur sichtbaren Karosserie. Heckflügel, Dachspoiler und
+  Schmutzfänger nehmen ihre Breite vom Querschnitt der Karosserie (die Endplatten standen sonst bis 15 cm über).
+- **Gegner und Herausforderer** bekommen eine Spur aus Rennen und Startplatz (ohne zusätzliche Zufallszahl, die übrigen
+  Teile bleiben gleich) und nur Zoll-Größen, die passen (`Builder.rival_rimsize`): kein hochgebocktes Rad, nichts unter
+  dem Minimum (vorher stand bis zu 60 % des Felds auf der kleinsten Felge). Reifenqualm und Spuren liegen genau unter
+  den Hinterrädern (`track_r`).
+- **Tests:** `tools/car_shots.tscn -- --checkfit` rechnet 21 060 Kombinationen nach (27 Autos × 13 Größen × 5 Spuren ×
+  3 Bodykits × 4 Fahrwerke): kein Reifen durchs Blech, Radläufe unter der Gürtellinie, Sättel hinter den Speichen,
+  keine verkehrt herum liegenden Flächen. `--rivalsizes` zeigt die Felgengrößen der Gegner, `--cachetest` den
+  Speicher der Garage; `tools/people_shots.tscn` hat `--night`, `--turn`, `--starter` und `--bench`.
+
 ## JDM-Autos, Qualm wie Rauch, Strecken mit Charakter, Autobahndreiecke (2.36)
 - **Zwei neue Autos** (`catalog.gd`, `car_builder.gd`), beide auch Gegner und Herausforderer:
   - **Yari Shinka VIII** (*yari* = Lanze, *shinka* = Evolution): kantige Allrad-Rallye-Limousine im Geist eines Lancer
@@ -568,11 +633,15 @@ bei GO runter. Im Ziel bleibt das Auto stehen, die Kamera kreist, Fans laufen au
 Sieg) oder klatschen. Unterwegs schauen Zuschauergruppen zu: hinter den Absperrungen der Seitenstraßen und hinter
 den Zäunen, wo kein Haus steht (dort kommt man mit dem Auto nicht hin). Sie jubeln, winken, klatschen oder filmen mit
 dem Handy. In den Wohnungen flackern hier und da Fernseher, manchmal steht jemand am Fenster.
-Die Leute sind seit 2.14 richtige Figuren statt Klötzchen: runde Formen, Ellbogen (klatschen, Arme verschränken,
-Handy am Ohr), Hände, Turnschuhe, ein Gesicht mit Augen, Brauen, Nase und Mund. Kleidung und Frisur wechseln:
-T-Shirt (manche mit Aufdruck), Langarm, Hoodie mit Kapuze und Kordeln, offene Jacke; Jeans mit Gürtel, Shorts, Rock;
-kurze oder lange Haare, Zopf, Dutt, Glatze, Kappe, Mütze; dazu schmale und kräftige Statur. In der Ferne (je nach
-Detaildichte ab 30–96 m) zeigt das Spiel die einfache Blockfigur, die kostet kaum etwas.
+Die Leute sehen seit 2.37 aus wie Menschen: eine durchgehende Haut mit Brust, Taille, Hüfte, Hals und Kopf mit Kinn,
+Nase und Ohren, Arme in einem Stück bis zur Hand mit Daumen, Beine mit Knie und Wade, Schuhe mit Ferse und Sohle,
+7,5 Kopflängen groß. Die Gelenke biegen weich, die Füße bleiben am Boden. Mann und Frau, schmal bis kräftig; Kleidung
+und Frisur wechseln: T-Shirt (manche mit Aufdruck), Langarm, Hoodie mit Kapuze und Kordeln, offene Jacke mit Kragen;
+Jeans mit Nähten und Gürtel, Shorts, Rock; Rucksack oder Umhängetasche; kurze oder lange Haare, Zopf, Dutt, Glatze,
+Kappe (auch verkehrt herum), Mütze, Brille, Bart. Sie stehen auf einem Bein, schauen sich um, verschränken die Arme,
+stecken die Hände in die Taschen, schauen aufs Handy, filmen oder telefonieren, jubeln mit Fäusten, springen, winken,
+klatschen, laufen und tanzen (drei Stile), jede Figur in ihrem eigenen Takt. In der Ferne (je nach Detaildichte ab
+30–96 m) zeigt das Spiel eine einfache Figur mit denselben Proportionen und Farben, die kostet kaum etwas.
 Seit 2.24 haben sie Knie und feinere Rundungen (Arme und Beine 12 statt 8 Seiten, kleinere Schulter- und
 Ellbogenkugeln, die vorher abstanden): beim Jubeln gehen sie vor dem Absprung und nach der Landung in die Knie, beim
 Tanzen federn sie auf jedem Schlag, und es gibt drei Tanzarten (Arme schwingen, Faust pumpen mit Kopfnicken, Schritt
@@ -872,8 +941,8 @@ Oben die alten Anzeigen, unten die neuen seit 2.10 (Minimap, Drehzahlmesser, Pla
 
 ## Tuning wie in NFS
 **Leistung für die ganze Garage, Optik je Auto (seit 2.25):** Motor, Turbo, Nitro, Fahrwerk und Reifen passen auf
-alle eigenen Autos, beim Autowechsel bleiben sie dran. Lack, Lackart, Felgen, Spoiler, Bodykit, Haube, Auspuff, Folie,
-Neon, Scheiben und Licht gestaltet man je Auto: ein Auto, das man zum ersten Mal wählt, ist blank (ab Werk, einfarbig).
+alle eigenen Autos, beim Autowechsel bleiben sie dran. Lack, Lackart, Felgen, Zoll, Spur, Spoiler, Bodykit, Haube, Auspuff,
+Folie, Neon, Scheiben und Licht gestaltet man je Auto: ein Auto, das man zum ersten Mal wählt, ist blank (ab Werk, einfarbig).
 Bis 2.24 galt auch die Optik für alle Autos, eine einmal angebrachte Folie war so auf jedem Auto. Alte Spielstände
 behalten ihre Optik am zuletzt gefahrenen Auto (`GameState.looks`). Rücktaste und Esc gehen eine Ebene zurück (Teileliste → Kategorie → Optik/Leistung →
 Garage), der Fokus steht wieder auf dem Eintrag, aus dem man kam.
@@ -902,16 +971,19 @@ Garage → Tuning → **Optik** oder **Leistung** (Motor, Turbo, Nitro, Fahrwerk
   lavendel, Schwarz tiefblau, bunte Lacke etwas im Farbton verschoben). Chrom bleibt Chrom, matt wird es gebürstet.
   Werkslacke: Silber-Autos ab Werk metallic, Kumo, Ryujin, Falke, Tanuki und Kaido metallic, Shiden, Kagura und Furia
   Perlmutt.
-- **Felgen:** 23 Bauarten, jede eigens gebaut: Serie (je Auto eine eigene Werksfelge), Fünfspeichen, Gitter,
-  Tiefbett (poliertes breites Horn), Doppelspeichen, Y-Speichen, Mehrspeichen, Stahlfelge mit Löchern, Turbine,
-  Rennsport-Sechs, Kreuzspeichen mit Zwischenring, Aero-Scheibe, Tiefbett Stern, dazu seit 2.18 Konkav-Stern,
-  Retro-Loch (Telefon-Wählscheibe), Radkappe, Rallye, Sichel (gebogene Speichen in Laufrichtung), Schmiede-Zehn,
-  Dreiteilig (Stufenbett mit Schraubenring), Kleeblatt, Drahtspeichen mit Flügelmutter und Zentralverschluss. Alle
-  mit Sechskant-Radmuttern (4 oder 5 je nach Auto), Nabendeckel mit Emblem und Ventil. **Felgenfarbe** extra
+- **Felgen:** 25 Bauarten nach echten Sportfelgen (seit 2.37): Serie (je Auto eine eigene Werksfelge), Fünfspeichen,
+  Kreuzgitter Gold, Tiefbett Schwarz, Doppelspeichen, Y-Speichen, Mehrspeichen, Stahlfelge, Turbofächer,
+  Rennsport-Sechs, Kreuzspeichen, Aero-Scheibe, Tiefbett Stern, Konkav-Stern, Retro-Loch (Telefon-Wählscheibe),
+  Radkappe, Rallye, Sichel (gebogene Speichen in Laufrichtung), Schmiede-Zehn, Dreiteilig (Y-Gitter mit polierter
+  Lippe), Fünfblatt, Drahtspeichen mit Flügelmutter, Zentralverschluss, Cup-Stern und Konkav Zehn. Alle mit
+  Radmuttern (4 oder 5 je nach Auto), Nabendeckel und Ventil, dahinter Bremsscheibe und Sattel. **Felgenfarbe** extra
   (passend, Silber, Schwarz, Gunmetal, Weiß, Wagenfarbe, Rot, Gold, Bronze, Neongrün, Chrom).
-- **Zoll:** Standard, -1 und +1 bis +4 Zoll. Die Liste zeigt die echte Größe für das gewählte Auto (z. B. 17"), das
-  Infofeld die Reifengröße (z. B. „245/30 R19“). Der Reifen behält seinen Durchmesser, die Flanke wird flacher; zu
-  groß für das Auto geht nicht (mindestens 4,5 cm Flanke). Nur Optik, ändert keine Fahrwerte.
+- **Zoll:** Standard und feste Größen von 13 bis 24 Zoll (seit 2.37). Die Kachel zeigt die Reifengröße (z. B.
+  „245/30 R19“). Der Reifen behält seinen Durchmesser, solange ein 20er-Querschnitt bleibt; darüber wächst das ganze
+  Rad und das Auto steht höher. Mehr als zwei Zoll unter Werk fehlt (passt nicht über die Bremse). Nur Optik.
+- **Spur:** Serie, Spurplatten 15 und 30 mm, Breit, Extrabreit (seit 2.37): die Räder rücken je Seite nach außen, bei
+  Breit und Extrabreit mit breiteren Reifen, Extrabreit steht gut 5 cm über den Kotflügel. Mit dem Breitbau-Kit füllen
+  die Räder die Verbreiterungen; tief und breit gibt negativen Sturz. Nur Optik.
 - **Spoiler:** Lippe, Entenbürzel, Street-Flügel, GT-Flügel, Schwanenhals, Doppeldecker, Dachspoiler, Bügelflügel,
   Monster-Flügel.
 - **Bodykit:** Seitenschweller, Street (lackierte Lippe, Schweller, Heckschürze), Rallye (Schmutzfänger,
@@ -1172,6 +1244,14 @@ Spiel). Die wichtigsten:
 - **2.19 – Tunnellicht:** links bis 2.18 (das Auto bekam im Tunnel kaum Licht und stand schwarz vor den hellen
   Wänden), rechts mit Laternenlicht aus der Lichtkarte auch auf dem Lack.
   <br><img src="update_bilder/tunnellicht_2_19.jpg" alt="Auto im Tunnel vorher und nachher" width="640">
+- **2.37 – Zuschauer:** oben die Figuren bis 2.36 (Röhren, Kugelgelenke, flache Hände), unten die neuen mit
+  durchgehender Haut, echten Proportionen, Händen, Gesichtern, Frisuren und Kleidung.
+  <br><img src="update_bilder/zuschauer_2_37.jpg" alt="Zuschauer vorher und nachher" width="640">
+- **2.37 – Sportfelgen:** alle 25 Bauarten am Mirai, je Zeile von links: Serie, Fünfspeichen, Kreuzgitter Gold,
+  Tiefbett Schwarz, Doppelspeichen · Y-Speichen, Mehrspeichen, Stahlfelge, Turbofächer, Rennsport-Sechs ·
+  Kreuzspeichen, Aero-Scheibe, Tiefbett Stern, Konkav-Stern, Retro-Loch · Radkappe, Rallye, Sichel, Schmiede-Zehn,
+  Dreiteilig · Fünfblatt, Drahtspeichen, Zentralverschluss, Cup-Stern, Konkav Zehn.
+  <br><img src="update_bilder/felgen_2_37.jpg" alt="Alle Felgen" width="720">
 - **2.18 – Felgen:** alle 23 Bauarten am Kaizen in ihrer Standardgröße, je Zeile von links: Serie (Kaizen),
   Fünfspeichen, Gitter Gold, Tiefbett Schwarz, Doppelspeichen, Y-Speichen · Mehrspeichen, Stahlfelge, Turbine,
   Rennsport-Sechs, Kreuzspeichen, Aero-Scheibe · Tiefbett Stern, Konkav-Stern, Retro-Loch, Radkappe, Rallye, Sichel ·

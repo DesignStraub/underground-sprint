@@ -751,6 +751,28 @@ func load_game() -> void:
 				one[cat] = v
 		if not one.is_empty():
 			looks[id] = one
+	_migrate_rimsize()
+
+
+## Zoll bis 2.36 relativ zur Standardgröße der Felge (Plätze 1–5: -1, +1 … +4 Zoll): umrechnen auf die feste Größe, die das
+## Auto damit hatte (alte Rechnung: Werk + Aufschlag der Felge, höchstens so groß, dass 4,5 cm Flanke blieben). Die alten
+## Plätze stehen ausgeblendet im Katalog und gelten weiter (Gegner, Tests), die Garage zeigt sie nicht mehr. car_builder
+## (Radgrößen der Autos) erst hier laden, er hängt selbst an GameState.
+func _migrate_rimsize() -> void:
+	var builder: GDScript = null
+	for id in looks:
+		var v := int(looks[id].get("rimsize", 0))
+		if v < 1 or v > 5:
+			continue
+		if builder == null:
+			builder = load("res://scripts/car_builder.gd")
+		var shape: Dictionary = builder.SHAPES.get(id, builder.SHAPES["kaizen"])
+		var max_old := floori((float(shape.get("wheel_r", 0.32)) - 0.045) / 0.0127)
+		var fac: Array = Catalog.FACTORY_RIMS.get(id, ["std", 7, Color(0.62, 0.63, 0.66), 16, 5])
+		var rim := Catalog.part_of(looks[id], "rims")
+		var std_old := mini(int(fac[3]) + int(rim.get("plus", 0)), max_old)
+		var inch := clampi(std_old + int(Catalog.PARTS["rimsize"]["options"][v]["inch"]), 13, max_old)
+		looks[id]["rimsize"] = maxi(Catalog.rimsize_index(inch), 0)
 
 
 func reset_progress() -> void:

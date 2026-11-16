@@ -330,50 +330,86 @@ const PARTS := {
 			{"name": "Perlmutt", "wins": 3, "level": 5, "finish": "pearl"},
 		],
 	},
-	# style: Bauart der Felge (car_builder._rim), spokes: Zahl der Speichen (bzw. Löcher, Schlitze), plus: so viel Zoll
-	# größer als die Werksfelge des Autos ist die Felge in ihrer Standardgröße (Kategorie "Zoll" ändert das).
+	# style: Bauart der Felge (car_builder._rim_build), spokes: Zahl der Speichen (bzw. Löcher, Schlitze), plus: so viel
+	# Zoll größer als die Werksfelge des Autos ist die Felge in ihrer Standardgröße (Kategorie "Zoll" ändert das).
 	# "Serie" ist die Werksfelge des jeweiligen Autos (FACTORY_RIMS).
+	# Seit 2.37 nach echten Sportfelgen, wie sie hier auf den Autos stehen (ohne Marken): Kreuzgitter mit poliertem
+	# Stufenbett und Nieten, geschmiedeter Sechsspeichen-Stern, Doppelspeichen, Tiefbett dreiteilig, Fünfblatt, Turbofächer,
+	# Cup-Stern, tief konkave Zehnspeichen. Die Nummern bleiben (Spielstände speichern sie), nur die Bauart ist neu.
 	"rims": {
 		"label": "Felgen",
 		"options": [
 			{"name": "Serie", "wins": 0, "color": Color(0.62, 0.63, 0.66), "plus": 0, "spokes": 7, "style": "std"},
-			{"name": "Fünfspeichen", "wins": 0, "color": Color(0.85, 0.85, 0.9), "plus": 2, "spokes": 5, "style": "std"},
-			{"name": "Gitter Gold", "wins": 0, "color": Color(0.85, 0.65, 0.2), "plus": 2, "spokes": 10, "style": "mesh"},
-			{"name": "Tiefbett Schwarz", "wins": 0, "color": Color(0.08, 0.08, 0.08), "plus": 2, "spokes": 6, "style": "dish"},
+			{"name": "Fünfspeichen", "wins": 0, "color": Color(0.83, 0.84, 0.87), "plus": 2, "spokes": 5, "style": "std"},
+			{"name": "Kreuzgitter Gold", "wins": 0, "color": Color(0.8, 0.62, 0.24), "plus": 2, "spokes": 15, "style": "mesh"},
+			{"name": "Tiefbett Schwarz", "wins": 0, "color": Color(0.07, 0.07, 0.075), "plus": 2, "spokes": 6, "style": "dish"},
 			{"name": "Doppelspeichen", "wins": 0, "color": Color(0.78, 0.79, 0.82), "plus": 2, "spokes": 5, "style": "split"},
-			{"name": "Y-Speichen", "wins": 0, "color": Color(0.46, 0.47, 0.5), "plus": 2, "spokes": 5, "style": "y"},
-			{"name": "Mehrspeichen", "wins": 0, "color": Color(0.8, 0.8, 0.83), "plus": 2, "spokes": 16, "style": "thin"},
+			{"name": "Y-Speichen", "wins": 0, "color": Color(0.36, 0.37, 0.4), "plus": 2, "spokes": 5, "style": "y"},
+			{"name": "Mehrspeichen", "wins": 0, "color": Color(0.8, 0.8, 0.83), "plus": 2, "spokes": 20, "style": "thin"},
 			{"name": "Stahlfelge", "wins": 0, "color": Color(0.1, 0.1, 0.11), "plus": 0, "spokes": 6, "style": "steel"},
-			{"name": "Turbine", "wins": 0, "color": Color(0.82, 0.83, 0.86), "plus": 1, "spokes": 12, "style": "turbine"},
-			{"name": "Rennsport-Sechs", "wins": 0, "color": Color(0.62, 0.42, 0.16), "plus": 2, "spokes": 6, "style": "te"},
-			{"name": "Kreuzspeichen", "wins": 0, "color": Color(0.85, 0.65, 0.25), "plus": 2, "spokes": 8, "style": "cross"},
+			{"name": "Turbofächer", "wins": 0, "color": Color(0.82, 0.83, 0.86), "plus": 1, "spokes": 18, "style": "turbine"},
+			{"name": "Rennsport-Sechs", "wins": 0, "color": Color(0.55, 0.38, 0.17), "plus": 2, "spokes": 6, "style": "te"},
+			{"name": "Kreuzspeichen", "wins": 0, "color": Color(0.74, 0.75, 0.78), "plus": 2, "spokes": 8, "style": "cross"},
 			{"name": "Aero-Scheibe", "wins": 0, "color": Color(0.9, 0.9, 0.9), "plus": 1, "spokes": 5, "style": "aero"},
 			{"name": "Tiefbett Stern", "wins": 0, "color": Color(0.85, 0.86, 0.9), "plus": 3, "spokes": 5, "style": "dish"},
 			# ab 2.18
-			{"name": "Konkav-Stern", "wins": 0, "color": Color(0.44, 0.45, 0.48), "plus": 3, "spokes": 5, "style": "concave"},
+			{"name": "Konkav-Stern", "wins": 0, "color": Color(0.32, 0.33, 0.36), "plus": 3, "spokes": 5, "style": "concave"},
 			{"name": "Retro-Loch", "wins": 0, "color": Color(0.8, 0.81, 0.83), "plus": 0, "spokes": 8, "style": "holes"},
 			{"name": "Radkappe", "wins": 0, "color": Color(0.72, 0.73, 0.75), "plus": 0, "spokes": 10, "style": "cap"},
-			{"name": "Rallye", "wins": 0, "color": Color(0.93, 0.93, 0.91), "plus": 1, "spokes": 6, "style": "rally"},
+			{"name": "Rallye", "wins": 0, "color": Color(0.93, 0.93, 0.91), "plus": 1, "spokes": 8, "style": "rally"},
 			{"name": "Sichel", "wins": 0, "color": Color(0.8, 0.81, 0.84), "plus": 2, "spokes": 10, "style": "sickle"},
 			{"name": "Schmiede-Zehn", "wins": 0, "color": Color(0.5, 0.36, 0.17), "plus": 2, "spokes": 10, "style": "ten"},
-			{"name": "Dreiteilig", "wins": 0, "color": Color(0.1, 0.1, 0.11), "plus": 2, "spokes": 6, "style": "3pc"},
-			{"name": "Kleeblatt", "wins": 0, "color": Color(0.82, 0.83, 0.85), "plus": 1, "spokes": 5, "style": "clover"},
+			{"name": "Dreiteilig", "wins": 0, "color": Color(0.1, 0.1, 0.11), "plus": 2, "spokes": 10, "style": "3pc"},
+			{"name": "Fünfblatt", "wins": 0, "color": Color(0.82, 0.83, 0.85), "plus": 1, "spokes": 5, "style": "clover"},
 			{"name": "Drahtspeichen", "wins": 0, "color": Color(0.85, 0.86, 0.88), "plus": 0, "spokes": 20, "style": "wire"},
 			{"name": "Zentralverschluss", "wins": 0, "color": Color(0.16, 0.16, 0.17), "plus": 2, "spokes": 5, "style": "center"},
+			# ab 2.37
+			{"name": "Cup-Stern", "wins": 0, "color": Color(0.8, 0.81, 0.84), "plus": 2, "spokes": 5, "style": "cup"},
+			{"name": "Konkav Zehn", "wins": 0, "color": Color(0.2, 0.2, 0.22), "plus": 3, "spokes": 10, "style": "concave"},
 		],
 	},
-	# Felgengröße: Standard = Werksfelge des Autos (bzw. die Felge in ihrer üblichen Größe), sonst Zoll mehr oder
-	# weniger. Der Reifen behält seinen Außendurchmesser (wie im echten Tuning: größere Felge, flacheres Profil);
-	# zu groß für das Auto geht nicht (mindestens 4 cm Flanke), car_builder.rim_spec begrenzt.
+	# Felgengröße seit 2.37 in festen Zoll (13" bis 24"), "Standard" ist die Felge in ihrer üblichen Größe (Werksfelge:
+	# ab Werk). Der Reifen behält seinen Außendurchmesser, solange eine echte Flanke bleibt (mindestens 20er-Querschnitt);
+	# darüber wächst das ganze Rad, das Auto steht entsprechend höher und die Radläufe werden größer (car_builder.rim_spec).
+	# Kleiner als zwei Zoll unter Werk passt nicht über die Bremse (fehlt dann in der Garage).
+	# Bis 2.36 galten die Größen relativ (-1, +1 … +4 Zoll zur Standardgröße): die Plätze 1–5 bleiben ausgeblendet stehen,
+	# weil Spielstände den Index speichern; GameState rechnet sie beim Laden auf die feste Größe um.
 	"rimsize": {
 		"label": "Zoll",
 		"options": [
 			{"name": "Standard", "wins": 0, "inch": 0},
-			{"name": "-1 Zoll", "wins": 0, "inch": -1},
-			{"name": "+1 Zoll", "wins": 0, "inch": 1},
-			{"name": "+2 Zoll", "wins": 0, "inch": 2},
-			{"name": "+3 Zoll", "wins": 0, "inch": 3},
-			{"name": "+4 Zoll", "wins": 0, "inch": 4},
+			{"name": "-1 Zoll", "wins": 0, "inch": -1, "hidden": true},
+			{"name": "+1 Zoll", "wins": 0, "inch": 1, "hidden": true},
+			{"name": "+2 Zoll", "wins": 0, "inch": 2, "hidden": true},
+			{"name": "+3 Zoll", "wins": 0, "inch": 3, "hidden": true},
+			{"name": "+4 Zoll", "wins": 0, "inch": 4, "hidden": true},
+			{"name": "13\"", "wins": 0, "abs": 13},
+			{"name": "14\"", "wins": 0, "abs": 14},
+			{"name": "15\"", "wins": 0, "abs": 15},
+			{"name": "16\"", "wins": 0, "abs": 16},
+			{"name": "17\"", "wins": 0, "abs": 17},
+			{"name": "18\"", "wins": 0, "abs": 18},
+			{"name": "19\"", "wins": 0, "abs": 19},
+			{"name": "20\"", "wins": 0, "abs": 20},
+			{"name": "21\"", "wins": 0, "abs": 21},
+			{"name": "22\"", "wins": 0, "abs": 22},
+			{"name": "23\"", "wins": 0, "abs": 23},
+			{"name": "24\"", "wins": 0, "abs": 24},
+		],
+	},
+	# Spur (seit 2.37): wie weit die Räder unter den Kotflügeln stehen. Ab Werk sitzen sie gut 2 cm innen, Spurplatten
+	# schieben sie je Seite nach außen (bündig bzw. leicht drüber), "Breit" nimmt dazu breitere Reifen (2 cm über die Kante),
+	# "Extrabreit" noch breitere und steht je Seite gut 5 cm über (wie ein Breitbau für die Räder; in Kurven auch in der
+	# Verfolgerkamera zu sehen, genau von hinten verdeckt das Heck die Hinterräder). Mit dem Breitbau-Kit rücken die Räder ohnehin um die Verbreiterung nach außen.
+	# spacer: Meter je Seite, wide: so viel breiter ist der Reifen (m)
+	"spur": {
+		"label": "Spur",
+		"options": [
+			{"name": "Serie", "wins": 0, "spacer": 0.0},
+			{"name": "Spurplatten 15 mm", "wins": 0, "level": 3, "spacer": 0.015},
+			{"name": "Spurplatten 30 mm", "wins": 0, "level": 6, "spacer": 0.03},
+			{"name": "Breit", "wins": 0, "level": 9, "spacer": 0.025, "wide": 0.03},
+			{"name": "Extrabreit", "wins": 0, "level": 12, "spacer": 0.045, "wide": 0.05},
 		],
 	},
 	# Felgenfarbe: "Passend" behält die Farbe der Felge, "Wagenfarbe" nimmt den Lack
@@ -607,12 +643,23 @@ const PARTS := {
 	},
 }
 
+## "spur" (seit 2.37) steht hinten: die Gegner würfeln ihr Tuning in dieser Reihenfolge (race.gd), so bleiben ihre übrigen
+## Teile gleich
 const PART_ORDER := ["paint", "finish", "rims", "rimcol", "rimsize", "spoiler", "bodykit", "hood", "exhaust", "vinyl", "vinylcol", "neon", "tint",
-	"lights", "engine", "turbo", "nitro", "suspension", "tires"]
+	"lights", "engine", "turbo", "nitro", "suspension", "tires", "spur"]
 ## Tuning-Menü wie in NFS: erst Optik oder Leistung, dann die Kategorie, dann das Teil
-const PART_GROUPS := {"optik": ["paint", "finish", "rims", "rimcol", "rimsize", "spoiler", "bodykit", "hood", "exhaust", "vinyl", "vinylcol", "neon",
-	"tint", "lights"],
+const PART_GROUPS := {"optik": ["paint", "finish", "rims", "rimcol", "rimsize", "spur", "spoiler", "bodykit", "hood", "exhaust", "vinyl", "vinylcol",
+	"neon", "tint", "lights"],
 	"leistung": ["engine", "turbo", "nitro", "suspension", "tires"]}
+
+
+## Option der Kategorie Zoll mit dieser festen Größe (13" bis 24"), -1 wenn es sie nicht gibt
+static func rimsize_index(inch: int) -> int:
+	var opts: Array = PARTS["rimsize"]["options"]
+	for i in opts.size():
+		if int(opts[i].get("abs", 0)) == inch:
+			return i
+	return -1
 
 
 ## Option einer Kategorie aus einer Konfiguration (fehlende Kategorien = Serie)

@@ -281,7 +281,8 @@ func setup(car_id: String, cfg: Dictionary) -> void:
 	half_width = w
 	tire_fx = TireFx.new()  # Reifenqualm und Reifenspuren (seit 2.35)
 	add_child(tire_fx)
-	tire_fx.setup(self, w, _length / 2.0 - _axle)
+	# Qualm und Spuren genau unter den Hinterrädern (seit 2.37 je Auto, Spurplatten und Breitbau eingerechnet)
+	tire_fx.setup(self, float(model.get_meta("track_r", w - 0.2)) + 0.2, _length / 2.0 - _axle)
 	var l := _length / 2.0
 	var pts := PackedVector3Array()
 	for y in [-0.6, 0.6]:

@@ -184,12 +184,18 @@ func _ready() -> void:
 		var id: String = pool[rng.randi() % pool.size()]
 		var cfg := {}
 		for cat in Catalog.PART_ORDER:
-			if cat != "finish":  # Lackart ohne Zufallszahl: sonst änderten sich seit 2.19 alle Gegnerfelder
+			if cat != "finish" and cat != "spur":  # Lackart und Spur ohne Zufallszahl: sonst änderten sich alle Gegnerfelder
 				cfg[cat] = rng.randi() % Catalog.PARTS[cat]["options"].size()
-				# entfernte Vinyls (seit 2.36 ausgeblendet) auf ein sichtbares umbiegen, ohne weitere Zufallszahl (Felder bleiben gleich)
-				while Catalog.PARTS[cat]["options"][cfg[cat]].get("hidden", false):
+				# entfernte Vinyls (seit 2.36 ausgeblendet) auf ein sichtbares umbiegen, ohne weitere Zufallszahl (Felder bleiben
+				# gleich). Zoll nicht: die alten relativen Größen (ausgeblendet) gelten weiter und bleiben im Rad (rim_spec);
+				# umgebogen landeten sie bis 2.37 alle auf 13"–17" und damit auf der kleinsten Felge, die das Auto trägt.
+				while cat != "rimsize" and Catalog.PARTS[cat]["options"][cfg[cat]].get("hidden", false):
 					cfg[cat] = (cfg[cat] + 5) % Catalog.PARTS[cat]["options"].size()
 		cfg["finish"] = (int(race["seed"]) + i * 3 + GameState.wins) % Catalog.PARTS["finish"]["options"].size()
+		# Spur (seit 2.37): Spurplatten oder breite Reifen bei manchen Gegnern; Zoll ohne Riesenfelgen und ohne Größen, die
+		# nicht über die Bremse passen (dann "Standard", Builder.rival_rimsize)
+		cfg["spur"] = (int(race["seed"]) * 7 + i * 2 + GameState.wins) % Catalog.PARTS["spur"]["options"].size()  # i * 2: bei fünf Stufen je Gegner eine andere
+		cfg["rimsize"] = Builder.rival_rimsize(id, cfg)
 		var ai := AICar.new()
 		ai.process_mode = Node.PROCESS_MODE_PAUSABLE
 		ai.player = player

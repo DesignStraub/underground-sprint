@@ -32,6 +32,11 @@ static var _mesh_cache := {}  # Reifen, Speichen, Flügel, Kennzeichen: einmal g
 ## Optional: pipes/pipe_r (Endrohre), tire_w (Reifenbreite), softtop (Stoffverdeck), wheel_r (Radradius), axle (Achse so weit
 ##   von Bug und Heck), mid (Mittelmotor: Einlässe in den Flanken), rear_engine (Heckmotor), chrome_bumpers
 ##   (Chromstoßstangen), overfenders (aufgeschraubte Kotflügelverbreiterungen)
+## Breite: Catalog "width" ist seit 2.37 die größte Breite wie bei den echten Vorbildern (über den Hüften, ohne Spiegel);
+##   Hüften und Kotflügel-Buckel gehen von der Grundbreite ab (_section). Bis 2.36 kamen sie obendrauf: die Autos waren 3
+##   bis 23 cm breiter als angegeben (Tengu 2,18 m statt 1,95 m, Raiden 2,18 m, Falke 2,04 m) und wirkten zu breit; dazu
+##   waren die Hüften kräftiger (z. B. Tengu 0,115, Raiden 0,1, Falke 0,095 je Seite).
+## arch_r (nur zur Laufzeit, build): Radius der Radläufe, wenn ein großes Rad mehr Platz braucht (wheel_fit)
 const SHAPES := {
 	"kaizen": {  # JDM-Fließheck (Civic-EG-Gefühl): rundliche flache Nase, schmale breite Scheinwerfer, große Scheiben,
 		# langes Dach, steile Heckscheibe, fast senkrechte Klappe mit umlaufenden Rückleuchten, dicker Endtopf
@@ -43,7 +48,7 @@ const SHAPES := {
 	},
 	"mirai": {  # 350Z: lange Haube, Dachbogen fließt ins kurze Heck, breite Hüften
 		"nose": 0.6, "hood": 0.86, "cowl": 0.42, "rf": 0.56, "rr": 0.64, "ge": 0.89, "cp": 0.71,
-		"roof": 1.22, "deck": 0.95, "tail": 0.96, "belt": 0.85, "fender": 0.04, "hips": 0.055,
+		"roof": 1.22, "deck": 0.95, "tail": 0.96, "belt": 0.85, "fender": 0.04, "hips": 0.035,
 		"round_f": 0.14, "round_r": 0.12, "tumble": 0.21, "hl": {6: 0.14, 5: 0.05}, "tl": {},
 		"doors": [0.435, 0.68], "intake": Vector2(0.5, 0.12),
 	},
@@ -55,25 +60,25 @@ const SHAPES := {
 	},
 	"vortex": {  # GT-R-Limousine: kantiger, höheres Dach, Stufenheck, vier Türen
 		"nose": 0.66, "hood": 0.88, "cowl": 0.36, "rf": 0.5, "rr": 0.71, "ge": 0.82, "cp": 0.72,
-		"roof": 1.27, "deck": 0.98, "tail": 0.99, "belt": 0.87, "fender": 0.02, "hips": 0.035,
+		"roof": 1.27, "deck": 0.98, "tail": 0.99, "belt": 0.87, "fender": 0.02, "hips": 0.025,
 		"round_f": 0.07, "round_r": 0.05, "tumble": 0.13, "hl": {6: 0.075, 5: 0.05}, "tl": {},
 		"doors": [0.375, 0.55, 0.715], "intake": Vector2(0.66, 0.13),
 	},
 	"ronin": {  # RX-7: sehr flach, runde Formen, hohe Kotflügel, Glaskuppel, langes gewölbtes Heckfenster
 		"nose": 0.54, "hood": 0.8, "cowl": 0.39, "rf": 0.55, "rr": 0.61, "ge": 0.87, "cp": 0.68,
-		"roof": 1.18, "deck": 0.92, "tail": 0.93, "belt": 0.82, "fender": 0.06, "hips": 0.05,
+		"roof": 1.18, "deck": 0.92, "tail": 0.93, "belt": 0.82, "fender": 0.06, "hips": 0.035,
 		"round_f": 0.2, "round_r": 0.15, "tumble": 0.22, "hl": {}, "tl": {},
 		"doors": [0.405, 0.655], "intake": Vector2(0.58, 0.13), "pipes": [0.0],
 	},
 	"kaze": {  # Supra-Gefühl: lang und rund, lange Nase, Kuppeldach, Bügelflügel, vier runde Rückleuchten
 		"nose": 0.55, "hood": 0.83, "cowl": 0.41, "rf": 0.565, "rr": 0.645, "ge": 0.85, "cp": 0.73,
-		"roof": 1.19, "deck": 0.95, "tail": 0.95, "belt": 0.83, "fender": 0.035, "hips": 0.065,
+		"roof": 1.19, "deck": 0.95, "tail": 0.95, "belt": 0.83, "fender": 0.035, "hips": 0.04,
 		"round_f": 0.23, "round_r": 0.17, "tumble": 0.25, "hl": {6: 0.11, 5: 0.075}, "tl": {},
 		"doors": [0.43, 0.69], "intake": Vector2(0.6, 0.12), "pipes": [0.46], "pipe_r": 0.068,
 	},
 	"raijin": {  # Rallye-Limousine (Evo/Impreza): kantig, breite Backen, Hutze, riesiger Flügel, Schmutzfänger
 		"nose": 0.66, "hood": 0.9, "cowl": 0.355, "rf": 0.495, "rr": 0.685, "ge": 0.825, "cp": 0.745,
-		"roof": 1.28, "deck": 0.99, "tail": 1.0, "belt": 0.88, "fender": 0.055, "hips": 0.06,
+		"roof": 1.28, "deck": 0.99, "tail": 1.0, "belt": 0.88, "fender": 0.055, "hips": 0.035,
 		"round_f": 0.06, "round_r": 0.04, "tumble": 0.12, "hl": {6: 0.075, 5: 0.06}, "tl": {},
 		"doors": [0.37, 0.545, 0.725], "intake": Vector2(0.62, 0.17), "pipes": [0.42], "pipe_r": 0.072,
 	},
@@ -81,7 +86,7 @@ const SHAPES := {
 		# große Seiteneinlässe mit Nebelscheinwerfern, Haube mit Luftauslässen, ausgestellte Backen, klare Rückleuchten,
 		# hoher Flügel, ein dickes Endrohr
 		"nose": 0.68, "hood": 0.9, "cowl": 0.36, "rf": 0.49, "rr": 0.69, "ge": 0.815, "cp": 0.75,
-		"roof": 1.31, "deck": 1.0, "tail": 1.0, "belt": 0.89, "fender": 0.065, "hips": 0.07,
+		"roof": 1.31, "deck": 1.0, "tail": 1.0, "belt": 0.89, "fender": 0.065, "hips": 0.045,
 		"round_f": 0.06, "round_r": 0.04, "tumble": 0.11, "hl": {}, "tl": {},
 		"doors": [0.36, 0.545, 0.725], "intake": Vector2(0.56, 0.15), "pipes": [0.44], "pipe_r": 0.06,
 		"axle": 0.9, "wheel_r": 0.325, "tire_w": 0.235, "edge_f": 0.055, "edge_r": 0.05,
@@ -89,14 +94,14 @@ const SHAPES := {
 	"tatsumaki": {  # Kreiskolben-Coupé (seit 2.36, FD-Gefühl): sehr flach und rund, Klappscheinwerfer, Kotflügel höher als
 		# die Haube, Doppelbuckel-Dach (bubble), lange gewölbte Heckscheibe, schmales Leuchtenband, Bügelflügel
 		"nose": 0.54, "hood": 0.79, "cowl": 0.405, "rf": 0.55, "rr": 0.625, "ge": 0.885, "cp": 0.7,
-		"roof": 1.16, "deck": 0.93, "tail": 0.95, "belt": 0.8, "fender": 0.085, "hips": 0.075,
+		"roof": 1.16, "deck": 0.93, "tail": 0.95, "belt": 0.8, "fender": 0.085, "hips": 0.045,
 		"round_f": 0.24, "round_r": 0.16, "tumble": 0.25, "hl": {}, "tl": {},
 		"doors": [0.415, 0.665], "intake": Vector2(0.38, 0.115), "pipes": [0.3, 0.405], "pipe_r": 0.045,
 		"axle": 0.92, "tire_w": 0.235, "edge_f": 0.09, "edge_r": 0.075, "bubble": 0.014,
 	},
 	"tsubame": {  # Roadster (S2000/MX-5): lange Haube, kleines Stoffverdeck weit hinten, kurzes Heck
 		"nose": 0.57, "hood": 0.8, "cowl": 0.465, "rf": 0.585, "rr": 0.655, "ge": 0.765, "cp": 0.71,
-		"roof": 1.1, "deck": 0.9, "tail": 0.92, "belt": 0.82, "fender": 0.05, "hips": 0.055,
+		"roof": 1.1, "deck": 0.9, "tail": 0.92, "belt": 0.82, "fender": 0.05, "hips": 0.035,
 		"round_f": 0.19, "round_r": 0.13, "tumble": 0.27, "hl": {6: 0.125, 5: 0.045}, "tl": {},
 		"doors": [0.47, 0.695], "intake": Vector2(0.42, 0.1), "pipes": [-0.32, 0.32], "softtop": true,
 	},
@@ -124,7 +129,7 @@ const SHAPES := {
 	"tenshi": {  # Mittelmotor (MR2-Gefühl): kurze flache Nase mit Klappscheinwerfern, Kabine weit vorn, steiles kleines
 		# Heckfenster, lange Motorhaube hinten, breite Hüften mit Lufteinlässen, Bürzel
 		"nose": 0.56, "hood": 0.76, "cowl": 0.335, "rf": 0.47, "rr": 0.575, "ge": 0.665, "cp": 0.65,
-		"roof": 1.18, "deck": 0.99, "tail": 0.97, "belt": 0.8, "fender": 0.03, "hips": 0.07,
+		"roof": 1.18, "deck": 0.99, "tail": 0.97, "belt": 0.8, "fender": 0.03, "hips": 0.045,
 		"round_f": 0.2, "round_r": 0.1, "tumble": 0.21, "hl": {}, "tl": {},
 		"doors": [0.355, 0.58], "intake": Vector2(0.45, 0.07), "pipes": [-0.36, 0.36], "mid": true,
 	},
@@ -138,14 +143,14 @@ const SHAPES := {
 	"shiden": {  # Mittelmotor-Supersportler (NSX-Gefühl): sehr flach, Kanzel weit vorn, lange flache Heckpartie,
 		# Klappscheinwerfer, schwarzes Band über das ganze Heck, Flügel aus einem Stück mit den Flanken
 		"nose": 0.54, "hood": 0.72, "cowl": 0.33, "rf": 0.455, "rr": 0.585, "ge": 0.72, "cp": 0.7,
-		"roof": 1.14, "deck": 0.97, "tail": 0.99, "belt": 0.79, "fender": 0.035, "hips": 0.06,
+		"roof": 1.14, "deck": 0.97, "tail": 0.99, "belt": 0.79, "fender": 0.035, "hips": 0.035,
 		"round_f": 0.21, "round_r": 0.07, "tumble": 0.24, "hl": {}, "tl": {},
 		"doors": [0.36, 0.6], "intake": Vector2(0.55, 0.07), "pipes": [-0.3, -0.2, 0.2, 0.3], "pipe_r": 0.045, "mid": true,
 	},
 	"ryujin": {  # Breites Biturbo-Coupé (300ZX-Gefühl): flache Keilnase mit schmalen liegenden Scheinwerfern, Glasdach mit
 		# Mittelsteg, kurzes hohes Heck mit Leuchtenband über die ganze Breite
 		"nose": 0.57, "hood": 0.8, "cowl": 0.39, "rf": 0.525, "rr": 0.62, "ge": 0.845, "cp": 0.72,
-		"roof": 1.2, "deck": 0.96, "tail": 0.98, "belt": 0.82, "fender": 0.03, "hips": 0.07,
+		"roof": 1.2, "deck": 0.96, "tail": 0.98, "belt": 0.82, "fender": 0.03, "hips": 0.04,
 		"round_f": 0.17, "round_r": 0.06, "tumble": 0.23, "hl": {6: 0.13}, "tl": {},
 		"doors": [0.42, 0.67], "intake": Vector2(0.4, 0.07), "pipes": [-0.42, 0.42], "pipe_r": 0.06,
 	},
@@ -159,14 +164,14 @@ const SHAPES := {
 	},
 	"hotaru": {  # Kei-Mittelmotor-Roadster (Beat-Gefühl): winzig, flach, Stoffverdeck, Kabine in der Mitte, flaches Heck
 		"nose": 0.57, "hood": 0.77, "cowl": 0.37, "rf": 0.5, "rr": 0.57, "ge": 0.66, "cp": 0.63,
-		"roof": 1.16, "deck": 0.9, "tail": 0.91, "belt": 0.79, "fender": 0.03, "hips": 0.045,
+		"roof": 1.16, "deck": 0.9, "tail": 0.91, "belt": 0.79, "fender": 0.03, "hips": 0.03,
 		"round_f": 0.17, "round_r": 0.11, "tumble": 0.2, "hl": {6: 0.1, 5: 0.035}, "tl": {},
 		"doors": [0.39, 0.62], "intake": Vector2(0.36, 0.06), "pipes": [0.34], "pipe_r": 0.04, "softtop": true, "mid": true,
 		"wheel_r": 0.27, "axle": 0.52, "tire_w": 0.165,
 	},
 	"tanuki": {  # Allrad-Turbo-Kleinwagen (GR-Yaris-Gefühl): kurz und breit, flaches Dach, riesige Hüften, großes Gitter vorn
 		"nose": 0.66, "hood": 0.89, "cowl": 0.3, "rf": 0.46, "rr": 0.72, "ge": 0.925, "cp": 0.86,
-		"roof": 1.35, "deck": 1.02, "tail": 0.99, "belt": 0.87, "fender": 0.04, "hips": 0.09,
+		"roof": 1.35, "deck": 1.02, "tail": 0.99, "belt": 0.87, "fender": 0.04, "hips": 0.06,
 		"round_f": 0.13, "round_r": 0.07, "tumble": 0.2, "hl": {}, "tl": {},
 		"doors": [0.34, 0.62], "intake": Vector2(0.72, 0.17), "pipes": [-0.36, 0.36], "pipe_r": 0.055,
 		"wheel_r": 0.31, "axle": 0.66,
@@ -185,7 +190,7 @@ const SHAPES := {
 	"hakone": {  # 70er-Fließheck (S30-Gefühl): sehr lange Haube, Scheinwerfer in Mulden vorn in den Kotflügeln, kleines
 		# Maul, Dach fließt bis ans Heck, Leuchten in einem schwarzen Feld
 		"nose": 0.6, "hood": 0.83, "cowl": 0.47, "rf": 0.585, "rr": 0.655, "ge": 0.93, "cp": 0.83,
-		"roof": 1.27, "deck": 0.96, "tail": 0.93, "belt": 0.82, "fender": 0.045, "hips": 0.045,
+		"roof": 1.27, "deck": 0.96, "tail": 0.93, "belt": 0.82, "fender": 0.045, "hips": 0.03,
 		"round_f": 0.16, "round_r": 0.06, "tumble": 0.18, "hl": {}, "tl": {},
 		"doors": [0.49, 0.71], "intake": Vector2(0.42, 0.09), "pipes": [0.4], "pipe_r": 0.045,
 		"wheel_r": 0.3, "axle": 0.72, "tire_w": 0.21, "chrome_bumpers": true,
@@ -194,7 +199,7 @@ const SHAPES := {
 	"kagura": {  # V10-Supersportler (LFA-Gefühl): lange Haube, Kabine weit hinten, nach hinten gezogene Scheinwerfer,
 		# dreieckige Rückleuchten, drei Endrohre in der Mitte
 		"nose": 0.56, "hood": 0.8, "cowl": 0.41, "rf": 0.555, "rr": 0.635, "ge": 0.86, "cp": 0.74,
-		"roof": 1.2, "deck": 0.98, "tail": 0.99, "belt": 0.84, "fender": 0.04, "hips": 0.075,
+		"roof": 1.2, "deck": 0.98, "tail": 0.99, "belt": 0.84, "fender": 0.04, "hips": 0.045,
 		"round_f": 0.18, "round_r": 0.07, "tumble": 0.25, "hl": {6: 0.13, 5: 0.06}, "tl": {},
 		"doors": [0.43, 0.68], "intake": Vector2(0.5, 0.12), "pipes": [-0.085, 0.0, 0.085], "pipe_r": 0.042,
 		"wheel_r": 0.335, "axle": 0.84, "tire_w": 0.27,
@@ -202,7 +207,7 @@ const SHAPES := {
 	"falke": {  # Heckmotor-Sportwagen (911-Gefühl): runde Scheinwerfer oben auf den Kotflügeln, flache Haube dazwischen,
 		# Dach fällt in einem Bogen zum Heck, breite Hüften, Leuchtenband über das ganze Heck, Entenbürzel
 		"nose": 0.56, "hood": 0.74, "cowl": 0.36, "rf": 0.5, "rr": 0.59, "ge": 0.8, "cp": 0.73,
-		"roof": 1.27, "deck": 0.97, "tail": 0.95, "belt": 0.83, "fender": 0.085, "hips": 0.095,
+		"roof": 1.27, "deck": 0.97, "tail": 0.95, "belt": 0.83, "fender": 0.085, "hips": 0.06,
 		"round_f": 0.23, "round_r": 0.19, "tumble": 0.25, "hl": {}, "tl": {},
 		"doors": [0.375, 0.655], "intake": Vector2(0.6, 0.1), "pipes": [-0.11, 0.11], "pipe_r": 0.05,
 		"wheel_r": 0.33, "axle": 0.92, "tire_w": 0.26, "rear_engine": true,
@@ -210,21 +215,21 @@ const SHAPES := {
 	"furia": {  # V12-Keil (Countach-Gefühl): sehr flach und breit, spitze Nase, Kanzel weit vorn, hoher Motordeckel mit
 		# Lamellen, Y-Leuchten, sechseckige Einlässe, Endrohre in der Mitte
 		"nose": 0.5, "hood": 0.71, "cowl": 0.32, "rf": 0.465, "rr": 0.55, "ge": 0.63, "cp": 0.66,
-		"roof": 1.13, "deck": 1.0, "tail": 1.0, "belt": 0.8, "fender": 0.03, "hips": 0.065,
+		"roof": 1.13, "deck": 1.0, "tail": 1.0, "belt": 0.8, "fender": 0.03, "hips": 0.045,
 		"round_f": 0.06, "round_r": 0.04, "tumble": 0.27, "hl": {6: 0.07}, "tl": {},
 		"doors": [0.33, 0.6], "intake": Vector2(0.74, 0.12), "pipes": [-0.075, 0.075], "pipe_r": 0.058, "mid": true,
 		"wheel_r": 0.345, "axle": 1.0, "tire_w": 0.3,
 	},
 	"raiden": {  # Allrad-GT (seit 2.32, Level 10): langes, flaches Coupé, Kabine in der Mitte, breite Hüften, vier Endrohre
 		"nose": 0.53, "hood": 0.77, "cowl": 0.39, "rf": 0.52, "rr": 0.6, "ge": 0.8, "cp": 0.71,
-		"roof": 1.18, "deck": 0.99, "tail": 0.98, "belt": 0.82, "fender": 0.055, "hips": 0.1,
+		"roof": 1.18, "deck": 0.99, "tail": 0.98, "belt": 0.82, "fender": 0.055, "hips": 0.055,
 		"round_f": 0.12, "round_r": 0.06, "tumble": 0.27, "hl": {6: 0.1}, "tl": {},
 		"doors": [0.38, 0.64], "intake": Vector2(0.66, 0.12), "pipes": [-0.12, -0.075, 0.075, 0.12], "pipe_r": 0.04,
 		"wheel_r": 0.34, "axle": 0.95, "tire_w": 0.29,
 	},
 	"tengu": {  # Drift-Monster (seit 2.32, Level 16): kurzer Überhang hinten, breite Backen, großes Mittelrohr
 		"nose": 0.55, "hood": 0.79, "cowl": 0.41, "rf": 0.53, "rr": 0.62, "ge": 0.84, "cp": 0.72,
-		"roof": 1.2, "deck": 0.97, "tail": 0.96, "belt": 0.83, "fender": 0.075, "hips": 0.115,
+		"roof": 1.2, "deck": 0.97, "tail": 0.96, "belt": 0.83, "fender": 0.075, "hips": 0.07,
 		"round_f": 0.15, "round_r": 0.08, "tumble": 0.24, "hl": {6: 0.1}, "tl": {},
 		"doors": [0.4, 0.66], "intake": Vector2(0.6, 0.13), "pipes": [0.0], "pipe_r": 0.065,
 		"wheel_r": 0.335, "axle": 0.9, "tire_w": 0.3,
@@ -247,6 +252,13 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 	var flare := kit_flare(cfg)
 	var zf := -L / 2.0
 	var zr := L / 2.0
+	# Sitz der Räder (Spur, Sturz) und Radläufe: ein größeres Rad hebt die Karosserie, die Läufe werden weiter (die Form
+	# hier ist eine Kopie, SHAPES bleibt unverändert)
+	var drop: float = Catalog.part_of(cfg, "suspension")["drop"] + S.get("drop", 0.0)
+	var fit := wheel_fit(rim, S, W, L, flare, drop)
+	if fit["arch_r"] > arch_r(S) + 0.0005:
+		S = S.duplicate()
+		S["arch_r"] = fit["arch_r"]
 
 	var root := Node3D.new()
 	root.name = "Car"
@@ -915,7 +927,7 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 		var flap := mat(Color(0.5, 0.03, 0.03), 0.0, 0.8)
 		for zi in [-1, 1]:
 			for s in [-1, 1]:
-				_add(body, box(Vector3(0.22, 0.2, 0.012)), flap, Vector3(s * (W / 2.0 - 0.18), CLEARANCE + 0.04, zi * (L / 2.0 - axle(S)) + wheel_r(S) + 0.1))
+				_add(body, box(Vector3(0.22, 0.2, 0.012)), flap, Vector3(s * _flap_x(S, W, L, flare, zi), CLEARANCE + 0.04, zi * (L / 2.0 - axle(S)) + arch_r(S) + 0.055))
 	elif car_id == "yari" and hood == 0:
 		# Haube mit großem Luftauslass vorn in der Mitte (Lamellen in Wagenfarbe über dunkler Öffnung) und je Seite einer
 		# Reihe Kiemen
@@ -984,23 +996,26 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 	var wz := zr - 0.25
 	var dp: PackedVector2Array = _section(S, (wz - zf) / L, W, L, flare)["p"]
 	var deck_y := dp[10].y
+	# halbe Spannweite der Flügel: Karosserie am Flügel + 2 cm (seit 2.37; bis dahin halbe Katalogbreite, mit den
+	# schlankeren Karosserien standen Endplatten bis 7 cm über, ein großer Flügel am Falke 15 cm)
+	var wh: float = dp[4].x + 0.02
 	if sp == 0 and car_id == "kaze":
 		# Serienflügel: Bügel von den äußeren Heckkanten, nach hinten geneigt
 		for s in [-1, 1]:
-			_add(body, rbox(Vector3(0.07, 0.25, 0.16)), paint, Vector3(s * (W / 2.0 - 0.25), deck_y + 0.09, wz + 0.03)).rotation_degrees.x = 20
-		_add(body, _airfoil(W - 0.4, 0.27, 0.04), paint, Vector3(0, deck_y + 0.21, wz + 0.08)).rotation_degrees.x = -5
+			_add(body, rbox(Vector3(0.07, 0.25, 0.16)), paint, Vector3(s * (wh - 0.25), deck_y + 0.09, wz + 0.03)).rotation_degrees.x = 20
+		_add(body, _airfoil(2.0 * wh - 0.4, 0.27, 0.04), paint, Vector3(0, deck_y + 0.21, wz + 0.08)).rotation_degrees.x = -5
 	elif sp == 0 and car_id == "raijin":
 		# Serienflügel: hoch, zwei Blätter
 		for s in [-1, 1]:
-			_add(body, rbox(Vector3(0.05, 0.26, 0.12)), dark, Vector3(s * (W / 2.0 - 0.32), deck_y + 0.13, wz))
-			_add(body, _endplate(0.035, 0.16, 0.38), paint, Vector3(s * (W / 2.0 - 0.07), deck_y + 0.28, wz))
-		_add(body, _airfoil(W - 0.14, 0.36, 0.04), paint, Vector3(0, deck_y + 0.26, wz))
-		_add(body, _airfoil(W - 0.14, 0.14, 0.03), paint, Vector3(0, deck_y + 0.33, wz + 0.12)).rotation_degrees.x = -14
+			_add(body, rbox(Vector3(0.05, 0.26, 0.12)), dark, Vector3(s * (wh - 0.32), deck_y + 0.13, wz))
+			_add(body, _endplate(0.035, 0.16, 0.38), paint, Vector3(s * (wh - 0.07), deck_y + 0.28, wz))
+		_add(body, _airfoil(2.0 * wh - 0.14, 0.36, 0.04), paint, Vector3(0, deck_y + 0.26, wz))
+		_add(body, _airfoil(2.0 * wh - 0.14, 0.14, 0.03), paint, Vector3(0, deck_y + 0.33, wz + 0.12)).rotation_degrees.x = -14
 	elif sp == 0 and car_id == "hayate":
 		# Serienflügel: hoch auf der Klappe, zwei Stützen
 		for s in [-1, 1]:
-			_add(body, rbox(Vector3(0.04, 0.13, 0.1)), paint, Vector3(s * (W / 2.0 - 0.36), deck_y + 0.06, wz + 0.04))
-		_add(body, _airfoil(W - 0.36, 0.22, 0.035), paint, Vector3(0, deck_y + 0.14, wz + 0.06)).rotation_degrees.x = -6
+			_add(body, rbox(Vector3(0.04, 0.13, 0.1)), paint, Vector3(s * (wh - 0.36), deck_y + 0.06, wz + 0.04))
+		_add(body, _airfoil(2.0 * wh - 0.36, 0.22, 0.035), paint, Vector3(0, deck_y + 0.14, wz + 0.06)).rotation_degrees.x = -6
 	elif sp == 0 and (car_id == "kitsune" or car_id == "tenshi" or car_id == "kumo" or car_id == "ryujin"):
 		# Serien-Bürzel: flache Abrisskante an der Heckkante
 		var bt := 1.0 - 0.07 / L
@@ -1010,46 +1025,47 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 		# Serien-Dachspoiler über der Heckscheibe, seitlich kleine Finnen
 		var rt: float = S["rr"]
 		var ry := _top_c(S, rt)
-		_add(body, _airfoil(W - 0.6, 0.2, 0.03), paint, Vector3(0, ry - 0.012, zf + rt * L + 0.1)).rotation_degrees.x = -6
+		var roof_h: float = (_section(S, rt, W, L, flare)["p"] as PackedVector2Array)[7].x  # halbe Dachbreite
+		_add(body, _airfoil(roof_h * 2.0 - 0.18, 0.2, 0.03), paint, Vector3(0, ry - 0.012, zf + rt * L + 0.1)).rotation_degrees.x = -6
 		for s in [-1, 1]:
-			_add(body, rbox(Vector3(0.025, 0.05, 0.18)), paint, Vector3(s * (W / 2.0 - 0.32), ry - 0.035, zf + rt * L + 0.1))
+			_add(body, rbox(Vector3(0.025, 0.05, 0.18)), paint, Vector3(s * (roof_h - 0.12), ry - 0.035, zf + rt * L + 0.1))
 	elif sp == 0 and car_id == "kagura":
 		# schmale Abrisskante aus Kohlefaser hinten auf dem Deckel
-		_add(body, _airfoil(W - 0.5, 0.14, 0.025), carbon_mat(), Vector3(0, deck_y + 0.03, wz + 0.12)).rotation_degrees.x = -8
+		_add(body, _airfoil(2.0 * wh - 0.5, 0.14, 0.025), carbon_mat(), Vector3(0, deck_y + 0.03, wz + 0.12)).rotation_degrees.x = -8
 	elif sp == 0 and car_id == "falke":
 		# Entenbürzel: der Motordeckel biegt hinten nach oben
-		_add(body, tapered_box(Vector2(W - 0.42, 0.34), Vector2(W - 0.48, 0.1), 0.07, 0.1), paint, Vector3(0, deck_y - 0.02, wz + 0.04))
+		_add(body, tapered_box(Vector2(2.0 * wh - 0.42, 0.34), Vector2(2.0 * wh - 0.48, 0.1), 0.07, 0.1), paint, Vector3(0, deck_y - 0.02, wz + 0.04))
 	elif sp == 0 and car_id == "furia":
 		# flaches Flügelblatt über dem Heck, zwei kurze Stützen
 		for s in [-1, 1]:
-			_add(body, rbox(Vector3(0.04, 0.08, 0.12)), dark, Vector3(s * (W / 2.0 - 0.45), deck_y + 0.03, wz + 0.08))
-		_add(body, _airfoil(W - 0.44, 0.24, 0.03), carbon_mat(), Vector3(0, deck_y + 0.08, wz + 0.1)).rotation_degrees.x = -5
+			_add(body, rbox(Vector3(0.04, 0.08, 0.12)), dark, Vector3(s * (wh - 0.45), deck_y + 0.03, wz + 0.08))
+		_add(body, _airfoil(2.0 * wh - 0.44, 0.24, 0.03), carbon_mat(), Vector3(0, deck_y + 0.08, wz + 0.1)).rotation_degrees.x = -5
 	elif sp == 0 and car_id == "shiden":
 		# Serienflügel aus einem Stück mit den Flanken: zwei Finnen an den Heckecken, Blatt über die ganze Breite
 		var fy: float = deck_y
 		for s in [-1, 1]:
-			_add(body, tapered_box(Vector2(0.06, 0.4), Vector2(0.05, 0.26), 0.11, 0.06), paint, Vector3(s * (W / 2.0 - 0.13), fy - 0.02, wz + 0.02))
-		_add(body, _airfoil(W - 0.18, 0.24, 0.035), paint, Vector3(0, fy + 0.1, wz + 0.08)).rotation_degrees.x = -4
+			_add(body, tapered_box(Vector2(0.06, 0.4), Vector2(0.05, 0.26), 0.11, 0.06), paint, Vector3(s * (wh - 0.13), fy - 0.02, wz + 0.02))
+		_add(body, _airfoil(2.0 * wh - 0.18, 0.24, 0.035), paint, Vector3(0, fy + 0.1, wz + 0.08)).rotation_degrees.x = -4
 	elif sp == 0 and car_id == "tatsumaki":
 		# Serienflügel: flacher Bügel hinten auf der Klappe, Stützen außen in Wagenfarbe
 		var bt := 1.0 - 0.13 / L
 		var by: float = (_section(S, bt, W, L, flare)["p"] as PackedVector2Array)[10].y
 		for s in [-1, 1]:
-			_add(body, tapered_box(Vector2(0.05, 0.2), Vector2(0.045, 0.12), 0.095, 0.03), paint, Vector3(s * (W / 2.0 - 0.27), by - 0.02, zr - 0.13))
-		_add(body, _airfoil(W - 0.5, 0.17, 0.03), paint, Vector3(0, by + 0.075, zr - 0.11)).rotation_degrees.x = -4
+			_add(body, tapered_box(Vector2(0.05, 0.2), Vector2(0.045, 0.12), 0.095, 0.03), paint, Vector3(s * (wh - 0.27), by - 0.02, zr - 0.13))
+		_add(body, _airfoil(2.0 * wh - 0.5, 0.17, 0.03), paint, Vector3(0, by + 0.075, zr - 0.11)).rotation_degrees.x = -4
 	elif sp == 0 and car_id == "yari":
 		# Serienflügel: hoch auf zwei dunklen Stützen, großes Blatt mit Abrisskante, Endplatten in Wagenfarbe
 		for s in [-1, 1]:
-			_add(body, rbox(Vector3(0.045, 0.3, 0.13), 0.012), dark, Vector3(s * (W / 2.0 - 0.36), deck_y + 0.14, wz + 0.02))
-			_add(body, _endplate(0.03, 0.17, 0.4), paint, Vector3(s * (W / 2.0 - 0.09), deck_y + 0.3, wz + 0.02))
-		_add(body, _airfoil(W - 0.18, 0.34, 0.045), paint, Vector3(0, deck_y + 0.29, wz + 0.02)).rotation_degrees.x = -6
+			_add(body, rbox(Vector3(0.045, 0.3, 0.13), 0.012), dark, Vector3(s * (wh - 0.36), deck_y + 0.14, wz + 0.02))
+			_add(body, _endplate(0.03, 0.17, 0.4), paint, Vector3(s * (wh - 0.09), deck_y + 0.3, wz + 0.02))
+		_add(body, _airfoil(2.0 * wh - 0.18, 0.34, 0.045), paint, Vector3(0, deck_y + 0.29, wz + 0.02)).rotation_degrees.x = -6
 	elif sp == 1:
-		_add(body, _airfoil(W - 0.4, 0.16, 0.045), paint, Vector3(0, deck_y + 0.02, zr - 0.12))
+		_add(body, _airfoil(2.0 * wh - 0.4, 0.16, 0.045), paint, Vector3(0, deck_y + 0.02, zr - 0.12))
 	elif sp == 2 or sp == 3:
 		var hgt := 0.22 if sp == 2 else 0.4
-		var ww := W - 0.12 if sp == 2 else W + 0.04
+		var ww := 2.0 * wh - 0.12 if sp == 2 else 2.0 * wh + 0.04
 		for s in [-1, 1]:
-			_add(body, rbox(Vector3(0.05, hgt, 0.1)), dark, Vector3(s * (W / 2 - 0.38), deck_y + hgt / 2, wz))
+			_add(body, rbox(Vector3(0.05, hgt, 0.1)), dark, Vector3(s * (wh - 0.38), deck_y + hgt / 2, wz))
 			_add(body, _endplate(0.04, 0.18, 0.42), paint, Vector3(s * ww / 2, deck_y + hgt + 0.02, wz))
 		_add(body, _airfoil(ww, 0.4, 0.045), paint, Vector3(0, deck_y + hgt, wz)).rotation_degrees.x = -4
 		if sp == 3:
@@ -1183,45 +1199,50 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 		flames.append(f)
 	root.set_meta("flame_mats", [flame_m, fire_m])
 
-	# Räder: Reifen mit offener Mitte, darin das Felgenbett. Bremsscheibe und Sattel sitzen tief dahinter, die
-	# Speichen laufen von der zurückgesetzten Nabe nach außen zum Horn (konkav). Felgengröße in Zoll (rim_spec).
-	var tire_m := mat(Color(0.05, 0.05, 0.05), 0, 0.9)
+	# Räder (seit 2.37): je Rad drei geteilte Meshes (Reifen, Felge mit Bremsscheibe, Sattel), je Material eine Fläche
+	# (_wheel_mesh). Sitz aus wheel_fit: Spur je Achse knapp innerhalb der Kotflügelkante, große Räder heben die Karosserie,
+	# tief und breit gibt negativen Sturz. Felgengröße in Zoll und Reifen aus rim_spec.
+	var tire_m := tire_mat()
 	var rc: Dictionary = Catalog.part_of(cfg, "rimcol")
 	var rim_c: Color = rim["color"]
 	var rim_m: Material = mat(rim_c, 0.65, 0.28)
 	if rc.get("paint", false):
-		rim_m = paint
+		# Wagenfarbe ohne Folie: das Motiv läge sonst in Felgenkoordinaten auf den Speichen
+		var c_nv := cfg.duplicate()
+		c_nv["vinyl"] = 0
+		rim_m = paint_mat(car_id, c_nv)
 		rim_c = paint_c
 	elif rc.has("color"):
 		rim_c = rc["color"]
 		rim_m = mat(rim_c, 0.85 if rc.get("chrome", false) else 0.65, 0.14 if rc.get("chrome", false) else 0.28)
-	var barrel_m := mat(rim_c.darkened(0.55), 0.55, 0.42)  # Innenseite des Felgenbetts liegt im Schatten
-	var rotor_m := mat(Color(0.42, 0.42, 0.44), 0.8, 0.35)
-	var hat_m := mat(Color(0.2, 0.2, 0.22), 0.7, 0.45)
 	# poliertes Metall statt Chrom: flache Chromflächen spiegeln nachts nur Schwarz
 	var polish := mat(Color(0.86, 0.87, 0.89), 0.72, 0.24)
 	# Sättel: getunt rot, Klasse S ab Werk gelb, sonst dunkel; große Bremsen gelocht
 	var big_brake: bool = perf > 0 or spec["class"] == "S"
 	var cal_c := Color(0.85, 0.06, 0.04) if perf > 0 else (Color(0.95, 0.66, 0.04) if spec["class"] == "S" else Color(0.2, 0.2, 0.22))
-	var caliper_m := mat(cal_c, 0.3, 0.35)
+	var role_m := {"face": rim_m, "lip": polish if rim["polish"] else rim_m, "barrel": mat(rim_c.darkened(0.55), 0.55, 0.42),
+		"dark": dark, "chrome": polish, "accent": mat(Color(0.8, 0.08, 0.05), 0.6, 0.3), "rotor": mat(Color(0.46, 0.46, 0.48), 0.8, 0.32),
+		"hat": mat(Color(0.2, 0.2, 0.22), 0.7, 0.45), "caliper": mat(cal_c, 0.3, 0.35)}
 	var fronts := []
 	var spinners := []
 	var blurs := []
-	var track := W / 2 - 0.15 + (0.05 if flare > 0.0 else 0.0) + (0.03 if S.get("overfenders", false) else 0.0)  # bündig unter dem Kotflügel
-	var wr := wheel_r(S)
-	var tw: float = S.get("tire_w", 0.24) * WHEEL_R / wr  # Breite in Metern (das Rad wird danach skaliert)
+	var wr: float = rim["wheel_r"]
+	var mu: float = rim["mu"]
+	var tw: float = float(rim["tire_w"]) * mu  # Reifenbreite in Modellmaßen (das Rad wird danach skaliert)
 	var o := tw / 2.0
 	var rr: float = rim["radius"]
 	var blur_m := _blur_mesh(rr, rim_c, rim["style"])
 	for zi in [-1, 1]:
+		var track: float = fit["track_f"] if zi < 0 else fit["track_r"]
 		for s in [-1, 1]:
 			var pivot := Node3D.new()
-			pivot.position = Vector3(s * track, wr, zi * (L / 2 - axle(S)))
+			pivot.position = Vector3(s * track, wr + fit["camber_lift"], zi * (L / 2 - axle(S)))
 			pivot.scale = Vector3.ONE * (wr / WHEEL_R)  # kleinere/größere Räder: das ganze Rad samt Felge und Bremse skaliert
+			pivot.rotation.z = s * fit["camber"]  # oben nach innen
 			root.add_child(pivot)
 			var spin := Node3D.new()
 			pivot.add_child(spin)
-			_add(spin, _tire_mesh(tw, rr - 0.004), tire_m, Vector3.ZERO)
+			_add(spin, _tire_mesh(tw, rr - 0.008, mu, s), tire_m, Vector3.ZERO)
 			var far_tire := CylinderMesh.new()
 			far_tire.top_radius = WHEEL_R
 			far_tire.bottom_radius = WHEEL_R
@@ -1229,38 +1250,16 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 			far_tire.radial_segments = 16
 			far_tire.rings = 1
 			_far(_add(spin, far_tire, tire_m, Vector3.ZERO)).rotation_degrees.z = 90
-			_far(_add(spin, _disc(rr, 0.012), rim_m, Vector3(s * (o + 0.012), 0, 0))).rotation_degrees.z = 90
-			# Felgenbett (zwischen den Speichen sichtbar, Innenseite) und dunkle Rückwand
-			_add(spin, _band(rr * 0.965, s * (-o + 0.012), rr * 0.965, s * (o + 0.014), Vector2(0, -1)), barrel_m, Vector3.ZERO)
-			_add(spin, _disc(rr * 0.97, 0.006), dark, Vector3(s * (-o + 0.016), 0, 0)).rotation_degrees.z = 90
-			# Bremse tief in der Felge: Scheibe (große Bremse gelocht), Topf, Nabe bis zur Speichenebene
-			var xr := o - 0.05
-			_add(spin, _disc(rr * 0.8, 0.02), rotor_m, Vector3(s * xr, 0, 0)).rotation_degrees.z = 90
-			_add(spin, _disc(rr * 0.42, 0.03), hat_m, Vector3(s * (xr + 0.006), 0, 0)).rotation_degrees.z = 90
-			_add(spin, _disc(rr * 0.2, 0.03), hat_m, Vector3(s * (xr + 0.015), 0, 0)).rotation_degrees.z = 90
-			if big_brake:
-				for k in 24:
-					var ha := TAU * k / 24.0
-					var hr := rr * (0.55 if k % 2 == 0 else 0.68)
-					_add(spin, _disc(0.0075, 0.004), dark, Vector3(s * (xr + 0.0095), cos(ha) * hr, sin(ha) * hr)).rotation_degrees.z = 90
-			else:
-				_add(spin, _band(rr * 0.5, s * (xr + 0.0102), rr * 0.52, s * (xr + 0.0102), Vector2(s, 0)), hat_m, Vector3.ZERO)
-			# Bremssattel steht still (am Achsschenkel), oben hinten: Block über dem Reibring, außen Deckplatte mit
-			# hellem Streifen und zwei Schrauben
-			var ca := 0.75
-			var cr := rr * 0.72
-			var cal_p := Vector3(0, cos(ca) * cr, sin(ca) * cr)
-			var cal := _add(pivot, box(Vector3(0.05, rr * (0.36 if big_brake else 0.3), 0.13 if big_brake else 0.1)), caliper_m, Vector3(s * xr, 0, 0) + cal_p)
-			cal.rotation.x = ca
-			var plate := _add(pivot, box(Vector3(0.008, rr * 0.27, 0.11 if big_brake else 0.085)), caliper_m, Vector3(s * (xr + 0.02), 0, 0) + cal_p * 1.02)
-			plate.rotation.x = ca
-			if big_brake:
-				var stripe := _add(pivot, box(Vector3(0.004, rr * 0.06, 0.07)), mat(Color(0.95, 0.95, 0.93), 0.1, 0.4), Vector3(s * (xr + 0.025), 0, 0) + cal_p * 1.02)
-				stripe.rotation.x = ca
-			for e in [-1.0, 1.0]:
-				var bp: Vector3 = cal_p * 0.86 + Vector3(0, -sin(ca), cos(ca)) * e * 0.04
-				_add(pivot, _hex(0.006, 0.006), polish, Vector3(s * (xr + 0.026), bp.y, bp.z)).rotation_degrees.z = 90
-			_rim(spin, rim, rim_m, dark, polish, barrel_m, s, o)
+			_far(_add(spin, _disc(rr, 0.012), rim_m, Vector3(s * (o + 0.002), 0, 0))).rotation_degrees.z = 90
+			var wm: Array = _wheel_mesh(rim, tw, big_brake, s)
+			var wmi := _add(spin, wm[0], null, Vector3.ZERO)
+			for i in (wm[1] as Array).size():
+				wmi.set_surface_override_material(i, role_m[wm[1][i]])
+			# Bremssattel steht still (am Achsschenkel), oben hinten über der Scheibe
+			var cm: Array = _caliper_mesh(rim, tw, big_brake, s)
+			var cmi := _add(pivot, cm[0], null, Vector3.ZERO)
+			for i in (cm[1] as Array).size():
+				cmi.set_surface_override_material(i, role_m[cm[1][i]])
 			# alles außer den Fernansicht-Ersatzteilen nur in der Nahansicht
 			for c in spin.get_children() + pivot.get_children():
 				if c is MeshInstance3D and not c.has_meta("lod_only"):
@@ -1273,7 +1272,7 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 			bm.albedo_color = Color(1, 1, 1, 0)
 			bm.metallic = 0.5
 			bm.roughness = 0.4
-			var bl := _add(pivot, blur_m, bm, Vector3(s * (o + 0.036), 0, 0))
+			var bl := _add(pivot, blur_m, bm, Vector3(s * (o + 0.02), 0, 0))
 			bl.rotation.y = 0.0 if s > 0 else PI
 			bl.set_meta("no_merge", true)
 			bl.visible = false
@@ -1285,7 +1284,7 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 	var head_spots := _lamp_spots(body, mats["head"])
 	var tail_spots := _lamp_spots(body, mats["tail"])
 	_lamp_detail(body, mats, L, light_c, not car_id in POPUP_IN)
-	body.position.y -= Catalog.part_of(cfg, "suspension")["drop"] + S.get("drop", 0.0)
+	body.position.y += fit["lift"] - fit["drop"]
 	if batch and not OS.get_cmdline_user_args().has("--nobatch"):
 		_merge_parts(root, body, fronts, spinners, flames)
 		if lod:
@@ -1316,7 +1315,8 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 	# Winkel zwischen zwei gleichen Speichen (Drahtspeichen: zwei Lagen), für Unschärfe und Begrenzung in animate()
 	root.set_meta("rim_period", TAU / float(maxi(int(rim["spokes"]) * (2 if rim["style"] == "wire" else 1), 1)))
 	root.set_meta("axle", axle(S))
-	root.set_meta("eye", Vector3(0, S["roof"] - 0.1, zf + (S["cowl"] + 0.07) * L))
+	root.set_meta("eye", Vector3(0, S["roof"] - 0.1 + fit["lift"], zf + (S["cowl"] + 0.07) * L))
+	root.set_meta("track_r", fit["track_r"])
 	return root
 
 
@@ -1521,111 +1521,6 @@ static func carbon_mat() -> StandardMaterial3D:
 	return _carbon
 
 
-## Speiche von p0 nach p1 (Radachse x, s = Seite): Querschnitt aus _spoke_mesh, Breite w quer zur Speiche, Dicke th
-## entlang der Achse; die gewölbte Außenseite zeigt auf beiden Seiten nach außen. Das breite Ende liegt bei p0.
-static func _spoke_pts(spin: Node3D, m: Material, p0: Vector3, p1: Vector3, w: float, th: float, s: float, k0 := 1.25, k1 := 0.85) -> MeshInstance3D:
-	var d := p1 - p0
-	var ln := d.length()
-	var key := "spoke_%.4f_%.4f_%.4f_%.2f_%.2f" % [ln, w, th, k0, k1]
-	if not _mesh_cache.has(key):
-		_mesh_cache[key] = _spoke_mesh(ln, w, th, k0, k1)
-	var y := d / ln
-	var z := Vector3.RIGHT.cross(y).normalized() * s
-	var sk := _add(spin, _mesh_cache[key], m, p0)
-	sk.basis = Basis(y.cross(z), y, z)
-	return sk
-
-
-## Speiche entlang +Y von 0 bis ln: Querschnitt achteckig gefast (Breite w quer, Dicke th nach außen), innen
-## 25 % breiter, außen 15 % schmaler (k0, k1); die Außenseite ist leicht gewölbt
-static func _spoke_mesh(ln: float, w: float, th: float, k0 := 1.25, k1 := 0.85) -> ArrayMesh:
-	var st := SurfaceTool.new()
-	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var sec := func(y: float, k: float) -> Array:
-		var hw := w * k / 2.0
-		var ht := th / 2.0
-		var c := minf(hw, ht) * 0.45
-		return [Vector3(-ht, y, -hw + c), Vector3(-ht + c, y, -hw), Vector3(ht - c, y, -hw), Vector3(ht, y, -hw + c),
-			Vector3(ht + th * 0.15, y, 0.0), Vector3(ht, y, hw - c), Vector3(ht - c, y, hw), Vector3(-ht + c, y, hw), Vector3(-ht, y, hw - c)]
-	var lo: Array = sec.call(0.0, k0)
-	var hi: Array = sec.call(ln, k1)
-	var n := lo.size()
-	for i in n:
-		var j := (i + 1) % n
-		var mid: Vector3 = (lo[i] + lo[j]) / 2.0
-		var nf := Vector3(mid.x, 0.0, mid.z).normalized()
-		_tri(st, lo[i], hi[i], hi[j], nf, nf, nf, nf)
-		_tri(st, lo[i], hi[j], lo[j], nf, nf, nf, nf)
-	for cap in [[lo, Vector3.DOWN], [hi, Vector3.UP]]:
-		var ring: Array = cap[0]
-		var c0: Vector3 = ring[0]
-		for i in range(1, n - 1):
-			_tri(st, c0, ring[i], ring[i + 1], cap[1], cap[1], cap[1], cap[1])
-	return st.commit()
-
-
-## Reifen als Drehkörper um die X-Achse: runde Schultern, bauchige Flanken, Lauffläche mit drei Längsrillen,
-## 36 Segmente. Innen offen ab dem Wulst rb (dort sitzt das Felgenbett); je größer die Felge, desto flacher die Flanke.
-static func _tire_mesh(tw: float, rb: float) -> ArrayMesh:
-	var key := "tire_%.3f_%.4f" % [tw, rb]
-	if _mesh_cache.has(key):
-		return _mesh_cache[key]
-	var R := WHEEL_R
-	var h := tw / 2.0
-	var sh := R - 0.02 - rb
-	var side := [Vector2(-h + 0.012, rb), Vector2(-h + 0.004, rb + 0.008), Vector2(-h - 0.003, rb + sh * 0.5),
-		Vector2(-h - 0.005, rb + sh * 0.78), Vector2(-h - 0.002, R - 0.02), Vector2(-h + 0.008, R - 0.007), Vector2(-h + 0.022, R)]
-	if sh > 0.07:
-		# seit 2.36: Felgenschutz-Wulst am Fuß der Flanke und eine flache Kehle dahinter (fängt einen hellen Ring Licht)
-		side = [Vector2(-h + 0.012, rb), Vector2(-h + 0.002, rb + 0.006), Vector2(-h - 0.006, rb + 0.015), Vector2(-h - 0.002, rb + 0.026),
-			Vector2(-h - 0.004, rb + sh * 0.5), Vector2(-h - 0.005, rb + sh * 0.78), Vector2(-h - 0.002, R - 0.02), Vector2(-h + 0.008, R - 0.007),
-			Vector2(-h + 0.022, R)]
-	var prof: Array = side.duplicate()
-	var tread := h - 0.022
-	for g in [-0.5, 0.0, 0.5]:
-		var gc: float = g * tread
-		prof.append_array([Vector2(gc - 0.008, R), Vector2(gc - 0.006, R - 0.006), Vector2(gc + 0.006, R - 0.006), Vector2(gc + 0.008, R)])
-	for i in range(side.size() - 1, -1, -1):
-		prof.append(Vector2(-side[i].x, side[i].y))
-	# Normale je Profilabschnitt (nach außen), an weichen Knicken gemittelt
-	var segn := []
-	for i in prof.size() - 1:
-		var d: Vector2 = prof[i + 1] - prof[i]
-		segn.append(Vector2(-d.y, d.x).normalized())
-	var seg := 36
-	var st := SurfaceTool.new()
-	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	for i in prof.size() - 1:
-		var p0: Vector2 = prof[i]
-		var p1: Vector2 = prof[i + 1]
-		if p0.distance_to(p1) < 1e-5:
-			continue
-		var n0: Vector2 = segn[i]
-		var n1: Vector2 = segn[i]
-		if i > 0 and segn[i - 1].dot(segn[i]) > 0.6:
-			n0 = (segn[i - 1] + segn[i]).normalized()
-		if i < segn.size() - 1 and segn[i + 1].dot(segn[i]) > 0.6:
-			n1 = (segn[i + 1] + segn[i]).normalized()
-		for k in seg:
-			var a0 := TAU * k / seg
-			var a1 := TAU * (k + 1) / seg
-			var P := func(p: Vector2, a: float) -> Vector3: return Vector3(p.x, p.y * cos(a), p.y * sin(a))
-			var N := func(nn: Vector2, a: float) -> Vector3: return Vector3(nn.x, nn.y * cos(a), nn.y * sin(a))
-			var am := (a0 + a1) / 2.0
-			var nf: Vector3 = N.call(segn[i], am)
-			var v00: Vector3 = P.call(p0, a0)
-			var v01: Vector3 = P.call(p0, a1)
-			var v10: Vector3 = P.call(p1, a0)
-			var v11: Vector3 = P.call(p1, a1)
-			if p0.y > 1e-5:
-				_tri(st, v00, v10, v11, N.call(n0, a0), N.call(n1, a0), N.call(n1, a1), nf)
-			if p1.y > 1e-5:
-				_tri(st, v00, v11, v01, N.call(n0, a0), N.call(n1, a1), N.call(n0, a1), nf)
-	var m := st.commit()
-	_mesh_cache[key] = m
-	return m
-
-
 ## Flügelprofil entlang X (Spannweite), Sehne entlang Z (vorn = -Z): oben fast flach, unten gewölbt wie ein
 ## umgedrehter Tragflügel, runde Nase, spitze Hinterkante. Ersetzt die flachen Kästen der Heckflügel.
 static func _airfoil(span: float, chord: float, thick: float) -> ArrayMesh:
@@ -1765,310 +1660,868 @@ static func _plate_text(text: String) -> Mesh:
 	return tm
 
 
-## Felge je Bauart (rim_spec: style, spokes, lugs, radius) auf der Außenseite des Rads, s = Seite, o = halbe
-## Reifenbreite. Die Speichen laufen konkav: an der Nabe um cv zurückgesetzt, am Horn vorn. Dazu Radmuttern
-## (Sechskant, 4 oder 5), Nabendeckel mit Emblem und Ventil; Bremse und Felgenbett baut build().
-static func _rim(spin: Node3D, rim: Dictionary, rim_m: Material, dark: Material, chrome: Material, barrel_m: Material, s: float, o: float) -> void:
-	var rr: float = rim["radius"]
-	var n: int = rim["spokes"]
-	var style: String = rim.get("style", "std")
-	var xf := o + 0.019  # Ebene am Horn (Betrag, nach außen)
-	var CV := {"std": 0.022, "thin": 0.016, "mesh": 0.012, "cross": 0.012, "split": 0.026, "y": 0.022, "turbine": 0.01,
-		"te": 0.03, "concave": 0.04, "rally": 0.008, "sickle": 0.022, "ten": 0.034, "3pc": 0.02, "clover": 0.012,
-		"wire": 0.04, "center": 0.026}
-	var cv: float = CV.get(style, 0.0)
-	var face0 := xf  # Tiefbett und Dreiteilig: der Stern liegt hinter einem breiten Außenring
-	if style == "dish":
-		face0 = xf - 0.03
-	elif style == "3pc":
-		face0 = xf - 0.018
-	var rh := rr * 0.2
-	var rl := rr * 0.96
-	var xat := func(r: float) -> float: return face0 - cv * clampf((rl - r) / (rl - rh), 0.0, 1.0)
-	var hub_x: float = face0 - cv  # Mitte der Nabenscheibe; ihre Vorderseite trägt die Radmuttern
-	var nut_x := hub_x + 0.012
-	var lip_in := 0.86
-	var lip_m: Material = rim_m
-	var face := func(r: float, m: Material, dx: float, h := 0.012) -> MeshInstance3D:
-		var d := _add(spin, _disc(r, h), m, Vector3(s * dx, 0, 0))
-		d.rotation_degrees.z = 90
-		return d
-	# Speiche ab Winkel a von Radius r0 bis r1, Richtung a + tilt; die Tiefe folgt der Konkave
-	var spoke := func(a: float, r0: float, r1: float, w: float, tilt := 0.0, th := 0.014, m: Material = rim_m, dx := 0.0) -> void:
-		var ln := r1 - r0
-		var c := Vector2(cos(a), sin(a)) * (r0 + r1) / 2.0
-		var d := Vector2(cos(a + tilt), sin(a + tilt))
-		var q0 := c - d * ln / 2.0
-		var q1 := c + d * ln / 2.0
-		var x0: float = xat.call(q0.length()) + dx
-		var x1: float = xat.call(q1.length()) + dx
-		_spoke_pts(spin, m, Vector3(s * x0, q0.x, q0.y), Vector3(s * x1, q1.x, q1.y), w, th, s)
-	match style:
-		"std":
-			var w := 0.06 if n <= 5 else (0.05 if n <= 7 else 0.04)
-			for k in n:
-				spoke.call(TAU * k / n, rr * 0.18, rr * 0.95, w)
-			face.call(rr * 0.27, rim_m, hub_x, 0.024)
-		"thin":
-			for k in n:
-				spoke.call(TAU * k / n, rr * 0.2, rr * 0.95, 0.022)
-			face.call(rr * 0.28, rim_m, hub_x, 0.024)
-		"mesh", "cross":
-			# Gitter: zwei Lagen schräger Speichen, die sich kreuzen; Kreuzspeichen mit Zwischenring
-			var tilt := 0.38 if style == "mesh" else 0.55
-			for k in n:
-				var a := TAU * k / n
-				spoke.call(a, rr * 0.28, rr * 0.93, 0.022, tilt)
-				spoke.call(a, rr * 0.28, rr * 0.93, 0.022, -tilt, 0.012, rim_m, -0.004)
-			face.call(rr * 0.32, rim_m, hub_x, 0.024)
-			if style == "cross":
-				var ring := TorusMesh.new()
-				ring.inner_radius = rr * 0.5
-				ring.outer_radius = rr * 0.58
-				ring.rings = 40
-				ring.ring_segments = 6
-				var rm := _add(spin, ring, rim_m, Vector3(s * xat.call(rr * 0.54), 0, 0))
-				rm.rotation_degrees.z = 90
-				rm.scale = Vector3(1, 0.3, 1)
-		"split":
-			# Doppelspeichen: je zwei schmale Speichen parallel nebeneinander
-			for k in n:
-				var a := TAU * k / n
-				for e in [-1.0, 1.0]:
-					spoke.call(a + e * 0.12, rr * 0.25, rr * 0.95, 0.026, -e * 0.12)
-			face.call(rr * 0.3, rim_m, hub_x, 0.024)
-		"y":
-			# Y-Speichen: innen eine kräftige Speiche, außen zwei auseinanderlaufende Äste
-			for k in n:
-				var a := TAU * k / n
-				spoke.call(a, rr * 0.12, rr * 0.55, 0.055)
-				for e in [-1.0, 1.0]:
-					spoke.call(a + e * 0.16, rr * 0.5, rr * 0.95, 0.03, e * 0.28)
-			face.call(rr * 0.27, rim_m, hub_x, 0.024)
-		"turbine":
-			# Turbine: verdrehte Schaufeln wie ein Lüfterrad
-			for k in n:
-				var a := TAU * k / n
-				var bl := _add(spin, box(Vector3(0.012, rr * 0.66, 0.06)), rim_m, Vector3(s * (xat.call(rr * 0.6) - 0.006), cos(a) * rr * 0.6, sin(a) * rr * 0.6))
-				bl.basis = Basis(Vector3.RIGHT, a) * Basis(Vector3.UP, 0.35 * s)
-			face.call(rr * 0.3, rim_m, hub_x, 0.024)
-			face.call(rr * 0.24, dark, hub_x + 0.008, 0.012)
-		"te":
-			# Rennsport-Sechs: breite, flache Speichen bis an das Horn, schmales Horn
-			for k in n:
-				spoke.call(TAU * k / n, rr * 0.18, rr * 0.92, 0.075)
-			face.call(rr * 0.28, rim_m, hub_x, 0.024)
-			lip_in = 0.9
-		"concave":
-			# Konkav-Stern: kräftige Speichen, an der Nabe tief eingezogen
-			for k in n:
-				spoke.call(TAU * k / n, rr * 0.18, rr * 0.96, 0.064, 0.0, 0.018)
-			face.call(rr * 0.26, rim_m, hub_x, 0.024)
-			lip_in = 0.9
-		"rally":
-			# Rallye: breite, flache Speichen mit kleinen Fenstern, große Mittelscheibe
-			for k in n:
-				spoke.call(TAU * k / n, rr * 0.3, rr * 0.94, 0.085 if n <= 6 else 0.07, 0.0, 0.018)
-			face.call(rr * 0.44, rim_m, hub_x, 0.024)
-			lip_in = 0.9
-		"sickle":
-			# Sichel: gebogene Speichen in Laufrichtung (rechts und links gespiegelt)
-			for k in n:
-				var a0 := TAU * k / n
-				var pts := []
-				for j in 6:
-					var f := j / 5.0
-					var r := lerpf(rr * 0.24, rr * 0.95, f)
-					var ang := a0 + s * 0.6 * pow(f, 1.3)
-					pts.append(Vector3(s * xat.call(r), cos(ang) * r, sin(ang) * r))
-				for j in 5:
-					var pa: Vector3 = pts[j]
-					var pb: Vector3 = pts[j + 1]
-					var dd := pb - pa
-					var w0 := lerpf(0.042, 0.026, j / 5.0)
-					var w1 := lerpf(0.042, 0.026, (j + 1) / 5.0)
-					_spoke_pts(spin, rim_m, pa - dd * 0.08, pb + dd * 0.08, w0, 0.014, s, 1.0, w1 / w0)
-			face.call(rr * 0.3, rim_m, hub_x, 0.024)
-		"ten":
-			# Schmiede-Zehn: zehn schlanke, gerade Speichen, stark konkav
-			for k in n:
-				spoke.call(TAU * k / n, rr * 0.2, rr * 0.96, 0.026, 0.0, 0.016)
-			face.call(rr * 0.26, rim_m, hub_x, 0.024)
-			lip_in = 0.92
-		"3pc":
-			# Dreiteilig: Doppelspeichen-Stern hinter einem polierten Stufenbett, Ring aus Schrauben
-			for k in n:
-				var a := TAU * k / n
-				for e in [-1.0, 1.0]:
-					spoke.call(a + e * 0.1, rr * 0.24, rr * 0.8, 0.026, -e * 0.1)
-			_add(spin, _band(rr * 0.8, s * xf, rr * 0.97, s * xf, Vector2(s, 0)), chrome, Vector3.ZERO)
-			_add(spin, _band(rr * 0.8, s * xf, rr * 0.79, s * (face0 - 0.004), Vector2(0, -1)), chrome, Vector3.ZERO)
-			for k in 24:
-				var a := TAU * k / 24.0
-				_add(spin, _disc(0.0055, 0.006), chrome, Vector3(s * (xf + 0.002), cos(a) * rr * 0.83, sin(a) * rr * 0.83)).rotation_degrees.z = 90
-			face.call(rr * 0.28, rim_m, hub_x, 0.024)
-			lip_in = 0.97
-			lip_m = chrome
-		"dish":
-			# Tiefbett: breiter polierter Außenring, der Stern sitzt tief dahinter
-			for k in n:
-				spoke.call(TAU * k / n, rr * 0.12, rr * 0.66, 0.05)
-			_add(spin, _band(rr * 0.66, s * xf, rr * 0.97, s * xf, Vector2(s, 0)), chrome, Vector3.ZERO)
-			_add(spin, _band(rr * 0.66, s * xf, rr * 0.64, s * (face0 - 0.004), Vector2(0, -1)), chrome, Vector3.ZERO)
-			face.call(rr * 0.26, rim_m, hub_x, 0.024)
-			lip_in = 0.94
-			lip_m = chrome
-		"steel":
-			# Stahlfelge: geschlossene Scheibe, erhabene Mitte, Löcher, Chromkappe
-			face.call(rr * 0.95, rim_m, xf - 0.01, 0.02)
-			face.call(rr * 0.46, rim_m, xf + 0.001, 0.01)
-			for k in n:
-				var a := TAU * k / n + 0.3
-				_add(spin, _disc(rr * 0.12, 0.003), dark, Vector3(s * (xf + 0.0003), cos(a) * rr * 0.68, sin(a) * rr * 0.68)).rotation_degrees.z = 90
-			nut_x = xf + 0.006
-			lip_in = 0.93
-		"aero":
-			# Aero-Scheibe: geschlossen und glatt, kleine Kühlschlitze am Rand
-			face.call(rr, rim_m, o + 0.008, 0.02)
-			for k in n * 2:
-				var a := TAU * k / (n * 2)
-				var sl := _add(spin, box(Vector3(0.006, 0.06, 0.022)), dark, Vector3(s * (o + 0.0185), cos(a) * rr * 0.76, sin(a) * rr * 0.76))
-				sl.rotation.x = a + PI / 2.0
-			face.call(rr * 0.3, rim_m, o + 0.016, 0.014)
-		"holes":
-			# Lochfelge (Retro, Telefon-Wählscheibe): geschlossene Scheibe mit großen runden Löchern
-			face.call(rr * 0.95, rim_m, xf - 0.01, 0.02)
-			var hr := rr * (0.2 if n <= 5 else 0.13)
-			for k in n:
-				var a := TAU * k / n
-				var hp := Vector2(cos(a), sin(a)) * rr * 0.6
-				_add(spin, _disc(hr * 1.15, 0.003), barrel_m, Vector3(s * (xf + 0.0004), hp.x, hp.y)).rotation_degrees.z = 90
-				_add(spin, _disc(hr, 0.004), dark, Vector3(s * (xf + 0.0009), hp.x, hp.y)).rotation_degrees.z = 90
-			face.call(rr * 0.32, rim_m, xf + 0.002, 0.014)
-			nut_x = xf + 0.009
-			lip_in = 0.92
-		"cap":
-			# Radkappe aus Kunststoff über einer Stahlfelge: erhabener Ring, Schlitze, Mitte mit Emblem
-			face.call(rr * 0.94, rim_m, xf - 0.008, 0.016)
-			var ring := TorusMesh.new()
-			ring.inner_radius = rr * 0.72
-			ring.outer_radius = rr * 0.84
-			ring.rings = 40
-			ring.ring_segments = 6
-			var rm := _add(spin, ring, rim_m, Vector3(s * xf, 0, 0))
-			rm.rotation_degrees.z = 90
-			rm.scale = Vector3(1, 0.3, 1)
-			for k in n:
-				var a := TAU * k / n
-				var sl := _add(spin, box(Vector3(0.004, rr * 0.16, 0.018)), dark, Vector3(s * (xf + 0.001), cos(a) * rr * 0.56, sin(a) * rr * 0.56))
-				sl.rotation.x = a
-			face.call(rr * 0.26, rim_m, xf + 0.004, 0.012)
-			face.call(rr * 0.09, chrome, xf + 0.011, 0.004)
-			lip_in = 0.93
-			lip_m = dark
-		"clover":
-			# Kleeblatt: polierte Blätter, die zum Rand hin breiter werden, dazwischen schwarz eloxiert
-			face.call(rr * 0.92, dark, xf - 0.012, 0.012)
-			for k in n:
-				var a := TAU * k / n
-				var po := Vector2(cos(a), sin(a))
-				_spoke_pts(spin, rim_m, Vector3(s * xf, po.x * rr * 0.9, po.y * rr * 0.9),
-					Vector3(s * (xf - cv), po.x * rr * 0.3, po.y * rr * 0.3), 0.13, 0.014, s)
-			face.call(rr * 0.36, rim_m, hub_x, 0.024)
-			lip_in = 0.92
-		"wire":
-			# Drahtspeichen: zwei Lagen dünner, gekreuzter Speichen, Zentralmutter mit Flügeln
-			for k in n * 2:
-				var a := TAU * k / (n * 2)
-				var odd := k % 2 == 1
-				spoke.call(a, rr * 0.2, rr * 0.93, 0.006, -0.5 if odd else 0.5, 0.006, chrome, -0.004 if odd else 0.0)
-			face.call(rr * 0.18, chrome, hub_x + 0.006, 0.036)
-			face.call(rr * 0.1, chrome, hub_x + 0.03, 0.012)
-			var ear := _add(spin, box(Vector3(0.008, rr * 0.38, 0.014)), chrome, Vector3(s * (hub_x + 0.04), 0, 0))
-			ear.rotation.x = 0.4
-			lip_in = 0.9
-			lip_m = chrome
-		"center":
-			# Zentralverschluss: Y-Speichen, eine große Mutter statt Radmuttern
-			for k in n:
-				var a := TAU * k / n
-				spoke.call(a, rr * 0.12, rr * 0.55, 0.055)
-				for e in [-1.0, 1.0]:
-					spoke.call(a + e * 0.16, rr * 0.5, rr * 0.95, 0.03, e * 0.28)
-			face.call(rr * 0.27, rim_m, hub_x, 0.024)
-			face.call(rr * 0.14, mat(Color(0.8, 0.08, 0.05), 0.6, 0.3), nut_x + 0.012, 0.024).mesh = _hex(rr * 0.14, 0.024)
-			face.call(rr * 0.05, chrome, nut_x + 0.026, 0.006)
-	# Radmuttern (Sechskant) und Nabendeckel mit kleinem Emblem
-	if style not in ["aero", "cap", "wire", "center"]:
-		var lugs: int = rim.get("lugs", 5)
-		for k in lugs:
-			var a := TAU * k / lugs + 0.3
-			_add(spin, _hex(0.0115, 0.014), chrome, Vector3(s * (nut_x + 0.006), cos(a) * rr * 0.19, sin(a) * rr * 0.19)).rotation_degrees.z = 90
-		if style == "steel":
-			face.call(rr * 0.12, chrome, nut_x + 0.006, 0.016)
-		else:
-			face.call(rr * 0.085, dark, nut_x + 0.004, 0.008)
-			face.call(rr * 0.045, chrome, nut_x + 0.009, 0.003)
-	# Ventil am Horn
-	if style not in ["aero", "cap"]:
-		var va := 2.4
-		var vr := rr * 0.885
-		var vp := Vector2(cos(va), sin(va)) * vr
-		_add(spin, _disc(0.0042, 0.024), dark, Vector3(s * (xf - 0.004), vp.x, vp.y)).rotation_degrees.z = 90
-		_add(spin, _disc(0.005, 0.008), chrome, Vector3(s * (xf + 0.01), vp.x, vp.y)).rotation_degrees.z = 90
-	# Horn (Felgenrand)
-	var lip := TorusMesh.new()
-	lip.inner_radius = rr * lip_in
-	lip.outer_radius = rr
-	lip.rings = 40
-	lip.ring_segments = 8
-	var lm := _add(spin, lip, lip_m, Vector3(s * (o + 0.016), 0, 0))
-	lm.rotation_degrees.z = 90
-	lm.scale = Vector3(1, 0.35, 1)
+# --- Räder (seit 2.37) ----------------------------------------------------------------------------------------------
+## Ein Rad sind drei Meshes, die alle Autos teilen (_mesh_cache): Reifen, Felge mit Bremsscheibe und Bremssattel (steht
+## still am Achsschenkel). Je Material eine Fläche ("Rolle": face Speichen und Stern, lip Horn und Stufenbett, barrel
+## Felgenbett innen, dark Schatten und Löcher, chrome Radmuttern, Nieten, Ventilkappe, accent Zentralmutter, rotor/hat
+## Bremsscheibe und Topf, caliper Sattel); build() gibt jeder Rolle ihr Material. Bis 2.36 waren es 40 bis 70 Einzelteile
+## je Rad, in der Garage (ohne Verschmelzen) jedes ein Draw Call.
+## Gebaut wird in Modellmaßen (Reifen außen WHEEL_R, das Rad wird danach auf seine echte Größe skaliert) und immer das
+## rechte Rad (außen = +X), das linke entsteht gespiegelt. mu = Modelleinheiten je Meter: Nabe, Radmuttern und Bremse
+## haben echte Maße und wachsen nicht mit der Felge (eine 20-Zoll-Felge zeigt mehr Luft um die Bremse als eine 15er).
+const WHEEL_ROLES := ["face", "lip", "barrel", "dark", "chrome", "accent", "rotor", "hat"]
+## Rad-Meshes (Felge, Reifen, Sattel, Unschärfescheibe) hängen von Felge, Größe, Reifenbreite und Spur ab: in der Garage
+## kam bis 2.37 bei jedem Teil, über das man fährt, ein neues dazu (87 Vorschauen: +38 MB Grafikspeicher, wichtig im
+## Browser). Seit 2.37 bleiben nur die zuletzt benutzten WHEEL_CACHE Einträge im Cache (gut 15 Räder mit Reifen, Sattel
+## und Scheibe), ältere fallen heraus; ein Auto, das ein Mesh noch trägt, behält es, bis es selbst verschwindet.
+const WHEEL_CACHE := 64
+static var _wheel_keys: Array = []
 
 
-## Rotationsband zwischen dem Kreis (r0 bei x0) und dem Kreis (r1 bei x1) um die X-Achse: Rohr, Kegelstumpf oder
-## flacher Ring. hint (x, r) gibt an, wohin die Vorderseite zeigt (z. B. (0, -1) zur Achse, (s, 0) nach außen).
-static func _band(r0: float, x0: float, r1: float, x1: float, hint: Vector2, seg := 40) -> ArrayMesh:
-	var key := "band_%.4f_%.4f_%.4f_%.4f_%.1f_%.1f" % [r0, x0, r1, x1, hint.x, hint.y]
-	if _mesh_cache.has(key):
-		return _mesh_cache[key]
-	var d := Vector2(x1 - x0, r1 - r0)
-	var n2 := Vector2(-d.y, d.x).normalized()
-	if n2.dot(hint) < 0.0:
-		n2 = -n2
-	var st := SurfaceTool.new()
-	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	for k in seg:
-		var a0 := TAU * k / seg
-		var a1 := TAU * (k + 1) / seg
-		var A := Vector3(x0, r0 * cos(a0), r0 * sin(a0))
-		var B := Vector3(x0, r0 * cos(a1), r0 * sin(a1))
-		var C := Vector3(x1, r1 * cos(a0), r1 * sin(a0))
-		var D := Vector3(x1, r1 * cos(a1), r1 * sin(a1))
-		var na := Vector3(n2.x, n2.y * cos(a0), n2.y * sin(a0))
-		var nb := Vector3(n2.x, n2.y * cos(a1), n2.y * sin(a1))
-		var nf := (na + nb).normalized()
-		_tri(st, A, C, D, na, na, nb, nf)
-		_tri(st, A, D, B, na, nb, nb, nf)
-	var m := st.commit()
-	_mesh_cache[key] = m
+## Rad-Mesh aus dem Cache holen (null, wenn nicht da) und als zuletzt benutzt markieren
+static func _wget(key: String):
+	var v = _mesh_cache.get(key)
+	if v != null:
+		var i := _wheel_keys.find(key)
+		if i >= 0 and i < _wheel_keys.size() - 1:
+			_wheel_keys.remove_at(i)
+			_wheel_keys.append(key)
+	return v
+
+
+## Rad-Mesh ablegen; über WHEEL_CACHE fällt das am längsten unbenutzte heraus
+static func _wput(key: String, v) -> void:
+	if not _mesh_cache.has(key):
+		_wheel_keys.append(key)
+	_mesh_cache[key] = v
+	while _wheel_keys.size() > WHEEL_CACHE:
+		_mesh_cache.erase(_wheel_keys.pop_front())
+## Bauarten mit poliertem Horn und Stufenbett (mehrteilig) bzw. Chromrand
+const POLISHED_LIP := ["mesh", "dish", "3pc", "thin", "wire", "cup"]
+
+
+## Dreieck in den Rohbau wb (Rolle -> [Punkte, Normalen, UVs]); Vorderseite nach nf (Godot: im Uhrzeigersinn)
+static func _wtri(wb: Dictionary, role: String, a: Vector3, b: Vector3, c: Vector3, na: Vector3, nb: Vector3, nc: Vector3, nf: Vector3,
+		ua := Vector2.ZERO, ub := Vector2.ZERO, uc := Vector2.ZERO) -> void:
+	if not wb.has(role):
+		wb[role] = [[], [], []]
+	var buf: Array = wb[role]
+	if (c - a).cross(b - a).dot(nf) < 0.0:
+		var tv := b
+		b = c
+		c = tv
+		var tn := nb
+		nb = nc
+		nc = tn
+		var tu := ub
+		ub = uc
+		uc = tu
+	buf[0].append_array([a, b, c])
+	buf[1].append_array([na, nb, nc])
+	buf[2].append_array([ua, ub, uc])
+
+
+## Viereck a-b-c-d (umlaufend), Normalen je Ecke
+static func _wquad(wb: Dictionary, role: String, a: Vector3, b: Vector3, c: Vector3, d: Vector3, na: Vector3, nb: Vector3, nc: Vector3,
+		nd: Vector3, nf: Vector3) -> void:
+	_wtri(wb, role, a, b, c, na, nb, nc, nf)
+	_wtri(wb, role, a, c, d, na, nc, nd, nf)
+
+
+## Drehkörper um die X-Achse aus dem Profil prof (Vector2(x, r)), seg Schritte am Umfang. Die Normale eines Abschnitts
+## ist (-d.r, d.x): Profile laufen so, dass sie nach außen zeigt (über eine Fläche nach vorn: von außen nach innen, über
+## eine Außenseite: von hinten nach vorn). An weichen Knicken (unter ~50°) gemittelt. vs: v je Profilpunkt (UV), u am
+## Umfang 0..1.
+static func _wrev(wb: Dictionary, role: String, prof: Array, seg: int, vs: Array = []) -> void:
+	var np := prof.size()
+	var segn := []
+	for i in np - 1:
+		var d: Vector2 = prof[i + 1] - prof[i]
+		segn.append(Vector2(-d.y, d.x).normalized() if d.length() > 1e-7 else Vector2.ZERO)
+	var cs := []
+	for k in seg + 1:
+		cs.append(Vector2(cos(TAU * k / seg), sin(TAU * k / seg)))
+	for i in np - 1:
+		var sn: Vector2 = segn[i]
+		if sn == Vector2.ZERO:
+			continue
+		var p0: Vector2 = prof[i]
+		var p1: Vector2 = prof[i + 1]
+		var n0 := sn
+		var n1 := sn
+		if i > 0 and (segn[i - 1] as Vector2).dot(sn) > 0.64:
+			n0 = (segn[i - 1] + sn).normalized()
+		if i < np - 2 and (segn[i + 1] as Vector2).dot(sn) > 0.64:
+			n1 = (segn[i + 1] + sn).normalized()
+		var v0: float = vs[i] if vs.size() > i else 0.0
+		var v1: float = vs[i + 1] if vs.size() > i + 1 else 0.0
+		for k in seg:
+			var ca: Vector2 = cs[k]
+			var cb: Vector2 = cs[k + 1]
+			var A := Vector3(p0.x, p0.y * ca.x, p0.y * ca.y)
+			var B := Vector3(p0.x, p0.y * cb.x, p0.y * cb.y)
+			var C := Vector3(p1.x, p1.y * ca.x, p1.y * ca.y)
+			var D := Vector3(p1.x, p1.y * cb.x, p1.y * cb.y)
+			var nA := Vector3(n0.x, n0.y * ca.x, n0.y * ca.y)
+			var nB := Vector3(n0.x, n0.y * cb.x, n0.y * cb.y)
+			var nC := Vector3(n1.x, n1.y * ca.x, n1.y * ca.y)
+			var nD := Vector3(n1.x, n1.y * cb.x, n1.y * cb.y)
+			var cm := (ca + cb).normalized()
+			var nf := Vector3(sn.x, sn.y * cm.x, sn.y * cm.y)
+			var u0 := float(k) / seg
+			var u1 := float(k + 1) / seg
+			if p1.y > 1e-6:
+				_wtri(wb, role, A, C, D, nA, nC, nD, nf, Vector2(u0, v0), Vector2(u0, v1), Vector2(u1, v1))
+			if p0.y > 1e-6:
+				_wtri(wb, role, A, D, B, nA, nD, nB, nf, Vector2(u0, v0), Vector2(u1, v1), Vector2(u1, v0))
+
+
+## Flaches Vieleck (n Ecken, Radius r) um c, Vorderseite nach nrm, raised hebt die Mitte an (Kuppe: Nieten, Schrauben)
+static func _wdisc(wb: Dictionary, role: String, c: Vector3, r: float, n: int, nrm: Vector3, raised := 0.0) -> void:
+	var u := nrm.cross(Vector3.UP if absf(nrm.y) < 0.9 else Vector3.FORWARD).normalized()
+	var v := nrm.cross(u).normalized()
+	var tip := c + nrm * raised
+	for k in n:
+		var a0 := TAU * k / n
+		var a1 := TAU * (k + 1) / n
+		var p0 := c + (u * cos(a0) + v * sin(a0)) * r
+		var p1 := c + (u * cos(a1) + v * sin(a1)) * r
+		var nn := nrm if raised <= 0.0 else (p1 - tip).cross(p0 - tip).normalized()
+		if nn.dot(nrm) < 0.0:
+			nn = -nn
+		_wtri(wb, role, tip, p0, p1, nn, nn, nn, nn)
+
+
+## Sechskant (Radmutter): Prisma entlang +X von x0 bis x1 um (y, z), Kopf leicht gefast
+static func _wnut(wb: Dictionary, role: String, y: float, z: float, x0: float, x1: float, r: float, n := 6) -> void:
+	var ctr := Vector3(x0, y, z)
+	for k in n:
+		var a0 := TAU * k / n + PI / n
+		var a1 := TAU * (k + 1) / n + PI / n
+		var d0 := Vector3(0, cos(a0), sin(a0))
+		var d1 := Vector3(0, cos(a1), sin(a1))
+		var nf := Vector3(0, cos((a0 + a1) / 2.0), sin((a0 + a1) / 2.0))
+		var b0 := ctr + d0 * r
+		var b1 := ctr + d1 * r
+		var t0 := b0 + Vector3(x1 - x0 - r * 0.25, 0, 0)
+		var t1 := b1 + Vector3(x1 - x0 - r * 0.25, 0, 0)
+		_wquad(wb, role, b0, t0, t1, b1, nf, nf, nf, nf, nf)
+		# Fase zum Kopf
+		var c0 := Vector3(x1, y, z) + d0 * r * 0.72
+		var c1 := Vector3(x1, y, z) + d1 * r * 0.72
+		var nc := (nf + Vector3.RIGHT).normalized()
+		_wquad(wb, role, t0, c0, c1, t1, nc, nc, nc, nc, nc)
+		_wtri(wb, role, Vector3(x1, y, z), c0, c1, Vector3.RIGHT, Vector3.RIGHT, Vector3.RIGHT, Vector3.RIGHT)
+
+
+## Schnitte einer Speiche von Radius r0 (Nabe) bis r1 (Bett) ab Winkel a: Breite vorn w0 -> w1 (wfn(f) statt linear, wenn
+## gesetzt), hinten back-mal so breit (Formschräge), Tiefe th, Fase ch. bend: so weit dreht sie bis außen (Sichel,
+## Kreuzspeichen; bexp formt den Bogen), off0/off1: seitlicher Versatz innen/außen (Doppelspeichen). xf(r): Lage der
+## Vorderseite (Konkave), dx verschiebt (zweite Lage beim Gitter).
+static func _wst(a: float, r0: float, r1: float, w0: float, w1: float, xf: Callable, th: float, ch: float, n := 5, bend := 0.0,
+		bexp := 1.4, off0 := 0.0, off1 := 0.0, back := 1.2, dx := 0.0, wfn := Callable(), straight := false) -> Array:
+	var pts := []
+	for i in n:
+		var f := float(i) / (n - 1)
+		if straight:
+			# gerade Sehne vom Anfangs- zum Endpunkt (Kreuzgitter), nicht als Spirale
+			pts.append(Vector2(cos(a), sin(a)) * r0 * (1.0 - f) + Vector2(cos(a + bend), sin(a + bend)) * r1 * f)
+			continue
+		var r := lerpf(r0, r1, f)
+		var ang := a + bend * pow(f, bexp)
+		pts.append(Vector2(cos(ang), sin(ang)) * r)
+	var out := []
+	for i in n:
+		var f := float(i) / (n - 1)
+		var d: Vector2 = ((pts[mini(i + 1, n - 1)] as Vector2) - (pts[maxi(i - 1, 0)] as Vector2)).normalized()
+		var t := Vector2(-d.y, d.x)
+		var q: Vector2 = pts[i] + t * lerpf(off0, off1, f)
+		var w: float = wfn.call(f) if wfn.is_valid() else lerpf(w0, w1, f)
+		out.append([Vector3(float(xf.call(q.length())) + dx, q.x, q.y), Vector3(0.0, t.x, t.y), w, w * back, th, ch])
+	return out
+
+
+## Speiche aus Schnitten (_wst): Seiten, Fasen und Vorderseite (crown > 0: Grat in der Mitte, gewölbt bzw. als V), die
+## Rückseite sieht man nie. Normalen flach je Fläche, entlang der Speiche gemittelt. cap_end: Stirnfläche außen (Speichen,
+## die bis über das Horn laufen).
+static func _wspoke(wb: Dictionary, role: String, st: Array, crown := 0.0, cap_end := false) -> void:
+	var X := Vector3.RIGHT
+	var secs := []
+	for s in st:
+		var c: Vector3 = s[0]
+		var t: Vector3 = s[1]
+		var hf: float = s[2] / 2.0
+		var hb: float = s[3] / 2.0
+		var th: float = s[4]
+		var ch: float = minf(s[5], hf * 0.45)
+		var sec := [c - t * hb - X * th, c - t * (hf + ch) - X * ch, c - t * hf]
+		if crown != 0.0:
+			sec.append(c + X * crown)
+		sec.append_array([c + t * hf, c + t * (hf + ch) - X * ch, c + t * hb - X * th])
+		secs.append(sec)
+	var n := secs.size()
+	var m: int = (secs[0] as Array).size()
+	var fn := []
+	for i in n - 1:
+		var row := []
+		var ctr: Vector3 = ((st[i][0] as Vector3) + (st[i + 1][0] as Vector3)) / 2.0 - X * (float(st[i][4]) * 0.5)
+		for j in m - 1:
+			var a: Vector3 = secs[i][j]
+			var b: Vector3 = secs[i][j + 1]
+			var c: Vector3 = secs[i + 1][j + 1]
+			var d: Vector3 = secs[i + 1][j]
+			var nn := (c - a).cross(d - b).normalized()
+			if nn.dot((a + b + c + d) / 4.0 - ctr) < 0.0:
+				nn = -nn
+			row.append(nn)
+		fn.append(row)
+	# Punktnormalen: entlang der Speiche gemittelt, quer nur über flache Knicke (Wölbung der Vorderseite, unter ~30°);
+	# Fasen und Seiten bleiben scharf
+	var vn := func(i: int, j: int, side: int) -> Vector3:
+		var acc := Vector3.ZERO
+		for ii in [i - 1, i]:
+			if ii < 0 or ii > n - 2:
+				continue
+			var f0: Vector3 = fn[ii][j]
+			acc += f0
+			var jn := j + side
+			if jn >= 0 and jn < m - 1 and (fn[ii][jn] as Vector3).dot(f0) > 0.87:
+				acc += fn[ii][jn]
+		return acc.normalized()
+	for i in n - 1:
+		for j in m - 1:
+			var nf: Vector3 = fn[i][j]
+			_wquad(wb, role, secs[i][j], secs[i][j + 1], secs[i + 1][j + 1], secs[i + 1][j], vn.call(i, j, -1), vn.call(i, j, 1),
+				vn.call(i + 1, j, 1), vn.call(i + 1, j, -1), nf)
+	if cap_end:
+		var last: Array = secs[n - 1]
+		var dl: Vector3 = ((st[n - 1][0] as Vector3) - (st[n - 2][0] as Vector3)).normalized()
+		for j in range(1, m - 1):
+			_wtri(wb, role, last[0], last[j], last[j + 1], dl, dl, dl, dl)
+
+
+## Rohbau in ein ArrayMesh (je Rolle eine Fläche, in der Reihenfolge roles); mirror: linkes Rad (X gespiegelt, Umlaufsinn
+## gedreht). Liefert [Mesh, Liste der Rollen je Fläche].
+static func _wcommit(wb: Dictionary, roles: Array, mirror: bool, uv := false) -> Array:
+	var mesh := ArrayMesh.new()
+	var used := []
+	for role in roles:
+		if not wb.has(role):
+			continue
+		var buf: Array = wb[role]
+		var pv := PackedVector3Array(buf[0])
+		var pn := PackedVector3Array(buf[1])
+		var pu := PackedVector2Array(buf[2])
+		if pv.is_empty():
+			continue
+		if mirror:
+			for i in pv.size():
+				var p := pv[i]
+				pv[i] = Vector3(-p.x, p.y, p.z)
+				var q := pn[i]
+				pn[i] = Vector3(-q.x, q.y, q.z)
+			for i in range(0, pv.size(), 3):
+				var tp := pv[i + 1]
+				pv[i + 1] = pv[i + 2]
+				pv[i + 2] = tp
+				var tq := pn[i + 1]
+				pn[i + 1] = pn[i + 2]
+				pn[i + 2] = tq
+				var tu := pu[i + 1]
+				pu[i + 1] = pu[i + 2]
+				pu[i + 2] = tu
+		var arr := []
+		arr.resize(Mesh.ARRAY_MAX)
+		arr[Mesh.ARRAY_VERTEX] = pv
+		arr[Mesh.ARRAY_NORMAL] = pn
+		if uv:
+			arr[Mesh.ARRAY_TEX_UV] = pu
+		# indiziert: Punkte mit gleicher Lage, Normale und UV nur einmal (Drehkörper teilen jeden Punkt mit bis zu sechs
+		# Dreiecken), seit 2.37 gut halb so viel Speicher bei gleichem Bild
+		var st := SurfaceTool.new()
+		st.create_from_arrays(arr, Mesh.PRIMITIVE_TRIANGLES)
+		st.index()
+		st.commit(mesh)
+		used.append(role)
+	return [mesh, used]
+
+
+## Reifen: Drehkörper mit flacher, leicht gewölbter Lauffläche, drei (breit: vier) Längsrillen, runden Schultern, leicht
+## bauchiger Flanke und Felgenschutz-Wulst am Fuß. Querrillen, Lamellen und ein unlesbares Schriftband malt tire_mat()
+## über die UVs: u am Umfang, v quer (Lauffläche -1..1 von innen nach außen, Schultern bis ±2, Flanke außen 2..3, innen
+## -2..-3). tw Breite, rb Wulst-Radius (Modellmaße), mu Modelleinheiten je Meter, side < 0: linkes Rad (gespiegelt, die
+## beschriftete Flanke zeigt auch dort nach außen). Bis 2.36: Ballon mit drei Rillen, beide Seiten gleich.
+static func _tire_mesh(tw: float, rb: float, mu: float, side := 1) -> ArrayMesh:
+	var key := "tire_%.4f_%.4f_%.3f_%d" % [tw, rb, mu, signi(side)]
+	var hit = _wget(key)
+	if hit != null:
+		return hit
+	var R := WHEEL_R
+	var h := tw / 2.0
+	var sh := R - rb
+	var sr := clampf(sh * 0.3, 0.009, 0.022)  # Schulter
+	var bul := clampf(sh * 0.11, 0.003, 0.008)  # Bauch der Flanke
+	var xt := h - sr
+	var crown := func(x: float) -> float: return R - 0.0022 * (x / h) * (x / h)
+	var yt: float = crown.call(xt)
+	var prof := []
+	var vs := []
+	var sidev := func(r: float) -> float: return 2.0 + clampf((yt - sr - r) / maxf(yt - sr - rb, 0.001), 0.0, 1.0)
+	# innen: Wulst, Flanke, Schulter (sieht man kaum)
+	for p in [Vector2(-h + 0.007, rb), Vector2(-h - bul * 0.8, rb + sh * 0.4), Vector2(-h - bul * 0.4, yt - sr * 1.15)]:
+		prof.append(p)
+		vs.append(-float(sidev.call(p.y)))
+	for ph in [70.0, 35.0]:
+		var a := deg_to_rad(ph)
+		prof.append(Vector2(-xt - sr * sin(a), yt - sr + sr * cos(a)))
+		vs.append(-(1.0 + ph / 90.0))
+	# Lauffläche mit Längsrillen (leicht unsymmetrisch wie bei echten Sportreifen)
+	var gw := 0.0095 * mu
+	var gd := minf(0.0065 * mu, sh * 0.25)
+	var grooves: Array = [-0.6, -0.18, 0.2, 0.62] if tw / mu >= 0.25 else [-0.5, 0.04, 0.55]
+	prof.append(Vector2(-xt, yt))
+	vs.append(-1.0)
+	for g in grooves:
+		var gx: float = g * xt
+		for q in [[gx - gw / 2.0, 0.0], [gx - gw / 2.0 + 0.0012, gd], [gx + gw / 2.0 - 0.0012, gd], [gx + gw / 2.0, 0.0]]:
+			prof.append(Vector2(q[0], float(crown.call(q[0])) - q[1]))
+			vs.append(q[0] / xt)
+	prof.append(Vector2(xt, yt))
+	vs.append(1.0)
+	for ph in [35.0, 70.0]:
+		var a := deg_to_rad(ph)
+		prof.append(Vector2(xt + sr * sin(a), yt - sr + sr * cos(a)))
+		vs.append(1.0 + ph / 90.0)
+	# außen: Flanke mit Bauch, Felgenschutz (bei flachen Reifen deutlich), Wulst
+	var outer := [Vector2(h + bul * 0.45, yt - sr * 1.15), Vector2(h + bul, rb + sh * 0.5), Vector2(h + bul * 0.8, rb + sh * 0.3)]
+	if sh > 0.03:
+		outer.append_array([Vector2(h + bul + 0.0032, rb + minf(0.016, sh * 0.32)), Vector2(h + bul + 0.003, rb + minf(0.01, sh * 0.2)),
+			Vector2(h + 0.0015, rb + 0.005)])
+	outer.append(Vector2(h - 0.006, rb))
+	for p in outer:
+		prof.append(p)
+		vs.append(float(sidev.call((p as Vector2).y)))
+	var wb := {}
+	_wrev(wb, "tire", prof, 44, vs)
+	var m: ArrayMesh = _wcommit(wb, ["tire"], side < 0, true)[0]
+	_wput(key, m)
 	return m
 
 
-## Sechskant (Radmuttern, Zentralmutter): Zylinder mit sechs Ecken entlang Y
-static func _hex(r: float, h: float) -> CylinderMesh:
-	var key := "hex_%.4f_%.4f" % [r, h]
-	if _mesh_cache.has(key):
-		return _mesh_cache[key]
-	var c := CylinderMesh.new()
-	c.top_radius = r
-	c.bottom_radius = r
-	c.height = h
-	c.radial_segments = 6
-	c.rings = 1
-	_mesh_cache[key] = c
-	return c
+## Reifen-Material (ein Shader für alle Autos): Gummi fast schwarz, Profil auf der Lauffläche (außen große Schulterblöcke,
+## Mitte schräge Lamellen, innen schmalere Blöcke), auf der Außenflanke ein Band aus erhabenen, unlesbaren Zeichen (zwei
+## Gruppen je Umlauf, keine Marke) und feine Rillen am Felgenschutz. Feine Muster blenden in der Ferne aus (kein Flimmern).
+static var _tire_m: ShaderMaterial
+
+
+static func tire_mat() -> ShaderMaterial:
+	if _tire_m:
+		return _tire_m
+	var sh := Shader.new()
+	sh.code = """shader_type spatial;
+// Reifen (car_builder.tire_mat): u am Umfang, v quer (Lauffläche -1..1, Schultern bis ±2, Flanke 2..3 außen)
+uniform vec3 rubber : source_color = vec3(0.036, 0.036, 0.038);
+uniform float pitches = 68.0;
+float h1(float n) { return fract(sin(n * 127.1 + 3.7) * 43758.5453); }
+float glyph(float id, vec2 p) {
+	if (p.x < 0.16 || p.x > 0.84 || p.y < 0.08 || p.y > 0.92) return 0.0;
+	vec2 g = floor(vec2((p.x - 0.16) / 0.68 * 3.0, (p.y - 0.08) / 0.84 * 5.0));
+	float on = step(0.45, h1(id * 17.0 + g.x * 3.0 + g.y * 11.0));
+	// senkrechte Striche öfter: wirkt wie Großbuchstaben
+	on = max(on, step(0.62, h1(id * 5.0 + g.x)) * step(0.5, abs(g.x - 1.0)));
+	return on;
+}
+void fragment() {
+	float v = UV.y;
+	float av = abs(v);
+	float u = UV.x;
+	vec3 col = rubber;
+	float rough = 0.82;
+	float fade = 1.0 - smoothstep(0.25, 0.7, fwidth(u * pitches));
+	if (av < 2.0) {
+		float g = 0.0;
+		if (v > 0.42) {
+			float q = fract(u * pitches + (v - 0.42) * 0.6);
+			g = step(q, 0.17) * smoothstep(0.42, 0.56, v);
+		} else if (v < -0.42) {
+			float q = fract(u * pitches * 1.25 - (v + 0.42) * 0.8 + 0.5);
+			g = step(q, 0.13) * smoothstep(-0.42, -0.56, v);
+		} else {
+			float q = fract(u * pitches * 0.5 + v * 1.1);
+			g = step(q, 0.045) * 0.85;
+		}
+		g *= (1.0 - smoothstep(1.45, 1.9, av)) * fade;
+		col = mix(col, rubber * 0.3, g);
+		rough = mix(0.78, 0.96, g) - 0.07 * (1.0 - smoothstep(0.0, 1.0, av)) * (1.0 - g);
+	} else {
+		float t = av - 2.0;
+		col = rubber * 1.1;
+		rough = 0.7;
+		if (v > 0.0) {
+			float w = fract(u * 2.0);
+			float big = step(0.3, t) * step(t, 0.54) * step(0.06, w) * step(w, 0.27);
+			float small = step(0.6, t) * step(t, 0.7) * step(0.38, w) * step(w, 0.5);
+			float lg = 0.0;
+			if (big > 0.0) {
+				float gu = u * 170.0;
+				lg = glyph(floor(gu), vec2(fract(gu), (t - 0.3) / 0.24));
+			} else if (small > 0.0) {
+				float gu = u * 330.0;
+				lg = glyph(floor(gu) + 91.0, vec2(fract(gu), (t - 0.6) / 0.1));
+			}
+			lg *= 1.0 - smoothstep(0.3, 0.8, fwidth(u * 170.0));
+			col = mix(col, vec3(0.07, 0.07, 0.074), lg * 0.75);
+			rough = mix(rough, 0.56, lg);
+			// Felgenschutz: feine Rillen
+			float ring = step(0.82, t) * step(0.5, fract(t * 60.0));
+			rough = mix(rough, 0.6, ring * 0.6);
+		}
+	}
+	ALBEDO = col;
+	ROUGHNESS = rough;
+	SPECULAR = 0.32;
+}
+"""
+	_tire_m = ShaderMaterial.new()
+	_tire_m.shader = sh
+	_tire_m.set_meta("lod_color", Color(0.04, 0.04, 0.042))
+	return _tire_m
+
+
+## Felge mit Bremsscheibe (rechtes Rad bzw. side < 0 gespiegelt): [Mesh, Rollen je Fläche]. rim aus rim_spec, tw
+## Reifenbreite (Modellmaße), big: große gelochte Bremse.
+static func _wheel_mesh(rim: Dictionary, tw: float, big: bool, side: int) -> Array:
+	var key := "wheel_%s_%d_%d_%.4f_%.4f_%.3f_%d_%.3f" % [rim["style"], rim["spokes"], rim["lugs"], rim["radius"], tw, rim["mu"], int(big),
+		float(rim.get("wide", 0.0))]
+	var hit = _wget(key)
+	if hit == null:
+		var wb := {}
+		_rim_build(wb, rim, tw)
+		_brake_build(wb, rim, tw, big)
+		hit = [_wcommit(wb, WHEEL_ROLES, false), _wcommit(wb, WHEEL_ROLES, true)]
+		_wput(key, hit)
+	return hit[0 if side > 0 else 1]
+
+
+## Maße, die Felge, Bremse und Sattel teilen (Modellmaße, rechtes Rad): Horn vorn x_lip, Anlage der Nabe x_mount
+## (Einpresstiefe ~40 mm; breite Felgen haben weniger), Felgenbett innen rb, Bremsscheibe disc_r und ihre Vorderseite x_rf
+static func _wheel_dims(rim: Dictionary, tw: float) -> Dictionary:
+	var rr: float = rim["radius"]
+	var mu: float = rim["mu"]
+	var fl := clampf(0.05 * rr, 0.008, 0.013)
+	var rb := rr - fl - 0.004
+	var x_mount := (0.04 - 0.6 * float(rim.get("wide", 0.0))) * mu
+	return {"rr": rr, "mu": mu, "h": tw / 2.0, "x_lip": tw / 2.0 + 0.004, "fl": fl, "rb": rb, "x_mount": x_mount,
+		"x_rf": x_mount - 0.033 * mu}
+
+
+## Felge je Bauart nach echten Vorbildern (ohne Marken): Horn und Bett, bei mehrteiligen ein poliertes Stufenbett mit
+## Nieten, der Stern (konkave Speichen, die vorn am Horn ansetzen und zur Nabe hin tiefer liegen), Nabe mit Radmuttern in
+## dunklen Bohrungen, Nabendeckel, Ventil, dunkle Rückwand.
+static func _rim_build(wb: Dictionary, rim: Dictionary, tw: float) -> void:
+	var D := _wheel_dims(rim, tw)
+	var rr: float = D["rr"]
+	var mu: float = D["mu"]
+	var h: float = D["h"]
+	var x_lip: float = D["x_lip"]
+	var fl: float = D["fl"]
+	var x_mount: float = D["x_mount"]
+	var n: int = maxi(int(rim["spokes"]), 1)
+	var style: String = str(rim.get("style", "std"))
+	var lugs: int = int(rim.get("lugs", 5))
+	var seg := 48
+	# Grundmaße je Bauart: dish Tiefe des Stufenbetts (Anteil der halben Reifenbreite), rc Außenkante des Sterns (Anteil
+	# des Felgenradius, nur mit Stufenbett), cvk Konkave (Anteil des Platzes vor der Nabe), pex Form der Konkave (<1:
+	# vorn steil, zur Nabe flach), rivets Nieten im Stufenbett
+	var dish := 0.0
+	var rc := 0.88
+	var cvk := 0.45
+	var pex := 0.8
+	var rivets := 0
+	var over_lip := style in ["te", "ten"]  # Speichen laufen bis über das Horn
+	match style:
+		"mesh":
+			dish = 0.2
+			rc = 0.86
+			cvk = 0.3
+			rivets = n * 2
+		"dish":
+			dish = 0.46
+			rc = 0.8
+			cvk = 0.1
+			pex = 1.0
+			rivets = 36
+		"3pc":
+			dish = 0.24
+			rc = 0.86
+			cvk = 0.3
+			rivets = 30
+		"thin":
+			dish = 0.1
+			rc = 0.91
+			cvk = 0.3
+			rivets = 20
+		"cup":
+			dish = 0.08
+			rc = 0.92
+			cvk = 0.35
+		"concave":
+			cvk = 0.95
+			pex = 0.6
+		"te":
+			cvk = 0.45
+			pex = 1.0
+		"ten":
+			cvk = 0.6
+			pex = 0.9
+		"split", "sickle":
+			cvk = 0.65
+			pex = 0.7
+		"y", "center":
+			cvk = 0.55
+		"rally":
+			cvk = 0.12
+			pex = 1.0
+		"clover":
+			cvk = 0.12
+			pex = 1.0
+		"turbine":
+			cvk = 0.1
+			pex = 1.0
+		"wire":
+			cvk = 0.7
+			pex = 1.0
+		"steel", "holes", "cap", "aero":
+			cvk = 0.35
+			pex = 1.0
+		"cross":
+			cvk = 0.5
+	var room := x_lip - x_mount - 0.02
+	dish = minf(dish * h, room * 0.55)
+	var stepped := dish > 0.0
+	# Außenkante des Sterns mindestens 1,2 cm unter dem Horn: sonst kippt der Konus des Stufenbetts nach hinten und
+	# fehlt als schmaler Streifen (Cup-Stern, Mehrspeichen bei kleinen Felgen)
+	var r_c := minf(rc * rr, rr - fl - 0.012) if stepped else rr - fl - 0.004
+	var x_out := x_lip - dish - 0.003
+	if over_lip:
+		x_out = x_lip + 0.0012
+	var cv := cvk * maxf(x_out - x_mount - 0.032, 0.0)
+	var rh := maxf(0.068 * mu, 0.25 * rr)  # Nabe (Mitte des Sterns)
+	if style == "rally":
+		rh = maxf(rh, 0.34 * rr)
+	var r_end: float = r_c - 0.014 if stepped else float(D["rb"]) + 0.004
+	if over_lip:
+		r_end = rr - 0.004
+	var x_root := x_out - cv
+	var xf := func(r: float) -> float:
+		var f := clampf((r_end - r) / maxf(r_end - rh, 0.01), 0.0, 1.0)
+		return x_out - cv * pow(f, pex)
+	var x_hub := x_root + 0.003  # Vorderseite der Nabe
+	var r0 := rh - 0.006
+	var th := 0.017
+	var ch := 0.0035
+
+	# Horn: abgerundete Kante vorn, bei mehrteiligen ein poliertes Stufenbett (Konus nach hinten bis zum Stern)
+	var lip := [Vector2(x_lip - 0.009, rr - 0.0015), Vector2(x_lip - 0.0025, rr + 0.0004), Vector2(x_lip + 0.0006, rr - 0.003),
+		Vector2(x_lip + 0.001, rr - fl * 0.55), Vector2(x_lip - 0.0004, rr - fl)]
+	if stepped:
+		lip.append_array([Vector2(x_lip - 0.003, rr - fl - 0.0025), Vector2(x_lip - dish + 0.003, r_c + 0.006),
+			Vector2(x_lip - dish + 0.0005, r_c + 0.0015), Vector2(x_lip - dish + 0.0005, r_c - 0.002)])
+	else:
+		lip.append_array([Vector2(x_lip - 0.004, rr - fl - 0.003), Vector2(x_lip - 0.012, D["rb"])])
+	_wrev(wb, "lip", lip, seg)
+	# Felgenbett innen (zwischen den Speichen sichtbar) mit Tiefbett in der Mitte, dahinter eine dunkle Rückwand
+	var rb: float = D["rb"]
+	var xb: float = (x_lip - dish - 0.004) if stepped else (x_out - 0.012 if not over_lip else x_lip - 0.012)
+	_wrev(wb, "barrel", [Vector2(xb, rb), Vector2(h * 0.05, rb), Vector2(-h * 0.08, rb - 0.012), Vector2(-h * 0.55, rb - 0.012),
+		Vector2(-h * 0.66, rb), Vector2(-h + 0.012, rb)], 40)
+	_wrev(wb, "dark", [Vector2(-h + 0.014, rb), Vector2(-h + 0.014, 0.0)], 32)
+	if stepped:
+		# Außenring des Sterns, darauf die Nieten bzw. Schrauben der mehrteiligen Felge
+		var xr := x_lip - dish - 0.0012
+		_wrev(wb, "face", [Vector2(xr - 0.004, r_c + 0.001), Vector2(xr, r_c - 0.001), Vector2(xr, r_c - 0.022), Vector2(xr - 0.006, r_c - 0.026)], seg)
+		for k in rivets:
+			var a := TAU * (k + 0.5) / rivets
+			_wdisc(wb, "chrome", Vector3(xr, cos(a) * (r_c - 0.011), sin(a) * (r_c - 0.011)), 0.0036 * mu, 6, Vector3.RIGHT, 0.0024 * mu)
+
+	# Stern je Bauart
+	match style:
+		"std":
+			var w0 := rr * (0.2 if n <= 5 else (0.135 if n <= 7 else 0.1))
+			for k in n:
+				_wspoke(wb, "face", _wst(TAU * k / n, r0, r_end, w0, w0 * 1.28, xf, th, ch), 0.003)
+		"te", "ten":
+			# geschmiedet: flache Speichen bis über das Horn, schmale Fase; Sechs breit, Zehn schlank
+			var w0 := rr * (0.15 if style == "te" else 0.07)
+			var w1 := rr * (0.25 if style == "te" else 0.095)
+			for k in n:
+				_wspoke(wb, "face", _wst(TAU * k / n, r0, r_end, w0, w1, xf, th, 0.0025, 6), 0.0 if style == "te" else 0.0015, true)
+		"split":
+			# Doppelspeichen: je zwei schlanke Speichen, die zur Nabe hin zusammenlaufen
+			for k in n:
+				for e in [-1.0, 1.0]:
+					_wspoke(wb, "face", _wst(TAU * k / n, r0, r_end, rr * 0.062, rr * 0.07, xf, th, ch, 5, 0.0, 1.4, e * rr * 0.03, e * rr * 0.085), 0.002)
+		"y", "center":
+			# Y: kräftiger Stamm, außen zwei Äste zum Nachbarn hin
+			var da := TAU / n * 0.24
+			for k in n:
+				var a := TAU * k / n
+				_wspoke(wb, "face", _wst(a, r0, rr * 0.56, rr * 0.17, rr * 0.13, xf, th, ch, 4), 0.003)
+				for e in [-1.0, 1.0]:
+					_wspoke(wb, "face", _wst(a, rr * 0.5, r_end, rr * 0.075, rr * 0.07, xf, th, ch, 5, e * da, 1.0), 0.002)
+		"concave":
+			if n >= 10:
+				# tief konkave Zehnspeichen, paarweise
+				for k in n / 2:
+					for e in [-1.0, 1.0]:
+						_wspoke(wb, "face", _wst(TAU * k / (n / 2), r0, r_end, rr * 0.06, rr * 0.068, xf, th, ch, 6, 0.0, 1.4, e * rr * 0.028, e * rr * 0.1), 0.002)
+			else:
+				for k in n:
+					_wspoke(wb, "face", _wst(TAU * k / n, r0, r_end, rr * 0.16, rr * 0.2, xf, th, ch, 6), 0.004)
+		"sickle":
+			for k in n:
+				_wspoke(wb, "face", _wst(TAU * k / n, r0, r_end, rr * 0.075, rr * 0.06, xf, th, ch, 7, 0.55), 0.002)
+		"thin":
+			for k in n:
+				_wspoke(wb, "face", _wst(TAU * k / n, r0, r_end, rr * 0.042, rr * 0.052, xf, 0.014, 0.003), 0.0015)
+		"mesh", "cross":
+			# Kreuzgitter: zwei Lagen schräger Speichen zum übernächsten Nachbarn, sie kreuzen sich auf halbem Weg (Rauten)
+			var da := TAU / n
+			var ws := rr * (0.04 if style == "mesh" else 0.068)
+			var rs0 := rh + (0.004 if style == "mesh" else -0.004)
+			for k in n:
+				var a := TAU * k / n
+				# gerade Sehnen: vier Schnitte reichen (30 Speichen beim Kreuzgitter, Dreiecke sparen)
+				_wspoke(wb, "face", _wst(a, rs0, r_end, ws, ws * 1.05, xf, 0.012, 0.002, 4, da, 1.0, 0.0, 0.0, 1.2, 0.0, Callable(), true), 0.004)
+				_wspoke(wb, "face", _wst(a, rs0, r_end, ws, ws * 1.05, xf, 0.012, 0.002, 4, -da, 1.0, 0.0, 0.0, 1.2, -0.004, Callable(), true), 0.004)
+		"3pc":
+			# mehrteilig mit Y-Gitter: n/2 Stämme, die sich außen teilen und am Ring mit dem Nachbarn treffen
+			var m := maxi(n / 2, 3)
+			var da := TAU / m * 0.5
+			for k in m:
+				var a := TAU * k / m
+				_wspoke(wb, "face", _wst(a, r0, rr * 0.6, rr * 0.13, rr * 0.085, xf, th, ch, 4), 0.003)
+				for e in [-1.0, 1.0]:
+					_wspoke(wb, "face", _wst(a, rr * 0.55, r_end, rr * 0.055, rr * 0.05, xf, 0.014, 0.0025, 5, e * da, 1.0), 0.002)
+		"dish":
+			# Tiefbett: Stern tief im polierten Bett, Speichen nach außen schmaler
+			for k in n:
+				_wspoke(wb, "face", _wst(TAU * k / n, r0, r_end, rr * 0.15, rr * 0.11, xf, th, ch), 0.003)
+		"cup":
+			# Cup: fünf breite Speichen mit Grat (V), poliertes Horn
+			for k in n:
+				_wspoke(wb, "face", _wst(TAU * k / n, r0, r_end, rr * 0.17, rr * 0.25, xf, th, 0.003), 0.012)
+		"rally":
+			# Rallye: breite flache Speichen, kleine Fenster, große Mitte
+			for k in n:
+				_wspoke(wb, "face", _wst(TAU * k / n, r0, r_end, rr * 0.27, rr * 0.34, xf, th, 0.003), 0.0)
+		"clover":
+			# Fünfblatt: polierte Blätter, die zum Rand hin breit werden, dazwischen schwarz eloxiert
+			var wend := 0.55 * TAU * r_end / n
+			var wst := 0.6 * TAU * rh / n
+			for k in n:
+				_wspoke(wb, "face", _wst(TAU * k / n, r0, r_end - 0.006, wst, wend, xf, th, 0.004, 6, 0.0, 1.4, 0.0, 0.0, 1.05, 0.0,
+					func(f: float) -> float: return lerpf(wst, wend, pow(f, 0.75))), 0.005)
+			_wrev(wb, "dark", [Vector2(x_out - 0.012, r_end), Vector2(x_root - 0.008, rh)], seg)
+			_wrev(wb, "face", [Vector2(x_out - 0.005, r_end + 0.002), Vector2(x_out, r_end - 0.002), Vector2(x_out, r_end - 0.012),
+				Vector2(x_out - 0.006, r_end - 0.016)], seg)
+		"turbine":
+			# Turbofächer: viele schmale, gebogene Schaufeln zwischen zwei Ringen
+			for k in n:
+				_wspoke(wb, "face", _wst(TAU * k / n, rh + 0.006, r_end - 0.01, rr * 0.05, rr * 0.07, xf, 0.01, 0.002, 6, 0.6, 1.2), 0.002)
+			_wrev(wb, "face", [Vector2(x_out - 0.006, r_end + 0.002), Vector2(x_out, r_end - 0.002), Vector2(x_out, r_end - 0.018),
+				Vector2(x_out - 0.008, r_end - 0.022)], seg)
+			_wrev(wb, "face", [Vector2(x_root - 0.008, rh + 0.024), Vector2(x_root + 0.001, rh + 0.02), Vector2(x_root + 0.001, rh - 0.004)], seg)
+		"wire":
+			# Drahtspeichen: zwei Lagen dünner, gekreuzter Speichen, Nabe mit Flügelmutter
+			for k in n * 2:
+				var a := TAU * k / (n * 2)
+				var odd := k % 2 == 1
+				_wspoke(wb, "chrome", _wst(a, rh * 0.85, r_end, 0.0045, 0.0045, xf, 0.0045, 0.0012, 3, 0.5 if odd else -0.5, 1.0, 0.0, 0.0, 1.0,
+					-0.006 if odd else 0.0))
+		"steel", "holes", "cap", "aero":
+			_disc_face(wb, style, n, rr, r_end, rh, x_out, x_root, mu, seg)
+
+	# Nabe: Sockel des Sterns mit Radmuttern in dunklen Bohrungen und Nabendeckel (Zentralverschluss: große Mutter;
+	# Radkappe und Aero-Scheibe decken die Mitte selbst ab)
+	if not style in ["cap"]:
+		_wrev(wb, "face", [Vector2(x_mount, rh + 0.002), Vector2(x_hub - 0.004, rh + 0.002), Vector2(x_hub, rh - 0.002),
+			Vector2(x_hub, 0.034 * mu), Vector2(x_hub - 0.003, 0.031 * mu)], seg)
+	if style == "center":
+		_wnut(wb, "accent", 0.0, 0.0, x_hub - 0.004, x_hub + 0.02 * mu, 0.042 * mu)
+		_wrev(wb, "chrome", [Vector2(x_hub + 0.02 * mu, 0.016 * mu), Vector2(x_hub + 0.026 * mu, 0.0)], 12)
+	elif style == "wire":
+		_wnut(wb, "chrome", 0.0, 0.0, x_hub - 0.004, x_hub + 0.016 * mu, 0.03 * mu, 8)
+		for e in [-1.0, 1.0]:
+			_wspoke(wb, "chrome", _wst(PI / 2.0 + (0.0 if e > 0 else PI), 0.02 * mu, 0.07 * mu, 0.014 * mu, 0.01 * mu,
+				func(_r: float) -> float: return x_hub + 0.014 * mu, 0.008, 0.002, 2), 0.002)
+	elif style != "cap":
+		var pcd := (0.05 if lugs == 4 else 0.0572) * mu
+		var xn := x_hub
+		if style == "aero":
+			xn = x_out - 0.004
+		for k in lugs:
+			var a := TAU * k / lugs + PI / lugs
+			var y := cos(a) * pcd
+			var z := sin(a) * pcd
+			_wdisc(wb, "dark", Vector3(xn + 0.0009, y, z), 0.0135 * mu, 10, Vector3.RIGHT)
+			_wnut(wb, "chrome", y, z, xn - 0.004, xn + 0.009 * mu, 0.0094 * mu)
+		# Nabendeckel: dunkle Kuppe mit hellem Ring und glattem Mittelfeld (ohne Zeichen)
+		var rcap := 0.03 * mu
+		_wrev(wb, "chrome", [Vector2(xn - 0.002, rcap + 0.0025), Vector2(xn + 0.003, rcap + 0.0022), Vector2(xn + 0.0042, rcap)], 24)
+		_wrev(wb, "dark", [Vector2(xn + 0.0042, rcap), Vector2(xn + 0.0068, rcap * 0.78), Vector2(xn + 0.0082, rcap * 0.45), Vector2(xn + 0.0086, 0.0)], 24)
+		_wdisc(wb, "face", Vector3(xn + 0.0089, 0, 0), rcap * 0.42, 16, Vector3.RIGHT)
+	# Ventil: im Bett zwischen zwei Speichen (mehrteilig: in der Wand des Stufenbetts), schräg nach vorn
+	if not style in ["cap", "aero"]:
+		var va := PI / n + 0.04
+		var vr: float = ((r_c + rr - fl) / 2.0 - 0.004) if stepped else D["rb"] - 0.003
+		var vx: float = (x_lip - dish * 0.55) if stepped else (x_out - 0.012 if not over_lip else x_lip - 0.016)
+		var base := Vector3(vx, cos(va) * vr, sin(va) * vr)
+		var radial := Vector3(0.0, cos(va), sin(va))
+		var tg := Vector3(0.0, -sin(va), cos(va))
+		var vd := (Vector3.RIGHT * 0.95 - radial * 0.32).normalized()
+		var tip := base + vd * 0.018
+		_wspoke(wb, "dark", [[base, tg, 0.0065, 0.0065, 0.0065, 0.0016], [tip, tg, 0.006, 0.006, 0.006, 0.0016]])
+		_wdisc(wb, "chrome", tip + vd * 0.0035, 0.0034, 8, vd, 0.002)
+
+
+## Geschlossene Scheiben (Stahlfelge, Lochfelge, Radkappe, Aero): Fläche als Drehkörper, Löcher und Schlitze als dunkle
+## Flächen davor
+static func _disc_face(wb: Dictionary, style: String, n: int, rr: float, r_end: float, rh: float, x_out: float, x_root: float, mu: float, seg: int) -> void:
+	match style:
+		"steel":
+			# gepresste Stahlscheibe: flacher Außenring, Mulde mit Lüftungslöchern, erhabener Hut mit den Radmuttern
+			_wrev(wb, "face", [Vector2(x_out - 0.004, r_end + 0.003), Vector2(x_out, r_end - 0.004), Vector2(x_out - 0.002, rr * 0.78),
+				Vector2(x_out - 0.014, rr * 0.7), Vector2(x_out - 0.014, rr * 0.56), Vector2(x_root - 0.002, rh + 0.012),
+				Vector2(x_root + 0.002, rh + 0.004)], seg)
+			for k in n:
+				var a := TAU * k / n + PI / n
+				_wdisc(wb, "dark", Vector3(x_out - 0.0132, cos(a) * rr * 0.63, sin(a) * rr * 0.63), rr * 0.07, 14, Vector3.RIGHT)
+		"holes":
+			# Lochfelge: leicht gewölbte Scheibe mit großen runden Löchern, jedes mit heller Fase
+			_wrev(wb, "face", [Vector2(x_out - 0.004, r_end + 0.003), Vector2(x_out, r_end - 0.004), Vector2(x_out - 0.004, rr * 0.5),
+				Vector2(x_root, rh + 0.004)], seg)
+			var hr := rr * (0.17 if n <= 5 else 0.115)
+			for k in n:
+				var a := TAU * k / n + PI / n
+				var r := rr * 0.6
+				var xs: float = lerpf(x_out - 0.004, x_out, (r - rr * 0.5) / (r_end - rr * 0.5)) + 0.0006
+				var c := Vector3(xs, cos(a) * r, sin(a) * r)
+				_wdisc(wb, "chrome", c, hr * 1.12, 18, Vector3.RIGHT)
+				_wdisc(wb, "dark", c + Vector3(0.0007, 0, 0), hr, 18, Vector3.RIGHT)
+		"cap":
+			# Radkappe aus Kunststoff: gewölbt, erhabener Ring, Schlitze, Mitte mit glattem Emblem
+			_wrev(wb, "face", [Vector2(x_out - 0.004, r_end + 0.003), Vector2(x_out + 0.002, r_end - 0.006), Vector2(x_out + 0.008, rr * 0.82),
+				Vector2(x_out + 0.009, rr * 0.76), Vector2(x_out + 0.004, rr * 0.7), Vector2(x_out + 0.004, rr * 0.36),
+				Vector2(x_out + 0.012, rr * 0.3), Vector2(x_out + 0.014, rr * 0.12), Vector2(x_out + 0.0145, 0.0)], seg)
+			for k in n:
+				var a := TAU * k / n
+				var c := Vector3(x_out + 0.0045, cos(a) * rr * 0.53, sin(a) * rr * 0.53)
+				var rad := Vector3(0, cos(a), sin(a))
+				var tg := Vector3(0, -sin(a), cos(a))
+				_wquad(wb, "dark", c - rad * rr * 0.12 - tg * 0.006, c + rad * rr * 0.12 - tg * 0.006, c + rad * rr * 0.12 + tg * 0.006,
+					c - rad * rr * 0.12 + tg * 0.006, Vector3.RIGHT, Vector3.RIGHT, Vector3.RIGHT, Vector3.RIGHT, Vector3.RIGHT)
+			_wdisc(wb, "chrome", Vector3(x_out + 0.0148, 0, 0), rr * 0.09, 16, Vector3.RIGHT)
+		"aero":
+			# Aero-Scheibe: glatt und geschlossen, Kühlschlitze am Rand
+			_wrev(wb, "face", [Vector2(x_out - 0.004, r_end + 0.003), Vector2(x_out, r_end - 0.004), Vector2(x_out - 0.002, rr * 0.5),
+				Vector2(x_out - 0.004, rh + 0.004), Vector2(x_out - 0.0046, rh - 0.004)], seg)
+			for k in n * 3:
+				var a := TAU * k / (n * 3)
+				var c := Vector3(x_out + 0.0006, cos(a) * rr * 0.77, sin(a) * rr * 0.77)
+				var rad := Vector3(0, cos(a), sin(a))
+				var tg := Vector3(0, -sin(a), cos(a))
+				_wquad(wb, "dark", c - rad * rr * 0.09 - tg * 0.005, c + rad * rr * 0.09 - tg * 0.005, c + rad * rr * 0.09 + tg * 0.005,
+					c - rad * rr * 0.09 + tg * 0.005, Vector3.RIGHT, Vector3.RIGHT, Vector3.RIGHT, Vector3.RIGHT, Vector3.RIGHT)
+
+
+## Bremse in der Felge: belüftete Scheibe (Reibring mit dunklem Rand, große Bremse gelocht und mit Topf-Nieten), Topf bis
+## zur Nabe. Echte Größen: 280 bis 380 mm, kleine Felgen begrenzen.
+static func _brake_build(wb: Dictionary, rim: Dictionary, tw: float, big: bool) -> void:
+	var D := _wheel_dims(rim, tw)
+	var mu: float = D["mu"]
+	var dr := _disc_r(rim, tw, big)
+	var x_rf: float = D["x_rf"]
+	var thk := 0.026 * mu
+	var ri := dr * 0.6
+	var rhat := minf(0.078 * mu, dr * 0.55)
+	_wrev(wb, "rotor", [Vector2(x_rf - thk, dr), Vector2(x_rf - 0.002, dr), Vector2(x_rf, dr - 0.002), Vector2(x_rf, ri + 0.004)], 40)
+	_wrev(wb, "dark", [Vector2(x_rf - thk * 0.8, dr + 0.0005), Vector2(x_rf - thk * 0.2, dr + 0.0005)], 40)  # Kühlkanäle im Rand
+	_wrev(wb, "hat", [Vector2(x_rf + 0.0006, ri + 0.004), Vector2(x_rf + 0.0006, rhat + 0.003), Vector2(x_rf + 0.003, rhat),
+		Vector2(D["x_mount"] - 0.002, rhat), Vector2(D["x_mount"], rhat - 0.004), Vector2(D["x_mount"], 0.03 * mu)], 32)
+	if big:
+		# gelocht: drei versetzte Reihen, Topf mit Nieten (schwimmend gelagert)
+		for row in 3:
+			var r := lerpf(ri + 0.012 * mu, dr - 0.012 * mu, row / 2.0)
+			for k in 12:
+				var a := TAU * (k + row / 3.0) / 12.0
+				_wdisc(wb, "dark", Vector3(x_rf + 0.0006, cos(a) * r, sin(a) * r), 0.0042 * mu, 6, Vector3.RIGHT)
+		for k in 10:
+			var a := TAU * k / 10.0
+			_wdisc(wb, "chrome", Vector3(x_rf + 0.0012, cos(a) * (ri + 0.002), sin(a) * (ri + 0.002)), 0.0045 * mu, 6, Vector3.RIGHT, 0.002 * mu)
+
+
+## Radius der Bremsscheibe (Modellmaße): ab Werk ~300 mm, groß ~350 mm, höchstens so groß, dass der Sattel ins Bett passt
+static func _disc_r(rim: Dictionary, tw: float, big: bool) -> float:
+	var D := _wheel_dims(rim, tw)
+	var mu: float = D["mu"]
+	return minf((0.176 if big else 0.15) * mu, float(D["rb"]) - 0.03 * mu)
+
+
+## Bremssattel (steht still am Achsschenkel, oben hinten über der Scheibe): gebogener Block mit runden Enden und Fase,
+## zwei Schrauben vorn. [Mesh, Rollen] wie _wheel_mesh.
+static func _caliper_mesh(rim: Dictionary, tw: float, big: bool, side: int) -> Array:
+	var key := "caliper_%.4f_%.4f_%.3f_%d_%.3f" % [rim["radius"], tw, rim["mu"], int(big), float(rim.get("wide", 0.0))]
+	var hit = _wget(key)
+	if hit == null:
+		var D := _wheel_dims(rim, tw)
+		var mu: float = D["mu"]
+		var dr := _disc_r(rim, tw, big)
+		var x_rf: float = D["x_rf"]
+		var ro := dr + 0.013 * mu
+		var ri := dr - (0.048 if big else 0.04) * mu
+		var xo := x_rf + 0.022 * mu
+		var xi := x_rf - 0.05 * mu
+		var ch := 0.006 * mu
+		var span := (0.24 if big else 0.17) * mu / dr
+		var ca := 0.75
+		var K := 10
+		var wb := {}
+		var secs := []
+		var mids := []
+		for k in K + 1:
+			var f := float(k) / K
+			var a := ca + (f - 0.5) * span
+			var e := pow(1.0 - pow(absf(2.0 * f - 1.0), 3.0), 1.0 / 3.0)  # runde Enden
+			var hh := (ro - ri) / 2.0 * (0.4 + 0.6 * e)
+			var rm := (ro + ri) / 2.0
+			var cs := Vector2(cos(a), sin(a))
+			var P := func(x: float, r: float) -> Vector3: return Vector3(x, cs.x * r, cs.y * r)
+			secs.append([P.call(xi, rm + hh), P.call(xo - ch, rm + hh), P.call(xo, rm + hh - ch), P.call(xo, rm - hh + ch),
+				P.call(xo - ch, rm - hh), P.call(xi, rm - hh)])
+			mids.append(P.call((xi + xo) / 2.0, rm))
+		for k in K:
+			for j in 5:
+				var a: Vector3 = secs[k][j]
+				var b: Vector3 = secs[k][j + 1]
+				var c: Vector3 = secs[k + 1][j + 1]
+				var d: Vector3 = secs[k + 1][j]
+				var nn := (c - a).cross(d - b).normalized()
+				if nn.dot((a + b + c + d) / 4.0 - ((mids[k] as Vector3) + (mids[k + 1] as Vector3)) / 2.0) < 0.0:
+					nn = -nn
+				_wquad(wb, "caliper", a, b, c, d, nn, nn, nn, nn, nn)
+		for end in [0, K]:
+			var sec: Array = secs[end]
+			var tg: Vector3 = ((secs[mini(end + 1, K)][2] as Vector3) - (secs[maxi(end - 1, 0)][2] as Vector3)).normalized() * (-1.0 if end == 0 else 1.0)
+			for j in range(1, 5):
+				_wtri(wb, "caliper", sec[0], sec[j], sec[j + 1], tg, tg, tg, tg)
+		for f: float in [0.2, 0.8]:
+			var a := ca + (f - 0.5) * span
+			var rm := (ro + ri) / 2.0 + (ro - ri) * 0.18
+			_wdisc(wb, "chrome", Vector3(xo + 0.0004, cos(a) * rm, sin(a) * rm), 0.0062 * mu, 6, Vector3.RIGHT, 0.0025 * mu)
+		hit = [_wcommit(wb, ["caliper", "chrome"], false), _wcommit(wb, ["caliper", "chrome"], true)]
+		_wput(key, hit)
+	return hit[0 if side > 0 else 1]
 
 
 ## Unschärfescheibe für schnell drehende Räder: flacher Ring (Vorderseite +X) in Vertexfarben. Innen und am Horn
@@ -2076,10 +2529,12 @@ static func _hex(r: float, h: float) -> CylinderMesh:
 ## wie viel Fläche die Speichen bedecken), mit feinen konzentrischen Streifen wie auf echten Aufnahmen.
 static func _blur_mesh(rr: float, c: Color, style: String) -> ArrayMesh:
 	var key := "blur_%.4f_%s_%s" % [rr, c.to_html(), style]
-	if _mesh_cache.has(key):
-		return _mesh_cache[key]
-	var cov: float = {"steel": 0.95, "aero": 0.95, "cap": 0.95, "holes": 0.85, "clover": 0.75, "wire": 0.35, "thin": 0.5,
-		"mesh": 0.5, "cross": 0.55, "rally": 0.65, "te": 0.55, "dish": 0.4, "ten": 0.4, "concave": 0.5}.get(style, 0.45)
+	var hit = _wget(key)
+	if hit != null:
+		return hit
+	var cov: float = {"steel": 0.95, "aero": 0.95, "cap": 0.95, "holes": 0.85, "clover": 0.8, "wire": 0.35, "thin": 0.5,
+		"mesh": 0.5, "cross": 0.55, "rally": 0.7, "te": 0.55, "dish": 0.4, "ten": 0.4, "concave": 0.45, "cup": 0.55, "turbine": 0.6,
+		"3pc": 0.45}.get(style, 0.45)
 	var mid := Color(0.05, 0.05, 0.055).lerp(c, cov)
 	var rings := [[0.1, 0.0], [0.15, 0.45], [0.24, 0.55], [0.32, 0.93], [0.45, 0.97], [0.58, 0.95], [0.7, 0.97], [0.82, 0.95], [0.92, 0.85], [0.985, 0.0]]
 	var st := SurfaceTool.new()
@@ -2101,14 +2556,19 @@ static func _blur_mesh(rr: float, c: Color, style: String) -> ArrayMesh:
 				st.set_color(col[v[2]])
 				st.set_normal(Vector3.RIGHT)
 				st.add_vertex(Vector3(0.0, v[0] * cos(v[1]), v[0] * sin(v[1])))
+	st.index()
 	var m := st.commit()
-	_mesh_cache[key] = m
+	_wput(key, m)
 	return m
 
 
-## Felge eines Autos mit Tuning: Bauart, Speichen, Farbe und Radmuttern ("Serie" = Werksfelge des Autos), Zoll
-## (Werk + Aufschlag der Felge + Zoll-Tuning, höchstens so groß, dass 4,5 cm Reifenflanke bleiben), Radius in
-## Modellmaßen (das Rad wird danach auf wheel_r skaliert) und Reifengröße als Text (z. B. "225/40 R18").
+## Felge eines Autos mit Tuning: Bauart, Speichen, Farbe und Radmuttern ("Serie" = Werksfelge des Autos), Größe in Zoll
+## (Kategorie Zoll: "Standard" = Werk + Aufschlag der Felge, sonst fest 13" bis 24"; kleiner als zwei Zoll unter Werk
+## passt nicht über die Bremse, min_in), Reifen (wird mit der Felge etwas breiter, "Breit" legt 30 mm drauf) und Rad:
+## der Reifen behält seinen Außendurchmesser, solange mindestens ein 20er-Querschnitt bzw. 4 cm Flanke bleibt (bis fit_in);
+## darüber wächst das ganze Rad (grow, build hebt die Karosserie und weitet die Radläufe, wheel_fit). radius und mu in
+## Modellmaßen (das Rad wird auf wheel_r skaliert), tire als Text (z. B. "225/40 R18").
+## Bis 2.36 galt die Größe relativ (-1 … +4 Zoll zur Standardgröße) und höchstens so groß, dass 4,5 cm Flanke blieben.
 static func rim_spec(car_id: String, cfg: Dictionary) -> Dictionary:
 	var S: Dictionary = SHAPES.get(car_id, SHAPES["kaizen"])
 	var wr := wheel_r(S)
@@ -2120,17 +2580,132 @@ static func rim_spec(car_id: String, cfg: Dictionary) -> Dictionary:
 		r["spokes"] = fac[1]
 		r["color"] = fac[2]
 	r["lugs"] = fac[4]
-	var max_in := floori((wr - 0.045) / 0.0127)
-	var std_in := mini(int(fac[3]) + int(opt.get("plus", 0)), max_in)
-	var inch := clampi(std_in + int(Catalog.part_of(cfg, "rimsize")["inch"]), 13, max_in)
+	r["polish"] = str(r["style"]) in POLISHED_LIP
+	var fac_in: int = fac[3]
+	var tw0: float = S.get("tire_w", 0.24)
+	var sp := Catalog.part_of(cfg, "spur")
+	var wide: float = sp.get("wide", 0.0)
+	var min_in := maxi(13, fac_in - 2)
+	var fit_in := min_in
+	for i in range(min_in, 25):
+		if i * 0.0127 + _min_side(_tire_w(tw0, fac_in, i, 0.0)) <= wr + 0.0005:
+			fit_in = i
+	var std_in := clampi(fac_in + int(opt.get("plus", 0)), min_in, fit_in)
+	var so := Catalog.part_of(cfg, "rimsize")
+	var inch := std_in
+	if so.has("abs"):
+		inch = clampi(int(so["abs"]), min_in, 24)
+	elif int(so.get("inch", 0)) != 0:
+		inch = clampi(std_in + int(so["inch"]), min_in, fit_in)  # alter Spielstand (bis 2.36): relativ zur Standardgröße
+	var tw := _tire_w(tw0, fac_in, inch, wide)
+	var side := maxf(wr - inch * 0.0127, _min_side(tw - wide))
+	var R := inch * 0.0127 + side
 	r["inch"] = inch
 	r["std_in"] = std_in
-	r["max_in"] = max_in
-	r["radius"] = inch * 0.0127 * WHEEL_R / wr
-	var width := roundi((float(S.get("tire_w", 0.24)) * 1000.0 - 5.0) / 10.0) * 10 + 5
-	var prof := clampi(roundi((wr - inch * 0.0127) * 1000.0 / width * 20.0) * 5, 20, 80)
+	r["min_in"] = min_in
+	r["fit_in"] = fit_in
+	r["max_in"] = 24
+	r["wheel_r"] = R
+	r["grow"] = R - wr
+	r["tire_w"] = tw
+	r["spacer"] = float(sp.get("spacer", 0.0))
+	r["wide"] = wide
+	r["radius"] = inch * 0.0127 * WHEEL_R / R
+	r["mu"] = WHEEL_R / R
+	var width := roundi((tw * 1000.0 - 5.0) / 10.0) * 10 + 5
+	var prof := clampi(roundi(side * 1000.0 / width * 20.0) * 5, 20, 80)
 	r["tire"] = "%d/%d R%d" % [width, prof, inch]
 	return r
+
+
+## Reifenbreite (m): ab Werk tire_w, je Zoll über Werk 5 mm mehr (höchstens 30 mm, kleiner bis 10 mm schmaler), dazu wide
+static func _tire_w(tw0: float, fac_in: int, inch: int, wide: float) -> float:
+	return tw0 + clampf((inch - fac_in) * 0.005, -0.01, 0.03) + wide
+
+
+## Kleinste Flanke (m): 20er-Querschnitt, mindestens 4 cm
+static func _min_side(tw: float) -> float:
+	return maxf(0.04, tw * 0.2)
+
+
+## Sitz der Räder (seit 2.37): Spur je Achse aus der Karosserie (Reifenflanke 2 cm innerhalb der Kotflügelkante, Spurplatten
+## schieben hinaus, mit Breitbau rückt die Kante und damit das Rad nach außen), Radius der Radläufe und Höherlegung für große
+## Räder (lift). Bis 2.36 saßen die Räder fest bei halber Breite minus 15 cm, an breiten Hüften tief im Radhaus.
+## Der Radlauf reicht höchstens bis 5 cm unter die Gürtellinie (dort beginnt die Flanke, _section); braucht ein großes Rad
+## mehr, steht das Auto um den Rest höher (extra_lift), damit oben 2 cm Luft bleiben.
+## Tiefergelegt steht der Reifen oben über der Kante des Radlaufs. Liegt er dabei innen (ab Werk), verschwindet er hinter dem
+## Blech. Steht er an oder über der Kante (Spurplatten, breit), stäche er durch Kotflügel und Radlaufkante; dann wie bei
+## echten tiefen Autos mit breiter Spur: negativer Sturz (die obere Hälfte wandert nach innen), der Radlauf wird etwas weiter
+## (gezogene Kotflügel: bis 4 cm, nicht über die Grenze unter der Gürtellinie), und reicht das nicht, geht die Karosserie nur
+## so weit herunter, wie das Rad Platz hat (drop: so viel tiefer liegt sie wirklich). drop_in: gewünschte Tieferlegung
+## (Fahrwerk, Werk).
+static func wheel_fit(rim: Dictionary, S: Dictionary, W: float, L: float, flare: float, drop_in: float) -> Dictionary:
+	var R: float = rim["wheel_r"]
+	var bulge := 0.007  # so weit steht die Flanke über die halbe Reifenbreite (m)
+	var tw: float = rim["tire_w"]
+	var wide: float = rim["wide"]
+	var wr := wheel_r(S)
+	var out := {}
+	var poke := -1.0
+	var belt := 9.0  # tiefste Gürtellinie über den Achsen
+	for i in 2:
+		var t := axle(S) / L if i == 0 else 1.0 - axle(S) / L
+		var sec: PackedVector2Array = _section(S, t, W, L, flare)["p"]
+		belt = minf(belt, sec[6].y)
+		var lip: float = sec[4].x
+		if S.get("overfenders", false):
+			lip += 0.045  # aufgeschraubte Verbreiterungen (_extras): die Räder füllen sie aus wie beim Vorbild
+		var xc: float = lip - 0.02 - (tw - wide) / 2.0 - bulge + float(rim["spacer"])
+		out["track_f" if i == 0 else "track_r"] = xc
+		poke = maxf(poke, xc + tw / 2.0 + bulge - lip)
+	var ra_max := maxf(belt - 0.05 - wr, wr + 0.045)  # nie enger als ab Werk
+	var ra := minf(maxf(wr + 0.045, R + 0.02), ra_max)
+	var extra := maxf(R + 0.02 - ra, 0.0)
+	var camber := 0.0
+	var drop := drop_in
+	var gap := 0.008
+	# Radmitte über der Mitte des Radlaufs (Karosserie-Maß): drop + Sturzhub - extra
+	if poke > -0.019 and drop_in - extra > ra - R - gap:
+		# Sturz: ab dieser Höhe über der Radmitte liegt die Außenkante 1,9 cm innen (hinter Blech und Radlaufkante)
+		camber = asin(minf((poke + 0.019) / (0.75 * R), sin(deg_to_rad(9.0))))
+		ra = minf(maxf(ra, R + drop_in - extra + gap), maxf(ra, minf(ra + 0.04, ra_max)))
+		var cl0 := (tw / 2.0) * sin(camber) - R * (1.0 - cos(camber))
+		var d_max := ra - gap - R
+		if camber > 0.0:
+			var hide := (poke + 0.019) / sin(camber)
+			d_max = -hide + sqrt(hide * hide + (ra - gap) * (ra - gap) - R * R)
+		drop = clampf(d_max - cl0 + extra, 0.0, drop_in)
+	out["lift"] = R - wr + extra
+	out["extra_lift"] = extra
+	out["arch_r"] = ra
+	out["drop"] = drop
+	out["camber"] = camber
+	out["camber_lift"] = (tw / 2.0) * sin(camber) - R * (1.0 - cos(camber))
+	out["poke"] = poke
+	return out
+
+
+## Zoll für Gegner und Herausforderer (gewürfelt, seit 2.37): feste Größen unter dem kleinsten, das über die Bremse passt
+## (würden sonst alle auf min_in hochgesetzt), und solche, bei denen das Rad wachsen müsste, werden zu "Standard". Die alten
+## relativen Plätze (1–5) bleiben: rim_spec hält sie zwischen min_in und fit_in, das Rad wächst damit nie.
+static func rival_rimsize(car_id: String, cfg: Dictionary) -> int:
+	var opt: Dictionary = Catalog.part_of(cfg, "rimsize")
+	if opt.has("abs"):
+		var rs := rim_spec(car_id, cfg)
+		if int(opt["abs"]) < int(rs["min_in"]) or float(rs["grow"]) > 0.001:
+			return 0
+	return int(cfg.get("rimsize", 0))
+
+
+## Felge und Sitz der Räder eines Autos mit Tuning in einem (Garage: Zoll, Reifen, Höherlegung, Sturz)
+static func fit_info(car_id: String, cfg: Dictionary) -> Dictionary:
+	var spec: Dictionary = Catalog.CARS[car_id]
+	var S: Dictionary = SHAPES.get(car_id, SHAPES["kaizen"])
+	var rim := rim_spec(car_id, cfg)
+	var drop: float = Catalog.part_of(cfg, "suspension")["drop"] + S.get("drop", 0.0)
+	rim.merge(wheel_fit(rim, S, spec["width"], spec["length"], kit_flare(cfg), drop))
+	rim["drop_in"] = drop
+	return rim
 
 
 ## Bodykits 3–6: Street (lackierte Lippe, Schweller, Heckschürze), Rallye (Schmutzfänger, Unterfahrschutz,
@@ -2154,7 +2729,7 @@ static func _bodykit(body: Node3D, fb: Node3D, S: Dictionary, W: float, L: float
 			var flap := mat(Color(0.75, 0.04, 0.04), 0.0, 0.8)
 			for zi in [-1, 1]:
 				for s in [-1, 1]:
-					_add(body, rbox(Vector3(0.24, 0.22, 0.012)), flap, Vector3(s * (W / 2.0 - 0.18), CLEARANCE + 0.03, zi * (L / 2.0 - axle(S)) + wheel_r(S) + 0.1))
+					_add(body, rbox(Vector3(0.24, 0.22, 0.012)), flap, Vector3(s * _flap_x(S, W, L, flare, zi), CLEARANCE + 0.03, zi * (L / 2.0 - axle(S)) + arch_r(S) + 0.055))
 			_add(body, rbox(Vector3(fw * 1.3, 0.02, 0.4)), mat(Color(0.6, 0.6, 0.62), 0.9, 0.35), Vector3(0, CLEARANCE - 0.03, zf + 0.22))
 			var aux := mat(Color(1.0, 0.92, 0.7), 0.0, 0.3, Color(1.0, 0.85, 0.5), 2.2)
 			for s in [-1, 1]:
@@ -2182,6 +2757,8 @@ static func _bodykit(body: Node3D, fb: Node3D, S: Dictionary, W: float, L: float
 static func _spoiler(body: Node3D, S: Dictionary, W: float, L: float, flare: float, sp: int, deck_y: float, wz: float,
 		dark: Material, paint: Material, car_id: String) -> void:
 	var zf := -L / 2.0
+	# halbe Spannweite wie in build(): Karosserie am Flügel + 2 cm (bis 2.36 halbe Katalogbreite)
+	var wh: float = (_section(S, (wz - zf) / L, W, L, flare)["p"] as PackedVector2Array)[4].x + 0.02
 	match sp:
 		4:
 			var bt := 1.0 - 0.09 / L
@@ -2190,36 +2767,36 @@ static func _spoiler(body: Node3D, S: Dictionary, W: float, L: float, flare: flo
 			_add(body, tapered_box(Vector2(bw, 0.24), Vector2(bw - 0.05, 0.05), 0.1, 0.12), paint, Vector3(0, bp[10].y - 0.015, zf + bt * L - 0.08))
 		5:
 			for s in [-1, 1]:
-				_add(body, rbox(Vector3(0.035, 0.1, 0.08)), dark, Vector3(s * (W / 2.0 - 0.42), deck_y + 0.05, wz + 0.03))
-				_add(body, _endplate(0.02, 0.08, 0.3), paint, Vector3(s * (W / 2.0 - 0.16), deck_y + 0.12, wz + 0.04))
-			_add(body, _airfoil(W - 0.32, 0.27, 0.035), paint, Vector3(0, deck_y + 0.11, wz + 0.04)).rotation_degrees.x = -6
+				_add(body, rbox(Vector3(0.035, 0.1, 0.08)), dark, Vector3(s * (wh - 0.42), deck_y + 0.05, wz + 0.03))
+				_add(body, _endplate(0.02, 0.08, 0.3), paint, Vector3(s * (wh - 0.16), deck_y + 0.12, wz + 0.04))
+			_add(body, _airfoil(2.0 * wh - 0.32, 0.27, 0.035), paint, Vector3(0, deck_y + 0.11, wz + 0.04)).rotation_degrees.x = -6
 		6:
 			var hgt := 0.32
 			for s in [-1, 1]:
 				_add(body, rbox(Vector3(0.04, hgt + 0.06, 0.06)), dark, Vector3(s * 0.32, deck_y + (hgt + 0.06) / 2.0, wz + 0.17))
 				_add(body, rbox(Vector3(0.04, 0.04, 0.2)), dark, Vector3(s * 0.32, deck_y + hgt + 0.06, wz + 0.08))
-				_add(body, _endplate(0.03, 0.2, 0.42), paint, Vector3(s * (W / 2.0 - 0.05), deck_y + hgt - 0.02, wz + 0.02))
-			_add(body, _airfoil(W - 0.1, 0.36, 0.04), paint, Vector3(0, deck_y + hgt, wz + 0.02)).rotation_degrees.x = -8
+				_add(body, _endplate(0.03, 0.2, 0.42), paint, Vector3(s * (wh - 0.05), deck_y + hgt - 0.02, wz + 0.02))
+			_add(body, _airfoil(2.0 * wh - 0.1, 0.36, 0.04), paint, Vector3(0, deck_y + hgt, wz + 0.02)).rotation_degrees.x = -8
 		7:
 			for s in [-1, 1]:
-				_add(body, rbox(Vector3(0.05, 0.24, 0.1)), dark, Vector3(s * (W / 2.0 - 0.4), deck_y + 0.12, wz))
-				_add(body, _endplate(0.03, 0.26, 0.46), paint, Vector3(s * (W / 2.0 - 0.04), deck_y + 0.3, wz + 0.02))
-			_add(body, _airfoil(W - 0.08, 0.34, 0.04), paint, Vector3(0, deck_y + 0.24, wz)).rotation_degrees.x = -5
-			_add(body, _airfoil(W - 0.08, 0.2, 0.03), paint, Vector3(0, deck_y + 0.38, wz + 0.1)).rotation_degrees.x = -14
+				_add(body, rbox(Vector3(0.05, 0.24, 0.1)), dark, Vector3(s * (wh - 0.4), deck_y + 0.12, wz))
+				_add(body, _endplate(0.03, 0.26, 0.46), paint, Vector3(s * (wh - 0.04), deck_y + 0.3, wz + 0.02))
+			_add(body, _airfoil(2.0 * wh - 0.08, 0.34, 0.04), paint, Vector3(0, deck_y + 0.24, wz)).rotation_degrees.x = -5
+			_add(body, _airfoil(2.0 * wh - 0.08, 0.2, 0.03), paint, Vector3(0, deck_y + 0.38, wz + 0.1)).rotation_degrees.x = -14
 		8:
 			if car_id == "kaizen":
 				return  # hat ab Werk einen Dachspoiler
 			var t0: float = S["rr"]
 			var y0 := _top_c(S, t0)
-			var roof_w: float = (W / 2.0 - S["tumble"]) * 2.0
+			var roof_w: float = (_section(S, t0, W, L, flare)["p"] as PackedVector2Array)[7].x * 2.0  # Dachbreite dort
 			var rs := _add(body, _airfoil(roof_w * 0.86, 0.22, 0.025), paint, Vector3(0, y0 + 0.012, (t0 - 0.5) * L + 0.09))
 			rs.rotation.x = 0.1
 			for s in [-1, 1]:
 				_add(body, rbox(Vector3(0.02, 0.05, 0.22)), paint, Vector3(s * roof_w * 0.43, y0 - 0.005, (t0 - 0.5) * L + 0.09)).rotation.x = 0.1
 		9:
 			for s in [-1, 1]:
-				_add(body, rbox(Vector3(0.07, 0.25, 0.16)), paint, Vector3(s * (W / 2.0 - 0.25), deck_y + 0.09, wz + 0.03)).rotation_degrees.x = 20
-			_add(body, _airfoil(W - 0.4, 0.27, 0.04), paint, Vector3(0, deck_y + 0.21, wz + 0.08)).rotation_degrees.x = -5
+				_add(body, rbox(Vector3(0.07, 0.25, 0.16)), paint, Vector3(s * (wh - 0.25), deck_y + 0.09, wz + 0.03)).rotation_degrees.x = 20
+			_add(body, _airfoil(2.0 * wh - 0.4, 0.27, 0.04), paint, Vector3(0, deck_y + 0.21, wz + 0.08)).rotation_degrees.x = -5
 
 
 ## Motorhauben 1–6 (5 = Kohlefaser ist nur Haut, siehe _skin): Hutze, Lamellen, NACA-Einlass, Doppelhutze
@@ -2267,7 +2844,7 @@ static func _hood(body: Node3D, S: Dictionary, W: float, L: float, flare: float,
 ## wie ausgestanzt). Folgt der Flanke (Punkt 4 des Querschnitts), beide Seiten.
 static func _arch_lips(body: Node3D, S: Dictionary, W: float, L: float, flare: float, m: Material) -> void:
 	var wr := wheel_r(S)
-	var ra := wr + 0.045
+	var ra := arch_r(S)
 	var rt := 0.013
 	const SEG := 20
 	const RING := 6
@@ -2339,7 +2916,7 @@ static func _extras(body: Node3D, fb: Node3D, rbm: Node3D, car_id: String, S: Di
 	if S.get("overfenders", false):
 		# Verbreiterungen: Bögen um die Radläufe in Wagenfarbe, außen auf die Flanke geschraubt. Seit 2.25 ein glatter,
 		# gerundeter Bogen (vorher elf aneinandergesetzte Klötzchen, das wirkte wie Lego).
-		var ra := wheel_r(S) + 0.07
+		var ra := arch_r(S) + 0.025
 		for wz in [-L / 2.0 + axle(S), L / 2.0 - axle(S)]:
 			for s in [-1, 1]:
 				var pts := []
@@ -2383,7 +2960,7 @@ static func _extras(body: Node3D, fb: Node3D, rbm: Node3D, car_id: String, S: Di
 
 
 static func _kaizen_extras(body: Node3D, S: Dictionary, W: float, L: float, mats: Dictionary) -> void:
-	var roof_w: float = (W / 2.0 - S["tumble"]) * 2.0
+	var roof_w: float = (_section(S, float(S["rr"]), W, L, 0.0)["p"] as PackedVector2Array)[7].x * 2.0  # Dachbreite (Querschnitt)
 	# Dachspoiler: setzt bündig an der Dachkante an und läuft flach über den Anfang der Heckscheibe
 	var t0: float = S["rr"] + 0.01
 	var t1: float = S["rr"] + 0.09
@@ -3522,16 +4099,17 @@ static func _section(S: Dictionary, t: float, W: float, L: float, flare: float) 
 	var wr := wheel_r(S)
 	var tf := ax / L
 	var tr := 1.0 - ax / L
-	# Draufsicht: runde Ecken, Kotflügel vorn, Hüften hinten
-	var w := W / 2.0
+	# Draufsicht: runde Ecken, Kotflügel vorn, Hüften hinten. W ist die größte Breite (über den Hüften): Hüften und
+	# Kotflügel-Buckel gehen von der Grundbreite ab, aufgeschraubte Verbreiterungen (overfenders) sitzen noch darauf.
+	var w := W / 2.0 - maxf(S["hips"], 0.015) - (0.045 if S.get("overfenders", false) else 0.0)
 	w -= S["round_f"] * pow(maxf(1.0 - t / 0.14, 0.0), 2.0)
 	w -= S["round_r"] * pow(maxf(1.0 - (1.0 - t) / 0.12, 0.0), 2.0)
 	var hip: float = (S["hips"] + flare) * exp(-pow((t - tr) / 0.1, 2.0))
 	var fend: float = (0.015 + flare) * exp(-pow((t - tf) / 0.08, 2.0))
 	var w2 := w + hip + fend
 	var w3 := w2 - 0.05 - hip * 0.5
-	# Radausschnitt
-	var ra := wr + 0.045
+	# Radausschnitt (Mitte auf Werks-Radhöhe; ein größeres Rad hebt die Karosserie, der Lauf wird weiter: arch_r)
+	var ra := arch_r(S)
 	var dz := minf(absf(z - (-L / 2.0 + ax)), absf(z - (L / 2.0 - ax)))
 	var arch := dz < ra
 	# Schürzen unten eingezogen: die Unterkante steigt zu Bug und Heck hin an
@@ -3560,7 +4138,7 @@ static func _section(S: Dictionary, t: float, W: float, L: float, flare: float) 
 	var p4 := Vector2(lerpf(w3 - 0.07, w - S["tumble"], g), lerpf(belt + 0.035, top - 0.045, g))
 	var y2 := clampf(maxf(C + 0.28, ybot + 0.035), C + 0.1, belt - 0.05)
 	var x1 := w2 - (0.01 if arch else 0.06)
-	var w_in := W / 2.0 - 0.33 if arch else x1
+	var w_in := w2 - 0.36 if arch else x1  # Innenwand des Radhauses, mit Abstand zum breitesten Reifen
 	var pts := PackedVector2Array([
 		Vector2(0.0, C), Vector2(w_in, C), Vector2(w_in, ybot), Vector2(x1, ybot), Vector2(w2, y2),
 		Vector2((w2 + w3) / 2.0 + 0.012, (y2 + belt) / 2.0), Vector2(w3, belt), p4,
@@ -3842,7 +4420,7 @@ static func _pillars(S: Dictionary) -> Array:
 ## Türen) sind schmale dunkle Bänder zwischen zwei dicht liegenden Querschnitten.
 static func _shell(body: Node3D, S: Dictionary, W: float, L: float, flare: float, vinyl: int, mats: Dictionary, carbon_hood := false) -> void:
 	var seams: Array = [FRONT_SEAM, REAR_SEAM] + S["doors"]
-	var ra := wheel_r(S) + 0.045
+	var ra := arch_r(S)
 	# Feste Querschnitte: Fugen (zwei dicht beieinander) und Radkanten (senkrechter Übergang)
 	var must := []
 	for sm in seams:
@@ -4066,6 +4644,19 @@ static func wheel_r(S: Dictionary) -> float:
 
 static func axle(S: Dictionary) -> float:
 	return S.get("axle", AXLE)
+
+
+## Schmutzfänger hinter einem Rad (zi -1 vorn, 1 hinten): Mitte gut 13 cm innerhalb der Kotflügelkante, wo der Reifen läuft
+## (bis 2.36 halbe Katalogbreite minus 18 cm: an den schlankeren Karosserien stünde er sonst über)
+static func _flap_x(S: Dictionary, W: float, L: float, flare: float, zi: int) -> float:
+	var t := axle(S) / L if zi < 0 else 1.0 - axle(S) / L
+	return (_section(S, t, W, L, flare)["p"] as PackedVector2Array)[4].x - 0.135
+
+
+## Radius der Radläufe (Mitte auf Werks-Radhöhe): ab Werk 4,5 cm über dem Reifen; braucht ein größeres Rad mehr Platz,
+## setzt build() arch_r (wheel_fit)
+static func arch_r(S: Dictionary) -> float:
+	return S.get("arch_r", wheel_r(S) + 0.045)
 
 
 ## Motor hinten (Mittel- oder Heckmotor): Lamellen und Motorraum hinten, Kofferraum vorn

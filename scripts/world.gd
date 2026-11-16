@@ -1651,10 +1651,15 @@ func _spawn_challenger() -> void:
 	var id: String = pool[_trng.randi() % pool.size()]
 	var cfg := {}
 	for cat in Catalog.PART_ORDER:
+		if cat == "spur":
+			continue  # ohne eigene Zufallszahl (seit 2.37), der übrige Verkehr bleibt wie vorher
 		cfg[cat] = _trng.randi() % Catalog.PARTS[cat]["options"].size()
-		# entfernte Vinyls (seit 2.36 ausgeblendet) auf ein sichtbares umbiegen, ohne weitere Zufallszahl (Felder bleiben gleich)
-		while Catalog.PARTS[cat]["options"][cfg[cat]].get("hidden", false):
+		# entfernte Vinyls (seit 2.36 ausgeblendet) auf ein sichtbares umbiegen, ohne weitere Zufallszahl (Felder bleiben
+		# gleich). Zoll nicht: die alten relativen Größen gelten weiter (siehe race.gd)
+		while cat != "rimsize" and Catalog.PARTS[cat]["options"][cfg[cat]].get("hidden", false):
 			cfg[cat] = (cfg[cat] + 5) % Catalog.PARTS[cat]["options"].size()
+	cfg["spur"] = (int(cfg["paint"]) + int(cfg["rims"])) % Catalog.PARTS["spur"]["options"].size()
+	cfg["rimsize"] = Builder.rival_rimsize(id, cfg)  # wie bei den Gegnern im Rennen: keine Riesenfelgen, nichts unter Minimum
 	var ch := Challenger.new()
 	ch.process_mode = Node.PROCESS_MODE_PAUSABLE
 	ch.curve = tr["curve"]
