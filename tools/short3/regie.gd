@@ -3,6 +3,9 @@ extends SceneTree
 ## wie ein Spieler (Gas, Bremse, Lenken über die Eingaben, während der Fahrt kein Versetzen), bei Bedarf mit eigener
 ## Kamera. Das Spiel bleibt unverändert: die Welt liest ihre Argumente (--tod, --nozoom, --zkind, --wstart ...) wie sonst.
 ## Aufruf über rec.sh: godot --path . -s res://tools/short3/regie.gd -- --regie=<ablauf> [Welt-Argumente]
+## Format: wie das Fenster (rec.sh: Hochformat 1080x1920, mit REC_SIZE=1920x1080 Querformat). Die Abläufe passen in
+## beide; nur die Karte wird im Hochformat umgebaut (vergrößert, Infofeld außerhalb), im Querformat bleibt sie wie im
+## Spiel.
 ## Abläufe:
 ##   anflug:<i>[:d] Start wie aus der Garage in Stadt i (dazu --wstart=<i>) oder auf der Hauptstraße bei d (dann mit
 ##                  --zkind=start): Anflug von oben, danach die Hauptstraße entlang (Gas schon während des Anflugs
@@ -22,17 +25,33 @@ extends SceneTree
 ##   fahrt:<i>:<d>[:m] Stadt i: Hauptstraße ab d (m Meter, Standard 400) rechts in der Spur, Verfolgerkamera
 ##   garage[:t]     Garage im Autohaus: das Auto fährt auf dem Band, nach t Sekunden (Standard 3) das nächste Auto
 ##                  (es fährt herein, das bisherige hinaus); --rhud=0 ohne Menü
-##   frei           nur Kamera und Anzeigen einstellen, die Welt fährt selbst (z. B. mit --otest=rampen:0)
+##   frei           nur Kamera und Anzeigen einstellen, die Welt fährt selbst (z. B. mit --otest=rampen:0, --wdrive)
+##   karte[:Stadt,…] große Karte (M), im Hochformat vergrößert (nur die Karte, das Infofeld liegt außerhalb), die
+##                  Auswahl wandert alle 0,6 s zur nächsten Stadt der Liste
+##   modus:<i>      Stadt i: auf der Hauptstraße, nach 1 s Q (Fahr-/Drift-Modus, Einblendung mit --rfeedk vergrößert),
+##                  dann quer durch die engste Kurve (Handbremse, Gas, Lenken nach dem Weg): Drift-Punkte
+##   rennen:<i>     Stadt i: zur Lichtsäule von Rennen i, darin halten, Enter: Ladebild mit der Karte des Rennens,
+##                  Countdown, Start (die Szene wechselt zu race.tscn, die Aufnahme läuft weiter)
+##   autobahn[:k[:spur[:v]]] innerer Ring, Stück k, Spur (Standard 11,25: rechts, mit den Lastwagen) mit v m/s
+##                  (Standard 24, so schnell wie der Verkehr dort: keine Auffahrunfälle); nach 3 s kommt der
+##                  Herausforderer auf der mittleren Spur, holt auf und überholt links, gut im Bild; fährt er 18 m vor
+##                  dir und steht der Hinweis, Enter: das Duell beginnt (ohne --challenger: damit startet es schon,
+##                  wenn er neben dir ist)
+##   tuning         Garage: Tuning, Lack (Farben durchblättern), Felgen (durchblättern), dann Autohaus mit neuem Auto
 ## Schalter: --rquit=<s> Ende nach s Sekunden, --rlog Lage alle 0,5 s ("R ..."), --rhud=0 HUD aus, --rui=<k> Oberfläche
 ## k-fach größer (Ortsname, Musiktitel lesbar im Hochformat), --rwait=<s> vor dem Losfahren warten, --rcam=<0|1>
 ## Verfolgerkamera (1 = weit), --rkam=ampel (Kreuzung: feste Kamera vor der Ampel der Querstraße), --rvor=<m> (Start so
 ## weit vor dem Schild, dem Ende der Auffahrt, der Golfplatz-Ausfahrt bzw. dem Dom), --rv0=<m/s> (Anfangstempo),
 ## --rschild=<m>:<fov> (Schild: Kamera so weit davor, Bildwinkel), --rtoast=<s> (Titel des laufenden Tracks nach s
 ## Sekunden noch einmal einblenden), --rtoastk=<k> (Titel-Einblendung k-fach größer, unten in der Mitte verankert:
-## im Hochformat sonst kaum lesbar). Level-Leiste unten und Tastenhilfe oben sind aus. Die Titel-Einblendung der Musik
-## läuft hier in Spielzeit (music.gd zählt sonst Echtzeit: bei --write-movie lief sie zu schnell oder war schon vorbei).
-## Fürs Schneiden: "REGIE MARKE <was> t=<s> bild=<n>" im Log (start, aktiv <Strecke>, anflug, ampel, halt, weiter, kran,
-## wegweiser, gelaende, drift, flug, sprungkamera, weg <art>, autowechsel); Bild n-1 ist das Bild in der Aufnahme.
+## im Hochformat sonst kaum lesbar), --rfeedk=<k> (Einblendungen links über der Minikarte k-fach: "DRIFT-MODUS",
+## Drift-Punkte; dazu die laufenden Drift-Punkte unten in der Mitte). Level-Leiste unten und Tastenhilfe oben sind aus.
+## Die Titel-Einblendung der Musik läuft hier in Spielzeit (music.gd zählt sonst Echtzeit: bei --write-movie lief sie zu
+## schnell oder war schon vorbei).
+## Fürs Schneiden: "REGIE MARKE <was> t=<s> bild=<n> film=<f>" im Log (start, aktiv <Strecke>, anflug, ampel, halt,
+## weiter, kran, wegweiser, gelaende, drift, flug, sprungkamera, weg <art>, autowechsel, karte <Stadt>, q,
+## herausforderer da/vorbei/hinweis, enter, duell <n>, rennen countdown/los, tuning <Schritt>); f ist das Bild in der
+## Aufnahme (schnitt.py nimmt f, in älteren Logs ohne film bild - 1).
 
 # Spielskripte erst zur Laufzeit laden (nach dem Start der Autoloads, die sie benutzen)
 var Layout
@@ -73,6 +92,8 @@ var schild_m := 30.0
 var schild_fov := 32.0
 var toast_at := -1.0
 var toast_k := 1.0
+var feed_k := 1.0
+var _left_world := false  # rennen: die Welt ist weg (Szene race.tscn), nur noch aufnehmen
 
 
 func _initialize() -> void:
@@ -105,6 +126,8 @@ func _initialize() -> void:
 			toast_at = float(a.substr(9))
 		elif a.begins_with("--rtoastk="):
 			toast_k = float(a.substr(10))
+		elif a.begins_with("--rfeedk="):
+			feed_k = float(a.substr(9))
 	await process_frame
 	if cam_mode >= 0:
 		root.get_node("GameState").cam_mode = cam_mode  # 1 = Verfolger weit: im Hochformat wirkt das Auto sonst riesig
@@ -121,7 +144,8 @@ func _initialize() -> void:
 		ws.has_return = true
 	if shot == "garage":
 		root.get_node("GameState").world_menu = "cars"  # Garage öffnet direkt im Autohaus (wie aus der Welt)
-	var scene: Node = (load("res://scenes/garage.tscn" if shot == "garage" else "res://scenes/world.tscn") as PackedScene).instantiate()
+	var garage := shot == "garage" or shot == "tuning"
+	var scene: Node = (load("res://scenes/garage.tscn" if garage else "res://scenes/world.tscn") as PackedScene).instantiate()
 	root.add_child(scene)
 	current_scene = scene
 	w = scene
@@ -181,6 +205,36 @@ func _plan_spawn() -> void:
 			_quiet = true
 			if v0 <= 0.0:
 				v0 = 75.0 / 3.6
+		"modus":
+			var c := _layout_city(lay, int(arg[0]))
+			var tr := _plan_track(c["race"])
+			var dc := _sharpest(tr)
+			var d := dc - 110.0
+			_spawn = c["xf"] * Track.xform_at(tr["curve"], d, Track.lane_lat(tr, d, 2.25))
+			_spawn.origin.y += 0.4
+			_has_spawn = true
+		"rennen":
+			var c := _layout_city(lay, int(arg[0]))
+			var tr := _plan_track(c["race"])
+			var d := float(tr["start"]) + (vor if vor > 0.0 else 70.0)
+			_spawn = c["xf"] * Track.xform_at(tr["curve"], d, Track.lane_lat(tr, d, -2.25))
+			_spawn.basis = _spawn.basis * Basis(Vector3.UP, PI)  # gegen die Streckenrichtung zum Start
+			_spawn.origin.y += 0.4
+			_has_spawn = true
+		"karte":
+			_quiet = true
+		"autobahn":
+			var k := int(arg[0]) if arg.size() > 0 else 0
+			var n := 0
+			for sg in lay["segments"]:
+				if sg.get("ring", 0) == 0:
+					if n == k:
+						var tr := _plan_track(sg["race"])
+						var lane := float(arg[1]) if arg.size() > 1 else 11.25
+						_spawn = Track.xform_at(tr["curve"], 120.0, Track.lane_lat(tr, 120.0, lane))
+						_spawn.origin.y += 0.4
+						_has_spawn = true
+					n += 1
 		"anflug":
 			if arg.size() > 1:
 				var c := _layout_city(lay, int(arg[0]))
@@ -327,6 +381,8 @@ func _pt(p: Vector3, v: float) -> Dictionary:
 # --- Ablauf ---------------------------------------------------------------------------------------------------------
 
 func _process(delta: float) -> bool:
+	if _iter0 < 0:
+		_iter0 = Engine.get_process_frames()
 	t += delta
 	# Titel-Einblendung der Musik in Spielzeit (music.gd rechnet mit Echtzeit; Aufnahmen laufen langsamer als Echtzeit)
 	var mu = root.get_node_or_null("Music")
@@ -344,6 +400,24 @@ func _process(delta: float) -> bool:
 			print("REGIE Titel eingeblendet bei rt=%.2f: %s" % [rt, mu.current_title])
 	if w != null and shot == "garage":
 		return _garage(delta)
+	if w != null and shot == "tuning":
+		return _tuning(delta)
+	# (eine freigegebene Welt gilt in Godot 4.7 als == null: deshalb über rt, nicht über w != null)
+	if _left_world or (rt >= 0.0 and not is_instance_valid(w)):
+		# Rennen gestartet: die Welt ist weg, race.tscn läuft (Ladebild, Startkarte, Countdown); nur noch Zeit zählen
+		_left_world = true
+		rt += delta
+		# Marken im Rennen: Zustand von race.gd (3 Kameraflug mit Startkarte, 0 Countdown, 1 Rennen)
+		var rs = current_scene
+		if rs != null and is_instance_valid(rs) and rs.get("state") != null:
+			var stv := int(rs.get("state"))
+			if stv != int(_ev.get("rstate", -1)):
+				_ev["rstate"] = stv
+				_mark("rennen " + ["countdown", "los", "ziel", "startkarte"][clampi(stv, 0, 3)])
+		if rt > quit_after:
+			print("REGIE ENDE %s nach %.1f s (im Rennen)" % [shot, rt])
+			quit()
+		return false
 	if w == null or not bool(w.get("_ready_done")):
 		return false
 	var pl = w.player
@@ -369,6 +443,26 @@ func _process(delta: float) -> bool:
 			(w.hud["lvl"] as Control).visible = false
 	rt += delta
 	_events(pl)
+	if feed_k != 1.0 and w.get("_feed") != null:
+		# Einblendungen über der Minikarte vergrößern, Anker unten links (wachsen nach oben)
+		var fd: Control = w._feed
+		fd.pivot_offset = Vector2(0.0, fd.size.y)
+		fd.scale = Vector2(feed_k, feed_k)
+		# laufende Drift-Punkte unten in der Mitte ebenso (Anker unten Mitte)
+		var dm: Control = w.hud.get("drift")
+		if dm != null:
+			dm.pivot_offset = Vector2(dm.size.x / 2.0, dm.size.y)
+			dm.scale = Vector2(feed_k, feed_k)
+	if shot == "karte":
+		_karte()
+	if info.has("q_at") and rt >= float(info["q_at"]):
+		info.erase("q_at")
+		for pressed in [true, false]:  # Q wie gedrückt (geht durch world._unhandled_input)
+			var ev := InputEventAction.new()
+			ev.action = "drift_toggle"
+			ev.pressed = pressed
+			Input.parse_input_event(ev)
+		_mark("q")
 	if cam_fn.is_valid():
 		cam_fn.call(pl)
 	if log_on:
@@ -390,8 +484,9 @@ func _process(delta: float) -> bool:
 
 
 func _physics_process(_delta: float) -> bool:
-	if rt < 0.0 or done or shot == "garage" or shot == "frei":
-		return false  # Garage und "frei": keine eigenen Eingaben (die Welt bzw. der Gelände-Test fährt selbst)
+	if rt < 0.0 or done or shot in ["garage", "tuning", "frei", "karte"] or _left_world or not is_instance_valid(w) \
+			or not (w as Node).is_inside_tree():
+		return false  # keine eigenen Eingaben (die Welt bzw. der Gelände-Test fährt selbst, Menüs, Rennen läuft)
 	var pl = w.player
 	for a in ["steer_left", "steer_right", "accelerate", "brake", "handbrake", "nitro"]:
 		Input.action_release(a)
@@ -428,6 +523,18 @@ func _begin(pl) -> void:
 			pass
 		"kies":
 			_begin_kies(pl)
+		"karte":
+			pass
+		"autobahn":
+			var k := int(arg[0]) if arg.size() > 0 else 0
+			var e: Dictionary = w._rings[0][k]
+			var lane := float(arg[1]) if arg.size() > 1 else 11.25
+			route = _along(e, 0, 123.0, 2500.0, lane, float(arg[2]) if arg.size() > 2 else 24.0)
+			w._ch_t = 3.0  # Herausforderer nach 3 s freier Fahrt (wie --challenger, aber das Duell startet hier mit Enter)
+		"modus":
+			_begin_modus(pl)
+		"rennen":
+			_begin_rennen(pl)
 		"fahrt":
 			var e := _city(int(arg[0]))
 			var tr: Dictionary = e["track"]
@@ -595,6 +702,19 @@ func _drift(pl, dt: float) -> void:
 	var dir := -1.0 if info.get("drift_left", true) else 1.0
 	var act := "steer_left" if dir < 0.0 else "steer_right"
 	var cnt := "steer_right" if dir < 0.0 else "steer_left"
+	if info.get("drift_weg", false):
+		# Kurve (modus): kurzer Stoß mit Handbremse, dann Vollgas und dem Weg nach lenken: das Heck kommt im Drift-Modus,
+		# die Lenkung zum Weg fängt es ab
+		if drift_t < 0.45:
+			Input.action_press("handbrake")
+			Input.action_press(act)
+			Input.action_press("accelerate", 0.6)
+			return
+		if drift_t < 2.8:
+			Input.action_press("accelerate")
+			_steer_path(pl)
+			return
+		drift_t = 2.9  # weiter unten: Ende, zurück zum Weg
 	if drift_t < 0.55:
 		Input.action_press("handbrake")
 		Input.action_press(act)
@@ -679,6 +799,145 @@ func _begin_kies(pl) -> void:
 	info["cam_fov"] = 46.0
 	cam_fn = _track_cam
 	print("REGIE kies Haufen h=%.1f bei %s, Anlauf ab %s" % [k["h"], str(c), str(p0)])
+
+
+## Engste Kurve der Hauptstraße (größte Richtungsänderung auf 40 m), Abstand vom Rand der Strecke
+func _sharpest(tr: Dictionary) -> float:
+	var c: Curve3D = tr["curve"]
+	var L := c.get_baked_length()
+	var best := 0.0
+	var bd := L * 0.5
+	var d := 140.0
+	while d < L - 60.0:
+		var f0: Dictionary = Track.frame_at(c, d)
+		var f1: Dictionary = Track.frame_at(c, d + 40.0)
+		var a := (f0["fwd"] as Vector3).angle_to(f1["fwd"])
+		if a > best:
+			best = a
+			bd = d
+		d += 5.0
+	return bd
+
+
+## Q und Drift: Hauptstraße rechts mit 60 km/h, nach 1 s Q (Drift-Modus), vor der engsten Kurve quer (Handbremse,
+## dann Gas, Lenken in die Kurve, gegenlenken), danach weiter dem Weg nach
+func _begin_modus(pl) -> void:
+	var e := _city(int(arg[0]))
+	var tr: Dictionary = e["track"]
+	var c: Curve3D = tr["curve"]
+	var dc := _sharpest(tr)
+	var d_pl := c.get_closest_offset((e["xf"] as Transform3D).affine_inverse() * pl.global_position)
+	route = _along(e, 0, d_pl + 3.0, dc + 160.0, 2.25, 16.5)
+	var f0: Dictionary = Track.frame_at(c, dc)
+	var f1: Dictionary = Track.frame_at(c, dc + 40.0)
+	info["drift_left"] = (f0["fwd"] as Vector3).cross(f1["fwd"]).y > 0.0  # Kurve nach links?
+	info["drift_weg"] = true
+	drift_at = int((dc - 14.0 - d_pl) / 3.0)
+	info["q_at"] = 1.0
+	print("REGIE modus Kurve bei d=%.0f (%s), Start d=%.0f" % [dc, "links" if info["drift_left"] else "rechts", d_pl])
+
+
+## Rennen i: gegen die Streckenrichtung zur Lichtsäule am Start, darin halten, nach 1 s Enter (world._start_race)
+func _begin_rennen(pl) -> void:
+	var e := _city(int(arg[0]))
+	var tr: Dictionary = e["track"]
+	var c: Curve3D = tr["curve"]
+	var ds := float(tr["start"])
+	var d_pl := c.get_closest_offset((e["xf"] as Transform3D).affine_inverse() * pl.global_position)
+	route = _along(e, 0, d_pl - 3.0, ds + 18.0, 2.25, 12.0)
+	route += _along(e, 0, ds + 15.0, ds, 2.25, 6.0)
+	route[-1]["v"] = 0.0
+	route[-1]["stop"] = func() -> bool:
+		# nach 1 s Enter (einmal), dann stehen bleiben, bis die Welt dem Rennen weicht (sonst endete der Weg hier und
+		# mit ihm die Aufnahme)
+		if rt - halt_t > 1.0 and not info.has("enter"):
+			info["enter"] = true
+			for pressed in [true, false]:
+				var ev := InputEventAction.new()
+				ev.action = "ui_accept"
+				ev.pressed = pressed
+				Input.parse_input_event(ev)
+			_mark("enter")
+		return false
+	print("REGIE rennen %s: Start d=%.0f, ab d=%.0f" % [Catalog.RACES[int(arg[0])]["name"], ds, d_pl])
+
+
+## Große Karte: öffnen, nur die Karte im Hochformat groß (Infofeld rechts außerhalb des Bildes), Auswahl wandert
+func _karte() -> void:
+	var mv = w.map_view
+	if mv == null:
+		return
+	if not mv.visible and not info.has("karte_auf"):
+		if rt < 0.3:
+			return
+		info["karte_auf"] = true
+		w._open_map()
+		(w.hud["root"] as Control).visible = false
+		_mark("karte auf")
+		var names := (arg[0] if arg.size() > 0 else "Aachen,Köln,Frankfurt am Main,Würzburg,München,Berlin,Hamburg").split(",")
+		var seq := []
+		for n in names:
+			for k in (mv.towns as Array).size():
+				if str(mv.towns[k]["name"]) == n:
+					seq.append(k)
+		info["seq"] = seq
+		info["seq_t"] = rt
+	if not mv.visible:
+		return
+	var vs: Vector2 = mv.get_viewport_rect().size
+	if vs.x < vs.y:
+		# Hochformat: Karte füllt die Breite (Fläche links ist 68 % der Breite), Schrift 1,6-fach; im Querformat bleibt
+		# sie wie im Spiel (Karte links, Infofeld rechts)
+		var k := 1.6
+		mv.set_anchors_preset(Control.PRESET_TOP_LEFT)
+		mv.position = Vector2(-32.0, 0.0)  # Fläche liegt sonst 30 px rechts der Mitte: Namen am rechten Rand abgeschnitten
+		mv.size = Vector2((vs.x / k + 28.0) / 0.68 - 12.0, vs.y / k)
+		mv.scale = Vector2(k, k)
+	var seq: Array = info.get("seq", [])
+	if not seq.is_empty():
+		var i := clampi(int((rt - float(info["seq_t"])) / 0.6), 0, seq.size() - 1)
+		if mv.sel != seq[i]:
+			mv.sel = seq[i]
+			mv.queue_redraw()
+			_mark("karte " + str(mv.towns[mv.sel]["name"]))
+
+
+# --- Tuning in der Garage ---------------------------------------------------------------------------------------------
+
+## Garage: Tuning, Lack (nach rechts blättern: das Auto wechselt die Farbe), Felgen (blättern), dann Autohaus mit neuem
+## Auto. Blättern wie mit der Taste (ui_right durch die Fokus-Steuerung der Oberfläche)
+func _tuning(delta: float) -> bool:
+	if rt < 0.0:
+		rt = 0.0
+		_mark("start")
+		info["plan"] = [[0.6, "lack"], [1.4, "r"], [1.85, "r"], [2.3, "r"], [2.75, "r"], [3.2, "r"], [3.8, "felgen"],
+			[4.7, "r"], [5.2, "r"], [5.7, "r"], [6.2, "r"], [6.9, "autohaus"], [7.6, "auto"]]
+	rt += delta
+	var plan: Array = info["plan"]
+	while not plan.is_empty() and rt >= float(plan[0][0]):
+		var step: String = plan.pop_front()[1]
+		match step:
+			"lack":
+				w._show_tuning()
+				w._show_parts("paint", "optik")
+			"felgen":
+				w._show_parts("rims", "optik")
+			"autohaus":
+				w._cam_view = ""  # ganzes Auto (nach den Felgen stand die Kamera noch am Rad)
+				w._show_cars()
+			"auto":
+				w._cycle_car(1)
+			"r":
+				for pressed in [true, false]:
+					var ev := InputEventAction.new()
+					ev.action = "ui_right"
+					ev.pressed = pressed
+					Input.parse_input_event(ev)
+		_mark("tuning " + step)
+	if rt > quit_after:
+		print("REGIE ENDE tuning nach %.1f s" % rt)
+		quit()
+	return false
 
 
 ## Am gelben Ortsschild vorbei: Kamera fest am rechten Bordstein schild_m vor dem Schild, lange Brennweite (schild_fov),
@@ -872,10 +1131,14 @@ func _busy() -> bool:
 # --- Marken fürs Schneiden: "REGIE MARKE <was> t=<s>" (t = Sekunde im Video, Bild = Engine.get_frames_drawn) ---------
 
 var _ev := {}
+var _iter0 := -1  # Engine.get_process_frames() beim ersten Bild der Aufnahme
 
 
+## film = Bild in der Aufnahme: --write-movie schreibt je Durchlauf der Hauptschleife ein Bild, auch wenn die Engine
+## eines nicht neu gezeichnet hat (dann steht das vorige noch einmal da; bild = Engine.get_frames_drawn() bleibt dabei
+## zurück). t ist Spielzeit und läuft in Zeitlupe (Sprungkamera) langsamer.
 func _mark(what: String) -> void:
-	print("REGIE MARKE %s t=%.3f bild=%d" % [what, t, Engine.get_frames_drawn()])
+	print("REGIE MARKE %s t=%.3f bild=%d film=%d" % [what, t, Engine.get_frames_drawn(), Engine.get_process_frames() - _iter0])
 
 
 func _events(pl) -> void:
@@ -904,6 +1167,34 @@ func _events(pl) -> void:
 		if lt != str(_ev.get("licht", "")):
 			_ev["licht"] = lt
 			_mark("ampel " + lt)
+	var chg := w.get("challenger") != null and is_instance_valid(w.challenger)
+	if chg != bool(_ev.get("ch", false)):
+		_ev["ch"] = chg
+		_mark("herausforderer " + ("da" if chg else "weg"))
+	var du := int(w.get("_duel"))
+	if du != int(_ev.get("duell", 0)):
+		_ev["duell"] = du
+		_mark("duell %d" % du)
+	if chg:
+		var ch = w.challenger
+		var gap: float = (pl.global_position - ch.global_position).dot(-ch.global_basis.z)  # > 0: du liegst vorn
+		if gap < -2.0 and not _ev.has("vorbei"):
+			_ev["vorbei"] = true
+			_mark("herausforderer vorbei")
+		var pr := bool(w.get("_ch_prompt"))
+		if pr != bool(_ev.get("prompt", false)):
+			_ev["prompt"] = pr
+			_mark("herausforderer hinweis " + ("an" if pr else "aus"))
+		# autobahn: Enter, sobald er gut sichtbar vor dir fährt und der Hinweis "Enter: Duell starten" steht
+		if shot == "autobahn" and pr and du == 0 and gap < -18.0 and not _ev.has("enter"):
+			_ev["enter"] = true
+			for pressed in [true, false]:
+				var ev := InputEventAction.new()
+				ev.action = "ui_accept"
+				ev.pressed = pressed
+				Input.parse_input_event(ev)
+			_mark("enter")
+			quit_after = minf(quit_after, rt + 5.0)
 	if drift_t >= 0.0 and not _ev.has("drift"):
 		_ev["drift"] = true
 		_mark("drift")
@@ -919,6 +1210,33 @@ func _events(pl) -> void:
 
 
 # --- Fahren ---------------------------------------------------------------------------------------------------------
+
+## Nur lenken: Ziel voraus auf dem Weg (wie in _follow), ohne Gas und Bremse
+func _steer_path(pl) -> void:
+	var p: Vector3 = pl.global_position
+	var bd := INF
+	var best := ri
+	for k in range(ri, mini(ri + 30, route.size())):
+		var dk := Vector2(route[k]["p"].x - p.x, route[k]["p"].z - p.z).length()
+		if dk < bd:
+			bd = dk
+			best = k
+	ri = best
+	var look := 5.0 + absf(float(pl.speed_fwd)) * 0.45
+	var k2 := ri
+	var acc := 0.0
+	while k2 < route.size() - 1 and acc < look:
+		acc += (route[k2]["p"] as Vector3).distance_to(route[k2 + 1]["p"])
+		k2 += 1
+	var tgt: Vector3 = route[k2]["p"]
+	var fwd: Vector3 = -pl.global_basis.z
+	var ang := Vector2(fwd.x, fwd.z).normalized().angle_to(Vector2(tgt.x - p.x, tgt.z - p.z).normalized())
+	var st := clampf(ang * 2.3, -1.0, 1.0)
+	if st > 0.02:
+		Input.action_press("steer_right", st)
+	elif st < -0.02:
+		Input.action_press("steer_left", -st)
+
 
 ## Dem Weg folgen wie ein Spieler: Ziel voraus (5 m + halbe Geschwindigkeit), Lenken nach dem Winkel dorthin, Tempo
 ## nach dem Weg mit Vorausschau (Bremsweg mit 4,5 m/s²); an Haltepunkten stehen bleiben, bis die Bedingung erfüllt ist
@@ -940,15 +1258,8 @@ func _follow(pl) -> void:
 	if drift_at >= 0 and ri >= drift_at:
 		drift_t = 0.0
 		return
-	if ri >= route.size() - 1:
-		if not done:
-			done = true
-			print("REGIE Weg zu Ende nach %.1f s" % rt)
-			if quit_after > rt + 2.5:
-				quit_after = rt + 2.5
-		return
 	var v: float = pl.speed_fwd
-	# Halt
+	# Halt (auch am letzten Punkt des Wegs, z. B. in der Lichtsäule)
 	if route[ri].has("stop") or (ri + 1 < route.size() and route[ri + 1].has("stop") and bd < 2.5):
 		var si := ri if route[ri].has("stop") else ri + 1
 		var sp: Vector3 = route[si]["p"]
@@ -968,6 +1279,13 @@ func _follow(pl) -> void:
 				print("REGIE weiter bei t=%.2f rt=%.2f nach %.1f s %s" % [t, rt, rt - halt_t, _light_txt()])
 				_mark("weiter")
 			return
+	if ri >= route.size() - 1 and not route[ri].has("stop"):
+		if not done:
+			done = true
+			print("REGIE Weg zu Ende nach %.1f s" % rt)
+			if quit_after > rt + 2.5:
+				quit_after = rt + 2.5
+		return
 	var look := 5.0 + absf(v) * 0.45
 	var k2 := ri
 	var acc := 0.0
@@ -984,8 +1302,11 @@ func _follow(pl) -> void:
 		Input.action_press("steer_right", st)
 	elif st < -0.02:
 		Input.action_press("steer_left", -st)
-	# Tempo: das kleinste erlaubte der nächsten 80 m
+	# Tempo: das kleinste erlaubte der nächsten 80 m (am Haltepunkt selbst: langsam heranrollen)
 	var vt: float = route[ri]["v"]
+	if route[ri].has("stop"):
+		var sq: Vector3 = route[ri]["p"]
+		vt = minf(5.0, sqrt(2.0 * 2.5 * maxf(Vector2(sq.x - p.x, sq.z - p.z).length() - 0.8, 0.0)))
 	var s := 0.0
 	var k3 := ri
 	while k3 < route.size() - 1 and s < 80.0:

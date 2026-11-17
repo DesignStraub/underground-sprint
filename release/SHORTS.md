@@ -210,129 +210,88 @@ gefunden mit `--placelog` (Platzwechsel, Treffer, Abstand zum nächsten Gegner).
 `tools/promo_overlays.tscn -- --sketch2`, Schnitt mit `tools/short2/cut4.py` (erwartet `clips/` und `ov/` daneben).
 Titel, Beschreibung und Hashtags: `release/SHORT_TEXTE_EN.txt`, Abschnitt „Zweites Short“.
 
-## 15. Neu in 2.39 (Deutsch, mit Lied, Stand 2.39)
+## 15. Überblick: das ganze Spiel (Deutsch, stumm, Stand 2.39)
 
-**Datei:** `release/need_for_geschwindigkeit_short_239.mp4` (30,9 s, 1080×1920, 30 Bilder/s, H.264/AAC, −14 LUFS, liegt
-nicht im Repo). Entsteht, sobald das Lied da ist (siehe unten). Bis dahin zum Prüfen des Schnitts:
-`release/need_for_geschwindigkeit_short_239_vorschau.mp4` (nur Spielton) und `…_239_klick.mp4` (Spielton leise, dazu ein
-Metronom-Klick auf jedem Schlag, die Eins jedes Takts höher). Titelbild:
-`release/need_for_geschwindigkeit_short_239_cover_1080x1920.png`.
+**Datei:** `release/need_for_geschwindigkeit_short_ueberblick.mp4` (33,4 s, 1080×1920, 30 Bilder/s, H.264, stumme
+AAC-Spur 48 kHz, liegt nicht im Repo). Titelbild: `release/need_for_geschwindigkeit_short_ueberblick_cover_1080x1920.png`.
+Die erste Fassung „Neu in 2.39“ mit Lied ist verworfen: Der Motor war darunter zu laut, ohne Ton wirkt der Überblick
+ruhiger.
 
-Stil wie Nr. 13 und 14 (Skizzen-Trailer): keine Sprecherstimme, Text als knappe Fragmente in Kleinschrift (Saira, weiß,
-kein Neon), Ortsnamen blendet das Spiel selbst ein (Viertel- und Ortsname oben, Wegweiser, Flächenname). Musik: ein Lied
-aus ElevenLabs Music (vom User erzeugt), 140 BPM, ein Takt 1,714 s, 18 Takte; Spielton leise darunter. Jede Szene beginnt
-auf einer Takt-Eins, schnelle Schnitte innerhalb der Takte auf die Schläge. Auto: Kagura V10 mit der Optik aus
-`tools/short2/cfgB.txt` (weiß, pinkes Unterbodenlicht) wie in Nr. 13 und 14, Kamera „Verfolger weit“.
+Ohne Ton: keine Musik, kein Spielton, nur eine stille Spur, damit jede Plattform das Video annimmt. Die Texte tragen,
+jeder steht mindestens knapp 2 s im Bild. Stil wie Nr. 13 und 14: Kleinschrift in Saira, weiß, kein Neon, sachlich, keine
+Witze. Kein Taktraster, geschnitten wird nach Bild. Auto: Kagura V10 mit der Optik aus `tools/short2/cfgB.txt` (weiß,
+pinkes Unterbodenlicht), Kamera „Verfolger weit“, Grafik Ultra.
 
-| Takte | Sekunden | Bild | Text |
-|---|---|---|---|
-| 1–2 | 0,0–3,4 | Anflug von oben über Frankfurt am Abend (Main, Brücke, Häuserblöcke hinter der Straße), oben kurz stehen | neu in 2.39. |
-| 3–4 | 3,4–6,9 | Landung hinter dem Auto genau auf Takt 3 (Hook), losfahren, oben „FRANKFURT AM MAIN“ | – |
-| 5–6 | 6,9–10,3 | Rostock nachts: Ampel nah (Rot), Auto wartet am Zebrastreifen, Ampel springt auf Grün, Auto fährt über die Kreuzung | kreuzungen mit ampeln. |
-| 7–8 | 10,3–13,7 | Gasse mit Kopfsteinpflaster (Unterbodenlicht auf den Steinen), dann hebt die Kamera ab über die Dächer der Altstadt | gassen mit kopfsteinpflaster. / städte mit hinterland. |
-| 9–10 | 13,7–17,1 | Querspange in der Dämmerung: Wegweiser „Ausfahrt Golfplatz“, Tor (oben „GOLFCLUB EICHENHAIN“), Fairway quer mit Spuren | golfplatz zum austoben. |
-| 11–12 | 17,1–20,6 | Stahlrampe über den kleinen Teich (Golfplatz), Sprungkamera mit Zeitlupe, Landung auf Takt 13 | – |
-| 13–14 | 20,6–24,0 | Kiesgrube am Morgen: das Auto kommt über die Spitze des großen Kieshaufens geflogen, landet vor der Kamera im Staub | kiesgrube. |
-| 15–16 | 24,0–27,4 | Garage, Autohaus: der Kagura fährt auf dem unsichtbaren Band, der Falke fährt herein (Ausschnitt 1,45-fach) | 27 autos. |
-| 17–18 | 27,4–30,9 | Endtafel über der unscharfen Altstadt von oben | need for geschwindigkeit · kostenlos · onehumanity.itch.io |
+Auf TikTok und Instagram lässt sich beim Hochladen Musik aus der Bibliothek der App darunterlegen (Unternehmenskonten
+nur aus der freigegebenen Bibliothek, bei TikTok „Commercial Music Library“); YouTube Shorts kann das im Editor auch.
+
+| Sekunden | Bild | Text |
+|---|---|---|
+| 0,0–4,2 | Große Karte (M), im Hochformat vergrößert: beide Autobahnringe, Spangen, alle Städte mit ihren Rennen, Golfplatz und Kiesgrube; die Auswahl springt über Aachen, Köln, Frankfurt, Würzburg, München, Berlin, Hamburg | die ganze karte. / 20 rennen, zwei autobahnringe. |
+| 4,2–7,0 | Anflug von oben auf Frankfurt am Abend, Landung hinter dem Auto | anflug von oben auf jede stadt. |
+| 7,0–9,7 | Innerer Ring am späten Abend, rechte Spur bei den Lastwagen: oben „HERAUSFORDERER: HAKONE 240 · Enter: Duell starten“, er zieht links vorbei | herausforderer auf der autobahn. |
+| 9,7–11,7 | dieselbe Einstellung: Enter, oben die Duell-Leiste, er setzt sich ab | duell: 300 m vorsprung gewinnt. |
+| 11,7–13,6 | Hamburger Hafen nachts: Q, links unten „DRIFT-MODUS“ | q: fahr- oder drift-modus. |
+| 13,6–16,0 | Handbremse, quer durch die Rechtskurve, unten „DRIFT 40“ bis „DRIFT 130“ | drift-punkte auch in der stadt. |
+| 16,0–17,4 | Heidelberg nachts: in der Lichtsäule am Start, oben „ALTSTADT-HÜGEL · Enter: Rennen starten“ | rennen: sprint, rundkurs, drift. |
+| 17,4–21,3 | Der Countdown läuft über drei Rennen: Altstadt-Hügel (Sprint) 3, 2 · Aachen Grabenring (Rundkurs, Regen) 2, 1 · Stadion-Drift in Gelsenkirchen 1, LOS!, die Gegner fahren los; unter der Zahl jeweils die Art in ihrer Farbe | (weiter) |
+| 21,3–25,0 | Golfplatz am Abend: Stahlrampe über den Teich mit Sprungkamera; Kiesgrube am Morgen: über den großen Kieshaufen | golfplatz und kiesgrube. |
+| 25,0–27,8 | Garage: Lack durchblättern, dann Felgen, die Kamera nah am Rad | tuning in der garage. |
+| 27,8–29,8 | Autohaus: Wechsel zum nächsten Auto (Falke 9 RS) | 27 autos. |
+| 29,8–33,4 | Endtafel über der unscharfen Altstadt von Rostock | need for geschwindigkeit · kostenlos · auch im browser · onehumanity.itch.io |
+
+Die Zahlen sind im Code nachgezählt: 20 Rennen an den Ringen (10 Sprint, 7 Rundkurs, 3 Drift; die drei Drag-Rennen liegen
+nicht in der Welt), zwei Autobahnringe (innen 8 Stücke, außen 17), 27 Autos (`Catalog.CARS`), Duell: 300 m Vorsprung
+gewinnt (`world.gd` `DUEL_GAP`).
 
 **Werkzeuge** (`tools/short3/`, Aufnahmen im Arbeitsordner `$SHORT3`, Standard `tools/short3/arbeit/`, nicht im Repo):
-- `regie.gd`: fährt und filmt die Abläufe in der Welt als eigenes Hauptprogramm (`godot -s`), das Spiel bleibt unverändert;
-  schreibt Marken mit Bildnummer ins Log (Ampel, Halt, Weiter, Kran, Wegweiser, Gelände, Drift, Sprungkamera, Flug,
-  Ortsname, Autowechsel), aus denen die Schnittskripte ihre Zeiten nehmen. Der Teich-Sprung kommt aus dem Gelände-Test
-  (`--otest=rampen:0`, zweite Rampe), der Kiesgruben-Sprung aus `--regie=kies:1` (Anlauf wie `--otest=kuppen:1`, Kamera
-  hinter der Landestelle). Die Golfplatz-Ausfahrt wird von der Gegenfahrbahn aus angefahren (links über den offenen
-  Mittelstreifen), weil der Wegweiser auf der anderen Fahrbahn seine Rückseite zeigt (siehe „Offen“ unten).
-- `rec.sh` (eine Szene: Hochformat 1080×1920, `--write-movie`, 30 Bilder/s, `--nomusic`, `--nopool`, Test-Spielstand,
-  stumm im Hintergrund ohne Fokus), `rec_a.sh` (alle Aufnahmen, gut 10 Minuten), `ovr.sh` (Einblendungen mit
-  `tools/promo_overlays.tscn -- --sketch3 --uifont=saira`, Titelbilder mit `--scover`), `cut_a.py` (Schnitt),
-  `schnitt.py` (gemeinsame Bausteine: Taktraster, Texte, Spielton, Musik mit Versatz und Tempo-Angleich, −14 LUFS,
-  Metronom, Taktmessung).
-- Neu aufnehmen und schneiden: `tools/short3/rec_a.sh && tools/short3/ovr.sh && python3 tools/short3/cut_a.py`.
-
-**Lied einsetzen (ein Befehl):**
-```
-python3 tools/short3/cut_a.py --musik ~/Downloads/lied.mp3
-```
-Misst Tempo und ersten Schlag des Lieds (ohne numpy, wenige Sekunden; mit einem Test-Klick bei 139 BPM geprüft: 139,0 BPM,
-erster Schlag auf 15 ms genau), streckt es auf 140 BPM, wenn es zwischen 137 und 143 liegt, legt den ersten Schlag auf den
-Anfang, Spielton 13 dB darunter, Summe −14 LUFS → `need_for_geschwindigkeit_short_239.mp4`. Ohne geschnittenes Bild im
-Arbeitsordner nimmt es die Vorschau aus `release/` als Bild und Spielton. Die Messung kennt den Schlag, nicht die Eins:
-liegt der Hook nicht auf Takt 3 (3,43 s), mit `--versatz` um ganze Schläge (0,429 s) oder Takte (1,714 s) verschieben.
-Von Hand: `--versatz 0.12` (so viele Sekunden des Lieds vor Takt 1 überspringen, negativ: Stille davor), `--bpm 139.6`,
-`--spielton 16` (Spielton 16 dB unter dem Lied), `--ohne-messung`, `--out datei.mp4`. Tempo eines Lieds allein:
-`python3 tools/short3/schnitt.py takt lied.mp3`.
-
-Offen: In `track_builder._exit_signs` werden Tafel, Ziffernfeld, Schrift und Streben in Welt-Z versetzt statt in
-Schildrichtung (`base + Vector3(0, 3.6, 0.02)` …): nur nach Süden gewandte Wegweiser sehen richtig aus, nach Norden
-gewandte zeigen den Fahrern die weiße Rückseite mit den Streben davor und keine Schrift (z. B. „Golfplatz“ von Norden).
-
-**Lied für ElevenLabs Music** (30,9 s = 18 Takte bei 140 BPM; Intro 2 Takte · Hook 2 · Verse 12 · Outro 2):
-
-Stil-Prompt (englisch):
-> Dark German drift-phonk rap, 140 BPM, A minor, exactly 31 seconds. Phonk cowbell melody, distorted 808 bass, crisp
-> trap hi-hats, a short riser into the hook. Male German rap vocals, deep, calm but driving, clear diction, no autotune,
-> no comedy. Lyrics are German; "Need for" is English, "Geschwindigkeit" is German (geh-SHVIN-dikh-kite). Intro
-> whispered, hook chanted by a small group, verse rapped one line per bar, outro spoken flat. Night city, engines.
-> Hard stop on the last word, no fade.
-
-```
-[Intro]
-Die Stadt ist wach.
-
-[Hook]
-Need for Geschwindigkeit!
-Need for Geschwindigkeit!
-
-[Verse]
-Rote Ampel, Kreuzung, Motor im Leerlauf
-Grün – und ich bieg in die Gasse
-Kopfsteinpflaster, Hinterhof, Licht im Block
-Die Stadt geht weiter, als die Straße reicht
-Ausfahrt Golfplatz, der Zaun ist offen
-Gras unter den Reifen, Staub statt Qualm
-Rampe am Teich –
-für 'ne Sekunde ist alles still
-Kiesgrube Moosbrunn, rauf auf den Wall
-und drüber
-Zurück in die Halle, das Band läuft
-neuer Wagen rollt rein, Motor an
-
-[Outro]
-Kostenlos. Auch im Browser.
-Need for Geschwindigkeit.
-```
+- `regie.gd`: fährt und filmt die Abläufe als eigenes Hauptprogramm (`godot -s`), das Spiel bleibt unverändert. Neu für
+  den Überblick: `karte` (große Karte, im Hochformat vergrößert, die Auswahl wandert), `autobahn:1` (rechte Spur mit
+  86 km/h, nach 3 s der Herausforderer, Enter, sobald er 18 m vor dem Auto fährt; aufgenommen um 20 Uhr, denn bei Tag
+  schweben über dem Horizont graue Kegel, vermutlich Turmspitzen der Landschaft, deren Türme im Dunst verschwinden, und
+  später ist er beim Überholen im Dunkeln kaum zu sehen), `modus:7` (Q, dann quer durch die engste Kurve;
+  `--rfeedk=2` vergrößert „DRIFT-MODUS“ und die Drift-Punkte), `rennen:<i>` (zur Lichtsäule am Start, Halt, Enter; die
+  Aufnahme läuft im Rennen weiter: Ladebild, Countdown, Start), `tuning` (Lack, Felgen, Autohaus, nächstes Auto). Aus der ersten Fassung weiter benutzt: Anflug über Frankfurt, Teich-Sprung (`--otest=rampen:0`),
+  Kieshaufen (`kies:1`), Kreuzung in Rostock (Hintergrund der Endtafel). Die Marken im Log tragen `film=<Bild der
+  Aufnahme>`: Zeichnet die Engine ein Bild nicht (kurz nach dem Laden, oder solange das Fenster verdeckt ist), schreibt
+  `--write-movie` das vorige noch einmal, und nur `film` zählt dann richtig mit.
+- `rec.sh` (eine Szene im Hochformat, mit `REC_SIZE=1920x1080` im Querformat; meldet am Ende, wie viele Bilder
+  verschieden sind: Standbild-Läufe mitten in einer Fahrt heißen neu aufnehmen), `rec_u.sh` (alle Aufnahmen des
+  Überblicks, gut 10 Minuten), `ovr.sh` (Einblendungen `--sketch5` und `--sketch4`, Titelbilder mit `--scover`),
+  `cut_u.py` (Schnitt, stumme Tonspur), `schnitt.py` (gemeinsame Bausteine).
+- Neu aufnehmen und schneiden: `tools/short3/rec_u.sh && tools/short3/ovr.sh && python3 tools/short3/cut_u.py`.
 
 **YouTube Shorts**
-- Titel: `Neu in 2.39: Kreuzungen, Gassen, Golfplatz, Kiesgrube | Need for Geschwindigkeit`
+- Titel: `Das ganze Spiel in 33 Sekunden | Need for Geschwindigkeit`
 - Beschreibung:
   ```
-  Need for Geschwindigkeit 2.39: Die Städte gehen jetzt hinter der Straße weiter, mit Häuserblöcken, Höfen und Parks.
-  Neue Nebenstraßen mit Kreuzungen, Ampeln und Zebrastreifen, Gassen mit Kopfsteinpflaster. Dazu zwei Flächen zum
-  Austoben: ein Golfplatz mit Rampe über den Teich und eine Kiesgrube mit Wall und Kieshaufen.
+  Need for Geschwindigkeit im Überblick: eine offene Welt mit 20 Rennen in deutschen Städten, verbunden durch zwei
+  Autobahnringe. Anflug von oben auf jede Stadt, Herausforderer auf der Autobahn (300 m Vorsprung gewinnt), mit Q
+  zwischen Fahr- und Drift-Modus wechseln, Rennen als Sprint, Rundkurs oder Drift, Golfplatz und Kiesgrube zum
+  Austoben, Tuning in der Garage und 27 Autos.
 
   ▶ Kostenlos spielen, auch im Browser: https://onehumanity.itch.io/need-for-geschwindigkeit
   Auch für Windows, Mac und Linux.
 
-  Gemacht mit Godot von ONE HUMANITY. Musik: mit ElevenLabs Music erzeugt.
+  Gemacht mit Godot von ONE HUMANITY.
 
-  #needforgeschwindigkeit #indiegame #rennspiel #streetracing #openworld #godot #gamedev #shorts
+  #needforgeschwindigkeit #indiegame #rennspiel #openworld #drift #streetracing #godot #gamedev #shorts
   ```
-- Angepinnter Kommentar: `Kostenlos im Browser 👉 onehumanity.itch.io/need-for-geschwindigkeit – welche Stadt soll als Nächstes Hinterland bekommen?`
+- Angepinnter Kommentar: `Kostenlos im Browser 👉 onehumanity.itch.io/need-for-geschwindigkeit – was soll als Nächstes ins Spiel?`
 
-**TikTok**
+**TikTok** (beim Hochladen einen Titel aus der Bibliothek wählen, sonst läuft es stumm)
 ```
-Neu in 2.39: Kreuzungen mit Ampeln, Gassen mit Kopfsteinpflaster, Golfplatz und Kiesgrube zum Austoben. 🏁 Kostenlos im Browser, Link im Profil.
-#needforgeschwindigkeit #indiegame #rennspiel #streetracing #openworld #gamedev #fyp
+Das ganze Spiel in 33 Sekunden: offene Welt, Herausforderer auf der Autobahn, Drift-Modus mit Q, Sprint, Rundkurs, Drift, Golfplatz, Kiesgrube, 27 Autos. 🏁 Kostenlos im Browser, Link im Profil.
+#needforgeschwindigkeit #indiegame #rennspiel #openworld #drift #gamedev #fyp
 ```
 
-**Instagram Reels**
+**Instagram Reels** (Musik ebenso beim Hochladen in der App wählen)
 ```
-Neu in 2.39 🏁
-Städte mit Hinterland, Kreuzungen mit Ampeln, Gassen mit Kopfsteinpflaster, ein Golfplatz mit Rampe über den Teich und eine Kiesgrube. Kostenlos, auch im Browser.
+Need for Geschwindigkeit im Überblick 🏁
+Offene Welt mit 20 Rennen und zwei Autobahnringen, Herausforderer auf der Autobahn, Fahr- und Drift-Modus mit Q, Sprint, Rundkurs und Drift, Golfplatz und Kiesgrube, Tuning und 27 Autos. Kostenlos, auch im Browser.
 👉 Link im Profil: onehumanity.itch.io/need-for-geschwindigkeit
 
-#needforgeschwindigkeit #indiegame #rennspiel #streetracing #openworld #godotengine #gamedev #indiedev #madeingermany
+#needforgeschwindigkeit #indiegame #rennspiel #openworld #drift #godotengine #gamedev #indiedev #madeingermany
 ```
 
 ## 16. Aufruf an Künstler: jede Stadt ihr Sound (Deutsch, Stand 2.39)
@@ -369,20 +328,22 @@ Titel-Einblendung der Musik in Spielzeit und 2,2-fach), Texte mit `ovr.sh` (`--s
 - Titel: `Deine Stadt, dein Song: Musik für Need for Geschwindigkeit gesucht`
 - Beschreibung:
   ```
-  In Need for Geschwindigkeit läuft in Aachen schon „AC“ von Bruder Jakob x Jonas Platin: Fährt man in die Stadt, kommt
-  ihr Song. Das soll es für jede Stadt im Spiel geben. Du machst Musik in deiner Stadt? Schreib deine Stadt und deinen
+  In Need for Geschwindigkeit läuft in Aachen schon „AC“ von Bruder Jakob x Jonas Platin: Wer in die Stadt fährt, hört
+  ihren Song. Das soll es für jede Stadt im Spiel geben. Du machst Musik in deiner Stadt? Schreib deine Stadt und deinen
   Song in die Kommentare.
 
   Städte im Spiel: Aachen, Bad Kissingen, Berlin, Bremen, Dortmund, Frankfurt am Main, Freudenstadt, Gelsenkirchen,
-  Hamburg, Hammelburg, Harz, Heidelberg, Köln, München, Nürnberg, Rostock, Stuttgart, Tauberbischofsheim, Würzburg.
+  Hamburg, Hammelburg, Heidelberg, Köln, München, Nürnberg, Rostock, Stuttgart, Tauberbischofsheim, Würzburg, dazu der
+  Driftberg im Harz.
 
   ▶ Kostenlos spielen, auch im Browser: https://onehumanity.itch.io/need-for-geschwindigkeit
 
-  Musik: „AC“ von Bruder Jakob x Jonas Platin (mit Erlaubnis).
+  Musik: „AC“ von Bruder Jakob x Jonas Platin, mit freundlicher Genehmigung.
 
   #needforgeschwindigkeit #deutschrap #aachen #indiegame #rennspiel #musiker #gamedev #shorts
   ```
-- Angepinnter Kommentar: `Welche Stadt, welcher Song? Schreib beides hier rein (gern mit Link).`
+  (Beim Einfügen in YouTube die Zeilen eines Absatzes zu einer Zeile zusammenziehen.)
+- Angepinnter Kommentar: `Welche Stadt, welcher Song? Schreib beides hier rein, gern mit Link.`
 
 **TikTok**
 ```

@@ -6,10 +6,10 @@ extends Node
 ##   [--scover=bild.png] zusätzlich Titelbild fürs Short 1080x1920 aus einem Spielbild im Hochformat
 ##   [--sketch]          schlichte Einblendungen für den Skizzen-Trailer (Kleinschrift, kein Neon, nur Ortsschilder)
 ##   [--sketch2]         dasselbe fürs zweite Short (Überholen, Abkürzung, Tunnel, U1), Dateien t_*.png
-##   [--sketch3]         deutsches Short zu 2.39 (mit Lied), Dateien a_*.png; mit --scover=bild.png nur das Titelbild
-##                       short_cover_239_1080x1920.png
 ##   [--sketch4]         deutsches Short "Aufruf an Künstler" (Musik "AC"), Dateien b_*.png; mit --scover=bild.png nur das
 ##                       Titelbild short_cover_kuenstler_1080x1920.png
+##   [--sketch5]         deutsches Überblick-Short (stumm), Dateien u_*.png; mit --scover=bild.png nur das Titelbild
+##                       short_cover_ueberblick_1080x1920.png
 ## Das Fenster lässt den Inhalt frei (transparent): darunter legt ffmpeg das Querformat-Video (1000x563 bei x 40, y 700).
 
 const UiStyle := preload("res://scripts/ui_style.gd")
@@ -72,21 +72,6 @@ func _ready() -> void:
 		await _render(e2, "t_end")
 		get_tree().quit()
 		return
-	if OS.get_cmdline_user_args().has("--sketch3"):
-		# Short zu 2.39 (deutsch, mit Lied): knappe Fragmente zu den Neuerungen, Dateien a_*.png; mit --scover das Titelbild
-		if scover_src != "":
-			await _render(_short_cover(_tex(scover_src), "NEU IN 2.39", "KOSTENLOS · IM BROWSER",
-				"kreuzungen · gassen · golfplatz · kiesgrube"), "short_cover_239_1080x1920", SIZE, false)
-			get_tree().quit()
-			return
-		await _render(_sketch_text("neu in 2.39.", 560.0), "a_intro")
-		for c in [["städte mit hinterland.", "a_hinterland"], ["kreuzungen mit ampeln.", "a_kreuzung"],
-				["gassen mit kopfsteinpflaster.", "a_gasse"], ["golfplatz zum austoben.", "a_golf"], ["kiesgrube.", "a_kies"],
-				["27 autos.", "a_autos"]]:
-			await _render(_sketch_text(c[0], 560.0), c[1])
-		await _render(_sketch_end_de(), "a_end")
-		get_tree().quit()
-		return
 	if OS.get_cmdline_user_args().has("--sketch4"):
 		# Aufruf an Künstler (deutsch, Musik "AC" von Bruder Jakob x Jonas Platin): Dateien b_*.png
 		if scover_src != "":
@@ -102,6 +87,32 @@ func _ready() -> void:
 		await _render(_sketch_lines(["du machst musik", "in deiner stadt?"], 860.0), "b_musik")
 		await _render(_sketch_lines(["schreib deine stadt", "und deinen song", "in die kommentare."], 820.0), "b_kommentare")
 		await _render(_sketch_end_de(), "b_end")
+		get_tree().quit()
+		return
+	if OS.get_cmdline_user_args().has("--sketch5"):
+		# Überblick über das ganze Spiel (stumm, seit 2.39): die Texte tragen, je mindestens knapp 2 s im Bild
+		if scover_src != "":
+			await _render(_short_cover(_tex(scover_src), "OFFENE WELT", "KOSTENLOS · IM BROWSER",
+				"sprint · rundkurs · drift · duelle · gelände"), "short_cover_ueberblick_1080x1920", SIZE, false)
+			get_tree().quit()
+			return
+		for c in [["die ganze karte.", "u_karte1", 250.0], ["20 rennen, zwei autobahnringe.", "u_karte2", 250.0],
+				["anflug von oben auf jede stadt.", "u_anflug", 560.0], ["herausforderer auf der autobahn.", "u_heraus", 400.0],
+				["duell: 300 m vorsprung gewinnt.", "u_duell", 400.0], ["q: fahr- oder drift-modus.", "u_modus", 560.0],
+				["drift-punkte auch in der stadt.", "u_driftpunkte", 560.0], ["rennen: sprint, rundkurs, drift.", "u_rennen", 620.0],
+				["golfplatz und kiesgrube.", "u_gelaende", 250.0], ["tuning in der garage.", "u_tuning", 330.0],
+				["27 autos.", "u_autos", 330.0]]:
+			await _render(_sketch_lines([c[0]], c[2]), c[1])
+		var e5 := Control.new()
+		e5.size = SIZE
+		var dim5 := ColorRect.new()
+		dim5.color = Color(0, 0, 0.01, 0.72)
+		dim5.size = SIZE
+		e5.add_child(dim5)
+		_sketch_line(e5, "need for geschwindigkeit", 800.0, 92)
+		_sketch_line(e5, "kostenlos · auch im browser", 935.0, 56, Color(0.78, 0.82, 0.9))
+		_sketch_line(e5, "onehumanity.itch.io", 1015.0, 56, Color(0.78, 0.82, 0.9))
+		await _render(e5, "u_end")
 		get_tree().quit()
 		return
 	if cover_src != "" or scover_src != "":

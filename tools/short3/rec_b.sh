@@ -1,6 +1,6 @@
 #!/bin/bash
 # rec_b.sh – alle Aufnahmen für das Short "Aufruf an Künstler" (cut_b.py), nacheinander nach $SHORT3/clips/b_*.avi.
-# Gleiches Auto und gleiche Kamera wie rec_a.sh. Stadt-Einfahrten: auf der Auffahrt 45 m vor der Stadt, oben blendet
+# Gleiches Auto und gleiche Kamera wie rec_u.sh. Stadt-Einfahrten: auf der Auffahrt 45 m vor der Stadt, oben blendet
 # das Spiel den Ortsnamen ein; in Aachen dazu unten Titel und Künstler des Stadt-Tracks ("AC", --nomusic: stumm,
 # vergrößert mit --rtoastk). Dauer gut 8 Minuten.
 D="$(cd "$(dirname "$0")" && pwd)"

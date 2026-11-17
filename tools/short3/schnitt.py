@@ -1,6 +1,6 @@
 # Schnitt-Bausteine für die Shorts zu 2.39 (tools/short3): Szenen auf ein Taktraster legen, Texte einblenden,
 # Spielton je Szene, dazu Musik (mit Versatz und Tempo-Angleich) oder ein Metronom-Klick, Lautheit auf -14 LUFS.
-# Nur ffmpeg, kein numpy. Benutzt von cut_a.py (Neu in 2.39) und cut_b.py (Aufruf an Künstler).
+# Nur ffmpeg, kein numpy. Benutzt von cut_u.py (Überblick) und cut_b.py (Aufruf an Künstler).
 import json, math, os, struct, subprocess, sys
 
 FPS = 30
@@ -107,9 +107,13 @@ def marks(clip, what):
     with open(os.path.join(CLIPS, clip + ".log"), errors="ignore") as f:
         for line in f:
             if line.startswith("REGIE MARKE " + what + " t="):
-                # Bild im Video: Engine.get_frames_drawn() zählt eins weiter als die Bilder der Aufnahme (gemessen am
-                # ersten Bild ohne Ladebild); ohne Bildnummer die Spielzeit t
-                if " bild=" in line:
+                # Bild im Video: film = Durchläufe der Hauptschleife seit dem ersten Bild (je Durchlauf schreibt
+                # --write-movie ein Bild, auch ein nicht neu gezeichnetes). Ältere Logs: bild = Engine.get_frames_drawn()
+                # zählt eins weiter als die Bilder der Aufnahme (stimmt nur, solange jedes Bild gezeichnet wurde);
+                # ohne Bildnummer die Spielzeit t
+                if " film=" in line:
+                    out.append(int(line.split(" film=")[1].split()[0]) / FPS)
+                elif " bild=" in line:
                     out.append((int(line.split(" bild=")[1].split()[0]) - 1) / FPS)
                 else:
                     out.append(float(line.split(" t=")[1].split()[0]))
@@ -124,7 +128,7 @@ def mark(clip, what, n=1, default=None):
     if default is not None:
         print("  Hinweis: Marke '%s' (%d.) fehlt in %s.log, nehme %.2f s" % (what, n, clip, default))
         return default
-    sys.exit("Marke '%s' (%d.) fehlt in %s.log: Aufnahme neu machen (rec_a.sh / rec_b.sh)" % (what, n, clip))
+    sys.exit("Marke '%s' (%d.) fehlt in %s.log: Aufnahme neu machen (rec_u.sh / rec_b.sh)" % (what, n, clip))
 
 
 def loudness(path):
