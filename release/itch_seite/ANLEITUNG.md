@@ -19,7 +19,7 @@ Kreuzberg unter der U1, Drift im Tunnel, Bahnübergang, Lackraster, Garage). Die
 zeigen noch Drag-Rennen, Sprungrampen und die alte Schrift und können weg.
 **Short (Hochformat, Englisch):** `release/need_for_geschwindigkeit_short_browser_en.mp4` (liegt nicht im Repo),
 Texte und Song-Vorlage für ElevenLabs in `release/SHORTS.md` Nr. 13.
-**Trailer:** `need_for_geschwindigkeit_trailer.mp4` (liegt nicht im Repo) auf YouTube hochladen und den Link unter
+**Trailer:** `need_for_geschwindigkeit_trailer_239.mp4` (Stand 2.39, liegt nicht im Repo; englisch `…_trailer_239_en.mp4`) auf YouTube hochladen und den Link unter
 Edit game → Trailer eintragen; itch.io nimmt nur YouTube- oder Vimeo-Links.
 
 ## Profil ONE HUMANITY (onehumanity.itch.io)

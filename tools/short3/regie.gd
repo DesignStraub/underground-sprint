@@ -32,11 +32,12 @@ extends SceneTree
 ##                  dann quer durch die engste Kurve (Handbremse, Gas, Lenken nach dem Weg): Drift-Punkte
 ##   rennen:<i>     Stadt i: zur Lichtsäule von Rennen i, darin halten, Enter: Ladebild mit der Karte des Rennens,
 ##                  Countdown, Start (die Szene wechselt zu race.tscn, die Aufnahme läuft weiter)
-##   autobahn[:k[:spur[:v]]] innerer Ring, Stück k, Spur (Standard 11,25: rechts, mit den Lastwagen) mit v m/s
+##   autobahn[:k[:spur[:v[:raser]]]] innerer Ring, Stück k, Spur (Standard 11,25: rechts, mit den Lastwagen) mit v m/s
 ##                  (Standard 24, so schnell wie der Verkehr dort: keine Auffahrunfälle); nach 3 s kommt der
 ##                  Herausforderer auf der mittleren Spur, holt auf und überholt links, gut im Bild; fährt er 18 m vor
 ##                  dir und steht der Hinweis, Enter: das Duell beginnt (ohne --challenger: damit startet es schon,
-##                  wenn er neben dir ist)
+##                  wenn er neben dir ist). Mit "raser": schnell (v, z. B. 46), überholt langsamere Autos über eine
+##                  freie Nachbarspur mit knapp 1 m Luft ("KNAPP VORBEI", Nitro), Nitro auf freier Bahn; kein Herausforderer
 ##   tuning         Garage: Tuning, Lack (Farben durchblättern), Felgen (durchblättern), dann Autohaus mit neuem Auto
 ## Schalter: --rquit=<s> Ende nach s Sekunden, --rlog Lage alle 0,5 s ("R ..."), --rhud=0 HUD aus, --rui=<k> Oberfläche
 ## k-fach größer (Ortsname, Musiktitel lesbar im Hochformat), --rwait=<s> vor dem Losfahren warten, --rcam=<0|1>
@@ -495,8 +496,12 @@ func _physics_process(_delta: float) -> bool:
 	if drift_t >= 0.0:
 		_drift(pl, _delta)
 		return false
+	if info.has("raser") and bool(pl.controls_enabled):
+		_raser(pl, _delta)
 	if not route.is_empty() and bool(pl.controls_enabled):
 		_follow(pl)
+		if info.has("raser") and bool(info["raser"].get("nos", false)):
+			Input.action_press("nitro")
 	elif not route.is_empty():
 		Input.action_press("accelerate")  # Anflug: Gas halten, fährt los, sobald die Kamera hinter dem Auto ist
 	return false
@@ -529,8 +534,14 @@ func _begin(pl) -> void:
 			var k := int(arg[0]) if arg.size() > 0 else 0
 			var e: Dictionary = w._rings[0][k]
 			var lane := float(arg[1]) if arg.size() > 1 else 11.25
-			route = _along(e, 0, 123.0, 2500.0, lane, float(arg[2]) if arg.size() > 2 else 24.0)
-			w._ch_t = 3.0  # Herausforderer nach 3 s freier Fahrt (wie --challenger, aber das Duell startet hier mit Enter)
+			if arg.size() > 3 and arg[3] == "raser":
+				info["raser"] = {"e": e, "lane": lane, "v": float(arg[2]) if arg.size() > 2 else 46.0, "t": 0.0, "pass": null,
+					"from": lane}
+				w._ch_t = 9999.0  # kein Herausforderer
+				_raser_route(pl, lane, lane)
+			else:
+				route = _along(e, 0, 123.0, 2500.0, lane, float(arg[2]) if arg.size() > 2 else 24.0)
+				w._ch_t = 3.0  # Herausforderer nach 3 s freier Fahrt (wie --challenger, aber das Duell startet hier mit Enter)
 		"modus":
 			_begin_modus(pl)
 		"rennen":
@@ -906,7 +917,17 @@ func _karte() -> void:
 
 ## Garage: Tuning, Lack (nach rechts blättern: das Auto wechselt die Farbe), Felgen (blättern), dann Autohaus mit neuem
 ## Auto. Blättern wie mit der Taste (ui_right durch die Fokus-Steuerung der Oberfläche)
+## Kopfzeile der Garage (Level, Titel, Siege, Auto) und die Linie darunter aus: der Test-Spielstand zeigt sonst
+## "LEVEL 99 · NEULING" (Level 99 mit dem ersten Titel), das wirkt in Aufnahmen seltsam. Den Spielstand selbst nicht ändern.
+func _garage_head() -> void:
+	for nm in ["status", "_xp_line"]:
+		var c = w.get(nm)
+		if c != null and is_instance_valid(c):
+			(c as Control).visible = false
+
+
 func _tuning(delta: float) -> bool:
+	_garage_head()
 	if rt < 0.0:
 		rt = 0.0
 		_mark("start")
@@ -1108,6 +1129,7 @@ func _garage(delta: float) -> bool:
 		_mark("start")
 		if not hud_on and w.get("_ui") != null:
 			(w._ui as Control).visible = false
+	_garage_head()
 	rt += delta
 	var tc := float(arg[0]) if arg.size() > 0 else 3.0
 	if rt >= tc and not info.has("cycled"):
@@ -1210,6 +1232,123 @@ func _events(pl) -> void:
 
 
 # --- Fahren ---------------------------------------------------------------------------------------------------------
+
+## Autobahn "raser": Weg ab hier auf Spur b (Querlage über 45 m von a nach b), Tempo v; Querlage in Spur-Koordinaten
+## (Mittelstreifen wird herausgerechnet)
+func _raser_route(pl, a: float, b: float) -> void:
+	var r: Dictionary = info["raser"]
+	var e: Dictionary = r["e"]
+	var tr: Dictionary = e["track"]
+	var xf: Transform3D = e["xf"]
+	var c: Curve3D = tr["paths"][0]["curve"]
+	var d0 := c.get_closest_offset(xf.affine_inverse() * pl.global_position)
+	var L := c.get_baked_length()
+	route = []
+	var k := 0
+	while k < 400 and d0 + 4.0 + k * 3.0 < L - 5.0:
+		var d := d0 + 4.0 + k * 3.0
+		var lat := lerpf(a, b, smoothstep(0.0, 45.0, k * 3.0))
+		var f: Dictionary = Track.frame_at(c, d)
+		var q: Vector3 = (f["pos"] as Vector3) + (f["right"] as Vector3) * Track.lane_lat(tr, d, lat) + Vector3(0, f["y"], 0)
+		route.append({"p": xf * q, "v": float(r["v"])})
+		k += 1
+	ri = 0
+	r["cur"] = b
+
+
+## Verkehr auf diesem Stück in Fahrtrichtung: [[Abstand vor mir (m), Spur, Tempo, Auto]]
+func _raser_cars(pl) -> Array:
+	var r: Dictionary = info["raser"]
+	var e: Dictionary = r["e"]
+	var c: Curve3D = e["track"]["curve"]
+	var d0 := c.get_closest_offset((e["xf"] as Transform3D).affine_inverse() * pl.global_position)
+	var out := []
+	for t in w.traffic:
+		if not is_instance_valid(t) or t.curve != c or float(t.dir) < 0.0 or bool(t.wrecked):
+			continue
+		out.append([float(t.progress) - d0, float(t.lane), float(t.speed), t])
+	return out
+
+
+## Je 0,15 s: steht vorn auf meiner Spur ein langsameres Auto, auf eine freie Nachbarspur wechseln und es so überholen,
+## dass knapp 1 m Luft bleibt (Querlage 1,45 m zu ihm hin: das Spiel meldet "KNAPP VORBEI" und füllt Nitro), danach
+## wieder in die Spurmitte. Fährt es auf einer Nachbarspur, in der eigenen Spur ebenso dicht daran vorbei (nur, wenn
+## ich gut 40 km/h schneller bin, sonst zählt es nicht). Nitro, solange 150 m vorn frei sind.
+func _raser(pl, dt: float) -> void:
+	var r: Dictionary = info["raser"]
+	r["t"] = float(r["t"]) - dt
+	if float(r["t"]) > 0.0:
+		return
+	r["t"] = 0.15
+	var cars := _raser_cars(pl)
+	var cur: float = r["cur"]
+	var v: float = maxf(float(pl.speed_fwd), 20.0)
+	var lanes := [2.25, 6.75, 11.25]
+	var base: float = r["lane"] if r["pass"] == null else float(r["base"])
+	# laufendes Überholen: vorbei? dann in die Mitte der neuen Spur
+	if r["pass"] != null:
+		var pc = r["pass"]
+		var rel := -999.0
+		for cc in cars:
+			if cc[3] == pc:
+				rel = cc[0]
+		if rel < -9.0:
+			r["pass"] = null
+			r["lane"] = base
+			_raser_route(pl, cur, base)
+			_mark("vorbei")
+			return
+	else:
+		var block = null
+		for cc in cars:
+			if absf(cc[1] - base) < 1.0 and cc[0] > 0.0 and cc[0] < 30.0 + maxf(v - cc[2], 0.0) * 3.2 and cc[2] < v - 2.0:
+				block = cc
+				break
+		if block == null:
+			# langsameres Auto auf einer Nachbarspur: dicht daran vorbei, ohne die Spur zu wechseln
+			for cc in cars:
+				var dl: float = cc[1] - base
+				if absf(dl) > 3.5 and absf(dl) < 5.5 and cc[0] > 12.0 and cc[0] < 70.0 and cc[2] < v - 11.5:
+					var own_free := true
+					for c2 in cars:
+						if absf(c2[1] - base) < 1.0 and c2[0] > -10.0 and c2[0] < 40.0:
+							own_free = false
+					if own_free:
+						r["pass"] = cc[3]
+						r["base"] = base
+						_raser_route(pl, cur, base + signf(dl) * 1.45)
+						_mark("knapp daneben %.2f" % cc[1])
+						break
+		elif block != null:
+			var best := -1.0
+			for ln in lanes:
+				if absf(ln - base) < 1.0 or absf(ln - base) > 5.0:
+					continue
+				var free := true
+				for cc in cars:
+					if absf(cc[1] - ln) < 1.0 and cc[0] > -14.0 and cc[0] < 70.0:
+						free = false
+				if free and (best < 0.0 or ln == 6.75):
+					best = ln
+			if best > 0.0:
+				r["pass"] = block[3]
+				r["base"] = best
+				var lat: float = best + signf(base - best) * 1.45  # zum überholten Auto hin
+				_raser_route(pl, cur, lat)
+				_mark("spurwechsel %.2f" % best)
+	# Nitro auf freier Bahn
+	var clear := true
+	for cc in cars:
+		if absf(cc[1] - float(r["cur"])) < 2.6 and cc[0] > 0.0 and cc[0] < 150.0:
+			clear = false
+	var nos: bool = clear and float(pl.nitro) > 0.15 and r["pass"] == null
+	if nos != bool(r.get("nos", false)):
+		# mit Nitro nicht bremsen (Tempo darf über v steigen), sonst wieder auf v
+		for pt in route:
+			pt["v"] = 70.0 if nos else float(r["v"])
+		_mark("nitro " + ("an" if nos else "aus"))
+	r["nos"] = nos
+
 
 ## Nur lenken: Ziel voraus auf dem Weg (wie in _follow), ohne Gas und Bremse
 func _steer_path(pl) -> void:

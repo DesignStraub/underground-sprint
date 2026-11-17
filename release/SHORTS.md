@@ -360,3 +360,101 @@ Musik: „AC“ von Bruder Jakob x Jonas Platin
 
 #needforgeschwindigkeit #deutschrap #aachen #musiker #newmusic #indiegame #rennspiel #gamedev #madeingermany
 ```
+
+## 17. Trailer 2.39 (Querformat)
+
+**Dateien:** `release/need_for_geschwindigkeit_trailer_239.mp4` (deutsche Einblendungen) und
+`release/need_for_geschwindigkeit_trailer_239_en.mp4` (dieselbe Fassung mit englischen Einblendungen; die Anzeigen des
+Spiels bleiben deutsch). Je 57,7 s, 1920×1080, 30 Bilder/s, H.264, AAC 48 kHz, −14 LUFS (Spitzen −2 dBTP); liegen
+nicht im Repo. Der alte Trailer vom 2. November (`need_for_geschwindigkeit_trailer.mp4`, 1280×720, 82 s) bleibt liegen.
+
+Das ganze Spiel im Überblick, mit mehr Weite als in den Shorts. Texte wie in Nr. 13 bis 16: Kleinschrift in Saira,
+weiß, je Szene ein sachliches Fragment, keine Stimme. Ton: nur die Musik, Motor und Spielton sind ganz weg. Geschnitten
+auf den Schlag, jede Szene einen, zwei oder vier Takte lang. Weite Blicke übers Land sind abends aufgenommen: Bei Tag
+schweben über dem Horizont graue Kegel (siehe Nr. 15). Auto: Kagura V10 mit der Optik aus `tools/short2/cfgB.txt`,
+Grafik Ultra.
+
+**Musik:** artissizm, „Drift Phonk“, aus dem Spiel-Soundtrack (Pixabay, Datei `music/artissizm-drift-phonk-200108.mp3`).
+Lizenz: [Pixabay Content License](https://pixabay.com/service/license-summary/), frei nutzbar, auch kommerziell, ohne
+Namensnennung (siehe `CREDITS.md`). Gemessen 103,96 BPM (ein Schlag 0,577 s, ein Takt 2,309 s). Der Ausschnitt beginnt
+mit Takt 9 des Lieds (18,47 s): acht Takte Aufbau für Karte, Anflug und Städte, dann fällt der Drop (Takt 17, 36,94 s im
+Lied) genau auf die Autobahn. Am Ende blendet die Musik über der Endtafel in 2,2 s aus. Falls YouTube einen
+Content-ID-Anspruch meldet: mit Verweis auf die Pixabay-Lizenz widersprechen.
+
+| Takte | Sekunden | Bild | Text (deutsch / englisch) |
+|---|---|---|---|
+| 1–2 | 0,0–4,6 | Große Karte wie im Spiel (links die Karte mit beiden Ringen, rechts das Infofeld zur Stadt); die Auswahl springt über acht Städte | eine offene welt. / one open world. |
+| 3–4 | 4,6–9,2 | Anflug von oben auf Frankfurt am Abend, Landung hinter dem Auto, oben „FRANKFURT AM MAIN“ | städte von hamburg bis münchen. / cities from hamburg to munich. |
+| 5 | 9,2–11,5 | Würzburg bei Tag, Hauptstraße am Main | bei tag und nacht. / day and night. |
+| 6 | 11,5–13,9 | Berlin-Kreuzberg nachts unter der Hochbahn der U1 | (weiter) |
+| 7 | 13,9–16,2 | Aachen im Regen (Rennen Grabenring, gut 230 km/h) | bei regen und nebel. / rain and fog. |
+| 8 | 16,2–18,5 | Hamburger Hafen im Nebel (Rennen Hafen-Drift), Nitro | (weiter) |
+| 9–10 | 18,5–23,1 | Drop: Autobahn um 20 Uhr, dicht an einem Lastwagen vorbei, unten „KNAPP VORBEI +610“, dann Nitro | knapp vorbei füllt das nitro. / near misses fill your nitro. |
+| 11–12 | 23,1–27,7 | Der Herausforderer zieht links vorbei, oben „HERAUSFORDERER: HAKONE 240 · Enter: Duell starten“, Enter, die Duell-Leiste | herausforderer auf der autobahn. / challengers on the autobahn. |
+| 13–14 | 27,7–32,3 | Hafen nachts: Q, links unten „DRIFT-MODUS“, dann quer durch die Kurve bis „DRIFT 130“ | q: drift-modus. / q: drift mode. |
+| 15 | 32,3–34,6 | Drift im Nebel am Hafen (Rennen Hafen-Drift) | – |
+| 16 | 34,6–36,9 | Pause im Lied: Kameraflug übers Startfeld mit der Startkarte „SPRINT · ALTSTADT-HÜGEL“ (Heidelberg) | sprint, rundkurs, drift. / sprint, circuit, drift. |
+| 17–18 | 36,9–41,6 | Der Countdown läuft über drei Rennen weiter: Aachen Grabenring 3, 2 · Stadion-Drift 2, 1 · Altstadt-Hügel 1, LOS!, alle fahren los | – |
+| 19–20 | 41,6–46,2 | Golfplatz: Rampe über den Teich mit Sprungkamera; Kiesgrube: Flug über den großen Haufen | golfplatz und kiesgrube. / golf course and gravel pit. |
+| 21–22 | 46,2–50,8 | Garage: Lack, Felgen nah am Rad, Autohaus: vom Kagura V10 zum Falke 9 RS | tuning und 27 autos. / tuning and 27 cars. |
+| 23 | 50,8–53,1 | Frankfurt nachts im Rennen (Bankenviertel-Sprint), mit Nitro durch die Neonstraßen | – |
+| 24–25 | 53,1–57,7 | Endtafel über der unscharfen Fahrt, Musik blendet aus | need for geschwindigkeit · kostenlos · auch im browser · onehumanity.itch.io / … · free · plays in your browser · … |
+
+Geprüft im Code: Knapp vorbei füllt Nitro (`world.gd` `_check_near_miss`, die Punkte gehen ins Nitro), 27 Autos
+(`Catalog.CARS`), Q schaltet den Drift-Modus (`drift_toggle`). „Städte von Hamburg bis München“ statt einer Zahl: Die
+Welt hat 20 Rennen, die Karriere 23 (mit Drag), die itch-Seite nennt 23 Events.
+
+**Werkzeuge** (`tools/short3/`, Arbeitsordner `$SHORT3`, für den Trailer ein eigener, z. B. `tools/short3/arbeit/trailer/`,
+liegt mit `tools/short3/arbeit/` außerhalb des Repos):
+- `rec_t.sh` (alle Aufnahmen im Querformat, `REC_SIZE=1920x1080`, gut 25 Minuten): Welt-Abläufe über `regie.gd` (`t_*`)
+  und Rennszenen über `debug_shot.gd` (`r_*`: `--race=<i> --drive`, `--at=d:<m>`, `--drifty`). Neu in `regie.gd`:
+  `autobahn:1:6.75:46:raser` (schnell auf der mittleren Spur, überholt langsamere Autos über eine freie Nachbarspur und
+  fährt mit knapp 1 m Luft an Autos auf der Nachbarspur vorbei: das Spiel meldet „KNAPP VORBEI“, Nitro auf freier Bahn),
+  die Rennen mit `--intro` (Kameraflug mit Startkarte) und `--drive` (nach LOS fährt der Autopilot), in der Garage ist
+  die Kopfzeile mit „LEVEL 99 · NEULING“ aus dem Test-Spielstand ausgeblendet (der Spielstand bleibt unverändert).
+- Einblendungen: `tools/short3/ovr.sh` (rendert auch `--trailer`: `td_*.png` deutsch, `te_*.png` englisch).
+- Schnitt: `python3 tools/short3/cut_t.py` (deutsch), `--en` (englisch), `--beide`.
+- Alles neu (im Projektordner): `export SHORT3=$PWD/tools/short3/arbeit/trailer && tools/short3/rec_t.sh &&
+  tools/short3/ovr.sh && python3 tools/short3/cut_t.py --beide`.
+
+**YouTube (deutsch)**
+- Titel: `Need for Geschwindigkeit – Trailer 2.39 | Straßenrennen in einer offenen Welt (kostenlos, im Browser)`
+- Beschreibung:
+  ```
+  Need for Geschwindigkeit 2.39: Straßenrennen in einem Mini-Deutschland aus Städten und zwei Autobahnringen. Würzburg bei
+  Tag, Berlin-Kreuzberg unter der U1, Aachen im Regen, der Hamburger Hafen im Nebel. Knapp vorbei füllt das Nitro,
+  Herausforderer fordern dich auf der Autobahn zum Duell, mit Q schaltest du in den Drift-Modus. Rennen als Sprint,
+  Rundkurs oder Drift, ein Golfplatz und eine Kiesgrube zum Austoben, Tuning in der Garage und 27 Autos.
+
+  ▶ Kostenlos spielen, auch im Browser: https://onehumanity.itch.io/need-for-geschwindigkeit
+  Auch für Windows, Mac und Linux.
+
+  Musik: artissizm – „Drift Phonk“ (Pixabay), läuft auch im Spiel.
+  Gemacht mit Godot von ONE HUMANITY.
+  ```
+- Tags: `need for geschwindigkeit, rennspiel, street racing, open world, autobahn, drift, nitro, tuning, indie game,
+  browserspiel, kostenlos, godot`
+
+**YouTube (englisch)**
+- Title: `Need for Geschwindigkeit – Trailer 2.39 | Open-world street racing in Germany (free, plays in your browser)`
+- Description:
+  ```
+  Need for Geschwindigkeit 2.39: street racing in a mini Germany of cities and two autobahn rings. Würzburg by day,
+  Berlin-Kreuzberg under the U1, Aachen in the rain, the port of Hamburg in fog. Near misses fill your nitro,
+  challengers call you out to a duel on the autobahn, Q switches to drift mode. Races as sprint, circuit or drift, a golf
+  course and a gravel pit to mess around in, tuning in the garage and 27 cars.
+
+  ▶ Play free, right in your browser: https://onehumanity.itch.io/need-for-geschwindigkeit
+  Also for Windows, Mac and Linux.
+
+  Music: artissizm – "Drift Phonk" (Pixabay), also in the game's soundtrack.
+  Made with Godot by ONE HUMANITY.
+  ```
+- Tags: `need for geschwindigkeit, racing game, street racing, open world, autobahn, drift, nitro, tuning, indie game,
+  browser game, free game, godot`
+
+**`release/ITCH_PAGE.md`** (geändert, nur die Tabelle der Grunddaten, nicht der Seitentext): in der Tabelle
+„Grunddaten“ die Zeile *Trailer* ersetzen durch „YouTube-Link zu `need_for_geschwindigkeit_trailer_239.mp4` (Stand 2.39,
+1920×1080, 58 s; dieselbe Fassung mit englischen Einblendungen: `need_for_geschwindigkeit_trailer_239_en.mp4`). itch.io
+nimmt nur YouTube- oder Vimeo-Links.“ Dazu in `release/itch_seite/ANLEITUNG.md` unter **Trailer** den Dateinamen
+ebenso auf `need_for_geschwindigkeit_trailer_239.mp4` ändern.

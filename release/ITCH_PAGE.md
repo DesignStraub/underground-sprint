@@ -18,7 +18,7 @@ Alles, was du auf der neuen itch.io-Seite eintragen musst (das Spiel hieß früh
 | AI generation disclosure | Ja – Code mit KI-Unterstützung erstellt (itch.io fragt das ab) |
 | Cover image | `itch_seite/need_for_geschwindigkeit_cover_630x500.png` |
 | Screenshots | die acht Bilder aus `screenshots_2_27/` (1920×1080, Stand 2.27); die alten aus `screenshots/` können weg |
-| Trailer | YouTube-Link zu `need_for_geschwindigkeit_trailer.mp4` (itch.io nimmt nur YouTube/Vimeo-Links) |
+| Trailer | YouTube-Link zu `need_for_geschwindigkeit_trailer_239.mp4` (Stand 2.39, 1920×1080, 58 s; englische Einblendungen: `need_for_geschwindigkeit_trailer_239_en.mp4`; itch.io nimmt nur YouTube/Vimeo-Links) |
 
 ## Handy im Browser
 Edit game → Embed options: **Mobile friendly** anhaken, **Orientation: Landscape**, **Fullscreen button** an.

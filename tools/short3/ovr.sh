@@ -1,6 +1,7 @@
 #!/bin/bash
-# ovr.sh [bild_u.png [bild_b.png]] – Einblendungen der Shorts zu 2.39 rendern (tools/promo_overlays.tscn, Schrift Saira
-# wie in den Shorts 13 und 14): Überblick (--sketch5, $SHORT3/ov/u_*.png) und Aufruf an Künstler (--sketch4, b_*.png).
+# ovr.sh [bild_u.png [bild_b.png]] – Einblendungen zu 2.39 rendern (tools/promo_overlays.tscn, Schrift Saira wie in den
+# Shorts 13 und 14): Überblick (--sketch5, $SHORT3/ov/u_*.png), Aufruf an Künstler (--sketch4, b_*.png) und Trailer im
+# Querformat (--trailer, td_*.png deutsch, te_*.png englisch).
 # Mit Standbildern (Hochformat 1080x1920, absolute Pfade) dazu die Titelbilder nach release/:
 #   bild_u.png -> need_for_geschwindigkeit_short_ueberblick_cover_1080x1920.png
 #   bild_b.png -> need_for_geschwindigkeit_short_kuenstler_cover_1080x1920.png
@@ -16,6 +17,7 @@ ov() {
 }
 ov --sketch5
 ov --sketch4
+ov --trailer
 if [ $# -ge 1 ]; then
 	ov --sketch5 --scover="$1"
 	cp "$W/ov/short_cover_ueberblick_1080x1920.png" "$P/release/need_for_geschwindigkeit_short_ueberblick_cover_1080x1920.png"

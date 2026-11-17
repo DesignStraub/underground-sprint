@@ -10,6 +10,7 @@ extends Node
 ##                       Titelbild short_cover_kuenstler_1080x1920.png
 ##   [--sketch5]         deutsches Überblick-Short (stumm), Dateien u_*.png; mit --scover=bild.png nur das Titelbild
 ##                       short_cover_ueberblick_1080x1920.png
+##   [--trailer]         Trailer zu 2.39 im Querformat (1920x1080): Einblendungen deutsch td_*.png, englisch te_*.png
 ## Das Fenster lässt den Inhalt frei (transparent): darunter legt ffmpeg das Querformat-Video (1000x563 bei x 40, y 700).
 
 const UiStyle := preload("res://scripts/ui_style.gd")
@@ -24,6 +25,7 @@ const WIN := Rect2(40, 600, 1000, 663)
 const CONTENT := Rect2(40, 700, 1000, 563)
 
 var out := "."
+var _cw := float(SIZE.x)  # Breite, über die _sketch_line zentriert (Querformat: 1920)
 
 
 func _ready() -> void:
@@ -87,6 +89,42 @@ func _ready() -> void:
 		await _render(_sketch_lines(["du machst musik", "in deiner stadt?"], 860.0), "b_musik")
 		await _render(_sketch_lines(["schreib deine stadt", "und deinen song", "in die kommentare."], 820.0), "b_kommentare")
 		await _render(_sketch_end_de(), "b_end")
+		get_tree().quit()
+		return
+	if OS.get_cmdline_user_args().has("--trailer"):
+		# Trailer zu 2.39 (Querformat, 1920x1080): je Szene ein Fragment oben in der Mitte, deutsch und englisch
+		_cw = 1920.0
+		var tsz := Vector2i(1920, 1080)
+		# [Name, deutsch, englisch, y (Standard 270: oben, unter dem Ortsnamen, den das Spiel bei 140-220 einblendet; die
+		# Karte füllt das Bild oben, dort unten; beim Duell steht bei 240-360 die Duell-Leiste, dort darüber)]
+		var texts := [["karte", "eine offene welt.", "one open world.", 968.0],
+			["staedte", "städte von hamburg bis münchen.", "cities from hamburg to munich."],
+			["tagnacht", "bei tag und nacht.", "day and night."],
+			["wetter", "bei regen und nebel.", "rain and fog."],
+			["knapp", "knapp vorbei füllt das nitro.", "near misses fill your nitro."],
+			["duell", "herausforderer auf der autobahn.", "challengers on the autobahn.", 100.0],
+			["drift", "q: drift-modus.", "q: drift mode."],
+			["rennen", "sprint, rundkurs, drift.", "sprint, circuit, drift."],
+			["gelaende", "golfplatz und kiesgrube.", "golf course and gravel pit."],
+			["tuning", "tuning und 27 autos.", "tuning and 27 cars."]]
+		for c in texts:
+			for li in 2:
+				var tc := Control.new()
+				tc.size = Vector2(tsz)
+				_sketch_line(tc, c[1 + li], c[3] if c.size() > 3 else 270.0, 60)
+				await _render(tc, ("td_" if li == 0 else "te_") + c[0], tsz)
+		for li in 2:
+			var te := Control.new()
+			te.size = Vector2(tsz)
+			var dimt := ColorRect.new()
+			dimt.color = Color(0, 0, 0.01, 0.72)
+			dimt.size = Vector2(tsz)
+			te.add_child(dimt)
+			_sketch_line(te, "need for geschwindigkeit", 410.0, 96)
+			_sketch_line(te, "kostenlos · auch im browser" if li == 0 else "free · plays in your browser", 548.0, 54,
+				Color(0.78, 0.82, 0.9))
+			_sketch_line(te, "onehumanity.itch.io", 624.0, 54, Color(0.78, 0.82, 0.9))
+			await _render(te, ("td_" if li == 0 else "te_") + "end", tsz)
 		get_tree().quit()
 		return
 	if OS.get_cmdline_user_args().has("--sketch5"):
@@ -203,7 +241,7 @@ func _sketch_line(parent: Control, text: String, y: float, px := 66, col := Colo
 	ls.shadow_offset = Vector2(0, 2)
 	l.label_settings = ls
 	l.position = Vector2(0, y)
-	l.size = Vector2(SIZE.x, 10)
+	l.size = Vector2(_cw, 10)
 	parent.add_child(l)
 	return l
 
