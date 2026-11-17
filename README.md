@@ -236,6 +236,41 @@ Außenring → nächste Stadt → Autobahn. Rundkurse und Drift-Kurse sind Schle
   (seit 2.38, Einzelheiten dort).
 - **Städte mit Hinterland, Straßennetz mit Kreuzungen, Gelände zum Austoben** (seit 2.39, Einzelheiten dort).
 - **Verbindungen mit Höhen und Tiefen, 15 Tunnel, Mittelstreifen in Abschnitten** (seit 2.40, Einzelheiten dort).
+- **Verkehr mit Details, Ampeln für den Verkehr, Kleinkram zum Umfahren** (seit 2.41, Einzelheiten dort).
+
+## Verkehr mit Details, Ampeln, Kleinkram zum Umfahren, Schilderbrücken (2.41)
+Nachgereicht zum Test von 2.39.1: der Verkehr sollte mehr Details bekommen; es fehlen Ampeln für den Verkehr; die
+Schilder zeigen immer nur in eine Richtung; Kleinkram sollte man wie Laternen umfahren können, ohne dass der Drift reißt.
+
+- **Verkehr mit Details** (`scripts/traffic_models.gd`, neu): bis 2.40 war ein Pkw zwei runde Quader (Karosserie und
+  dunkle Kabine) mit Lichtern und Rädern. Jetzt eine Karosserie aus Querschnitten (Bug, Motorhaube, Flanke mit
+  Schulter, Kofferraum, Heck), darauf eine Kabine aus Glas mit Dach und A-, B- und C-Säulen, Scheinwerfer, Kühlergrill
+  mit Chromleiste, Lufteinlass, Blinker, Rückleuchten, Nummernschilder (weiß mit EU-Feld), Außenspiegel, Türfugen und
+  Griffe, Schweller, dunkle Radläufe und Felgen mit fünf Speichen. Vier Formen reihum (Limousine, Kombi, Kleinwagen,
+  SUV, ohne Zufallszahlen: der übrige Zufall bleibt). Das Taxi ist hellelfenbein wie in Deutschland (bis 2.40 gelb)
+  mit TAXI-Dachschild; der Transporter hat Hochdach, Seitenscheiben vorn, Schiebetür und eine Aufschrift (Elektro
+  Müller, Bäckerei Schmitt …); der Linienbus Fensterband mit Säulen, drei Türen, Zierstreifen, Spiegel an Bügeln und
+  eine Zielanzeige („7 HAUPTBAHNHOF“); der Sattelzug ein Fahrerhaus mit Scheiben, Grill, Spiegeln, Dachspoiler und Tanks,
+  am Auflieger Hecktüren und Unterfahrschutz. Gebaut je Art, Form und Farbe einmal (beim Laden), dann wie bisher je
+  Material verschmolzen: 117 statt 53 Bilder pro Sekunde auf dem Außenring mit gut 130 Autos (gleiche Zeichenaufrufe,
+  `--hitch`). Vorschau: `tools/traffic_shots.tscn -- --out=/pfad/prefix`.
+- **Ampeln für den Verkehr** (`street_net._ped_lights`, `traffic_car._next_signal`, `Track.signal_state`): der Verkehr
+  hält bei Rot und Rot-Gelb an der Haltelinie, bei Gelb nur, wenn das Bremsen noch reicht, und fährt bei Grün los (Takt
+  wie die Lichter im Shader, Umlauf 12 s). Dazu auf den Hauptstraßen der Städte alle 380-560 m eine Fußgängerampel mit
+  Zebrastreifen über die ganze Fahrbahn, eine Ampel mit Ausleger je Richtung (nicht an Einmündungen, Tunneln, Brücken,
+  Mittelstreifen, Bahnübergang, nah an Start und Ziel): 44 Fußgängerampeln in 15 Städten, zusammen mit den Kreuzungen
+  116 Ampeln, an denen der Verkehr hält. Der Spieler darf durch. Test: `--ampellog` (Lage der Fußgängerampeln, „VERKEHR
+  wartet an Rot …“ / „fährt bei Grün los“: in 40 s zehn Autos genau an der Haltelinie, beide Richtungen),
+  `--noampel` (ohne Fußgängerampeln).
+- **Kleinkram zum Umfahren:** Bank, Hydrant, Poller, Pflanzkübel, Haltestelle, Telefonzelle und Müllcontainer waren seit
+  2.35 hart wie eine Wand (Crash, die Drift-Kette riss ab), ebenso das Vorfahrt-Schild. Jetzt fliegen sie weg wie
+  Laternen und kosten je nach Gewicht Tempo (Bank 3 %, Haltestelle 9 %); ein Treffer zählt nicht als Crash, die
+  Drift-Kette läuft weiter. Fest bleiben Betonleitwand, Ampelmasten und Bäume.
+- **Schilderbrücken:** beide Tafeln zeigten in dieselbe Richtung, wer auf der Gegenfahrbahn fuhr, sah nur Rückseiten.
+  Jetzt ist die Tafel über der linken Fahrbahn zum Gegenverkehr gedreht (beim Drag bleiben beide vorn).
+- **Tests:** Rundfahrt `--wtour=cities` 100,5 km, 271 Abschnitte, 10 leichte Schrammer des Autopiloten an Ecken der
+  Nebenstraßen und eine gewollte Kiste in einer Gasse (wie 2.39), nichts an Ampelmasten oder Kleinkram; `--worldcheck`
+  0 Überschneidungen; Rennen mit Autopilot (`fulltest.sh` 0 und 14) ohne Hänger und Sturz; Bildrate siehe oben.
 
 ## Verbindungen mit Höhen, Tunneln und wechselndem Mittelstreifen (2.40)
 Rückmeldung aus dem Test von 2.39.1 (das große Ganze steht in [FAHRPLAN.md](FAHRPLAN.md)): die Verbindungen zwischen
@@ -1574,7 +1609,8 @@ Texte, Cover und Screenshots für die itch.io-Seite: `release/`.
 - `scripts/garage_set.gd` – Werkstatt der Garage mit Rollenprüfstand (Band im Hallenboden, Wände, Werkzeug, Gebläse),
   `shaders/garage_floor.gdshader`, `garage_wall.gdshader`
 - `scripts/intro.gd` – Studio-Intro
-- `scripts/traffic_car.gd` – Verkehr
+- `scripts/traffic_car.gd` – Verkehr, `scripts/traffic_models.gd` – Modelle des Verkehrs (seit 2.41),
+  Vorschau `tools/traffic_shots.tscn`
 - `scripts/rail_crossing.gd` – Bahnübergang mit Bahnhof und Zug
 - `scripts/city_builder.gd` – Wahrzeichen der Städte-Strecken (Dom, Residenz, Festung, Gradierbau, Türmersturm …)
 - `scripts/city_data.gd` – Straßenverläufe, Flüsse, Gebäude und Wahrzeichen-Positionen (erzeugt von `tools/osm_city.py`)

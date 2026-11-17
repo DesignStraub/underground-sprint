@@ -1,7 +1,8 @@
 extends RigidBody3D
-## Leichtes Straßenobjekt (Laterne, Mülltonne, Leitkegel, Zeitungsbox, Schild ...): steht fest, bis ein Auto es trifft,
-## dann fliegt es weg und verstreut Trümmer. Schweres und fest Verankertes (Hydrant, Poller, Haltestelle, Bäume ...)
-## ist kein Knockable, sondern hart (track_builder._build_props).
+## Straßenobjekt (Laterne, Mülltonne, Leitkegel, Zeitungsbox, Schild, seit 2.41 auch Bank, Hydrant, Poller,
+## Pflanzkübel, Haltestelle, Telefonzelle, Müllcontainer und Vorfahrt-Schild): steht fest, bis ein Auto es trifft, dann
+## fliegt es weg und verstreut Trümmer. Ein Treffer zählt nicht als Crash, die Drift-Kette läuft weiter. Hart bleiben
+## Betonleitwand, Ampelmasten und Bäume (track_builder._build_props, street_net).
 ## Seit 2.35: kinematisch eingefroren (der Fühler des Autos sah statisch eingefrorene Teile mit Jolt nie, man fuhr durch
 ## alles hindurch); fliegt schneller als das Auto und zur Seite davon (vorher mit 0,7-fachem Tempo geradeaus: das Auto
 ## holte es ein). Laternen kippen von der Straße weg und blenden kurz nach der Landung aus, alles andere nach ein paar

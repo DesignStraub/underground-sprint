@@ -12,6 +12,7 @@ extends CharacterBody3D
 
 const Builder := preload("res://scripts/car_builder.gd")
 const Track := preload("res://scripts/track_builder.gd")
+const Models := preload("res://scripts/traffic_models.gd")  # Modelle mit Details (seit 2.41)
 const EngineAudio := preload("res://scripts/engine_audio.gd")
 ## Motorklang: ruhiger Vierzylinder; der Bus ein rauer Sechszylinder-Diesel
 
@@ -84,7 +85,11 @@ var lane_rate := 2.0  # Spurwechsel m/s quer (Herausforderer: schneller)
 var accel_up := 4.0  # Beschleunigen m/s² (Herausforderer: wie ein Sportwagen)
 
 
-static var _models := {}  # Art + Farbe -> [[Mesh, Lage, Material, Schatten]] (setup)
+static var _models := {}  # Art + Form + Farbe -> [[Mesh, Lage, Material, Schatten]] (setup)
+static var _form_i := 0  # reihum die Formen der Pkw (ohne Zufallszahlen: der übrige Zufall bleibt, wie er war)
+var form := ""  # Pkw und Taxi: Limousine, Kombi, Kleinwagen, SUV (traffic_models.CARS)
+var _sig_waiting := false
+static var _sig_log := OS.get_cmdline_user_args().has("--ampellog")  # Test: Halten an der Ampel melden
 
 
 func setup(kind_: String, rng: RandomNumberGenerator) -> void:
@@ -100,7 +105,7 @@ func setup(kind_: String, rng: RandomNumberGenerator) -> void:
 	# Lackfarbe festlegen (Zufallszahlen in derselben Reihenfolge wie bisher)
 	match kind:
 		"taxi":
-			col = Color(0.95, 0.75, 0.05)
+			col = Models.TAXI_IVORY  # seit 2.41 hellelfenbein wie in Deutschland (bis 2.40 gelb)
 		"van":
 			size = Vector3(2.0, 2.3, 5.2)
 			col = Color(0.85, 0.85, 0.85) if rng.randf() < 0.6 else col
@@ -111,6 +116,15 @@ func setup(kind_: String, rng: RandomNumberGenerator) -> void:
 			# Sattelzug (seit 2.29, nur Autobahn): Zugmaschine in Farbe, weißer Auflieger mit Spedition
 			size = Vector3(2.55, 3.9, 16.5)
 			col = LKW_COLORS[rng.randi() % LKW_COLORS.size()]
+	if kind == "sedan" or kind == "taxi":
+		form = Models.FORMS[_form_i % Models.FORMS.size()] if kind == "sedan" else ["limousine", "kombi"][_form_i % 2]
+		_form_i += 1
+		var S: Dictionary = Models.CARS[form]
+		size = Vector3(S["W"], S["roof"], S["L"])
+	elif kind == "van":
+		size = Vector3(2.02, 2.5, 5.6)
+	elif kind == "bus":
+		size = Vector3(2.55, 3.1, 11.6)
 	length = size.z
 	_half_w = size.x / 2.0
 	_size = size
@@ -126,9 +140,9 @@ func setup(kind_: String, rng: RandomNumberGenerator) -> void:
 	add_child(cs)
 
 
-## Modell aus dem Zwischenspeicher oder neu bauen (dann merken)
+## Modell aus dem Zwischenspeicher oder neu bauen (dann merken); seit 2.41 aus traffic_models.gd mit Details
 func _model(col: Color) -> void:
-	var key := kind + col.to_html()
+	var key := kind + form + col.to_html()
 	if _models.has(key):
 		for it in _models[key]:
 			if it[0] is String:
@@ -141,57 +155,19 @@ func _model(col: Color) -> void:
 			mi.cast_shadow = it[3]
 			add_child(mi)
 	else:
+		var tag := absi(col.to_html().hash()) % 997
 		match kind:
 			"sedan":
-				_body(Vector2(1.8, 4.5), 0.65, col, Vector2(1.6, 2.2), 0.5)
+				Models.car(self, form if form != "" else "limousine", col, tag)
 			"taxi":
-				_body(Vector2(1.8, 4.6), 0.65, col, Vector2(1.6, 2.3), 0.5)
-				Builder._add(self, Builder.box(Vector3(0.7, 0.22, 0.3)), Builder.mat(Color(1, 1, 0.8), 0, 0.4, Color(1, 0.95, 0.6), 2.5), Vector3(0, 1.62, 0.2))
+				Models.car(self, form if form != "" else "limousine", col, tag, true)
 			"van":
-				_body(Vector2(2.0, 5.2), 1.6, col, Vector2(1.9, 1.0), 0.45, -1.9)
+				Models.van(self, col, tag)
 			"lkw":
-				# Zugmaschine vorn (Fahrerhaus hoch), dahinter der Auflieger
-				var paint := Builder.gloss_mat(col, 0.3, 0.4)
-				var white := Builder.mat(Color(0.9, 0.9, 0.88), 0.1, 0.6)
-				var dark := Builder.mat(Color(0.06, 0.06, 0.07), 0.2, 0.7)
-				var glass := Builder.mat(Color(0.03, 0.04, 0.06), 0.7, 0.1)
-				Builder._add(self, Builder.rtapered_box(Vector2(2.5, 2.4), Vector2(2.4, 2.3), 2.6, 0.0, 0.12), paint, Vector3(0, 0.9, -7.0))
-				Builder._add(self, Builder.box(Vector3(2.3, 0.9, 0.05)), glass, Vector3(0, 2.75, -8.22))
-				Builder._add(self, Builder.box(Vector3(2.5, 0.9, 3.6)), dark, Vector3(0, 0.45, -6.4))
-				Builder._add(self, Builder.box(Vector3(2.55, 3.0, 13.4)), white, Vector3(0, 2.4, 1.5))
-				Builder._add(self, Builder.box(Vector3(2.5, 0.7, 13.0)), dark, Vector3(0, 0.55, 1.5))
-				var head := Builder.mat(Color(1, 1, 0.9), 0, 0.3, Color(1, 0.95, 0.8), 4.0)
-				var tail := Builder.mat(Color(0.6, 0, 0), 0, 0.3, Color(1, 0.05, 0.02), 3.0)
-				for sx in [-1, 1]:
-					Builder._add(self, Builder.box(Vector3(0.4, 0.18, 0.05)), head, Vector3(sx * 0.9, 1.25, -8.22))
-					Builder._add(self, Builder.box(Vector3(0.35, 0.15, 0.05)), tail, Vector3(sx * 1.0, 0.95, 8.21))
-					for wz in [-7.6, -4.6, 4.4, 5.8, 7.2]:
-						var c := CylinderMesh.new()
-						c.top_radius = 0.5
-						c.bottom_radius = 0.5
-						c.height = 0.3
-						c.radial_segments = 14
-						c.rings = 1
-						Builder._add(self, c, Builder.mat(Color(0.05, 0.05, 0.05), 0, 0.9), Vector3(sx * 1.08, 0.5, wz)).rotation_degrees.z = 90
-				# Speditionsname an beiden Seiten des Aufliegers
-				var name: String = SPEDITIONEN[absi(col.to_html().hash()) % SPEDITIONEN.size()]
-				for sx in [-1.0, 1.0]:
-					var l := Label3D.new()
-					l.text = name
-					l.font_size = 64
-					l.pixel_size = 0.016
-					l.modulate = col if col.get_luminance() < 0.8 else Color(0.1, 0.2, 0.5)
-					l.shaded = true
-					l.double_sided = false
-					l.position = Vector3(sx * 1.29, 2.6, 1.5)
-					l.rotation.y = sx * PI / 2.0
-					add_child(l)
+				# Zugmaschine in Farbe, weißer Auflieger mit Spedition (Name fest je Farbe)
+				Models.lkw(self, col, SPEDITIONEN[absi(col.to_html().hash()) % SPEDITIONEN.size()])
 			"bus":
-				_body(Vector2(2.5, 11.0), 2.6, col, Vector2.ZERO, 0.0)
-				var win := Builder.mat(Color(0.1, 0.1, 0.1), 0.5, 0.2, Color(1, 0.9, 0.6), 1.2)
-				for s in [-1, 1]:
-					Builder._add(self, Builder.box(Vector3(0.05, 0.9, 9.0)), win, Vector3(s * 1.26, 2.1, 0.5))
-				Builder._add(self, Builder.box(Vector3(2.3, 1.0, 0.05)), win, Vector3(0, 2.0, -5.51))
+				Models.bus(self, col, tag)
 		Builder.merge_static(self)
 		var items := []
 		var cacheable := true
@@ -199,7 +175,8 @@ func _model(col: Color) -> void:
 			if c is MeshInstance3D and c.get_child_count() == 0:
 				items.append([c.mesh, c.transform, c.material_override, c.cast_shadow])
 			elif c is Label3D:
-				items.append([(c as Label3D).text, c.transform, (c as Label3D).modulate, (c as Label3D).pixel_size])
+				var lc := c as Label3D
+				items.append([lc.text, lc.transform, lc.modulate, lc.pixel_size, lc.shaded])
 			else:
 				cacheable = false  # unerwartete Teile: lieber nicht zwischenspeichern
 		if cacheable:
@@ -214,7 +191,7 @@ func _label_from(it: Array) -> void:
 	l.modulate = it[2]
 	l.pixel_size = it[3]
 	l.font_size = 64
-	l.shaded = true
+	l.shaded = it[4] if it.size() > 4 else true
 	l.double_sided = false
 	add_child(l)
 
@@ -223,53 +200,22 @@ func _label_from(it: Array) -> void:
 static func prewarm() -> void:
 	var plan := []
 	for c in COLORS:
-		plan.append(["sedan", c])
-		plan.append(["van", c])
-	plan.append_array([["taxi", Color(0.95, 0.75, 0.05)], ["van", Color(0.85, 0.85, 0.85)], ["bus", Color(0.9, 0.85, 0.1)],
-		["bus", Color(0.85, 0.85, 0.85)]])
+		for f in ["limousine", "kombi", "kleinwagen", "suv"]:
+			plan.append(["sedan", f, c])
+		plan.append(["van", "", c])
+	plan.append_array([["taxi", "limousine", Models.TAXI_IVORY], ["taxi", "kombi", Models.TAXI_IVORY],
+		["van", "", Color(0.85, 0.85, 0.85)], ["bus", "", Color(0.9, 0.85, 0.1)], ["bus", "", Color(0.85, 0.85, 0.85)]])
 	for c in LKW_COLORS:
-		plan.append(["lkw", c])
+		plan.append(["lkw", "", c])
 	var Self: GDScript = load("res://scripts/traffic_car.gd")
 	for it in plan:
-		if _models.has(it[0] + (it[1] as Color).to_html()):
+		if _models.has(it[0] + it[1] + (it[2] as Color).to_html()):
 			continue
 		var t: Node3D = Self.new()
 		t.kind = it[0]
-		t._model(it[1])
+		t.form = it[1]
+		t._model(it[2])
 		t.free()
-
-
-func _body(fp: Vector2, h: float, col: Color, cabin: Vector2, cabin_h: float, cabin_z := 0.2) -> void:
-	var paint := Builder.gloss_mat(col, 0.3, 0.4)
-	var glass := Builder.mat(Color(0.03, 0.04, 0.06), 0.7, 0.1)
-	var clear := 0.25
-	# Karosserie und Kabine mit runden Kanten (bis 2.20 scharfkantige Kisten), dazu Stoßfänger, Spiegel und Felgen
-	Builder._add(self, Builder.rtapered_box(fp, fp - Vector2(0.08, 0.2), h, 0.0, minf(0.14, h * 0.3)), paint, Vector3(0, clear, 0))
-	if cabin.x > 0.0:
-		Builder._add(self, Builder.rtapered_box(cabin, cabin - Vector2(0.25, 0.5), cabin_h, 0.1, 0.1), glass, Vector3(0, clear + h, cabin_z))
-	var head := Builder.mat(Color(1, 1, 0.9), 0, 0.3, Color(1, 0.95, 0.8), 4.0)
-	var tail := Builder.mat(Color(0.6, 0, 0), 0, 0.3, Color(1, 0.05, 0.02), 3.0)
-	var trim := Builder.mat(Color(0.06, 0.06, 0.07), 0.2, 0.7)
-	for s in [-1, 1]:
-		Builder._add(self, Builder.rbox(Vector3(0.35, 0.15, 0.05), 0.02), head, Vector3(s * (fp.x / 2 - 0.3), clear + 0.35, -fp.y / 2 - 0.01))
-		Builder._add(self, Builder.rbox(Vector3(0.35, 0.15, 0.05), 0.02), tail, Vector3(s * (fp.x / 2 - 0.3), clear + 0.4, fp.y / 2 + 0.01))
-		if cabin.x > 0.0:
-			Builder._add(self, Builder.rbox(Vector3(0.16, 0.09, 0.07), 0.03), paint, Vector3(s * (fp.x / 2 + 0.05), clear + h + 0.05, cabin_z - cabin.y / 2 + 0.25))
-	for z in [-1, 1]:
-		Builder._add(self, Builder.rbox(Vector3(fp.x - 0.06, 0.12, 0.1), 0.04), trim, Vector3(0, clear + 0.08, z * (fp.y / 2 - 0.02)))
-	var tire := Builder.mat(Color(0.05, 0.05, 0.05), 0, 0.9)
-	var hub := Builder.mat(Color(0.55, 0.56, 0.58), 0.7, 0.35)
-	for s in [-1, 1]:
-		for z in [-1, 1]:
-			var c := CylinderMesh.new()
-			c.top_radius = 0.33
-			c.bottom_radius = 0.33
-			c.height = 0.24
-			c.radial_segments = 16
-			c.rings = 1
-			var wp := Vector3(s * (fp.x / 2 - 0.1), 0.33, z * (fp.y / 2 - 0.9))
-			Builder._add(self, c, tire, wp).rotation_degrees.z = 90
-			Builder._add(self, Builder._disc(0.2, 0.01), hub, wp + Vector3(s * 0.121, 0, 0)).rotation_degrees.z = 90
 
 
 ## Klang vorrechnen (race.gd beim Laden): sonst rechnete das erste nahe Auto mitten im Rennen und es ruckelte
@@ -363,6 +309,21 @@ func _physics_process(dt: float) -> void:
 		var stop: float = (crossing.d_cross - 12.0 - progress) if dir > 0.0 else (progress - crossing.d_cross - 12.0)
 		if stop > -2.0 and stop < 140.0:
 			target = minf(target, sqrt(2.0 * 7.0 * maxf(stop, 0.0)))
+	# Ampel (seit 2.41): bei Rot und Rot-Gelb vor der Haltelinie stehen bleiben; bei Gelb nur, wenn es noch bequem
+	# reicht (sonst fährt er durch, statt auf der Kreuzung zu bremsen)
+	if path_id == 0 and not recovering and not (track.get("signals", []) as Array).is_empty():
+		var sg := _next_signal()
+		if sg.x < 150.0:
+			var st := Track.signal_state(sg.y)
+			if st >= 2 or (st == 1 and sg.x > speed * speed / 14.0 + 2.0):
+				target = minf(target, sqrt(2.0 * 7.0 * maxf(sg.x, 0.0)))
+				if _sig_log and speed < 0.3 and sg.x < 4.0 and not _sig_waiting:
+					_sig_waiting = true
+					print("VERKEHR wartet an Rot: Richtung %+d, %.1f m vor der Haltelinie, Spur %.1f, Phase %d" % [int(dir), sg.x, _lane_cur, st])
+			elif _sig_waiting and st == 0:
+				_sig_waiting = false
+				if _sig_log:
+					print("VERKEHR fährt bei Grün los: Richtung %+d" % int(dir))
 	speed = move_toward(speed, target, dt * (accel_up if target > speed else 10.0))
 	progress += speed * dt * dir
 	if path_id == 0 and track.get("loop", false):
@@ -397,6 +358,18 @@ func _physics_process(dt: float) -> void:
 			return
 		_far_t = 0.5
 	place()
+
+
+## Nächste Ampel vor mir auf meiner Seite der Hauptstraße: (Abstand zur Haltelinie, Phase); nichts: x = 1e9
+func _next_signal() -> Vector2:
+	var best := Vector2(1e9, 0.0)
+	for s in track["signals"]:
+		if signf(float(s["side"])) != signf(dir):
+			continue
+		var gap: float = (float(s["d"]) - float(s["stop"]) - progress) if dir > 0.0 else (progress - float(s["d"]) - float(s["stop"]))
+		if gap > -1.5 and gap < best.x:
+			best = Vector2(gap, float(s["phase"]))
+	return best
 
 
 ## Auf die Straße setzen (Spur, Fahrtrichtung, Steigung)

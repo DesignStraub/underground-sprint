@@ -44,7 +44,7 @@ namens „Dragmania“ zur Sprache (Name unsicher).
 
 ## 6. Charme für jede Stadt
 
-## 6a. Verkehr, Ampeln, Schilder, Kleinkram (nachgereicht am 17.11.2026)
+## 6a. Verkehr, Ampeln, Schilder, Kleinkram (nachgereicht am 17.11.2026; erledigt in 2.41)
 - Die Autos, Busse und Transporter im Verkehr sollen mehr Details bekommen.
 - Ampeln, nach denen sich der Verkehr richtet.
 - Schilder sind falsch ausgerichtet und zeigen immer nur in eine Richtung.

@@ -1870,6 +1870,9 @@ static func build_junctions(root: Node3D, track: Dictionary, rng: RandomNumberGe
 	var white := Track.Builder.mat(Color(0.85, 0.85, 0.85), 0.0, 0.5)
 	var zebra := []
 	var mm := {}  # Ampeln und Schilder der ganzen Stadt: Teil -> [Mesh, Material, Lagen] (je Teil ein MultiMesh)
+	# Ampeln der Hauptstraße für den Verkehr (seit 2.41): {d, side (+1 Verkehr in Wegrichtung, -1 Gegenverkehr), phase,
+	# stop (Haltelinie so weit vor d)}; traffic_car hält dort bei Rot
+	track["signals"] = []
 	for j in track.get("junctions", []):
 		var p: Dictionary = track["paths"][j["path"]]
 		if p["kind"] == "passage":
@@ -1912,12 +1915,16 @@ static func build_junctions(root: Node3D, track: Dictionary, rng: RandomNumberGe
 			var dirm: Vector3 = fm["fwd"] * -sd  # Verkehr auf dieser Seite kommt aus dieser Richtung
 			var mc: Vector3 = fm["pos"] + fm["right"] * sd * (hwm + 1.0) + dirm * (half + 2.5)
 			mc.y = 0.0
-			_signal(root, mm, mc, dirm, hwm * 0.45, ph, true)
+			if _signal(root, mm, mc, dirm, hwm * 0.45, ph, true):
+				track["signals"].append({"d": float(j["d"]), "side": sd, "phase": ph, "stop": half + 4.5})
 		else:
 			_yield_sign(root, mm, corner, -toward)
+	_ped_lights(root, track, mm, zebra)
 	if not zebra.is_empty():
 		Track._multi(root, Track.Builder.box(Vector3(1.0, 0.02, 3.0)), white, zebra)
 	for key in mm:
+		if key == "yield_mats":
+			continue  # Vorfahrt-Schilder sind seit 2.41 einzelne, umfahrbare Teile (_yield_sign)
 		Track._multi(root, mm[key][0], mm[key][1], mm[key][2])
 	root.remove_meta("track_ref")
 
@@ -1936,9 +1943,9 @@ static func _mm_add(mm: Dictionary, key: String, mesh: Mesh, mat: Material, xf: 
 
 ## Ampel an der Ecke: Mast, Ausleger über die Fahrbahn (arm m), Kopf mit drei Lichtern (traffic_light.gdshader,
 ## Umlauf ab phase); fester Mast
-static func _signal(root: Node3D, mm: Dictionary, pos: Vector3, face: Vector3, arm: float, phase: float, big := false) -> void:
+static func _signal(root: Node3D, mm: Dictionary, pos: Vector3, face: Vector3, arm: float, phase: float, big := false) -> bool:
 	if not _free_spot(root, pos):
-		return
+		return false
 	var t := Transform3D(Basis.looking_at(-face, Vector3.UP), pos + Vector3(0, Track.CURB_H, 0))
 	var dark := Track.Builder.mat(Color(0.06, 0.06, 0.07), 0.6, 0.4)
 	var unit := Track.Builder.box(Vector3.ONE)
@@ -1964,21 +1971,88 @@ static func _signal(root: Node3D, mm: Dictionary, pos: Vector3, face: Vector3, a
 			mm[key] = [sm, lm, []]
 		mm[key][2].append(t * Transform3D(Basis(), head_pos + Vector3(0, 0.38 - k * 0.38, 0.17)))
 	Track._solid_cyl(root, 0.14, 2.0, pos + Vector3(0, 1.0 + Track.CURB_H, 0))
+	return true
 
 
-## Vorfahrt achten: rot-weißes Dreieck mit der Spitze nach unten auf einem Pfosten (fest wie ein Poller)
+## Fußgängerampeln (seit 2.41; Rückmeldung zu 2.39.1: "es fehlt sowas wie Ampeln für den Verkehr"): auf der Hauptstraße
+## alle 380-560 m ein Zebrastreifen mit einer Ampel je Richtung (Ausleger über die Fahrbahn), nicht an Einmündungen,
+## Tunneln, Brücken, Bahnübergang, Hochbahn, Mittelstreifen und nicht nah an Start und Ziel. Der Verkehr hält bei Rot an
+## der Haltelinie (track["signals"], traffic_car), der Spieler darf durch.
+static func _ped_lights(root: Node3D, track: Dictionary, mm: Dictionary, zebra: Array) -> void:
+	if OS.get_cmdline_user_args().has("--noampel"):
+		return
+	var main: Curve3D = track["curve"]
+	var L: float = track["length"]
+	var rng := RandomNumberGenerator.new()  # eigener Zufall: der übrige Bau der Stadt bleibt, wie er war
+	rng.seed = int(L * 13.0) + 77
+	var d := rng.randf_range(200.0, 320.0)
+	var n := 0
+	while d < L - 150.0:
+		var ok: bool = Track._range_free(track, d - 30.0, d + 30.0) and Track._trough_at(track, d - 20.0) == 0 \
+			and Track._trough_at(track, d + 20.0) == 0 and Track.bridge_at(track, d).is_empty() \
+			and Track.median_at(track, d - 15.0) < 0.05 and Track.median_at(track, d + 15.0) < 0.05 \
+			and (track["crossing_d"] < 0.0 or absf(d - float(track["crossing_d"])) > 90.0) \
+			and absf(Track.elev_at(main, d)) < 0.3 and not Track._district_at(track, d).get("rural", false)
+		for j in track.get("junctions", []):
+			if absf(float(j["d"]) - d) < 55.0:
+				ok = false
+		var fm := Track.frame_at(main, d)
+		var hwm: float = Track.hw(track, d)
+		if ok:
+			for sd in [-1.0, 1.0]:
+				# Einmündung oder Gasse am Gehweg?
+				for o in [-14.0, 0.0, 14.0]:
+					var q: Vector3 = fm["pos"] + fm["right"] * sd * (hwm + 1.0) + fm["fwd"] * o
+					if branch_clear(track, q, true, true) < 2.0:
+						ok = false
+		if not ok:
+			d += 35.0
+			continue
+		var ph := rng.randf_range(0.0, 12.0)
+		var placed := 0
+		for sd in [-1.0, 1.0]:
+			var dirm: Vector3 = fm["fwd"] * -sd  # Verkehr auf dieser Seite kommt aus dieser Richtung
+			var mc: Vector3 = fm["pos"] + fm["right"] * sd * (hwm + 1.0) + dirm * 3.0
+			mc.y = 0.0
+			if _signal(root, mm, mc, dirm, hwm * 0.45, ph, true):
+				track["signals"].append({"d": d, "side": sd, "phase": ph, "stop": 4.5})
+				placed += 1
+		if placed > 0 and OS.get_cmdline_user_args().has("--ampellog"):
+			var wp: Vector3 = (track.get("xf", Transform3D.IDENTITY) as Transform3D) * fm["pos"]
+			var wf: Vector3 = (track.get("xf", Transform3D.IDENTITY) as Transform3D).basis * fm["fwd"]
+			print("AMPEL bei xy:%.0f:%.0f Richtung %.0f Grad" % [wp.x, wp.z, rad_to_deg(atan2(wf.x, -wf.z))])
+		if placed > 0:
+			# Zebrastreifen quer über die ganze Fahrbahn (Balken in Fahrtrichtung)
+			var bz := Basis.looking_at(fm["fwd"], Vector3.UP)
+			var lx := -hwm + 1.0
+			while lx < hwm - 0.5:
+				var zp: Vector3 = fm["pos"] + fm["right"] * lx
+				zebra.append(Transform3D(bz, Vector3(zp.x, 0.03, zp.z)))
+				lx += 2.0
+			n += 1
+		d += rng.randf_range(380.0, 560.0)
+	if OS.get_cmdline_user_args().has("--ampellog"):
+		print("AMPEL %-28s %d Fußgängerampeln, %d Ampeln für den Verkehr" % [track.get("name", "?"), n, (track["signals"] as Array).size()])
+
+
+## Vorfahrt achten: rot-weißes Dreieck mit der Spitze nach unten auf einem Pfosten. Seit 2.41 umfahrbar wie ein
+## Parkschild (bis 2.40 fest wie ein Poller: Crash, die Drift-Kette riss ab)
 static func _yield_sign(root: Node3D, mm: Dictionary, pos: Vector3, face: Vector3) -> void:
 	if not _free_spot(root, pos):
 		return
-	var t := Transform3D(Basis.looking_at(-face, Vector3.UP), pos + Vector3(0, Track.CURB_H, 0))
-	var grey := Track.Builder.mat(Color(0.45, 0.46, 0.48), 0.6, 0.4)
-	_mm_add(mm, "pfosten", Track.Builder.box(Vector3(0.07, 2.3, 0.07)), grey, t * Transform3D(Basis(), Vector3(0, 1.15, 0)))
-	if not mm.has("dreieck_rot"):
-		mm["dreieck_rot"] = [_tri(0.8), Track.Builder.mat(Color(0.85, 0.08, 0.06), 0.0, 0.5), []]
-		mm["dreieck_weiss"] = [_tri(0.55), Track.Builder.mat(Color(0.95, 0.95, 0.93), 0.0, 0.5), []]
-	mm["dreieck_rot"][2].append(t * Transform3D(Basis(), Vector3(0, 2.15, 0.06)))
-	mm["dreieck_weiss"][2].append(t * Transform3D(Basis(), Vector3(0, 2.15 + 0.06, 0.08)))
-	Track._solid_cyl(root, 0.06, 2.0, pos + Vector3(0, 1.0 + Track.CURB_H, 0))
+	if not mm.has("yield_mats"):
+		mm["yield_mats"] = [_tri(0.8), Track.Builder.mat(Color(0.85, 0.08, 0.06), 0.0, 0.5), _tri(0.55),
+			Track.Builder.mat(Color(0.95, 0.95, 0.93), 0.0, 0.5), Track.Builder.mat(Color(0.45, 0.46, 0.48), 0.6, 0.4), []]
+	var ym: Array = mm["yield_mats"]
+	var k := Track.Knockable.new()
+	k.transform = Transform3D(Basis.looking_at(-face, Vector3.UP), pos + Vector3(0, Track.CURB_H, 0))
+	k.mass = 8.0
+	k.slowdown = 0.99
+	Track.Builder._add(k, Track.Builder.box(Vector3(0.07, 2.3, 0.07)), ym[4], Vector3(0, 1.15, 0))
+	Track.Builder._add(k, ym[0], ym[1], Vector3(0, 2.15, 0.06))
+	Track.Builder._add(k, ym[2], ym[3], Vector3(0, 2.15 + 0.06, 0.08))
+	Track._knock_shape(k, Vector3(0.3, 2.4, 0.3), Vector3(0, 1.2, 0))
+	root.add_child(k)
 
 
 ## Dreieck (Spitze unten) der Seitenlänge a, zur Straße (+Z) gewandt, beidseitig

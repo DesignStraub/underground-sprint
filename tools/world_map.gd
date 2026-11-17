@@ -54,6 +54,8 @@ func _ready() -> void:
 				hl += "%d " % int(round(Track.elev_at(tr["curve"], dd)))
 				dd += 200.0
 			print("HOEHE seg:%d:%d alle 200 m: %s" % [ri, si, hl])
+			if tr.has("posts") and not (tr["posts"] as Array).is_empty():
+				print("BRUECKEN seg:%d:%d Schilderbrücken bei %s" % [ri, si, str((tr["posts"] as Array).map(func(x): return int(x)))])
 			for tt in tr["tunnels"]:
 				if tt.get("land", false):
 					print("TUNNEL seg:%d:%d %s von %d bis %d" % [ri, si, tt["name"], int(tt["from"]), int(tt["to"])])

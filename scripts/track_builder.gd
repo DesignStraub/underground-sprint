@@ -6002,16 +6002,25 @@ static func _build_props(root: Node3D, track: Dictionary, rng: RandomNumberGener
 				k.add_child(cs)
 				root.add_child(k)
 			else:
-				# Schwer und fest verankert: hart wie eine Wand, Crash (seit 2.35; vorher flog auch das weg und kostete nur
-				# Tempo). Bank, Hydrant, Poller, Pflanzkübel, Haltestelle, Telefonzelle, Müllcontainer, Betonleitwand
-				var s := Node3D.new()
+				# Seit 2.41 umfahrbar wie Laternen (Rückmeldung: "Kleinkram sollte man auch wie Laternen umfahren können, und
+				# sie unterbrechen den Drift nicht"): Bank, Hydrant, Poller, Pflanzkübel, Haltestelle, Telefonzelle und
+				# Müllcontainer fliegen weg und kosten je nach Gewicht Tempo; ein Treffer zählt nicht als Crash, die
+				# Drift-Kette läuft weiter. Von 2.35 bis 2.40 waren sie hart wie eine Wand. Fest bleibt die Betonleitwand.
+				var s: Node3D = Node3D.new() if kind == 15 else Knockable.new()
 				s.transform = xf
-				root.add_child(s)
+				var kn := s as Knockable
+				if kn != null:
+					var ms: Array = {5: [35.0, 0.95], 6: [45.0, 0.93], 8: [70.0, 0.9], 9: [180.0, 0.86], 10: [120.0, 0.88],
+						14: [150.0, 0.87]}.get(kind, [30.0, 0.95])
+					kn.mass = ms[0]
+					kn.slowdown = ms[1]
+				if kind != 7:
+					root.add_child(s)
 				match kind:
 					5:
 						Builder._add(s, Builder.box(Vector3(1.8, 0.1, 0.5)), wood, Vector3(0, 0.45, 0))
 						Builder._add(s, Builder.box(Vector3(1.8, 0.5, 0.08)), wood, Vector3(0, 0.75, 0.22))
-						_solid(s, Vector3(1.8, 0.9, 0.5), Vector3(0, 0.45, 0))
+						_knock_shape(s, Vector3(1.8, 0.9, 0.5), Vector3(0, 0.45, 0))
 					6:
 						var c := CylinderMesh.new()
 						c.top_radius = 0.16
@@ -6019,16 +6028,23 @@ static func _build_props(root: Node3D, track: Dictionary, rng: RandomNumberGener
 						c.height = 0.8
 						c.radial_segments = 8
 						Builder._add(s, c, red, Vector3(0, 0.4, 0))
-						_solid_cyl(s, 0.22, 1.0, Vector3(0, 0.5, 0))
+						_knock_shape(s, Vector3(0.44, 1.0, 0.44), Vector3(0, 0.5, 0))
 					7:
+						# drei Poller: jeder fliegt für sich
+						s.free()
 						for i in 3:
+							var kp := Knockable.new()
+							kp.transform = xf * Transform3D(Basis(), Vector3(-1.5 + i * 1.5, 0, 0))
+							kp.mass = 25.0
+							kp.slowdown = 0.96
 							var c := CylinderMesh.new()
 							c.top_radius = 0.12
 							c.bottom_radius = 0.12
 							c.height = 0.9
 							c.radial_segments = 8
-							Builder._add(s, c, dark, Vector3(-1.5 + i * 1.5, 0.45, 0))
-							_solid_cyl(s, 0.14, 1.0, Vector3(-1.5 + i * 1.5, 0.5, 0))
+							Builder._add(kp, c, dark, Vector3(0, 0.45, 0))
+							_knock_shape(kp, Vector3(0.28, 1.0, 0.28), Vector3(0, 0.5, 0))
+							root.add_child(kp)
 					8:
 						Builder._add(s, Builder.box(Vector3(1.4, 0.6, 1.4)), concrete, Vector3(0, 0.3, 0))
 						var sm := SphereMesh.new()
@@ -6037,7 +6053,7 @@ static func _build_props(root: Node3D, track: Dictionary, rng: RandomNumberGener
 						sm.radial_segments = 8
 						sm.rings = 4
 						Builder._add(s, sm, bush, Vector3(0, 1.0, 0))
-						_solid(s, Vector3(1.4, 1.2, 1.4), Vector3(0, 0.6, 0))
+						_knock_shape(s, Vector3(1.4, 1.2, 1.4), Vector3(0, 0.6, 0))
 					9:
 						s.transform.origin = Vector3(pos.x, CURB_H, pos.z) + f["right"] * side * (hwd + WALK - 1.1 - off)
 						Builder._add(s, Builder.box(Vector3(3.6, 0.12, 1.5)), dark, Vector3(0, 2.5, 0))
@@ -6057,7 +6073,7 @@ static func _build_props(root: Node3D, track: Dictionary, rng: RandomNumberGener
 						else:
 							Builder._add(s, Builder.box(Vector3(0.06, 2.4, 1.4)), ad, Vector3(1.75, 1.25, 0))
 						Builder._add(s, Builder.box(Vector3(2.4, 0.08, 0.4)), wood, Vector3(-0.3, 0.45, 0.45))
-						_solid(s, Vector3(3.6, 2.5, 1.5), Vector3(0, 1.25, 0))
+						_knock_shape(s, Vector3(3.6, 2.5, 1.5), Vector3(0, 1.25, 0))
 					10:
 						for cx in [-0.52, 0.52]:
 							for cz in [-0.52, 0.52]:
@@ -6067,13 +6083,13 @@ static func _build_props(root: Node3D, track: Dictionary, rng: RandomNumberGener
 						var tc: Color = NEON[rng.randi() % NEON.size()]
 						Builder._add(s, Builder.box(Vector3(1.1, 0.28, 1.1)), Builder.mat(tc, 0.0, 0.4, tc, 2.0), Vector3(0, 2.25, 0))
 						_label(s, "TELEFON", Color(0.05, 0.05, 0.05), 12, Vector3(0, 2.25, -0.57), 1.0)
-						_solid(s, Vector3(1.1, 2.5, 1.1), Vector3(0, 1.25, 0))
+						_knock_shape(s, Vector3(1.1, 2.5, 1.1), Vector3(0, 1.25, 0))
 					14:
 						s.transform.origin = Vector3(pos.x, CURB_H, pos.z) + f["right"] * side * (hwd + WALK - 1.0 - off)
 						var dc := Builder.mat(Color(0.05, 0.25, 0.12) if rng.randf() < 0.5 else Color(0.08, 0.15, 0.4), 0.4, 0.6)
 						Builder._add(s, Builder.box(Vector3(1.9, 1.2, 1.1)), dc, Vector3(0, 0.65, 0))
 						Builder._add(s, Builder.box(Vector3(1.96, 0.08, 1.16)), dark, Vector3(0, 1.3, 0.05)).rotation.x = 0.12
-						_solid(s, Vector3(2.0, 1.4, 1.2), Vector3(0, 0.7, 0))
+						_knock_shape(s, Vector3(2.0, 1.4, 1.2), Vector3(0, 0.7, 0))
 					15:
 						Builder._add(s, Builder.tapered_box(Vector2(3.6, 0.6), Vector2(3.6, 0.22), 0.85, 0.0), concrete, Vector3.ZERO)
 						_solid(s, Vector3(3.6, 1.0, 0.6), Vector3(0, 0.5, 0))
@@ -6860,6 +6876,19 @@ static func _land_hill(root: Node3D, track: Dictionary, t: Dictionary) -> void:
 		_multi(root, Builder.box(Vector3(0.45, 2.2, 0.45)), Builder.mat(Color(0.25, 0.17, 0.1), 0.0, 0.9), trunk)
 
 
+## Zustand einer Ampel mit Phase ph, genau wie shaders/traffic_light.gdshader (Umlauf 12 s, TIME läuft wie die Uhr seit
+## dem Start, nach einer Stunde von vorn): 0 grün, 1 gelb, 2 rot, 3 rot-gelb (seit 2.41: der Verkehr hält bei Rot)
+static func signal_state(ph: float) -> int:
+	var t := fmod(fmod(Time.get_ticks_msec() / 1000.0, 3600.0) + ph, 12.0)
+	if t < 5.0:
+		return 0
+	if t < 6.5:
+		return 1
+	if t < 11.5:
+		return 2
+	return 3
+
+
 ## Halbe lichte Weite eines Tunnels bei d (bis zur Innenwand): in der Stadt TUN_W, auf der Autobahn (seit 2.40, Tunnel
 ## über Land) so breit wie die Fahrbahn samt Mittelstreifen plus Seitenstreifen
 static func tun_w(track: Dictionary, d: float) -> float:
@@ -7439,10 +7468,14 @@ static func _gantry(root: Node3D, track: Dictionary, d: float, rng: RandomNumber
 	var m := median_at(track, d)
 	for k in 2:
 		var x := (-4.6 - m) if k == 0 else (4.6 + m)
-		_part(g, white, Builder.box(Vector3(7.2, 2.5, 0.1)), Transform3D(Basis(), Vector3(x, 6.95, 0.22)))
-		_part(g, green, Builder.box(Vector3(7.0, 2.3, 0.1)), Transform3D(Basis(), Vector3(x, 6.95, 0.28)))
+		# Tafel über der linken Fahrbahn zum Gegenverkehr gedreht (seit 2.41): bis 2.40 zeigten beide Tafeln in dieselbe
+		# Richtung, wer auf der Gegenfahrbahn fuhr, sah nur Rückseiten
+		var flip: bool = k == 0 and track.get("type", "") != "drag"  # Drag: alle Spuren in eine Richtung
+		var pt := Transform3D(Basis(Vector3.UP, PI) if flip else Basis(), Vector3(x, 0, 0))
+		_part(g, white, Builder.box(Vector3(7.2, 2.5, 0.1)), pt * Transform3D(Basis(), Vector3(0, 6.95, 0.22)))
+		_part(g, green, Builder.box(Vector3(7.0, 2.3, 0.1)), pt * Transform3D(Basis(), Vector3(0, 6.95, 0.28)))
 		for lx in [-2.0, 2.0]:
-			_part(g, lamp, Builder.box(Vector3(0.5, 0.1, 0.3)), Transform3D(Basis(), Vector3(x + lx, 8.3, 0.55)))
+			_part(g, lamp, Builder.box(Vector3(0.5, 0.1, 0.3)), pt * Transform3D(Basis(), Vector3(lx, 8.3, 0.55)))
 		var tx: String = texts[k]
 		var arrow := "pfeil_unten"
 		if tx.begins_with("< "):
@@ -7462,7 +7495,7 @@ static func _gantry(root: Node3D, track: Dictionary, d: float, rng: RandomNumber
 		l.modulate = ink
 		l.shaded = false
 		l.double_sided = false
-		l.transform = xf * Transform3D(Basis(), Vector3(x - ax * 0.22, 6.95 if subs.is_empty() else 7.25, 0.35))
+		l.transform = xf * pt * Transform3D(Basis(), Vector3(-ax * 0.22, 6.95 if subs.is_empty() else 7.25, 0.35))
 		root.add_child(l)
 		var aq := QuadMesh.new()
 		aq.size = Vector2(1.3, 1.3)
@@ -7470,7 +7503,7 @@ static func _gantry(root: Node3D, track: Dictionary, d: float, rng: RandomNumber
 		ai.mesh = aq
 		ai.material_override = SignIcons.material(arrow, ink)
 		ai.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		ai.transform = xf * Transform3D(Basis(), Vector3(x + ax, 6.95, 0.35))
+		ai.transform = xf * pt * Transform3D(Basis(), Vector3(ax, 6.95, 0.35))
 		root.add_child(ai)
 		if not subs.is_empty():
 			var sl := Label3D.new()
@@ -7480,7 +7513,7 @@ static func _gantry(root: Node3D, track: Dictionary, d: float, rng: RandomNumber
 			sl.modulate = ink
 			sl.shaded = false
 			sl.double_sided = false
-			sl.transform = xf * Transform3D(Basis(), Vector3(x - ax * 0.22, 6.35, 0.35))
+			sl.transform = xf * pt * Transform3D(Basis(), Vector3(-ax * 0.22, 6.35, 0.35))
 			root.add_child(sl)
 	_bake(root, g, xf)
 	track["posts"].append(d)
