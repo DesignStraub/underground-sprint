@@ -263,13 +263,14 @@ func _intro_done(skipped: bool, played := true) -> void:
 
 
 func _exit_tree() -> void:
+	# erst den Bau im Hintergrund abwarten (er liest noch Offroad.areas), dann aufräumen
+	if _task >= 0:
+		Track.wait_build(_task)
+		_task = -1
 	Builder.async_vinyls = false
 	Offroad.areas = []  # im Rennen gibt es kein Gelände
 	if GameState.xp_dirty:
 		GameState.save_game()
-	if _task >= 0:
-		WorkerThreadPool.wait_for_task_completion(_task)
-		_task = -1
 
 
 ## Startpunkt: nach einem Rennen am Marker, sonst am Start des ersten Rennens, Blick zur Ausfahrt (zur Autobahn)

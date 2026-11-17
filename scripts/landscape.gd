@@ -807,7 +807,7 @@ func _web() -> bool:
 
 func _exit_tree() -> void:
 	if _task >= 0:
-		WorkerThreadPool.wait_for_task_completion(_task)
+		Track.wait_build(_task)  # nicht wait_for_task_completion: der Bau wartet auf den RenderingServer
 		_task = -1
 		if _task_out and not _task_out.is_inside_tree():
 			_task_out.free()

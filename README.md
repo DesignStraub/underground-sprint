@@ -323,6 +323,23 @@ nirgends Erde unter den Rädern, Hauben „unglaublich lang“, das Laufband der
 - **Tests:** `--worldcheck` 0 Überschneidungen (57 Strecken), Häuserprüfung aller erfundenen Städte ohne Befund,
   Rennen unverändert (`ftall`), Rundfahrten `--wtour=cities` und `--wtour=mitte`, Ruckler (`--hitch`) ohne neue,
   Compatibility-Renderer am Rechner. Nicht getestet: der echte Browser.
+- **Nachtrag 2.39.1: Schilder richtig herum, kein Hänger beim Beenden** (gefunden beim Aufnehmen der Shorts):
+  - **Wegweiser „Ausfahrt …“** (`track_builder._exit_signs`): Tafel, Nummernfeld, Schrift, Pfeil und Streben waren in
+    Welt-Z versetzt statt in Blickrichtung des Schilds. Nur nach Süden gewandte Schilder stimmten; nach Norden gewandte
+    zeigten den Fahrern die weiße Rückseite mit den Streben davor und keine Schrift (z. B. „Golfplatz“ und „Kieswerk“
+    von Norden), quer stehende waren verschoben. Jetzt alle Versätze entlang der Schildrichtung (`b.z`).
+  - **Gelbe Ortsschilder** (`_build_city_signs`): derselbe Fehler beim schwarzen Rand. Je nach Richtung lag er vor der
+    gelben Tafel und der Schrift (München, Köln, Freudenstadt und Aachen hatten ein schwarzes Schild), sonst stand er
+    seitlich verschoben. Jetzt immer dahinter. `--signlog` meldet auch die Ortsschilder („CITYSIGN …“).
+  - **Hänger beim Beenden** (`Track.wait_build`): Welt, Landschaft und Gelände bauen im Hintergrund und holen dabei
+    Mesh-Daten vom RenderingServer zurück (`append_from`, `surface_get_arrays`); dafür wartet der Bau, bis der Hauptthread
+    die Befehle abarbeitet. In `_exit_tree` wartete der Hauptthread aber mit `wait_for_task_completion` auf den Bau,
+    beide hingen für immer (Godot blieb nach dem Beenden im Hintergrund stehen). Jetzt arbeitet der Hauptthread beim
+    Warten die Befehle ab (`RenderingServer.force_sync`). Dasselbe Warten steckt im Wechsel aus der Welt ins Rennen, in
+    die Garage und in der Schnellreise; dort ist der Hänger nicht eigens nachgestellt.
+  - Tests: vorher hing einer von vier Läufen `world.tscn -- --wspawn=gelaende:1:30:0:0 --nozoom --wshot=/pfad.png:6`,
+    nachher 12 von 12 ohne Hänger (vier Startpunkte, Ende nach 3–9 s), in drei davon lief beim Beenden noch ein Bau
+    (mit `--worldlog` steht „BAU fertig …“ nach „WSHOT“). `--worldcheck` 0 Überschneidungen (57 Strecken).
 
 ## Garage mit Rollenprüfstand, Optik kommt mit, Anflug von oben, Vinyl-Fehler behoben (2.38)
 - **Optik kommt mit wie in Underground** (`GameState.switch_car`): wer Lack, Felgen, Folie, Bodykit … anbaut und dann

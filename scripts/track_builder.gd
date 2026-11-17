@@ -209,6 +209,17 @@ static func build(race: Dictionary) -> Dictionary:
 	return job["track"]
 
 
+## Auf einen Bau im Hintergrund warten (seit 2.39.1; Welt, Landschaft und Gelände beim Beenden und beim Wechsel ins
+## Rennen oder in die Garage). Der Bau holt Mesh-Daten vom RenderingServer zurück (append_from, surface_get_arrays) und
+## wartet dafür, bis der Hauptthread dessen Befehle abarbeitet. Mit wait_for_task_completion allein wartete der
+## Hauptthread aber auf den Bau: beide hingen für immer. force_sync arbeitet die Befehle in der Wartezeit ab.
+static func wait_build(task: int) -> void:
+	while not WorkerThreadPool.is_task_completed(task):
+		RenderingServer.force_sync()
+		OS.delay_msec(1)
+	WorkerThreadPool.wait_for_task_completion(task)
+
+
 ## Planung (Mittellinie, Viertel, Abzweige, Tunnel ...): schnell. Gibt den Bauauftrag für step() zurück.
 static func begin(race: Dictionary) -> Dictionary:
 	if race.get("type", "") == "dreieck":
@@ -4386,17 +4397,19 @@ static func _exit_signs(root: Node3D, track: Dictionary) -> void:
 			base = base - b.x * (w / 2.0 - 0.6) + Vector3(0, 2.4, 0)
 			if OS.get_cmdline_user_args().has("--signlog"):
 				print("EXITSIGN ", name, " pos=", base, " fwd=", fwd)
-			_part(g, post, Builder.box(Vector3(0.3, 7.6, 0.3)), Transform3D(b, post_p + Vector3(0, 3.8, -0.15)))
-			_part(g, post, Builder.box(Vector3(w * 0.9, 0.2, 0.2)), Transform3D(b, base + Vector3(0, 3.6 + 1.2, -0.15)))
-			_part(g, post, Builder.box(Vector3(w * 0.9, 0.2, 0.2)), Transform3D(b, base + Vector3(0, 3.6 - 1.0, -0.15)))
+			# Vor und zurück immer entlang b.z (zu den Fahrern), nie in Welt-Z: bis 2.39 standen Tafel, Schrift und Streben
+			# in Welt-Z versetzt, nach Norden gewandte Schilder zeigten den Fahrern die weiße Rückseite ohne Schrift
+			_part(g, post, Builder.box(Vector3(0.3, 7.6, 0.3)), Transform3D(b, post_p + Vector3(0, 3.8, 0) - b.z * 0.15))
+			_part(g, post, Builder.box(Vector3(w * 0.9, 0.2, 0.2)), Transform3D(b, base + Vector3(0, 3.6 + 1.2, 0) - b.z * 0.15))
+			_part(g, post, Builder.box(Vector3(w * 0.9, 0.2, 0.2)), Transform3D(b, base + Vector3(0, 3.6 - 1.0, 0) - b.z * 0.15))
 			_part(g, white, Builder.box(Vector3(w + 0.16, 3.16, 0.06)), Transform3D(b, base + Vector3(0, 3.6, 0.0)))
-			_part(g, blue, Builder.box(Vector3(w, 3.0, 0.08)), Transform3D(b, base + Vector3(0, 3.6, 0.02)))
+			_part(g, blue, Builder.box(Vector3(w, 3.0, 0.08)), Transform3D(b, base + Vector3(0, 3.6, 0) + b.z * 0.02))
 			# Nummernfeld oben links (weiß umrandet)
-			_part(g, white, Builder.box(Vector3(1.3, 0.8, 0.02)), Transform3D(b, base + Vector3(0, 4.55, 0.07) - b.x * (w / 2.0 - 0.95)))
-			_part(g, blue, Builder.box(Vector3(1.16, 0.66, 0.02)), Transform3D(b, base + Vector3(0, 4.55, 0.085) - b.x * (w / 2.0 - 0.95)))
-			var labels := [[num, 30, base + Vector3(0, 4.55, 0.11) - b.x * (w / 2.0 - 0.95)],
-				["Ausfahrt", 26, base + Vector3(0, 4.55, 0.11) - b.x * (w / 2.0 - 2.9)],
-				[name, 48, base + Vector3(0, 3.35, 0.11) - b.x * 0.6]]
+			_part(g, white, Builder.box(Vector3(1.3, 0.8, 0.02)), Transform3D(b, base + Vector3(0, 4.55, 0) + b.z * 0.07 - b.x * (w / 2.0 - 0.95)))
+			_part(g, blue, Builder.box(Vector3(1.16, 0.66, 0.02)), Transform3D(b, base + Vector3(0, 4.55, 0) + b.z * 0.085 - b.x * (w / 2.0 - 0.95)))
+			var labels := [[num, 30, base + Vector3(0, 4.55, 0) + b.z * 0.11 - b.x * (w / 2.0 - 0.95)],
+				["Ausfahrt", 26, base + Vector3(0, 4.55, 0) + b.z * 0.11 - b.x * (w / 2.0 - 2.9)],
+				[name, 48, base + Vector3(0, 3.35, 0) + b.z * 0.11 - b.x * 0.6]]
 			for lb in labels:
 				var l := Label3D.new()
 				l.text = lb[0]
@@ -4414,7 +4427,7 @@ static func _exit_signs(root: Node3D, track: Dictionary) -> void:
 			ai.material_override = SignIcons.material("pfeil_rechts", Color(1.5, 1.5, 1.5))
 			ai.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			# Pfeil schräg nach rechts oben (Ausfahrt)
-			ai.transform = Transform3D(b * Basis(Vector3.BACK, deg_to_rad(40.0)), base + Vector3(0, 3.2, 0.11) + b.x * (w / 2.0 - 1.1))
+			ai.transform = Transform3D(b * Basis(Vector3.BACK, deg_to_rad(40.0)), base + Vector3(0, 3.2, 0) + b.z * 0.11 + b.x * (w / 2.0 - 1.1))
 			root.add_child(ai)
 			_bake(root, g, Transform3D.IDENTITY)
 
@@ -4443,7 +4456,10 @@ static func _build_city_signs(root: Node3D, track: Dictionary, race: Dictionary)
 	var pw := maxf(2.2, maxf(_text_w(town, 96, 0.0042), _text_w(region, 34, 0.0042)) + 0.5)
 	for s in [-1.0, 1.0]:
 		_part(groups, post, Builder.box(Vector3(0.08, 2.9, 0.08)), Transform3D(bf, base + bf.x * s * (pw * 0.35) + Vector3(0, CURB_H + 1.45, 0)))
-	_part(groups, black, Builder.box(Vector3(pw + 0.12, 1.32, 0.05)), Transform3D(bf, base + Vector3(0, CURB_H + 2.35, 0.04)))
+	if OS.get_cmdline_user_args().has("--signlog"):
+		print("CITYSIGN ", town, " pos=", base, " fwd=", f["fwd"])
+	# schwarzer Rand hinter der gelben Tafel, entlang bf.z (bis 2.39 in Welt-Z: je nach Richtung lag er vor der Schrift)
+	_part(groups, black, Builder.box(Vector3(pw + 0.12, 1.32, 0.05)), Transform3D(bf, base + Vector3(0, CURB_H + 2.35, 0) - bf.z * 0.04))
 	_part(groups, yellow, Builder.box(Vector3(pw, 1.2, 0.06)), Transform3D(bf, base + Vector3(0, CURB_H + 2.35, 0)))
 	for txt in [[town, 0.2, 96], [region, -0.32, 34]]:
 		if txt[0] == "":
