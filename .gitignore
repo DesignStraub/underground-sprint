@@ -6,6 +6,8 @@ override.cfg
 builds/
 release/*.zip
 *.mp4
+# Aufnahmen und Einblendungen der Shorts (tools/short3, Arbeitsordner $SHORT3)
+tools/short3/arbeit/
 .DS_Store
 
 # Stadt-Tracks von Künstlern: im Spiel (lokal und im Export), aber nicht im öffentlichen Repo

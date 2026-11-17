@@ -6,6 +6,10 @@ extends Node
 ##   [--scover=bild.png] zusätzlich Titelbild fürs Short 1080x1920 aus einem Spielbild im Hochformat
 ##   [--sketch]          schlichte Einblendungen für den Skizzen-Trailer (Kleinschrift, kein Neon, nur Ortsschilder)
 ##   [--sketch2]         dasselbe fürs zweite Short (Überholen, Abkürzung, Tunnel, U1), Dateien t_*.png
+##   [--sketch3]         deutsches Short zu 2.39 (mit Lied), Dateien a_*.png; mit --scover=bild.png nur das Titelbild
+##                       short_cover_239_1080x1920.png
+##   [--sketch4]         deutsches Short "Aufruf an Künstler" (Musik "AC"), Dateien b_*.png; mit --scover=bild.png nur das
+##                       Titelbild short_cover_kuenstler_1080x1920.png
 ## Das Fenster lässt den Inhalt frei (transparent): darunter legt ffmpeg das Querformat-Video (1000x563 bei x 40, y 700).
 
 const UiStyle := preload("res://scripts/ui_style.gd")
@@ -66,6 +70,38 @@ func _ready() -> void:
 		_sketch_line(e2, "free · no download", 935.0, 56, Color(0.78, 0.82, 0.9))
 		_sketch_line(e2, "onehumanity.itch.io", 1015.0, 56, Color(0.78, 0.82, 0.9))
 		await _render(e2, "t_end")
+		get_tree().quit()
+		return
+	if OS.get_cmdline_user_args().has("--sketch3"):
+		# Short zu 2.39 (deutsch, mit Lied): knappe Fragmente zu den Neuerungen, Dateien a_*.png; mit --scover das Titelbild
+		if scover_src != "":
+			await _render(_short_cover(_tex(scover_src), "NEU IN 2.39", "KOSTENLOS · IM BROWSER",
+				"kreuzungen · gassen · golfplatz · kiesgrube"), "short_cover_239_1080x1920", SIZE, false)
+			get_tree().quit()
+			return
+		await _render(_sketch_text("neu in 2.39.", 560.0), "a_intro")
+		for c in [["städte mit hinterland.", "a_hinterland"], ["kreuzungen mit ampeln.", "a_kreuzung"],
+				["gassen mit kopfsteinpflaster.", "a_gasse"], ["golfplatz zum austoben.", "a_golf"], ["kiesgrube.", "a_kies"],
+				["27 autos.", "a_autos"]]:
+			await _render(_sketch_text(c[0], 560.0), c[1])
+		await _render(_sketch_end_de(), "a_end")
+		get_tree().quit()
+		return
+	if OS.get_cmdline_user_args().has("--sketch4"):
+		# Aufruf an Künstler (deutsch, Musik "AC" von Bruder Jakob x Jonas Platin): Dateien b_*.png
+		if scover_src != "":
+			await _render(_short_cover(_tex(scover_src), "DEINE STADT.\nDEIN SOUND.", "SCHREIB'S IN DIE KOMMENTARE",
+				"jede stadt im spiel soll ihren sound haben"), "short_cover_kuenstler_1080x1920", SIZE, false)
+			get_tree().quit()
+			return
+		await _render(_sketch_lines(["in aachen läuft „AC“."], 520.0), "b_aachen1")
+		await _render(_sketch_lines(["in aachen läuft „AC“.", "von bruder jakob x jonas platin."], 520.0), "b_aachen2")
+		await _render(_sketch_lines(["noch frei."], 520.0), "b_frei")
+		await _render(_sketch_lines(["?"], 500.0, 120), "b_frage")
+		await _render(_sketch_lines(["jede stadt soll", "ihren sound haben."], 860.0), "b_sound")
+		await _render(_sketch_lines(["du machst musik", "in deiner stadt?"], 860.0), "b_musik")
+		await _render(_sketch_lines(["schreib deine stadt", "und deinen song", "in die kommentare."], 820.0), "b_kommentare")
+		await _render(_sketch_end_de(), "b_end")
 		get_tree().quit()
 		return
 	if cover_src != "" or scover_src != "":
@@ -177,6 +213,28 @@ func _sketch_end() -> Control:
 	root.add_child(dim)
 	_sketch_line(root, "need for geschwindigkeit", 840.0, 92)
 	_sketch_line(root, "free · onehumanity.itch.io", 975.0, 56, Color(0.78, 0.82, 0.9))
+	return root
+
+
+## Endtafel der deutschen Shorts (seit 2.39): need for geschwindigkeit · kostenlos · onehumanity.itch.io
+func _sketch_end_de() -> Control:
+	var root := Control.new()
+	root.size = SIZE
+	var dim := ColorRect.new()
+	dim.color = Color(0, 0, 0.01, 0.72)
+	dim.size = SIZE
+	root.add_child(dim)
+	_sketch_line(root, "need for geschwindigkeit", 840.0, 92)
+	_sketch_line(root, "kostenlos · onehumanity.itch.io", 975.0, 56, Color(0.78, 0.82, 0.9))
+	return root
+
+
+## Mehrere Zeilen untereinander (lange Sätze von Hand umbrochen), gleiche Schrift wie _sketch_line
+func _sketch_lines(lines: Array, y: float, px := 66) -> Control:
+	var root := Control.new()
+	root.size = SIZE
+	for i in lines.size():
+		_sketch_line(root, lines[i], y + i * px * 1.3, px)
 	return root
 
 
@@ -490,8 +548,9 @@ func _cover(bg: Texture2D, size: Vector2) -> Control:
 	return root
 
 
-## Titelbild fürs Short (Hochformat): Titel oben, Botschaft unten über der Tacho-Ecke
-func _short_cover(bg: Texture2D) -> Control:
+## Titelbild fürs Short (Hochformat): Titel oben, Botschaft unten über der Tacho-Ecke (seit 2.39 mit eigenem Text für
+## die deutschen Shorts: big zweizeilig in der breiten Schrift, sub eine Zeile darunter, pill unten)
+func _short_cover(bg: Texture2D, big := "STREET RACING\nIN YOUR BROWSER", pill := "PLAY FREE · NO DOWNLOAD", sub := "") -> Control:
 	var root := Control.new()
 	root.size = SIZE
 	_fill(root, bg, Vector2(SIZE), 0.5, 0.5)
@@ -500,8 +559,11 @@ func _short_cover(bg: Texture2D) -> Control:
 	_label(root, "NEED FOR", "wide", 110, CYAN, 210, CYAN, 12)
 	var t2 := _label(root, "GESCHWINDIGKEIT", "wide", 132, Color.WHITE, 310, CYAN, 16)
 	_bar(root, SIZE.x / 2.0, 310 + t2.get_minimum_size().y - 4.0, 640.0, PINK, 12.0)
-	_label(root, "STREET RACING\nIN YOUR BROWSER", "wide", 112, Color.WHITE, 1320, PINK, 14)
-	_pill(root, "PLAY FREE · NO DOWNLOAD", Vector2(SIZE.x / 2.0, 1790), 60, GREEN, Color(0.02, 0.06, 0.03))
+	var bl := _label(root, big, "wide", 112, Color.WHITE, 1320 if sub == "" else 1250, PINK, 14)
+	if sub != "":
+		var sl := _label(root, sub, "cond", 50, Color.WHITE, 1250 + bl.get_minimum_size().y + 10.0, Color(0, 0, 0), 10)
+		sl.label_settings.shadow_size = 0
+	_pill(root, pill, Vector2(SIZE.x / 2.0, 1790), 60, GREEN, Color(0.02, 0.06, 0.03))
 	return root
 
 
