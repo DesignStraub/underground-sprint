@@ -59,6 +59,11 @@ const SPUR_HALF := 6.0
 const FORK_HALF := 6.0  # Gabelung: zweispurige Straße mit Gegenverkehr
 const MED := 2.6  # halbe Breite des Mittelstreifens auf Boulevards
 const MED_TAPER := 45.0
+## Mittelstreifen der Autobahn in Abschnitten (seit 2.40, _style_medians): halbe Breite und Anlauf je Art.
+## gruen: Grünstreifen wie bisher, luecken: Grünstreifen mit Überfahrten, beton: Betonleitwand (fest), poller: Poller
+## auf einer Sperrfläche (fliegen weg, man kommt durch), offen: keine Trennung (volle Breite, kein Eintrag)
+const MED_W := {"gruen": MED, "luecken": MED, "beton": 0.75, "poller": 0.6}
+const MED_TAPER_OF := {"gruen": MED_TAPER, "luecken": MED_TAPER, "beton": 16.0, "poller": 10.0}
 const TUN_W := HALF_W + 1.6  # Tunnel-Innenwand
 const TUN_H := 7.0
 const DIP := 6.2  # so tief liegt die Fahrbahn im Tunnel (Decke knapp über dem Straßenniveau der Stadt)
@@ -365,6 +370,9 @@ static func begin(race: Dictionary) -> Dictionary:
 			_plan_medians(track, rng)
 	if not track["elev0"].is_empty():
 		curve.set_meta("elev", track["elev0"])
+	if type == "autobahn" and race.has("prof_line"):
+		# Höhen und Tiefen über Land (seit 2.40, world_layout._plan_profiles)
+		curve.set_meta("prof", line_prof(curve, race["prof_line"]))
 	if race.get("world", false) and type != "autobahn":
 		# Autobahnstücke haben keine Ausfahrt: früher bekamen auch sie an beiden Enden ein Stück "tail", dessen Wände
 		# (bei 9,3 m) an jeder Naht zwischen zwei Stücken quer durch die äußere Spur liefen, im Kreisel mitten auf die
@@ -664,8 +672,8 @@ static func ground_holes(track: Dictionary) -> PackedVector3Array:
 	var curve: Curve3D = track["curve"]
 	var holes := PackedVector3Array()
 	for t in track["tunnels"]:
-		if t.get("rock", false):
-			continue  # Felstunnel: kein Trog im Boden
+		if t.get("rock", false) or t.get("land", false):
+			continue  # Felstunnel, Tunnel über Land: kein Trog im Boden
 		for span in [[t["r0"], t["from"] + 1.0], [t["to"] - 1.0, t["r1"]]]:
 			var d: float = span[0]
 			while d <= span[1]:
@@ -921,14 +929,7 @@ static func frame_at(curve: Curve3D, d: float) -> Dictionary:
 ## Höhenprofil eines Wegs (Meta "elev" an der Kurve): Liste von {a, b, c, e, h}. Zwischen a und b geht es weich
 ## auf h (negativ = Senke), bis c bleibt es dort, bis e geht es zurück auf 0.
 static func elev_at(curve: Curve3D, d: float) -> float:
-	var y := 0.0
-	if curve.has_meta("prof"):
-		# entworfene Strecke (seit 2.36): Höhenprofil alle 1 m abgetastet (track_design.gd), Rundkurs über den Start hinweg
-		var pr: PackedFloat32Array = curve.get_meta("prof")
-		var L := curve.get_baked_length()
-		var u := (fposmod(d, L) if curve.has_meta("loop") else clampf(d, 0.0, L)) / Design.PROF_STEP
-		var pi := mini(int(u), pr.size() - 2)
-		y = lerpf(pr[pi], pr[pi + 1], u - pi)
+	var y := prof_y(curve, d)
 	if not curve.has_meta("elev"):
 		return y
 	for s in curve.get_meta("elev"):
@@ -941,6 +942,92 @@ static func elev_at(curve: Curve3D, d: float) -> float:
 		else:
 			y += s["h"] * (1.0 - smoothstep(s["c"], s["e"], d))
 	return y
+
+
+## Abgetastetes Höhenprofil (Meta "prof", alle Design.PROF_STEP): entworfene Strecken (seit 2.36, track_design.gd) und
+## Verbindungen über Land (seit 2.40, line_prof); ohne Kuppen, Tröge und Talbrücken (die liegen in "elev" obendrauf).
+## Rundkurs über den Start hinweg.
+static func prof_y(curve: Curve3D, d: float) -> float:
+	if not curve.has_meta("prof"):
+		return 0.0
+	var pr: PackedFloat32Array = curve.get_meta("prof")
+	var L := curve.get_baked_length()
+	var u := (fposmod(d, L) if curve.has_meta("loop") else clampf(d, 0.0, L)) / Design.PROF_STEP
+	var pi := clampi(int(u), 0, pr.size() - 2)
+	return lerpf(pr[pi], pr[pi + 1], u - pi)
+
+
+## Profil einer Kurve aus einer Profillinie der Welt (world_layout._plan_profiles, seit 2.40): jede Stelle der Kurve
+## auf die Linie projiziert (nicht über die Länge: Kurve und Linie sind verschieden lang, an den Nähten zweier Stücke
+## gäbe es sonst Stufen). xf: Lage der Kurve in der Welt.
+static func line_prof(curve: Curve3D, line: Dictionary, xf := Transform3D.IDENTITY) -> PackedFloat32Array:
+	var pts: PackedVector2Array = line["pts"]
+	var n := pts.size()
+	var closed: bool = line["closed"]
+	var L := curve.get_baked_length()
+	var cnt := int(ceil(L / Design.PROF_STEP)) + 2
+	var out := PackedFloat32Array()
+	out.resize(cnt)
+	var idx := -1
+	for j in cnt:
+		var w3: Vector3 = xf * curve.sample_baked(minf(j * Design.PROF_STEP, L))
+		var q := Vector2(w3.x, w3.z)
+		if idx < 0:
+			var bd := 1e18
+			for i in n:
+				var dd := q.distance_squared_to(pts[i])
+				if dd < bd:
+					bd = dd
+					idx = i
+		for it in 400:
+			var moved := false
+			for stp in [1, -1]:
+				var k: int = idx + stp
+				if closed:
+					k = posmod(k, n)
+				elif k < 0 or k >= n:
+					continue
+				if q.distance_squared_to(pts[k]) < q.distance_squared_to(pts[idx]):
+					idx = k
+					moved = true
+					break
+			if not moved:
+				break
+		out[j] = proj_y(line, idx, q)
+	return out
+
+
+## Höhe an q, projiziert auf die beiden Stücke neben dem Punkt i der Linie
+static func proj_y(line: Dictionary, i: int, q: Vector2) -> float:
+	var pts: PackedVector2Array = line["pts"]
+	var ys: PackedFloat32Array = line["y"]
+	var n := pts.size()
+	var closed: bool = line["closed"]
+	var best_y := ys[i]
+	var best_d := 1e18
+	for k0 in [i - 1, i]:
+		var a: int = k0
+		var b: int = k0 + 1
+		if closed:
+			a = posmod(a, n)
+			b = posmod(b, n)
+		elif a < 0 or b >= n:
+			continue
+		var ab := pts[b] - pts[a]
+		var t := clampf((q - pts[a]).dot(ab) / maxf(ab.length_squared(), 1e-6), 0.0, 1.0)
+		var dd := q.distance_squared_to(pts[a] + ab * t)
+		if dd < best_d:
+			best_d = dd
+			# kubisch (Catmull-Rom) statt linear: linear knickte die Steigung alle 20 m, und das Auto hob bei hohem
+			# Tempo an jedem Knick kurz ab (Kuppen-Erkennung in player_car._update_vertical)
+			var a0: int = posmod(a - 1, n) if closed else maxi(a - 1, 0)
+			var b1: int = posmod(b + 1, n) if closed else mini(b + 1, n - 1)
+			var ma := (ys[b] - ys[a0]) * 0.5
+			var mb := (ys[b1] - ys[a]) * 0.5
+			var t2 := t * t
+			var t3 := t2 * t
+			best_y = (2.0 * t3 - 3.0 * t2 + 1.0) * ys[a] + (t3 - 2.0 * t2 + t) * ma + (-2.0 * t3 + 3.0 * t2) * ys[b] + (t3 - t2) * mb
+	return best_y
 
 
 ## Steigung (Höhe pro Meter) bei d
@@ -970,8 +1057,26 @@ static func median_at(track: Dictionary, d: float) -> float:
 	var m := 0.0
 	for r in track["medians"]:
 		if d > r["from"] and d < r["to"]:
-			m = maxf(m, MED * smoothstep(0.0, 1.0, minf(d - r["from"], r["to"] - d) / MED_TAPER))
+			var sty: String = r.get("style", "gruen")
+			m = maxf(m, float(MED_W[sty]) * smoothstep(0.0, 1.0, minf(d - r["from"], r["to"] - d) / float(MED_TAPER_OF[sty])))
 	return m
+
+
+## Art des Mittelstreifens bei d (seit 2.40): "gruen", "luecken", "beton", "poller" oder "" (keiner); bei Überlappung
+## (Übergang zweier Abschnitte) die breitere
+static func median_style_at(track: Dictionary, d: float) -> String:
+	if track["loop"]:
+		d = fposmod(d, track["length"])
+	var best := ""
+	var bm := 0.0
+	for r in track["medians"]:
+		if d > r["from"] and d < r["to"]:
+			var sty: String = r.get("style", "gruen")
+			var m := float(MED_W[sty]) * smoothstep(0.0, 1.0, minf(d - r["from"], r["to"] - d) / float(MED_TAPER_OF[sty]))
+			if m > bm:
+				bm = m
+				best = sty
+	return best
 
 
 ## Halbe Fahrbahnbreite der Hauptstraße bei d (breiter, wo ein Mittelstreifen ist)
@@ -1025,8 +1130,8 @@ static func ground_path(track: Dictionary, path_id: int, d: float, lat: float, s
 	var base := elev_at(track["paths"][path_id]["curve"], d)
 	var h := 0.0
 	var on_ramp := false
-	if path_id == 0 and (score > 0.2 or absf(lat) < median_at(track, d) - 0.2):
-		h = CURB_H  # Gehweg oder Mittelstreifen
+	if path_id == 0 and (score > 0.2 or (absf(lat) < median_at(track, d) - 0.2 and median_style_at(track, d) != "poller")):
+		h = CURB_H  # Gehweg oder Mittelstreifen (die Sperrfläche mit Pollern liegt auf Fahrbahnhöhe)
 	elif path_id != 0 and score > -0.45 and track["paths"][path_id].has("net") and Streets.curb(track["paths"][path_id], lat):
 		h = CURB_H  # Gehweg und Grünstreifen der neuen Straßen (seit 2.39)
 	for r in track["ramps"]:
@@ -1374,6 +1479,8 @@ static func _plan_autobahn(track: Dictionary, race: Dictionary) -> void:
 		else:
 			sc.add_point(f["pos"])
 			sc.add_point(Vector3(end.x, 0.0, end.z))
+		if r.has("prof_line"):
+			sc.set_meta("prof", line_prof(sc, r["prof_line"]))  # Verbindung über Land mit Höhenprofil (seit 2.40)
 		# Ausfahrt zu einem Gelände (seit 2.39, offroad.gd): schmal (zwei Spuren), endet am Tor im Zaun
 		track["paths"].append({"id": track["paths"].size(), "kind": "ramp", "curve": sc, "half_w": r.get("half", RAMP_HALF + (AB_EXTRA if r.get("wide", false) else 0.0)),
 			"length": sc.get_baked_length(), "from": d, "to": d, "closed": false,
@@ -1412,14 +1519,111 @@ static func _plan_autobahn(track: Dictionary, race: Dictionary) -> void:
 			if g[1] < pc[1]:
 				next.append([g[1], pc[1]])
 		pieces = next
-	for pc in pieces:
-		if pc[1] - pc[0] > 2.0 * MED_TAPER:
-			track["medians"].append({"from": pc[0], "to": pc[1]})
+	_style_medians(track, race, pieces)
+	# Tunnel durch die Hügel (seit 2.40, world_layout._plan_land_tunnels): Röhre auf Höhe des Profils, kein Trog; davor und
+	# darin Betonleitwand statt Grünstreifen oder Pollern
+	for lt in race.get("land_tunnels", []):
+		var ta := curve.get_closest_offset(Vector3(lt["a"].x, 0.0, lt["a"].z))
+		var tb := curve.get_closest_offset(Vector3(lt["b"].x, 0.0, lt["b"].z))
+		var d0 := minf(ta, tb)
+		var d1 := maxf(ta, tb)
+		track["tunnels"].append({"from": d0, "to": d1, "r0": d0, "r1": d1, "name": lt["name"], "sodium": true, "land": true,
+			"ridge": float(lt["ridge"])})
+		track["zones"].append({"from": d0 - 70.0, "to": d1 + 70.0})
+		_force_median(track, d0 - 120.0, d1 + 120.0, "beton")
 	# Talbrücken (seit 2.36): auf diesen Kuppen steht der Ring oben auf Pfeilern statt auf einem Damm
 	for v in race.get("viaducts", []):
 		if not track.has("viaducts"):
 			track["viaducts"] = []
 		track["viaducts"].append([float(v[0]) * L, float(v[1]) * L])
+
+
+## Mittelstreifen in Abschnitten (seit 2.40; Rückmeldung zu 2.39: "immer an eine Straßenseite gebunden, nie wird es
+## mal breiter"). Wie in Need for Speed wechseln sich ab: Grünstreifen wie bisher, Grünstreifen mit Überfahrten alle gut
+## 200 m, Betonleitwand (hält einen ein paar Kurven auf seiner Seite), Poller auf einer Sperrfläche (fliegen weg, man
+## kommt durch) und volle Breite ohne Trennung. Je Abschnitt 350-850 m, nie zweimal dieselbe Art hintereinander. An den
+## Nähten der Stücke und vor Lücken (Auffahrten, Dreiecke) bleiben 220 m Grünstreifen: dort passen Nachbarstücke und
+## Anschlüsse zusammen wie bisher. Kreisel und kurze Stücke: nur Grünstreifen.
+static func _style_medians(track: Dictionary, race: Dictionary, pieces: Array) -> void:
+	var L: float = track["length"]
+	var rng := RandomNumberGenerator.new()
+	rng.seed = int(race["seed"]) * 41 + 9
+	var plain: bool = race.get("name", "") == "Kreisel" or OS.get_cmdline_user_args().has("--oldmedian")
+	var last := "gruen"
+	for pc in pieces:
+		var a: float = pc[0]
+		var b: float = pc[1]
+		if b - a <= 2.0 * MED_TAPER:
+			continue
+		var lo := maxf(a, 0.0) + 220.0
+		var hi := minf(b, L) - 220.0
+		if plain or hi - lo < 450.0:
+			track["medians"].append({"from": a, "to": b, "style": "gruen"})
+			continue
+		# Abschnitte zwischen lo und hi; davor und dahinter Grünstreifen bis an die Lücke bzw. über die Naht
+		var cuts := [lo]
+		var s := lo
+		while hi - s > 0.0:
+			var ln := rng.randf_range(350.0, 850.0)
+			if hi - (s + ln) < 300.0:
+				ln = hi - s  # Rest dazu
+			s += ln
+			cuts.append(s)
+		var styles := []
+		for k in cuts.size() - 1:
+			var opts := ["luecken", "beton", "poller", "offen", "gruen"]
+			opts.erase(last)
+			if k == 0 or k == cuts.size() - 2:
+				opts.erase("gruen")  # neben dem Grünstreifen am Rand etwas anderes
+			var w := {"luecken": 1.0, "beton": 1.0, "poller": 1.1, "offen": 1.0, "gruen": 0.5}
+			var tot := 0.0
+			for o in opts:
+				tot += w[o]
+			var pick := rng.randf() * tot
+			var sty: String = opts[-1]
+			for o in opts:
+				pick -= w[o]
+				if pick <= 0.0:
+					sty = o
+					break
+			styles.append(sty)
+			last = sty
+		last = "gruen"
+		track["medians"].append({"from": a, "to": lo, "style": "gruen"})
+		for k in styles.size():
+			var s0: float = cuts[k]
+			var s1: float = cuts[k + 1]
+			match styles[k]:
+				"offen":
+					pass  # volle Breite: kein Mittelstreifen
+				"luecken":
+					# Grünstreifen mit Überfahrten: 160-240 m Streifen, dazwischen 35 m frei
+					var q := s0
+					while s1 - q > 120.0:
+						var e := minf(q + rng.randf_range(160.0, 240.0), s1)
+						if s1 - e < 120.0:
+							e = s1
+						track["medians"].append({"from": q, "to": e, "style": "luecken"})
+						q = e + 35.0
+				_:
+					track["medians"].append({"from": s0, "to": s1, "style": styles[k]})
+		track["medians"].append({"from": hi, "to": b, "style": "gruen"})
+
+
+## Mittelstreifen zwischen a und b auf eine Art festlegen (seit 2.40, Tunnel über Land): andere Abschnitte dort kürzen
+static func _force_median(track: Dictionary, a: float, b: float, style: String) -> void:
+	var out := []
+	for r in track["medians"]:
+		if r["to"] <= a or r["from"] >= b:
+			out.append(r)
+			continue
+		if r["from"] < a - 30.0:
+			out.append({"from": r["from"], "to": a, "style": r.get("style", "gruen")})
+		if r["to"] > b + 30.0:
+			out.append({"from": b, "to": r["to"], "style": r.get("style", "gruen")})
+	out.append({"from": a, "to": b, "style": style})
+	out.sort_custom(func(x, y): return x["from"] < y["from"])
+	track["medians"] = out
 
 
 ## Open World: Ausfahrt der Stadt zur Autobahn. Sprint: die Straße geht hinter dem Start einfach weiter ("tail").
@@ -1798,7 +2002,7 @@ static func _trough_wedge(root: Node3D, walls: StaticBody3D, track: Dictionary, 
 	var blk := Builder.mat(Color(0.04, 0.04, 0.045), 0.0, 0.7)
 	for sd in [-1.0, 1.0]:
 		var a: Vector3 = fa["pos"] + fa["right"] * sd * (h + WALK + 0.3) + Vector3(0, fa["y"], 0)
-		var b: Vector3 = fb["pos"] + fb["right"] * sd * (TUN_W + 0.1) + Vector3(0, fb["y"], 0)
+		var b: Vector3 = fb["pos"] + fb["right"] * sd * (tun_w(track, d_wall) + 0.1) + Vector3(0, fb["y"], 0)
 		_wall_shape(walls, a, b)
 		var len := a.distance_to(b)
 		var bas := Basis.looking_at((b - a).normalized(), Vector3.UP)
@@ -1845,6 +2049,10 @@ static func _build_road(root: Node3D, track: Dictionary) -> void:
 	carr.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var grass := SurfaceTool.new()
 	grass.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var hatch := SurfaceTool.new()  # Sperrfläche unter den Pollern (seit 2.40)
+	hatch.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var cstrip := SurfaceTool.new()  # Betonstreifen unter der Leitwand (seit 2.40)
+	cstrip.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var walls := StaticBody3D.new()
 	walls.name = "WallsRoad"
 	root.add_child(walls)
@@ -1870,6 +2078,7 @@ static func _build_road(root: Node3D, track: Dictionary) -> void:
 	var piece_d0 := 0.0
 	var n_road := 0
 	var n_carr := 0
+	var n_med := [0, 0, 0]  # Streifen im Stück: Gras, Sperrfläche, Beton
 	while d <= length:
 		var f := frame_at(curve, d)
 		var c: Vector3 = f["pos"]
@@ -1884,22 +2093,37 @@ static func _build_road(root: Node3D, track: Dictionary) -> void:
 			"lo": c - r * (h + WALK) + Yp, "ro": c + r * (h + WALK) + Yp,
 			"lm": c - r * (h + WALK * 0.5) + Yp, "rm": c + r * (h + WALK * 0.5) + Yp, "d": d,
 			# Trog: Seitenstreifen bis zur Mauer auf Fahrbahnhöhe, oben auf Stadtniveau der Gehweg ab der Mauerkrone
-			"tr": _trough_at(track, d), "y": f["y"], "dir": r,
-			"lt": c - r * TUN_W + Y, "rt": c + r * TUN_W + Y, "lc": c - r * (TUN_W + 0.35), "rc": c + r * (TUN_W + 0.35),
+			"tr": _trough_at(track, d), "y": f["y"], "dir": r, "pb": prof_y(curve, d) if track["type"] == "autobahn" else 0.0,
+			"lt": c - r * tun_w(track, d) + Y, "rt": c + r * tun_w(track, d) + Y, "lc": c - r * (tun_w(track, d) + 0.35), "rc": c + r * (tun_w(track, d) + 0.35),
 		}
 		if not prev.is_empty():
 			var up := Vector3(0, CURB_H, 0)
 			var in_tr: bool = cur["tr"] > 0 or prev["tr"] > 0
 			var open: bool = in_tr and not (cur["tr"] == 2 and prev["tr"] == 2)
-			if cur["m"] > 0.3 or prev["m"] > 0.3:
-				# Zwei Richtungsfahrbahnen, dazwischen ein erhöhter Mittelstreifen
+			var msty := median_style_at(track, d - step * 0.5) if cur["m"] > 0.3 or prev["m"] > 0.3 else ""
+			if msty == "poller":
+				# Sperrfläche mit Pollern (seit 2.40): auf Fahrbahnhöhe, ohne Bordstein und Wand, die Poller fliegen weg
 				_strip(carr, prev["l"], prev["ml"], cur["l"], cur["ml"], prev["d"], d)
 				_strip(carr, prev["mr"], prev["r"], cur["mr"], cur["r"], prev["d"], d)
-				_strip(grass, prev["ml"] + up, prev["mr"] + up, cur["ml"] + up, cur["mr"] + up, 0.0, 0.0)
+				var hy := Vector3(0, 0.012, 0)
+				_strip(hatch, prev["ml"] + hy, prev["mr"] + hy, cur["ml"] + hy, cur["mr"] + hy, prev["d"], d)
+				n_carr += 1
+				n_med[1] += 1
+			elif cur["m"] > 0.3 or prev["m"] > 0.3:
+				# Zwei Richtungsfahrbahnen, dazwischen ein erhöhter Mittelstreifen (Gras, seit 2.40 auch Beton unter einer
+				# Leitwand)
+				_strip(carr, prev["l"], prev["ml"], cur["l"], cur["ml"], prev["d"], d)
+				_strip(carr, prev["mr"], prev["r"], cur["mr"], cur["r"], prev["d"], d)
+				_strip(cstrip if msty == "beton" else grass, prev["ml"] + up, prev["mr"] + up, cur["ml"] + up, cur["mr"] + up, 0.0, 0.0)
 				_strip_v(walk, prev["ml"], cur["ml"], CURB_H, false)
 				_strip_v(walk, prev["mr"], cur["mr"], CURB_H, true)
 				n_carr += 1
+				n_med[2 if msty == "beton" else 0] += 1
 				var mm: float = minf(cur["m"], prev["m"])
+				if msty == "beton" and mm > 0.35:
+					# Betonleitwand mitten auf dem Streifen (Teile zu 3,1 m, lückenlos)
+					var bmid: Vector3 = (prev["ml"] + prev["mr"] + cur["ml"] + cur["mr"]) / 4.0 + up
+					barriers.append(Transform3D(Basis.looking_at(f["fwd"], Vector3.UP), bmid))
 				# Kollision genau an den Bordsteinkanten: spitz zulaufende Insel, an der man seitlich abgleitet
 				if mm > 0.35:
 					_wall_shape(walls, prev["ml"], cur["ml"], 1.6)
@@ -1911,7 +2135,7 @@ static func _build_road(root: Node3D, track: Dictionary) -> void:
 					var tip: Vector3 = (thin["ml"] + thin["mr"]) / 2.0
 					_wall_shape(walls, tip, wide["ml"], 1.6)
 					_wall_shape(walls, tip, wide["mr"], 1.6)
-				if mm > 1.2:
+				if mm > 1.2 and msty != "beton":
 					var mid: Vector3 = (prev["ml"] + prev["mr"] + cur["ml"] + cur["mr"]) / 4.0 + up
 					var bf := Basis.looking_at(f["fwd"], Vector3.UP)
 					if _district_at(track, d).has("soundwall"):
@@ -1973,15 +2197,19 @@ static func _build_road(root: Node3D, track: Dictionary) -> void:
 				if _branch_clearance(track, (prev[side] + cur[side]) / 2, true, true) > 1.0 and not (cur["tr"] == 2 and prev["tr"] == 2):
 					_wall_shape(walls, prev[side], cur[side])
 				# Damm: von der Gehwegkante schräg hinunter zum Boden (Böschung 1:1,6)
-				var ya: float = prev[side].y
-				var yb: float = cur[side].y
+				# Autobahn über Land (seit 2.40): die Landschaft liegt auf Höhe des Profils, der Damm nur für Kuppe und
+				# Talbrücke darüber
+				var pa: float = prev["pb"]
+				var pbb: float = cur["pb"]
+				var ya: float = prev[side].y - pa
+				var yb: float = cur[side].y - pbb
 				if (ya > 0.3 or yb > 0.3) and not in_tr and not Design.no_bank(track, prev["d"], prev[side]) \
 						and not _in_viaduct(track, d, minf(ya, yb)):  # am Berg trägt das Gelände, auf der Talbrücke Pfeiler
 					var sd2 := -1.0 if side == "lw" else 1.0
 					var ga: Vector3 = prev[side] + prev["dir"] * sd2 * ya * 1.6
 					var gb: Vector3 = cur[side] + cur["dir"] * sd2 * yb * 1.6
-					ga.y = -0.05
-					gb.y = -0.05
+					ga.y = pa - 0.05
+					gb.y = pbb - 0.05
 					if sd2 < 0.0:
 						_strip(bank, ga, prev[side], gb, cur[side], 0.0, 0.0)
 					else:
@@ -2001,14 +2229,20 @@ static func _build_road(root: Node3D, track: Dictionary) -> void:
 			if n_carr > 0:
 				var ab: bool = track["extra"] >= AB_EXTRA
 				_road_mesh(root, carr, 3.0 if ab else 2.0, HALF_W + track["extra"] if ab else HALF_W, 0.0)
-				_flush(root, grass, grass_m)
+				if n_med[0] > 0:
+					_flush(root, grass, grass_m)
+				if n_med[1] > 0:
+					_road_mesh(root, hatch, 0.5, float(MED_W["poller"]) * 2.0, 0.0)  # Sperrfläche (road.gdshader, lanes 0,5)
+				if n_med[2] > 0:
+					_flush(root, cstrip, Builder.mat(Color(0.44, 0.44, 0.45), 0.0, 0.9))
+				n_med = [0, 0, 0]
 			if n_trough > 0:
 				_flush(root, trough, trough_m)
 			if n_bank > 0:
 				_flush(root, bank, bank_m)
 				n_bank = 0
 			_flush(root, walk, _walk_mat(WALK, track["districts"][clampi(int((piece_d0 + 30.0) / DISTRICT_LEN), 0, track["districts"].size() - 1)]))
-			for st in [road, walk, carr, grass, trough, bank]:
+			for st in [road, walk, carr, grass, hatch, cstrip, trough, bank]:
 				st.clear()
 				st.begin(Mesh.PRIMITIVE_TRIANGLES)
 			piece = 0
@@ -2025,6 +2259,7 @@ static func _build_road(root: Node3D, track: Dictionary) -> void:
 	_multi(root, Builder.tapered_box(Vector2(0.7, 3.1), Vector2(0.28, 3.1), 0.85, 0.0), Builder.mat(Color(0.42, 0.42, 0.43), 0.0, 0.85), barriers)
 	_multi(root, Builder.box(Vector3(1.6, 0.08, 0.04)), Builder.mat(Color(1.0, 0.7, 0.3), 0.0, 0.4, Color(1.0, 0.6, 0.2), 4.0), guide)
 	_build_median_lamps(root, track)
+	_build_median_posts(root, track)
 
 
 ## Drift-Kurs: durchgehende Bande an beiden Rändern (rot-weiß, mit Sponsorentafeln), Reifenstapel außen in
@@ -2169,7 +2404,10 @@ static func _build_median_lamps(root: Node3D, track: Dictionary) -> void:
 	bm.set_shader_parameter("col", Color(1.0, 0.6, 0.05))
 	bm.set_shader_parameter("rate", 1.4)
 	for r in track["medians"]:
-		for nd in [r["from"] + MED_TAPER * 0.45, r["to"] - MED_TAPER * 0.45]:
+		if r.get("style", "gruen") == "poller":
+			continue  # Sperrfläche: Poller statt Anpralldämpfer (_build_median_posts)
+		var tp: float = MED_TAPER_OF[r.get("style", "gruen")]
+		for nd in [r["from"] + tp * 0.45, r["to"] - tp * 0.45]:
 			var nf := frame_at(curve, nd)
 			var post := Knockable.new()
 			post.mass = 15.0
@@ -2219,6 +2457,43 @@ static func _build_median_lamps(root: Node3D, track: Dictionary) -> void:
 				cs.position.y = 4.5
 				n.add_child(cs)
 			d += LAMP_STEP
+
+
+## Poller auf der Sperrfläche zwischen den Richtungsfahrbahnen (seit 2.40): weiße Flexpfosten mit roten Streifen alle
+## 9 m. Sie trennen sichtbar, halten aber nicht auf: wer hindurchfährt, schleudert sie weg (Knockable, kaum langsamer).
+static func _build_median_posts(root: Node3D, track: Dictionary) -> void:
+	var curve: Curve3D = track["curve"]
+	var post_mesh := CylinderMesh.new()
+	post_mesh.top_radius = 0.07
+	post_mesh.bottom_radius = 0.09
+	post_mesh.height = 1.0
+	post_mesh.radial_segments = 8
+	post_mesh.rings = 1
+	var band_mesh := CylinderMesh.new()
+	band_mesh.top_radius = 0.083
+	band_mesh.bottom_radius = 0.085
+	band_mesh.height = 0.12
+	band_mesh.radial_segments = 8
+	band_mesh.rings = 1
+	var white := Builder.mat(Color(0.9, 0.9, 0.88), 0.0, 0.5)
+	var red := Builder.mat(Color(0.85, 0.06, 0.04), 0.0, 0.4, Color(0.9, 0.08, 0.05), 0.5)
+	for r in track["medians"]:
+		if r.get("style", "") != "poller":
+			continue
+		var d: float = r["from"] + 6.0
+		while d < r["to"] - 6.0:
+			if median_at(track, d) > 0.45:
+				var f := frame_at(curve, d)
+				var k := Knockable.new()
+				k.mass = 4.0
+				k.slowdown = 0.985
+				k.position = f["pos"] + Vector3(0, f["y"], 0)
+				root.add_child(k)
+				Builder._add(k, post_mesh, white, Vector3(0, 0.5, 0))
+				Builder._add(k, band_mesh, red, Vector3(0, 0.78, 0))
+				Builder._add(k, band_mesh, red, Vector3(0, 0.55, 0))
+				_knock_shape(k, Vector3(0.3, 1.0, 0.3), Vector3(0, 0.5, 0))
+			d += 9.0
 
 
 ## Horizontaler Streifen; a/b = vorherige Kante links/rechts, c/d = aktuelle.
@@ -2288,15 +2563,18 @@ static func _build_branch(root: Node3D, track: Dictionary, p: Dictionary, rng: R
 		# Fahrbahn der Auffahrt (vorher endete beides als Stufe mitten auf der Straße)
 		var ww := walk_w * clampf((len - d) / 14.0, 0.0, 1.0) if tail and not join else walk_w
 		var cur := {"l": cp - r * half, "r": cp + r * half, "lw": cp - r * (half + ww + 0.3), "rw": cp + r * (half + ww + 0.3),
-			"lo": cp - r * (half + ww), "ro": cp + r * (half + ww), "d": d, "y": f["y"]}
+			"lo": cp - r * (half + ww), "ro": cp + r * (half + ww), "d": d, "y": f["y"],
+			"pb": prof_y(c, d) if track["type"] == "autobahn" else 0.0}  # Verbindung über Land: Gelände auf Profilhöhe (2.40)
 		if not prev.is_empty():
-			if cur["y"] > 0.05 or prev["y"] > 0.05:
+			if cur["y"] - cur["pb"] > 0.05 or prev["y"] - prev["pb"] > 0.05:
 				# Außenseite: Mauer vom Boden bis zur Gehweg- bzw. Fahrbahnkante
 				var lift := CURB_H if walk_w > 0.0 else 0.0
 				var lk := "lo" if walk_w > 0.0 else "l"
 				var rk := "ro" if walk_w > 0.0 else "r"
-				_wall_quad(ret, Vector3(prev[lk].x, -0.05, prev[lk].z), Vector3(cur[lk].x, -0.05, cur[lk].z), prev[lk].y + lift, cur[lk].y + lift, false)
-				_wall_quad(ret, Vector3(prev[rk].x, -0.05, prev[rk].z), Vector3(cur[rk].x, -0.05, cur[rk].z), prev[rk].y + lift, cur[rk].y + lift, true)
+				var ba: float = prev["pb"] - 0.05
+				var bb: float = cur["pb"] - 0.05
+				_wall_quad(ret, Vector3(prev[lk].x, ba, prev[lk].z), Vector3(cur[lk].x, bb, cur[lk].z), prev[lk].y + lift, cur[lk].y + lift, false)
+				_wall_quad(ret, Vector3(prev[rk].x, ba, prev[rk].z), Vector3(cur[rk].x, bb, cur[rk].z), prev[rk].y + lift, cur[rk].y + lift, true)
 				n_ret += 1
 			var mid: Vector3 = (prev["l"] + cur["r"]) / 2
 			var in_gap: bool = d > gap0 and prev["d"] < gap1
@@ -2763,8 +3041,11 @@ static func _build_fences(root: Node3D, track: Dictionary, blockers: Array) -> v
 	var fan_rng := RandomNumberGenerator.new()
 	fan_rng.seed = int(track["length"] * 7.0) + 11
 	var next_fans := {-1.0: 30.0, 1.0: 70.0}  # frühestes d für die nächste Gruppe je Seite
+	var wood_posts := []  # Koppelzaun an Auffahrten und Verbindungen (seit 2.40)
+	var wood_rails := []
 	for p in track["paths"]:
-		if p["id"] == 0 or p["kind"] == "fork" or p["kind"] == "spur" or p["kind"] == "lane" or p["kind"] == "passage":
+		if p["id"] == 0 or p["kind"] == "fork" or p["kind"] == "spur" or p["kind"] == "lane" or p["kind"] == "passage" \
+				or (p["kind"] == "ramp" and track["world"]):
 			lines.append(p)
 	for p in lines:
 		var c: Curve3D = p["curve"]
@@ -2787,9 +3068,12 @@ static func _build_fences(root: Node3D, track: Dictionary, blockers: Array) -> v
 					continue
 				var hidden := false
 				var pk := Vector2i(floori(pos.x / LOT_CELL), floori(pos.z / LOT_CELL))
+				var is_ramp: bool = p["kind"] == "ramp"
 				for gx in range(pk.x - breach, pk.x + breach + 1):
 					for gz in range(pk.y - breach, pk.y + breach + 1):
 						for b in bgrid.get(Vector2i(gx, gz), []):
+							if is_ramp and b.get("ko", false):
+								continue  # Sperrfläche der Welt (oft die Verbindung selbst): versteckt nichts (seit 2.40)
 							if _flat(pos - b["pos"]).length() < b["r"] * 0.85 + 1.5:
 								hidden = true
 								break
@@ -2817,7 +3101,21 @@ static func _build_fences(root: Node3D, track: Dictionary, blockers: Array) -> v
 				if main and _district_at(track, d).get("rural", false):
 					# Autobahn über Land: Leitplanke statt Stadtgeländer (Pfosten alle 3 m, Schutzplanke in 0,6 m Höhe)
 					guard_posts.append(Transform3D(bf, base + Vector3(0, 0.38, 0)))
-					guard.append(Transform3D(bf, base + Vector3(0, 0.6, -side * 0.12)))
+					guard.append(Transform3D(bf, base + Vector3(0, 0.6, 0) - f["right"] * side * 0.12))
+					continue
+				if p["kind"] == "ramp":
+					# Auffahrten und Verbindungen (seit 2.40): bis 2.39 ohne sichtbaren Rand, man stieß im offenen Feld an eine
+					# unsichtbare Wand. Jetzt genau auf der Wand Leitplanke, Hecke oder Koppelzaun, je 60-150 m im Wechsel.
+					var rs := _ramp_border(p, d, side)
+					if rs == 0:
+						guard_posts.append(Transform3D(bf, base + Vector3(0, 0.38, 0) + f["right"] * side * 0.1))
+						guard.append(Transform3D(bf, base + Vector3(0, 0.6, 0) - f["right"] * side * 0.02))
+					elif rs == 1:
+						hedges.append(Transform3D(bf, base + Vector3(0, 0.65, 0) + f["right"] * side * 0.45))
+					else:
+						wood_posts.append(Transform3D(bf, base + Vector3(0, 0.62, 0) + f["right"] * side * 0.1))
+						for ry in [0.5, 1.0]:
+							wood_rails.append(Transform3D(bf, base + Vector3(0, ry, 0) + f["right"] * side * 0.02))
 					continue
 				# Open World (seit 2.39): Ränder je Abschnitt verschieden (Zaun, Hecke, niedrige Mauer, Poller), passend zum Viertel
 				var style := _border_style(track, p, d, side) if track["world"] else 0
@@ -2862,6 +3160,20 @@ static func _build_fences(root: Node3D, track: Dictionary, blockers: Array) -> v
 		var steel := Builder.mat(Color(0.62, 0.64, 0.66), 0.85, 0.32)
 		_multi(root, Builder.box(Vector3(0.12, 0.76, 0.12)), metal, guard_posts)
 		_multi(root, Builder.box(Vector3(0.06, 0.32, 3.02)), steel, guard)
+	if not wood_posts.is_empty():
+		var wood := Builder.mat(Color(0.36, 0.25, 0.15), 0.0, 0.9)
+		_multi(root, Builder.box(Vector3(0.14, 1.25, 0.14)), wood, wood_posts)
+		_multi(root, Builder.box(Vector3(0.06, 0.12, 3.04)), wood, wood_rails)
+
+
+## Rand einer Auffahrt oder Verbindung (seit 2.40): 0 Leitplanke, 1 Hecke, 2 Koppelzaun. Wechselt je 60-150 m, fest aus
+## Weg, Seite und Lage (ohne Zufallszahlen); nahe am Ring (erste 90 m) immer Leitplanke wie an der Autobahn.
+static func _ramp_border(p: Dictionary, d: float, side: float) -> int:
+	if d < 90.0 or float(p["length"]) - d < 40.0:
+		return 0
+	var seg := int(floor((d - 90.0) / (60.0 + float(posmod(int(p["id"]) * 13 + int(side) * 5, 10)) * 10.0)))
+	var h := posmod(hash([int(p["id"]), int(side), seg, int(p["length"])]), 100)
+	return 0 if h < 50 else (1 if h < 78 else 2)
 
 
 ## Rand an der Wand, wo kein Haus davor steht (Open World, seit 2.39): 0 Zaun, 1 Hecke, 2 niedrige Mauer, 3 Poller.
@@ -3353,6 +3665,8 @@ static func _build_landmarks(root: Node3D, track: Dictionary, rng: RandomNumberG
 			var d: float = length * entry[0] + shift
 			if _in_zone(track, d, 40.0):
 				continue
+			if track["type"] == "autobahn" and maxf(prof_y(curve, d - 80.0), prof_y(curve, d + 80.0)) > 1.0:
+				continue  # Autobahn über Land am Hang (seit 2.40): Kirche, Tankstelle, Stadion nur, wo es flach ist
 			for s in [side, -side]:
 				var dist := hw(track, d) + WALK + 1.5 + depth / 2.0
 				var r: float = 66.0 if entry[1] == "stadium" else depth
@@ -5458,10 +5772,11 @@ static func _build_posters(root: Node3D, track: Dictionary) -> void:
 			if auto:
 				step = rng.randf_range(900.0, 1500.0)
 				# nur über Land, nicht auf Brücken und Rampen, nicht an Ausfahrten
-				ok = ok and dist.get("rural", false) and not dist.get("forest", false) and float(f["y"]) < 0.3
+				ok = ok and dist.get("rural", false) and not dist.get("forest", false) and float(f["y"]) - prof_y(curve, d) < 0.3
+				ok = ok and absf(slope_at(curve, d)) < 0.03  # seit 2.40: nicht am Hang (die Tafel stünde schief zur Straße)
 				if ok:
 					var off := hwd + 10.0
-					var pos: Vector3 = f["pos"] + f["right"] * side * off
+					var pos: Vector3 = f["pos"] + f["right"] * side * off + Vector3(0, maxf(prof_y(curve, d) - 0.4, 0.0), 0)
 					if _branch_clearance(track, pos) < 16.0:
 						ok = false
 					else:
@@ -6242,6 +6557,315 @@ static func _plan_tunnels(track: Dictionary, rng: RandomNumberGenerator) -> void
 			break
 
 
+## Tunnel über Land (seit 2.40; Rückmeldung zu 2.39: "an fünf Stellen mal ein Tunnel, viel zu wenig"): Röhre auf
+## Fahrbahnhöhe (Kacheln, Lichtbänder, Lüfter, Notausgänge), Portale aus Beton mit Namen, davor ein Einschnitt mit
+## Stützmauern und darüber ein Hügel quer zur Straße. Der Hügel ist ein eigenes Gitter entlang der Straße, nicht das
+## Gelände der Landschaft (die liegt dort flach unter ihm): mit dessen 25-m-Raster lägen an den Portalen schräge
+## Flächen quer in der Röhre.
+const HILL_STEP := 6.0
+static func _build_land_tunnels(root: Node3D, track: Dictionary, tile: Material, ceil_m: Material, steel: Material,
+		panel: Material, warn: Material, exit_m: Material, walls: StaticBody3D) -> void:
+	var curve: Curve3D = track["curve"]
+	for t in track["tunnels"]:
+		if not t.get("land", false):
+			continue
+		var col := Color(1.0, 0.62, 0.28)
+		var lamp_m := Builder.mat(col, 0.0, 0.3, col, 6.0)
+		var d0: float = t["from"]
+		var d1: float = t["to"]
+		var len := d1 - d0
+		# Wände und Decke (Kollision der Wände kommt aus _build_road, wie im Trog)
+		var st := SurfaceTool.new()
+		st.begin(Mesh.PRIMITIVE_TRIANGLES)
+		var sc := SurfaceTool.new()
+		sc.begin(Mesh.PRIMITIVE_TRIANGLES)
+		var n := int(ceil(len / 3.0))
+		var prev := {}
+		for i in n + 1:
+			var u := len * i / n
+			var f := frame_at(curve, d0 + u)
+			var c: Vector3 = f["pos"] + Vector3(0, f["y"], 0)
+			var r: Vector3 = f["right"]
+			var tw := tun_w(track, d0 + u)
+			var cur := {"l": c - r * tw, "r": c + r * tw}
+			if not prev.is_empty():
+				_wall_uv(st, prev["l"], cur["l"], TUN_H, u - len / n, u, true)
+				_wall_uv(st, prev["r"], cur["r"], TUN_H, u - len / n, u, false)
+				var up := Vector3(0, TUN_H, 0)
+				for v in [prev["l"] + up, prev["r"] + up, cur["l"] + up, prev["r"] + up, cur["r"] + up, cur["l"] + up]:
+					sc.set_uv(Vector2.ZERO)
+					sc.add_vertex(v)
+				if i % 10 == 0 or i == n:
+					_flush(root, st, tile)
+					_flush(root, sc, ceil_m)
+					st = SurfaceTool.new()
+					st.begin(Mesh.PRIMITIVE_TRIANGLES)
+					sc = SurfaceTool.new()
+					sc.begin(Mesh.PRIMITIVE_TRIANGLES)
+			prev = cur
+		# Lichtbänder an der Decke, gleichmäßige Lichtkarte, ein paar echte Lampen
+		var strips := []
+		var u2 := 2.0
+		while u2 < len:
+			var f := frame_at(curve, d0 + u2)
+			var tw := tun_w(track, d0 + u2)
+			if fmod(u2, 3.0) < 1.6:
+				track["pools"].append([f["pos"].x, f["pos"].z, tw + 0.5, col * 0.3])
+			var b := Basis.looking_at(f["fwd"], Vector3.UP)
+			for s in [-1.0, -0.33, 0.33, 1.0]:
+				strips.append(Transform3D(b, f["pos"] + f["right"] * s * (tw - 0.45) + Vector3(0, f["y"] + TUN_H - 0.3, 0)))
+			u2 += 4.5
+		_multi(root, Builder.box(Vector3(0.3, 0.12, 2.6)), lamp_m, strips)
+		var side := 1.0
+		u2 = 10.0
+		while u2 < len - 5.0:
+			var f := frame_at(curve, d0 + u2)
+			var light := OmniLight3D.new()
+			light.light_color = col
+			light.light_energy = 1.6
+			light.omni_range = 18.0
+			light.omni_attenuation = 1.0
+			light.position = f["pos"] + f["right"] * side * (tun_w(track, d0 + u2) - 3.0) + Vector3(0, f["y"] + TUN_H - 0.8, 0)
+			root.add_child(light)
+			side = -side
+			u2 += 22.0
+		# Strahlventilatoren über dem Mittelstreifen und Notausgänge an den Wänden
+		var g := {}
+		u2 = 35.0
+		while u2 < len - 20.0:
+			var f := frame_at(curve, d0 + u2)
+			var b := Basis.looking_at(f["fwd"], Vector3.UP)
+			for s in [-1.0, 1.0]:
+				var fan := CylinderMesh.new()
+				fan.top_radius = 0.7
+				fan.bottom_radius = 0.7
+				fan.height = 4.0
+				fan.radial_segments = 12
+				var p: Vector3 = f["pos"] + f["right"] * s * 6.0 + Vector3(0, f["y"] + TUN_H - 0.95, 0)
+				_part(g, steel, fan, Transform3D(b * Basis(Vector3.RIGHT, PI / 2.0), p))
+				_part(g, steel, Builder.box(Vector3(0.1, 0.3, 0.1)), Transform3D(b, p + Vector3(0, 0.8, 0)))
+			u2 += 80.0
+		u2 = 30.0
+		side = -1.0
+		while u2 < len - 10.0:
+			var f := frame_at(curve, d0 + u2)
+			var wb := Basis.looking_at(f["right"] * side, Vector3.UP)  # +Z zeigt zur Fahrbahn
+			var p: Vector3 = f["pos"] + f["right"] * side * (tun_w(track, d0 + u2) - 0.06) + Vector3(0, f["y"] + 2.6, 0)
+			_part(g, exit_m, Builder.box(Vector3(1.4, 0.4, 0.1)), Transform3D(wb, p))
+			var l := Label3D.new()
+			l.text = "NOTAUSGANG"
+			l.font_size = 32
+			l.pixel_size = 0.008
+			l.modulate = Color(0.0, 0.05, 0.0)
+			l.shaded = false
+			l.double_sided = false
+			l.transform = Transform3D(wb, p + wb.z * 0.06)
+			root.add_child(l)
+			side = -side
+			u2 += 60.0
+		_bake(root, g)
+		# Portale: Betonfront um die Öffnung, Warnstreifen, Lampen, Name; quer davor die Wand zur Randwand der Straße
+		for end in 2:
+			var d: float = d0 if end == 0 else d1
+			var f := frame_at(curve, d)
+			var tw := tun_w(track, d)
+			var out_dir: Vector3 = -f["fwd"] if end == 0 else f["fwd"]
+			var pn := Node3D.new()
+			pn.transform = Transform3D(Basis.looking_at(-out_dir, Vector3.UP), f["pos"] + Vector3(0, f["y"], 0))  # +Z aus dem Tunnel
+			root.add_child(pn)
+			var pg := {}
+			var outer := hw(track, d) + WALK + 3.3  # bis zur Stützmauer des Einschnitts
+			var ph := TUN_H + 6.0
+			for s in [-1.0, 1.0]:
+				var w := outer - tw
+				_part(pg, panel, Builder.box(Vector3(w, ph, 2.6)), Transform3D(Basis(), Vector3(s * (tw + w / 2.0), ph / 2.0, -1.0)))
+				_part(pg, warn, Builder.box(Vector3(0.35, TUN_H, 0.1)), Transform3D(Basis(), Vector3(s * (tw + 0.18), TUN_H / 2.0, 0.33)))
+				var wa: Vector3 = f["pos"] + f["right"] * s * tw + Vector3(0, f["y"], 0)
+				var wb2: Vector3 = f["pos"] + f["right"] * s * (outer + 0.3) + Vector3(0, f["y"], 0)
+				_wall_shape(walls, wa, wb2)
+			_part(pg, panel, Builder.box(Vector3(tw * 2.0, ph - TUN_H, 2.6)), Transform3D(Basis(), Vector3(0, (ph + TUN_H) / 2.0, -1.0)))
+			_part(pg, warn, Builder.box(Vector3(tw * 2.0 + 0.7, 0.35, 0.1)), Transform3D(Basis(), Vector3(0, TUN_H + 0.18, 0.33)))
+			for k in 11:
+				_part(pg, lamp_m, Builder.box(Vector3(0.6, 0.15, 0.3)), Transform3D(Basis(), Vector3(-12.5 + k * 2.5, TUN_H + 0.65, 0.45)))
+			_bake(pn, pg)
+			for s in [-1.0, 1.0]:
+				var fl := OmniLight3D.new()
+				fl.light_color = Color(1.0, 0.9, 0.75)
+				fl.light_energy = 2.5
+				fl.omni_range = 20.0
+				fl.position = Vector3(s * 9.0, TUN_H + 3.0, 6.0)
+				pn.add_child(fl)
+			var lb := Label3D.new()
+			lb.text = t["name"]
+			lb.font_size = 110
+			lb.pixel_size = 0.024
+			lb.modulate = Color(col.r * 2.2, col.g * 2.2, col.b * 2.2)
+			lb.shaded = false
+			lb.double_sided = false
+			lb.position = Vector3(0, TUN_H + 3.4, 0.36)
+			pn.add_child(lb)
+		_land_hill(root, track, t)
+
+
+## Hügel über einem Tunnel über Land: Gitter entlang der Straße (alle HILL_STEP längs und quer), Höhe aus Profil plus
+## Rücken (quer abfallend bis unter die Fahrbahn bei HILL_W, längs vor und hinter den Portalen auslaufend). Vor den Portalen
+## bleibt ein Einschnitt frei (bis zur Stützmauer neben der Randwand), dort senkrechte Stützmauern, an den Portalen die
+## Felswand über der Röhre. Oben Wald.
+static func _land_hill(root: Node3D, track: Dictionary, t: Dictionary) -> void:
+	const W := 150.0
+	const E := 70.0
+	var curve: Curve3D = track["curve"]
+	var L: float = track["length"]
+	var d0: float = t["from"]
+	var d1: float = t["to"]
+	var ridge: float = t.get("ridge", 24.0)
+	var notch := hw(track, (d0 + d1) / 2.0) + WALK + 3.3
+	var tw := tun_w(track, (d0 + d1) / 2.0)
+	# Querlagen: gleichmäßig, dazu genau die Kante des Einschnitts und der Röhre
+	var lats := []
+	var x := -W
+	while x <= W + 0.01:
+		lats.append(x)
+		x += 8.0
+	for e in [-notch, notch, -tw, tw]:
+		# genau diese Werte (Stützmauer und Röhre suchen sie mit find), nahe Rasterwerte weichen
+		lats = lats.filter(func(q): return absf(float(q) - e) >= 1.0)
+		lats.append(e)
+	lats.sort()
+	var ds := []
+	var dd := maxf(d0 - E, 1.0)
+	while dd < minf(d1 + E, L - 1.0):
+		ds.append(dd)
+		dd += HILL_STEP
+	ds.append(minf(d1 + E, L - 1.0))
+	for e in [d0, d1]:
+		ds = ds.filter(func(q): return absf(float(q) - e) >= 0.5)  # genau die Portale (find), nahe Werte weichen
+		ds.append(e)
+	ds.sort()
+	var hfun := func(d: float, lat: float, y: float) -> float:
+		var al := absf(lat)
+		var core := 1.0
+		if al > notch + 10.0:
+			core = 0.5 + 0.5 * cos(PI * clampf((al - notch - 10.0) / (W - notch - 10.0), 0.0, 1.0))
+		# an den Portalen niedrig (knapp über der Betonfront), dahinter steigt der Hügel an: sonst stand über jedem Portal
+		# eine 30 m hohe, glatte Felswand
+		var lg := 1.0
+		if d < d0:
+			lg = 0.3 * smoothstep(d0 - E, d0, d)
+		elif d > d1:
+			lg = 0.3 * (1.0 - smoothstep(d1, d1 + E, d))
+		else:
+			lg = 0.3 + 0.7 * smoothstep(d0, d0 + 90.0, d) * (1.0 - smoothstep(d1 - 90.0, d1, d)) \
+				+ 0.1 * sin(PI * (d - d0) / maxf(d1 - d0, 1.0))
+		var h := y - 1.5 + (ridge + 1.5) * core * lg
+		if d >= d0 - 0.01 and d <= d1 + 0.01 and al <= notch + 2.0:
+			h = maxf(h, y + TUN_H + 2.5)  # über der Röhre immer Erde
+		return h
+	var top := SurfaceTool.new()
+	top.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var face := SurfaceTool.new()
+	face.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var wall := SurfaceTool.new()
+	wall.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var rows := []  # je d: [Punkte, y]
+	for d in ds:
+		var f := frame_at(curve, d)
+		var y: float = f["y"]
+		var row := []
+		for lat in lats:
+			var p: Vector3 = f["pos"] + f["right"] * float(lat)
+			p.y = hfun.call(d, float(lat), y)
+			row.append(p)
+		rows.append([row, y, d, f])
+	var nl := lats.size()
+	var trees := []
+	var trng := RandomNumberGenerator.new()
+	trng.seed = int(d0 * 13.0) + 7
+	for i in rows.size() - 1:
+		var ra: Array = rows[i][0]
+		var rb: Array = rows[i + 1][0]
+		var da: float = rows[i][2]
+		var db: float = rows[i + 1][2]
+		var in_tun := da >= d0 - 0.01 and db <= d1 + 0.01
+		for k in nl - 1:
+			var la: float = lats[k]
+			var lb: float = lats[k + 1]
+			if not in_tun and maxf(absf(la), absf(lb)) <= notch + 0.01:
+				continue  # Einschnitt vor dem Portal: frei
+			# von oben im Uhrzeigersinn (Fahrtrichtung oben, rechts = +lat)
+			for v in [ra[k], rb[k], ra[k + 1], ra[k + 1], rb[k], rb[k + 1]]:
+				top.set_uv(Vector2.ZERO)
+				top.add_vertex(v)
+			# Wald oben (nicht direkt am Einschnitt, nicht an den Rändern)
+			var mid: Vector3 = (ra[k] + rb[k + 1]) / 2.0
+			var am := absf((la + lb) / 2.0)
+			if am > notch + 8.0 and am < W - 25.0 and trng.randf() < 0.5:
+				var lg2 := clampf(minf(mid.distance_to(rows[0][0][k]), mid.distance_to(rows[-1][0][k])) / E, 0.0, 1.0)
+				if lg2 > 0.5:
+					var sz := trng.randf_range(0.8, 1.3)
+					trees.append(Transform3D(Basis(Vector3.UP, trng.randf() * TAU).scaled(Vector3(sz, sz * trng.randf_range(0.9, 1.25), sz)),
+						mid + Vector3(trng.randf_range(-2.0, 2.0), -0.3, trng.randf_range(-2.0, 2.0))))
+	# Stützmauern des Einschnitts (vor beiden Portalen) und Felswand über den Portalen
+	for i in rows.size() - 1:
+		var da: float = rows[i][2]
+		var db: float = rows[i + 1][2]
+		if da >= d0 - 0.01 and db <= d1 + 0.01:
+			continue
+		for s in [-1.0, 1.0]:
+			var ka: int = lats.find(s * notch)
+			var a: Vector3 = rows[i][0][ka]
+			var b: Vector3 = rows[i + 1][0][ka]
+			var ya: float = rows[i][1] - 0.6
+			var yb: float = rows[i + 1][1] - 0.6
+			if maxf(a.y - ya, b.y - yb) < 0.3:
+				continue
+			_wall_quad(wall, Vector3(a.x, ya, a.z), Vector3(b.x, yb, b.z), a.y, b.y, s > 0.0)
+			_wall_quad(wall, Vector3(a.x, ya, a.z), Vector3(b.x, yb, b.z), a.y, b.y, s < 0.0)
+	for end in 2:
+		var ri: int = ds.find(d0 if end == 0 else d1)
+		var row: Array = rows[ri][0]
+		var y: float = rows[ri][1]
+		for k in nl - 1:
+			var la: float = lats[k]
+			var lb: float = lats[k + 1]
+			if maxf(absf(la), absf(lb)) > notch + 0.01:
+				continue
+			var bot := y + TUN_H if maxf(absf(la), absf(lb)) <= tw + 0.01 else y - 0.6
+			var a: Vector3 = row[k]
+			var b: Vector3 = row[k + 1]
+			_wall_quad(face, Vector3(a.x, bot, a.z), Vector3(b.x, bot, b.z), a.y, b.y, end == 0)
+			_wall_quad(face, Vector3(a.x, bot, a.z), Vector3(b.x, bot, b.z), a.y, b.y, end != 0)
+	top.generate_normals()
+	var mi := MeshInstance3D.new()
+	mi.name = "Tunnelhuegel"
+	mi.mesh = top.commit()
+	mi.material_override = land_mat if land_mat != null else Builder.mat(Color(0.2, 0.32, 0.12), 0.0, 0.95)
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	root.add_child(mi)
+	_flush(root, face, Builder.mat(Color(0.37, 0.35, 0.32), 0.0, 0.95))
+	_flush(root, wall, Builder.mat(Color(0.5, 0.5, 0.49), 0.0, 0.85))
+	if not trees.is_empty():
+		var cone := CylinderMesh.new()
+		cone.top_radius = 0.0
+		cone.bottom_radius = 2.6
+		cone.height = 9.0
+		cone.radial_segments = 7
+		cone.rings = 1
+		var tf := []
+		var trunk := []
+		for tx in trees:
+			tf.append(tx * Transform3D(Basis(), Vector3(0, 6.0, 0)))
+			trunk.append(tx * Transform3D(Basis(), Vector3(0, 1.0, 0)))
+		_multi(root, cone, Builder.mat(Color(0.08, 0.2, 0.08), 0.0, 0.9), tf)
+		_multi(root, Builder.box(Vector3(0.45, 2.2, 0.45)), Builder.mat(Color(0.25, 0.17, 0.1), 0.0, 0.9), trunk)
+
+
+## Halbe lichte Weite eines Tunnels bei d (bis zur Innenwand): in der Stadt TUN_W, auf der Autobahn (seit 2.40, Tunnel
+## über Land) so breit wie die Fahrbahn samt Mittelstreifen plus Seitenstreifen
+static func tun_w(track: Dictionary, d: float) -> float:
+	return hw(track, d) + 1.6 if track.get("type", "") == "autobahn" else TUN_W
+
+
 ## Trog/Tunnel bei d: 0 = nichts, 1 = offener Trog (Rampe), 2 = im Tunnel
 static func _trough_at(track: Dictionary, d: float) -> int:
 	for t in track["tunnels"]:
@@ -6293,9 +6917,10 @@ static func _build_tunnels(root: Node3D, track: Dictionary, rng: RandomNumberGen
 	var walls := StaticBody3D.new()
 	walls.name = "WallsTunnel"
 	root.add_child(walls)
+	_build_land_tunnels(root, track, tile, ceil_m, steel, panel, warn, exit_m, walls)
 	for t in track["tunnels"]:
-		if t.get("rock", false):
-			continue  # Felstunnel: baut track_design.gd
+		if t.get("rock", false) or t.get("land", false):
+			continue  # Felstunnel: baut track_design.gd; Tunnel über Land (seit 2.40): _build_land_tunnels
 		var col: Color = Color(1.0, 0.6, 0.25) if t["sodium"] else Color(0.75, 0.9, 1.0)
 		var lamp_m := Builder.mat(col, 0.0, 0.3, col, 6.0)
 		var d0: float = t["from"]

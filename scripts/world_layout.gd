@@ -228,7 +228,9 @@ static func build() -> Dictionary:
 	# die ganze Autobahn, und die Welt sah überall gleich aus). Die Landschaft (landscape.gd) fragt dasselbe ab.
 	var urban := []
 	var zones := []  # Viertel am Ring je Auffahrt (ramp_zone)
-	for r in ramps + oramps:
+	# Seit 2.40 nur am inneren Ring: der Außenring läuft auch an den Verbindungen zu den Städten über Land (Leitplanke statt
+	# Häuser und Lärmschutzwand), dort steigt und fällt er mit dem Gelände (_plan_profiles); --altrand: wie bis 2.39
+	for r in (ramps + oramps if OS.get_cmdline_user_args().has("--altrand") else ramps):
 		if not r.get("wide", false) and not r.get("forest", false):
 			urban.append(r["from"])
 			zones.append(r.get("zone", "highway"))
@@ -276,6 +278,7 @@ static func build() -> Dictionary:
 		var rp2 := PackedVector2Array()
 		for q in _ramp_pts(r):
 			rp2.append(Vector2(q.x, q.z))
+		r["road_i"] = roads.size()  # Höhen kommen nach der Planung der Profile dazu (seit 2.40)
 		roads.append([rp2, 1])
 		ramp_lines.append(rp2)
 	for c in cities:
@@ -297,6 +300,22 @@ static func build() -> Dictionary:
 	var offroad := [] if OS.get_cmdline_user_args().has("--nooffroad") else Offroad.plan(segments)
 	for a in offroad:
 		roads.append([a["access"], 1])
+	# Höhen und Tiefen (seit 2.40): Ringe, Querspangen, Spangen und Verbindungen folgen dem Gelände (_plan_profiles);
+	# --flach: alles auf Höhe 0 wie bis 2.39 (Vergleich)
+	var plines := []
+	if not OS.get_cmdline_user_args().has("--flach"):
+		var tp := Time.get_ticks_msec()
+		plines = _plan_profiles(ring, oring, mid, spokes, segments, cities, ramps + oramps + mid["rb_ramps"], ixs, cuts, vlakes,
+			offroad, urban, rbc)
+		for r in ramps + oramps:
+			if r.has("prof_line") and r.has("road_i"):
+				var rrow: Array = roads[r["road_i"]]
+				var hs := PackedFloat32Array()
+				for q in rrow[0]:
+					hs.append(line_y_at(r["prof_line"], q))
+				rrow.append(hs)
+		if OS.get_cmdline_user_args().has("--worldlog"):
+			print("WELT Höhenprofile geplant in %d ms" % (Time.get_ticks_msec() - tp))
 	# Löcher im Boden (Tunneltröge, Flussbetten) aller Städte in Weltkoordinaten an jede Strecke: ihr Boden darf sie
 	# nicht zudecken, auch nicht den Trog der Nachbarstadt
 	var holes := PackedVector3Array()
@@ -323,7 +342,8 @@ static func build() -> Dictionary:
 	if OS.get_cmdline_user_args().has("--worldlog"):
 		print("WELT Stadtfüllung geplant in %d ms" % (Time.get_ticks_msec() - tf))
 	_cache = {"cities": cities, "segments": segments, "ring_r": R, "ring": ring, "oring": oring, "roads": roads, "holes": holes,
-		"urban": urban, "center": rbc, "ramp_lines": ramp_lines, "ixs": ixs, "vlakes": vlakes, "cuts": cuts, "offroad": offroad}
+		"urban": urban, "center": rbc, "ramp_lines": ramp_lines, "ixs": ixs, "vlakes": vlakes, "cuts": cuts, "offroad": offroad,
+		"prof_lines": plines, "land_tunnels": _land_tunnels.duplicate()}
 	if OS.get_cmdline_user_args().has("--worldlog"):
 		for j in ixs:
 			var jp: Vector3 = j["J"]
@@ -1465,3 +1485,366 @@ static func _plan_cuts(segments: Array) -> Array:
 		cuts.append({"pts": cp, "h": rng.randf_range(9.0, 12.0)})
 		race["xzones"] = race.get("xzones", []) + [[cp[0], cp[-1]]]
 	return cuts
+
+
+# --- Höhen und Tiefen (seit 2.40) -------------------------------------------------------------------------------------
+
+const PROF_DS := 20.0  # Abstand der Höhenwerte entlang einer Linie (m)
+const PROF_HMAX := 42.0  # so hoch steigt eine Straße über Land höchstens
+const PROF_DROP := 10.0  # so weit liegt sie unter dem natürlichen Gelände (fährt durch Senken und über Sättel)
+const PROF_G := 0.055  # größte Steigung
+const PROF_PIN_G := 0.055  # so steil darf es weg von flachen Stellen ansteigen
+const PIN_CELL := 300.0
+
+static var _hn: FastNoiseLite = null
+static var _dn: FastNoiseLite = null
+static var _land_tunnels := []  # zuletzt geplante Tunnel (für die Landschaft: Hügel ohne Bäume der Landschaft)
+
+
+## Natürliche Geländehöhe ohne Rücksicht auf Straßen (dieselbe Formel und dasselbe Rauschen wie die Landschaft,
+## landscape.raw_height ruft diese hier auf)
+static func raw_height(p: Vector2) -> float:
+	if _hn == null:
+		var dn := FastNoiseLite.new()
+		dn.seed = 77
+		dn.frequency = 1.0 / 420.0
+		dn.fractal_octaves = 2
+		_dn = dn
+		var hn := FastNoiseLite.new()
+		hn.seed = 2029
+		hn.frequency = 1.0 / 1900.0
+		hn.fractal_octaves = 3
+		_hn = hn
+	var n := clampf(_hn.get_noise_2d(p.x, p.y) * 1.1 + 0.5, 0.0, 1.0)
+	return pow(n, 1.7) * 115.0 + _dn.get_noise_2d(p.x, p.y) * 12.0 + 6.0
+
+
+## Höhenprofile der Verbindungen über Land (Rückmeldung zu 2.39: "mehr mit Höhen und Tiefen spielen ... mal einen Berg
+## hochfahren, mal runterfahren"). Bis 2.39 lagen alle Straßen auf Höhe 0, die Landschaft wurde neben jeder Straße flach
+## gedrückt und die Hügel stiegen erst dahinter an. Jetzt folgt jede Linie (innerer Ring, Außenring, Querspangen,
+## Spangen, Verbindungen zu den Städten) dem natürlichen Gelände, PROF_DROP tiefer (Senken, Sättel), geglättet,
+## höchstens PROF_G steil und PROF_HMAX hoch. Flach (0) bleibt es an Städten, Auffahrten, Dreiecken, Talbrücken,
+## Einschnitten, am Gelände zum Austoben und in der Mitte; von dort steigt es höchstens mit PROF_PIN_G an. Die kleinen
+## Kuppen (Dämme) entfallen, die Talbrücken bleiben. Die Landschaft legt ihre flache Zone auf die Höhe der nächsten
+## Straße (landscape.gd), Strecken lesen ihr Profil über race["prof_line"] (track_builder.line_prof).
+## Liefert die Linien [{pts (alle PROF_DS), y, closed, name}].
+static func _plan_profiles(ring: Array, oring: Array, mid: Dictionary, spokes: Array, segments: Array, cities: Array,
+		ramps: Array, ixs: Array, cuts: Array, vlakes: Array, offroad: Array, urban: Array, center: Vector3) -> Array:
+	# flache Stellen: [Punkt, Radius, in dem es flach bleibt]
+	var pins := {}
+	var add := func(q: Vector2, r0: float) -> void:
+		var key := Vector2i(floori(q.x / PIN_CELL), floori(q.y / PIN_CELL))
+		if not pins.has(key):
+			pins[key] = []
+		pins[key].append([q, r0])
+	for c in cities:
+		for rd in c["roads"]:
+			var pl: PackedVector2Array = rd[0]
+			for k in range(0, pl.size(), 6):
+				add.call(pl[k], 170.0)  # flache Zone der Landschaft an Stadtstraßen (CITY_FLAT) und etwas Rand
+		var bw: PackedVector2Array = c.get("bld_world", PackedVector2Array())
+		for k in range(0, bw.size(), 10):
+			add.call(bw[k], 130.0)
+	for r in ramps:
+		add.call(Vector2(r["from"].x, r["from"].z), 160.0)
+		for q in _ramp_pts(r):
+			if not r.has("pts"):
+				add.call(Vector2(q.x, q.z), 80.0)  # gerade Auffahrt in die Stadt: flach
+	for u in urban:
+		add.call(Vector2(u.x, u.z), URBAN_R + 30.0)  # Autobahn als Stadt (Häuser am Rand stehen auf 0)
+	add.call(Vector2(center.x, center.z), CENTER_R + 150.0)
+	for j in ixs:
+		add.call(Vector2(j["J"].x, j["J"].z), float(j["reach"]) + 120.0)
+	for ct in cuts:
+		var cp: Array = ct["pts"]
+		for k in range(0, cp.size(), 5):
+			add.call(Vector2(cp[k].x, cp[k].z), 220.0)
+	for vl in vlakes:
+		add.call(vl["pos"], float(vl["r"]) + 260.0)
+	for a in offroad:
+		add.call(a["mid"], float(a["inner_r"]) + 250.0)
+		var ac: PackedVector2Array = a["access"]
+		for k in range(0, ac.size(), 4):
+			add.call(ac[k], 120.0)
+	for sg in segments:
+		var race: Dictionary = sg["race"]
+		if race.get("type", "") != "autobahn":
+			continue
+		# Talbrücken behalten ihr eigenes Profil: dort und davor flach
+		if race.has("viaducts"):
+			var pts: Array = race["pts"]
+			var cum := [0.0]
+			for k in pts.size() - 1:
+				cum.append(cum[k] + (pts[k] as Vector3).distance_to(pts[k + 1]))
+			for v in race["viaducts"]:
+				for k in pts.size():
+					var u: float = cum[k] / maxf(cum[-1], 1.0)
+					if u >= float(v[0]) - 0.05 and u <= float(v[1]) + 0.05:
+						add.call(Vector2(pts[k].x, pts[k].z), 200.0)
+		# kleine Kuppen (Dämme) entfallen, das Profil übernimmt
+		race["crests"] = (race.get("crests", []) as Array).filter(func(cr): return (cr as Array).size() > 3)
+	var cap_at := func(q: Vector2) -> float:
+		var c0 := Vector2i(floori(q.x / PIN_CELL), floori(q.y / PIN_CELL))
+		var best := PROF_HMAX / PROF_PIN_G
+		for dy in range(-5, 6):
+			for dx in range(-5, 6):
+				for pn in pins.get(c0 + Vector2i(dx, dy), []):
+					best = minf(best, maxf((pn[0] as Vector2).distance_to(q) - float(pn[1]), 0.0))
+		return best * PROF_PIN_G
+	var lines := []
+	lines.append(_line_profile(ring, true, "Ring", cap_at))
+	lines.append(_line_profile(oring, true, "Außenring", cap_at))
+	for arm in mid["arms"]:
+		lines.append(_line_profile(arm, false, "Querspange", cap_at))
+	for sp in spokes:
+		lines.append(_line_profile(sp, false, "Spange", cap_at))
+	# Stücke: Ring 0 innen, 1 außen, 2 Kreisel (flach), 3.. Querspangen, dann Spangen
+	for sg in segments:
+		var ri: int = sg.get("ring", 0)
+		if sg["race"].get("type", "") != "autobahn" or ri == 2:
+			continue
+		var li := 0 if ri == 0 else (1 if ri == 1 else ri - 1)
+		if li < lines.size():
+			sg["race"]["prof_line"] = lines[li]
+	# Tunnel durch die Hügel (seit 2.40): nur auf Ringen, Querspangen und Spangen (nicht auf den Verbindungen)
+	var tunnels := _plan_land_tunnels(lines, segments, pins)
+	# Verbindungen zu den Städten (Bögen mit Punkten): eigenes Profil, an beiden Enden flach
+	for r in ramps:
+		if r.has("pts") and (r["pts"] as Array).size() > 2:
+			var ln := _line_profile(r["pts"], false, "Verbindung " + str(r.get("name", "")), cap_at)
+			r["prof_line"] = ln
+			lines.append(ln)
+	_land_tunnels = tunnels
+	if OS.get_cmdline_user_args().has("--worldlog"):
+		for tn in tunnels:
+			print("WELT Tunnel %-22s %4.0f m auf %-10s bei (%.0f, %.0f), Fahrbahn %.0f m, Hügel %.0f m darüber" % [tn["name"], tn["len"],
+				tn["line"], tn["a"].x, tn["a"].z, tn["y"], tn["ridge"]])
+		for ln in lines:
+			var ys: PackedFloat32Array = ln["y"]
+			var hi := 0.0
+			var up := 0
+			for y in ys:
+				hi = maxf(hi, y)
+				if y > 3.0:
+					up += 1
+			if hi > 0.5:
+				print("WELT Profil %-24s %5.1f km, höchstens %4.1f m, %3.0f %% über 3 m" % [ln["name"], ys.size() * PROF_DS / 1000.0,
+					hi, 100.0 * up / maxf(ys.size(), 1)])
+	return lines
+
+
+## Eine Linie alle PROF_DS abtasten und ihr Profil rechnen (cap_at: höchste erlaubte Höhe an einem Punkt)
+static func _line_profile(src: Array, closed: bool, name: String, cap_at: Callable) -> Dictionary:
+	var pts := PackedVector2Array()
+	var poly := []
+	for q in src:
+		poly.append(Vector2(q.x, q.z))
+	if closed:
+		poly.append(poly[0])
+	pts.append(poly[0])
+	var carry := 0.0
+	for k in poly.size() - 1:
+		var a: Vector2 = poly[k]
+		var b: Vector2 = poly[k + 1]
+		var l := a.distance_to(b)
+		var t := PROF_DS - carry
+		while t <= l:
+			pts.append(a.lerp(b, t / maxf(l, 0.001)))
+			t += PROF_DS
+		carry = l - (t - PROF_DS)
+	if closed and pts.size() > 2 and pts[pts.size() - 1].distance_to(pts[0]) < PROF_DS * 0.5:
+		pts.remove_at(pts.size() - 1)
+	elif not closed and pts[pts.size() - 1].distance_to(poly[-1]) > 1.0:
+		pts.append(poly[-1])
+	var n := pts.size()
+	var cap := PackedFloat32Array()
+	cap.resize(n)
+	var y := PackedFloat32Array()
+	y.resize(n)
+	var raw := PackedFloat32Array()
+	raw.resize(n)
+	for i in n:
+		cap[i] = cap_at.call(pts[i])
+		raw[i] = raw_height(pts[i])
+		y[i] = minf(clampf(raw[i] - PROF_DROP, 0.0, PROF_HMAX), cap[i])
+	# glätten (gleitender Mittelwert über gut 200 m), dabei nie über die Grenze
+	for it in 26:
+		y = _box(y, 5, closed)
+		for i in n:
+			y[i] = minf(y[i], cap[i])
+	y = _grade(y, closed)
+	for it in 4:
+		y = _box(y, 2, closed)
+		for i in n:
+			y[i] = minf(y[i], cap[i])
+	# zum Schluss ohne Grenze glätten: das Abschneiden an den Grenzen ließ Knicke, an denen man mit Tempo abhob
+	# (Mittelwerte machen nie steiler, die flachen Stellen bekommen am Rand ein paar Zentimeter)
+	for it in 3:
+		y = _box(y, 2, closed)
+	return {"pts": pts, "y": y, "closed": closed, "name": name, "raw": raw, "cap": cap}
+
+
+## Gleitender Mittelwert über 2r+1 Werte (an offenen Enden der Rand wiederholt)
+static func _box(y: PackedFloat32Array, r: int, closed: bool) -> PackedFloat32Array:
+	var n := y.size()
+	var out := PackedFloat32Array()
+	out.resize(n)
+	for i in n:
+		var s := 0.0
+		for k in range(-r, r + 1):
+			var j := i + k
+			j = posmod(j, n) if closed else clampi(j, 0, n - 1)
+			s += y[j]
+		out[i] = s / float(2 * r + 1)
+	return out
+
+
+## Steigung begrenzen: Kuppen so weit absenken, dass es nirgends steiler als PROF_G wird (vorwärts und rückwärts)
+static func _grade(y: PackedFloat32Array, closed: bool) -> PackedFloat32Array:
+	var n := y.size()
+	var g := PROF_G * PROF_DS
+	for rnd in (3 if closed else 1):
+		for i in range(1, n + (n if closed else 0)):
+			var a := posmod(i - 1, n)
+			var b := posmod(i, n)
+			y[b] = minf(y[b], y[a] + g)
+		for i in range(n - 2 + (n if closed else 0), -1, -1):
+			var a := posmod(i + 1, n)
+			var b := posmod(i, n)
+			y[b] = minf(y[b], y[a] + g)
+	return y
+
+
+## Höhe einer Profillinie am Punkt q (nächstes Stück der Linie, dazwischen linear)
+static func line_y_at(line: Dictionary, q: Vector2) -> float:
+	var pts: PackedVector2Array = line["pts"]
+	var best := 0
+	var bd := 1e18
+	for i in pts.size():
+		var dd := q.distance_squared_to(pts[i])
+		if dd < bd:
+			bd = dd
+			best = i
+	return Track.proj_y(line, best, q)
+
+
+
+# --- Tunnel durch die Hügel (seit 2.40) -------------------------------------------------------------------------------
+
+const TUN_DIFF := 26.0  # so viel höher als die Fahrbahn muss das natürliche Gelände sein
+const TUN_MIN := 160.0
+const TUN_MAX := 420.0
+const TUN_GAP := 1400.0  # Abstand zweier Tunnel auf derselben Linie
+const HILL_W := 150.0  # halbe Breite des Hügels über einem Tunnel (quer zur Straße)
+const HILL_E := 70.0  # so weit läuft der Hügel vor und hinter den Portalen aus (seitlich des Einschnitts)
+const LAND_TUNNEL_NAMES := ["EICHBERGTUNNEL", "WALDKOPFTUNNEL", "SONNENBERGTUNNEL", "HIRSCHKOPFTUNNEL", "LINDENBERGTUNNEL",
+	"SCHLOSSBERGTUNNEL", "FALKENSTEINTUNNEL", "KALTENBERGTUNNEL", "BUCHENHANGTUNNEL", "ROSSKOPFTUNNEL", "HOHE-WARTE-TUNNEL",
+	"FUCHSBERGTUNNEL", "WEINBERGTUNNEL", "KÖNIGSHÜGELTUNNEL", "TANNENKOPFTUNNEL", "DREI-EICHEN-TUNNEL"]
+
+
+## Wo das Gelände hoch über der Fahrbahn bleibt (TUN_DIFF, mindestens TUN_MIN lang, weit weg von flachen Stellen),
+## geht die Straße durch einen Tunnel unter einem Hügel (bis 2.39 gab es nur gut fünf Tunnel, alle in Städten). Je Linie
+## mit Abstand TUN_GAP, nie über eine Naht zweier Stücke, nie nah an einer anderen Straße (der Hügel ist 2 HILL_W breit).
+## Liefert [{line, a, b (Weltlage der Portale), d0, d1 (Meter auf der Linie), y, ridge, name, len, hill (Mittellinie samt
+## Auslauf, 2D), w}] und hängt jeden Tunnel an sein Stück (race["land_tunnels"]).
+static func _plan_land_tunnels(lines: Array, segments: Array, pins: Dictionary) -> Array:
+	var out := []
+	if OS.get_cmdline_user_args().has("--notunnel"):
+		return out
+	var name_i := 0
+	for ln in lines:
+		var pts: PackedVector2Array = ln["pts"]
+		var ys: PackedFloat32Array = ln["y"]
+		var raw: PackedFloat32Array = ln["raw"]
+		var cap: PackedFloat32Array = ln["cap"]
+		var n := pts.size()
+		var closed: bool = ln["closed"]
+		var placed := []  # Mitte (Index) der Tunnel auf dieser Linie
+		var i := 0
+		while i < n:
+			if raw[i] - ys[i] < TUN_DIFF or cap[i] < 10.0:
+				i += 1
+				continue
+			var j := i
+			while j < n and raw[j] - ys[j] >= TUN_DIFF and cap[j] >= 10.0:
+				j += 1
+			var run := (j - i) * PROF_DS
+			if run >= TUN_MIN:
+				# Mitte am höchsten Gelände, Länge höchstens TUN_MAX
+				var best := i
+				for k in range(i, j):
+					if raw[k] - ys[k] > raw[best] - ys[best]:
+						best = k
+				var half := int(minf(run, TUN_MAX) / PROF_DS / 2.0)
+				var a := clampi(best - half, i, j - 1)
+				var b := clampi(a + 2 * half, i + 1, j - 1)
+				var mid := (a + b) / 2
+				var far := true
+				for pm in placed:
+					var dk := absi(pm - mid)
+					if closed:
+						dk = mini(dk, n - dk)
+					if dk * PROF_DS < TUN_GAP:
+						far = false
+				if far and _tunnel_room(pts, a, b, pins, ln, lines):
+					var tn := {"line": ln["name"], "a": Vector3(pts[a].x, ys[a], pts[a].y), "b": Vector3(pts[b].x, ys[b], pts[b].y),
+						"d0": a * PROF_DS, "d1": b * PROF_DS, "y": ys[mid], "len": (b - a) * PROF_DS,
+						"ridge": clampf(raw[mid] - ys[mid] - 6.0, 15.0, 30.0),
+						"name": LAND_TUNNEL_NAMES[name_i % LAND_TUNNEL_NAMES.size()], "w": HILL_W, "ln": ln}
+					# Hügel samt Auslauf (für die Landschaft: dort keine eigenen Bäume)
+					var hill := PackedVector2Array()
+					var e := int(HILL_E / PROF_DS)
+					for k in range(a - e, b + e + 1):
+						var kk := posmod(k, n) if closed else clampi(k, 0, n - 1)
+						hill.append(pts[kk])
+					tn["hill"] = hill
+					if _attach_tunnel(tn, segments, ln):
+						out.append(tn)
+						placed.append(mid)
+						name_i += 1
+			i = j
+	return out
+
+
+## Ist neben dem Tunnel Platz für den Hügel (keine Stadt, Auffahrt, kein Dreieck und keine andere Linie näher als
+## HILL_W + 40 m)?
+static func _tunnel_room(pts: PackedVector2Array, a: int, b: int, pins: Dictionary, own: Dictionary, lines: Array) -> bool:
+	var reach := HILL_W + 40.0
+	for k in range(a, b + 1, 2):
+		var q := pts[k]
+		var c0 := Vector2i(floori(q.x / PIN_CELL), floori(q.y / PIN_CELL))
+		for dy in range(-1, 2):
+			for dx in range(-1, 2):
+				for pn in pins.get(c0 + Vector2i(dx, dy), []):
+					if (pn[0] as Vector2).distance_to(q) < reach:
+						return false
+		for ln in lines:
+			if is_same(ln, own):
+				continue
+			var lp: PackedVector2Array = ln["pts"]
+			for m in range(0, lp.size(), 3):
+				if lp[m].distance_to(q) < reach:
+					return false
+	return true
+
+
+## Tunnel an das Stück hängen, in dem er ganz liegt (mindestens 80 m von den Nähten); sonst kein Tunnel
+static func _attach_tunnel(tn: Dictionary, segments: Array, ln: Dictionary) -> bool:
+	for sg in segments:
+		var race: Dictionary = sg["race"]
+		if not race.has("prof_line") or not is_same(race["prof_line"], ln):
+			continue
+		var pts: Array = race["pts"]
+		var c := Interchange.smooth_curve(pts)
+		var L := c.get_baked_length()
+		var da := c.get_closest_offset(Vector3(tn["a"].x, 0.0, tn["a"].z))
+		var db := c.get_closest_offset(Vector3(tn["b"].x, 0.0, tn["b"].z))
+		var pa := c.sample_baked(da)
+		var pb := c.sample_baked(db)
+		if Vector2(pa.x - tn["a"].x, pa.z - tn["a"].z).length() > 6.0 or Vector2(pb.x - tn["b"].x, pb.z - tn["b"].z).length() > 6.0:
+			continue
+		if minf(da, db) < 80.0 or maxf(da, db) > L - 80.0:
+			return false
+		race["land_tunnels"] = race.get("land_tunnels", []) + [tn]
+		return true
+	return false

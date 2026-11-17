@@ -5,7 +5,7 @@
 Nächtliches Straßenrennen im Stil der frühen 2000er (früher „Underground Sprint“), Low-Poly-3D mit Pixel-Look (Godot 4.7).
 
 Ein Spiel von **ONE HUMANITY** – kostenlos auf [itch.io](https://onehumanity.itch.io/need-for-geschwindigkeit) für
-Windows, macOS, Linux und im Browser.
+Windows, macOS, Linux und im Browser. Was noch kommt, steht im [Fahrplan](FAHRPLAN.md).
 
 ![Würzburg Mainufer im Kitsune 18S](release/screenshots/12_wuerzburg_kitsune.jpg)
 
@@ -235,6 +235,65 @@ Außenring → nächste Stadt → Autobahn. Rundkurse und Drift-Kurse sind Schle
 - **Anflug von oben wie in GTA** beim Laden der Welt, nach Schnellreise und bei der Rückkehr aus Rennen oder Garage
   (seit 2.38, Einzelheiten dort).
 - **Städte mit Hinterland, Straßennetz mit Kreuzungen, Gelände zum Austoben** (seit 2.39, Einzelheiten dort).
+- **Verbindungen mit Höhen und Tiefen, 15 Tunnel, Mittelstreifen in Abschnitten** (seit 2.40, Einzelheiten dort).
+
+## Verbindungen mit Höhen, Tunneln und wechselndem Mittelstreifen (2.40)
+Rückmeldung aus dem Test von 2.39.1 (das große Ganze steht in [FAHRPLAN.md](FAHRPLAN.md)): die Verbindungen zwischen
+den Städten zu monoton, man ist immer an eine Straßenseite gebunden, links und rechts freie Fläche mit einer unsichtbaren
+Wand, kaum Höhen und Tiefen, nur gut fünf Tunnel; bei Tag schweben graue Kegel über dem Horizont.
+
+- **Mittelstreifen in Abschnitten** (`track_builder._style_medians`, nur Autobahnstücke): bis 2.39 trennte überall
+  derselbe Grünstreifen mit Büschen die Richtungen. Jetzt wechseln je Stück Abschnitte von 350-850 m wie in Need for
+  Speed: **volle Breite** ohne Trennung (sechs Spuren, eine durchgezogene Mittellinie, man kann auf die Gegenfahrbahn),
+  **Poller** auf einer Sperrfläche mit schrägen Streifen (weiße Flexpfosten mit roten Streifen alle 9 m, fliegen weg
+  wie Leitkegel, `_build_median_posts`, Sperrfläche im Fahrbahn-Shader mit `lanes` 0,5), **Überfahrten** (Grünstreifen
+  mit 35 m Lücken alle 160-240 m), **Betonleitwand** (hält einen ein paar Kurven auf seiner Seite) und der Grünstreifen
+  wie bisher. Nie zweimal dieselbe Art hintereinander; an den Nähten der Stücke und vor Auffahrten 220 m Grünstreifen,
+  damit Nachbarstücke und Anschlüsse zusammenpassen. Kreisel nur Grünstreifen. Auf 82,6 km Autobahn: 33,2 km
+  Grünstreifen, 18,2 km Betonwand (auch in und vor allen Tunneln), 13,4 km volle Breite, 11,4 km Poller, 6,4 km
+  Überfahrten. `median_style_at` gibt die Art an einer Stelle, die Bordsteinkante gilt nicht auf der Sperrfläche.
+  `--oldmedian`: Grünstreifen wie bisher (Vergleich).
+- **Sichtbarer Rand an allen Auffahrten und Verbindungen** (`_build_fences`, `_ramp_border`): die Wege von den Ringen
+  zu den Städten (bis 1,4 km lang) hatten eine unsichtbare Wand direkt an der Fahrbahnkante und daneben offenes Feld.
+  Jetzt steht genau auf der Wand eine Leitplanke, eine Hecke oder ein Koppelzaun, je 60-150 m im Wechsel (die ersten
+  90 m am Ring Leitplanke). Dabei behoben: die Sperrflächen der Welt (damit dort keine Häuser stehen) liegen oft auf
+  der Verbindung selbst und galten als Häuser, hinter denen kein Zaun nötig ist; an manchen Verbindungen gab es
+  deshalb gar keinen Rand. Auch die Leitplanke der Autobahn über Land war in Welt-Z versetzt statt quer zur Straße.
+- **Höhen und Tiefen** (`world_layout._plan_profiles`, `track_builder.line_prof`, `landscape.near_roads`): bis 2.39
+  lagen alle Straßen auf Höhe 0, die Landschaft wurde 55 m neben jeder Straße flach gedrückt, die Hügel stiegen erst
+  dahinter an. Jetzt folgt jede Linie über Land dem natürlichen Gelände (dieselbe Formel wie die Landschaft,
+  `world_layout.raw_height`), 10 m tiefer (durch Senken und über Sättel), geglättet, höchstens 5,5 % steil und 42 m
+  hoch. Flach bleibt es an Städten, Auffahrten, Dreiecken, Talbrücken, am Gelände zum Austoben und in der Mitte; von
+  dort steigt es höchstens mit 5,5 % an. Außenring bis 33 m (43 % des Rings über 3 m), drei Querspangen bis 37-39 m,
+  der innere Ring bleibt Stadtautobahn (Häuser an den Auffahrten). Die Verbindungen des Außenrings zu den Städten
+  haben dafür keine Häuser und Lärmschutzwände mehr an der Einmündung, sondern Land mit Leitplanke (`--altrand`: wie
+  bis 2.39). Die Landschaft legt ihre flache Zone auf die Höhe der Straßen daneben (gewichtetes Mittel aller
+  Straßenpunkte in der Nähe, nie eine Stufe zwischen zwei Straßen), Hügel steigen von dort an. Profil je Stück aus
+  der Lage projiziert, nicht über die Länge (keine Stufen an den Nähten), kubisch zwischen den Punkten alle 20 m
+  (linear knickte die Steigung, und das Auto hob mit Tempo an jedem Knick ab). Die kleinen Kuppen (Dämme) entfallen,
+  die Talbrücken bleiben (jetzt fünf); die Einschnitte entfallen, das Profil hat eigene Senken. Kirche, Tankstelle,
+  Krankenhaus und Stadion an der Autobahn nur, wo es flach ist, Werbetafeln auf Fahrbahnhöhe und nicht am Hang.
+  Testfahrt `--wspawn=seg:4:0:400 --wdrive`: mit gut 250 km/h auf 38 m und wieder hinunter, immer auf der Fahrbahn
+  („WD …“ zeigt jetzt Höhe des Autos, der Fahrbahn und ob es in der Luft ist). `--flach`: alles auf 0 (Vergleich).
+- **15 Tunnel über Land** (`world_layout._plan_land_tunnels`, `track_builder._build_land_tunnels`, `_land_hill`): wo
+  das natürliche Gelände mindestens 26 m über der Fahrbahn bleibt, auf mindestens 160 m (bis 420 m), weit weg von
+  anderen Straßen und Nähten, geht die Straße durch einen Tunnel: zwölf am Außenring, drei auf den Querspangen
+  (Eichberg-, Waldkopf-, Sonnenberg-, Königshügeltunnel …). Röhre auf Fahrbahnhöhe so breit wie die Autobahn (Kacheln,
+  Lichtbänder, Strahlventilatoren, Notausgänge), Portale aus Beton mit Namen, davor Betonleitwand mit Anpralldämpfer
+  und ein Einschnitt mit Stützmauern. Darüber ein bewaldeter Hügel quer zur Straße (300 m breit, 15-30 m hoch, an den
+  Portalen niedrig, dahinter ansteigend): ein eigenes Gitter entlang der Straße, nicht das Gelände der Landschaft (mit
+  deren 25-m-Raster lägen an den Portalen schräge Flächen quer in der Röhre). Die Landschaft pflanzt dort keine eigenen
+  Bäume. `--notunnel`: ohne (Vergleich).
+- **Keine schwebenden Kegel mehr bei Tag**: die Kirchtürme der Dörfer waren fast weiß und verschwanden im hellen Dunst,
+  die dunkle Spitze nicht; ebenso die Dachkegel der Burgen. Turm grauer verputzt, Spitze und Dächer heller.
+- **Tests:** Rundfahrten `--wtour=mitte` (31,3 km) und `--wtour=outer` (39,8 km, alle zwölf Tunnel dort) ohne Befund,
+  `--worldcheck` 0 Überschneidungen (57 Strecken), Rennstrecken unverändert (`tools/track_stats.tscn`: Länge, Knoten,
+  Tunnel und Shader gleich), Ruckler (`--hitch`, 90 s Außenring mit Autopilot) 72 statt 517 mit der alten Welt
+  (`--flach --notunnel --oldmedian --altrand`), Bildrate 53 statt 41, Compatibility-Renderer am Rechner (Tunnel,
+  Sperrfläche). Nicht getestet: der echte Browser.
+- **Werkzeuge:** `tools/world_map.tscn -- --mitte` (Mittelstreifen, Höhe alle 200 m und Tunnel je Stück),
+  `--hoehen` (natürliches Gelände entlang der Stücke), `--worldlog` (Profile, Tunnel, Auffahrten mit Länge);
+  `world.tscn -- --wspawn=rline:j:m` (auf Auffahrt oder Verbindung j, m Meter vom Ring).
 
 ## Städte mit Hinterland, Kreuzungen, Gelände zum Austoben, kürzere Hauben (2.39)
 Rückmeldung zu 2.38: in den Städten viele leere Flächen, Abzweige „bam um die Kurve“, alle Straßen gleich breit,

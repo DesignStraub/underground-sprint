@@ -627,7 +627,7 @@ func _lat_limit(d: float) -> float:
 	if track.get("type", "") == "drift":
 		wall = Track.hw(track, d) + 0.4
 	elif Track._trough_at(track, d) > 0:
-		wall = Track.TUN_W
+		wall = Track.tun_w(track, d)
 	return maxf(wall - _half_w - 0.2, 1.0)
 
 

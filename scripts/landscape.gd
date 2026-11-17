@@ -45,6 +45,7 @@ var _tower_mat: StandardMaterial3D
 var _blade_mat: StandardMaterial3D
 
 var _road := {}  # Rasterzelle -> PackedVector2Array (Punkte alle 20 m auf Autobahnen und Auffahrten)
+var _road_y := {}  # Rasterzelle -> PackedFloat32Array: Fahrbahnhöhe je Punkt in _road (seit 2.40, Höhenprofile)
 var _croad := {}  # dasselbe für die Straßen der Städte
 var _froad := {}
 var _ringg := {}  # nur Ringe, Kreisel und Diagonalen (ohne Auffahrten): dort stehen am Rand Häuser
@@ -84,6 +85,9 @@ var _corr := {}
 var _trunk_shapes := {}
 ## Einschnitte des Rings (seit 2.36, world_layout._plan_cuts): {c (Mittellinie), L, h, lo, hi (Umriss mit Rand)}
 var _cuts := []
+## Hügel über den Tunneln über Land (seit 2.40, track_builder._land_hill): Mittellinie samt Auslauf, dort keine Bäume
+## der Landschaft (sie stünden im Hügel oder ragten heraus)
+var _hills := []
 
 const VILLAGE_NAMES := ["Oberweiler", "Kirchheim", "Lindenau", "Birkenfeld", "Hohenstein", "Mühlbach", "Eichstetten", "Wiesental", "Rotenburg", "Sonnenberg", "Tannhausen", "Grünwald", "Steinach", "Haselbach", "Altdorf", "Buchholz", "Unterried", "Waldhausen", "Kleinfeld", "Bergrheinfeld", "Erlenbach", "Hirschau", "Fischbach", "Ahornhof", "Weidenstetten", "Lerchenau", "Rabenstein", "Moosbrunn", "Hagenau", "Kesselbach", "Ulmenhof", "Dornstetten", "Falkenried", "Brunnthal", "Eschenau", "Hüttenbach", "Kranichfeld", "Lauterbach", "Mittelweiler", "Neuhaus", "Ochsenfurt-Au", "Pfaffenhofen", "Quellbach", "Reichenau", "Schönwald", "Talheim", "Uhlenhorst", "Vogelsang", "Wolfsried", "Zellerau", "Amselfeld", "Bärental", "Dachsberg", "Eulenbach", "Fuchsstadt", "Gänsewies", "Hasenmühle", "Igelsbach", "Krähenwinkel", "Lindenhof", "Marderau", "Nesselried", "Otterbach", "Rehweiler"]
 
@@ -108,16 +112,31 @@ func setup(lay: Dictionary) -> void:
 	# Autobahn, Kreisel, Diagonalen und Auffahrten: flach bis ROAD_FLAT; Stadtstraßen (mit Häusern daneben) bis CITY_FLAT
 	for rd in layout["roads"]:
 		if rd[1] == 1:
-			_add_line(_road, rd[0])
+			_add_line(_road, rd[0], rd[2] if rd.size() > 2 else PackedFloat32Array())
 	_ramp_lines = layout.get("ramp_lines", [])
+	var lines_done := []
 	for sg in layout["segments"]:
 		if sg["race"].get("type", "") == "dreieck":
 			continue  # Autobahndreiecke: alle ihre Wege stehen schon als Auffahrten in layout["roads"]
 		var pl := PackedVector2Array()
 		for q in sg["race"]["pts"]:
 			pl.append(Vector2(q.x, q.z))
-		_add_line(_road, pl)
 		_add_line(_ringg, pl)
+		if sg["race"].has("prof_line"):
+			# Höhenprofil (seit 2.40): die ganze Linie einmal, mit ihren Höhen
+			var ln: Dictionary = sg["race"]["prof_line"]
+			if not lines_done.any(func(x): return is_same(x, ln)):
+				lines_done.append(ln)
+				var lp: PackedVector2Array = ln["pts"]
+				var ly: PackedFloat32Array = ln["y"]
+				if ln["closed"]:
+					lp = lp.duplicate()
+					lp.append(lp[0])
+					ly = ly.duplicate()
+					ly.append(ly[0])
+				_add_line(_road, lp, ly)
+		else:
+			_add_line(_road, pl)
 	var hmax := 0.0
 	for h in layout.get("holes", PackedVector3Array()):
 		var hk := Vector2i(floori(h.x / 40.0), floori(h.y / 40.0))
@@ -146,6 +165,14 @@ func setup(lay: Dictionary) -> void:
 	if layout.has("center"):
 		_center = Vector2(layout["center"].x, layout["center"].z)
 		_has_center = true
+	for tn in layout.get("land_tunnels", []):
+		var hp: PackedVector2Array = tn["hill"]
+		var lo := Vector2(1e9, 1e9)
+		var hi := Vector2(-1e9, -1e9)
+		for q in hp:
+			lo = lo.min(q)
+			hi = hi.max(q)
+		_hills.append({"pts": hp, "w": float(tn["w"]) + 10.0, "lo": lo - Vector2(170, 170), "hi": hi + Vector2(170, 170)})
 	_plan_corridors()
 	_plan_sites()
 	_make_materials()
@@ -153,7 +180,8 @@ func setup(lay: Dictionary) -> void:
 	_plan_cuts()
 
 
-func _add_line(grid: Dictionary, pl: PackedVector2Array) -> void:
+func _add_line(grid: Dictionary, pl: PackedVector2Array, ys := PackedFloat32Array()) -> void:
+	var with_y := is_same(grid, _road)  # Autobahn und Auffahrten: Höhe je Punkt mitführen (seit 2.40)
 	for k in pl.size() - 1:
 		var a := pl[k]
 		var b := pl[k + 1]
@@ -164,6 +192,10 @@ func _add_line(grid: Dictionary, pl: PackedVector2Array) -> void:
 			var arr: PackedVector2Array = grid.get(c, PackedVector2Array())
 			arr.append(p)
 			grid[c] = arr  # Packed-Arrays kommen als Kopie aus dem Dictionary: zurückschreiben
+			if with_y:
+				var ya: PackedFloat32Array = _road_y.get(c, PackedFloat32Array())
+				ya.append(lerpf(ys[k], ys[k + 1], j / float(n)) if ys.size() == pl.size() else 0.0)
+				_road_y[c] = ya
 
 
 ## Befahrbare Streifen für die Bäume (seit 2.35): Fahrbahn samt Gehweg/Bankett bis zur Randwand, mit der Höhe der
@@ -192,6 +224,8 @@ func _plan_corridors() -> void:
 			elev.append({"a": cr[0] * L, "b": cr[0] * L + rl, "c": cr[1] * L - rl, "e": cr[1] * L, "h": cr[2]})
 		if not elev.is_empty():
 			c.set_meta("elev", elev)
+		if race.has("prof_line"):
+			c.set_meta("prof", Track.line_prof(c, race["prof_line"]))  # Höhen und Tiefen (seit 2.40)
 		if race.has("viaducts"):
 			_corr_via(cells, c, race, ab_half)
 		else:
@@ -199,10 +233,13 @@ func _plan_corridors() -> void:
 		for r in race.get("ramps", []):
 			var rp: Array = r["pts"] if r.has("pts") else [r["from"], r["end"]]
 			var rh: float = Track.RAMP_HALF + (Track.AB_EXTRA if r.get("wide", false) else 0.0) + 0.3
+			var ry := []  # Höhe je Punkt (Verbindungen mit Profil, seit 2.40)
+			for q in rp:
+				ry.append(Layout.line_y_at(r["prof_line"], Vector2(q.x, q.z)) if r.has("prof_line") else 0.0)
 			for k in rp.size() - 1:
 				var a: Vector3 = rp[k]
 				var b: Vector3 = rp[k + 1]
-				_corr_add(cells, Vector3(a.x, 0.0, a.z), Vector3(b.x, 0.0, b.z), rh, rh)
+				_corr_add(cells, Vector3(a.x, ry[k], a.z), Vector3(b.x, ry[k + 1], b.z), rh, rh)
 	for city in layout["cities"]:
 		var tr: Dictionary = city.get("track", {})
 		if tr.is_empty() and city.has("race") and city["race"].get("forest", false):
@@ -392,6 +429,12 @@ func free_dist(p: Vector2) -> float:
 	return _free_from(p, road_dist(p), city_dist(p))
 
 
+## Geländehöhe an p samt Straßen in der Nähe (seit 2.40: flache Zone auf deren Höhe), für einzelne Punkte
+func ground_h(p: Vector2) -> float:
+	var nr := near_roads(p)
+	return height_at(p, _free_from(p, nr.x, nr.y), nr.z)
+
+
 ## free_dist mit schon bekanntem Abstand zu Autobahn (rd) und Stadtstraßen (cd)
 func _free_from(p: Vector2, rd: float, cd: float) -> float:
 	var f := minf(minf(rd - ROAD_FLAT, cd - CITY_FLAT), _dist(_froad, p) - FOREST_FLAT)
@@ -428,17 +471,57 @@ func forest_dist(p: Vector2) -> float:
 	return _dist(_froad, p) if not _froad.is_empty() else 400.0
 
 
-## Geländehöhe ohne Rücksicht auf Straßen (für Dörfer und Windparks)
+## Geländehöhe ohne Rücksicht auf Straßen (für Dörfer und Windparks). Seit 2.40 rechnet die Welt-Planung damit auch
+## die Höhenprofile der Straßen (world_layout.raw_height, dasselbe Rauschen wie hier)
 func raw_height(p: Vector2) -> float:
 	# Simplex liegt meist zwischen -0.5 und 0.5: auf 0..1 strecken, Kuppen betonen
-	var n := clampf(_hill.get_noise_2d(p.x, p.y) * 1.1 + 0.5, 0.0, 1.0)
-	return pow(n, 1.7) * HILL_H + _detail.get_noise_2d(p.x, p.y) * 12.0 + 6.0
+	return Layout.raw_height(p)
 
 
-## Höhe mit vorberechnetem Abstand zur flachen Zone (free_dist); unter 0 heißt: unter dem flachen Boden versteckt
-func height_at(p: Vector2, free: float) -> float:
+## Höhe der Straßen um p (seit 2.40): gewichtetes Mittel der Fahrbahnhöhen aller Straßenpunkte in der Nähe (je näher,
+## desto mehr; Stadtstraßen mit 0). Gibt (Abstand Autobahn/Auffahrten, Abstand Stadtstraßen, Höhe) zurück. Weich auch
+## zwischen zwei verschieden hohen Straßen (nie eine Stufe in der Mitte).
+func near_roads(p: Vector2) -> Vector3:
+	var c := Vector2i(floori(p.x / ROAD_CELL), floori(p.y / ROAD_CELL))
+	var br := 1e16
+	var bc := 1e16
+	var ws := 0.0
+	var wy := 0.0
+	for dy in range(-5, 6):
+		for dx in range(-5, 6):
+			var key := c + Vector2i(dx, dy)
+			var arr = _road.get(key)
+			if arr != null:
+				var ys = _road_y.get(key)
+				var pa: PackedVector2Array = arr
+				for i in pa.size():
+					var d2 := p.distance_squared_to(pa[i])
+					br = minf(br, d2)
+					if ys != null:
+						var w := 1.0 / ((d2 + 400.0) * (d2 + 400.0))
+						ws += w
+						wy += w * (ys as PackedFloat32Array)[i]
+			var arc = _croad.get(key)
+			if arc != null:
+				for q in (arc as PackedVector2Array):
+					var d2 := p.distance_squared_to(q)
+					bc = minf(bc, d2)
+					ws += 1.0 / ((d2 + 400.0) * (d2 + 400.0))
+			var arf = _froad.get(key)  # Waldstrecke: liegt auf 0 wie die Städte
+			if arf != null:
+				for q in (arf as PackedVector2Array):
+					var d2 := p.distance_squared_to(q)
+					ws += 1.0 / ((d2 + 400.0) * (d2 + 400.0))
+	return Vector3(sqrt(br) if br < 1e15 else 1e4, sqrt(bc) if bc < 1e15 else 1e4, wy / ws if ws > 0.0 else 0.0)
+
+
+## Höhe mit vorberechnetem Abstand zur flachen Zone (free_dist); unter 0 heißt: unter dem flachen Boden versteckt.
+## base: Höhe der Straßen in der Nähe (near_roads; seit 2.40, bis dahin immer 0), NAN = selbst nachsehen
+func height_at(p: Vector2, free: float, base := NAN) -> float:
+	if is_nan(base):
+		base = near_roads(p).z if not _road_y.is_empty() else 0.0
 	if free <= 0.0:
-		return -0.6
+		return base - 0.6
 	var fade := smoothstep(0.0, RISE, free)
 	var h := raw_height(p)
 	for v in _villages:
@@ -455,7 +538,7 @@ func height_at(p: Vector2, free: float) -> float:
 				h = bowl
 			else:
 				h = lerpf(lk["level"] + 0.4, h, smoothstep(lr, lr + 180.0, dl))
-	var r := fade * h - (1.0 - fade) * 0.6
+	var r := lerpf(base - 0.6, h, fade)  # bis 2.39: fade * h - (1 - fade) * 0.6 (base immer 0)
 	if not _cuts.is_empty():
 		# Einschnitt: neben den Böschungen liegt das Gelände oben (knapp unter der Hochfläche aus _build_cuts)
 		var ct := _cut_at(p)
@@ -612,8 +695,10 @@ func _make_materials() -> void:
 	_crown_mat = StandardMaterial3D.new()
 	_crown_mat.vertex_color_use_as_albedo = true
 	_crown_mat.roughness = 0.95
+	# Kirchtürme der Dörfer (seit 2.40 grauer verputzt statt fast weiß): bei Tag verschwand der weiße Turm im hellen
+	# Dunst, die dunkle Spitze nicht, und über dem Horizont schwebten graue Kegel. Turm und Spitze jetzt ähnlich hell.
 	_tower_mat = StandardMaterial3D.new()
-	_tower_mat.albedo_color = Color(0.86, 0.87, 0.88)
+	_tower_mat.albedo_color = Color(0.64, 0.62, 0.58)
 	_tower_mat.roughness = 0.5
 	_blade_mat = StandardMaterial3D.new()
 	_blade_mat.albedo_color = Color(0.9, 0.91, 0.92)
@@ -824,28 +909,32 @@ func build_chunk(key: Vector2i) -> Node3D:
 	var hs := PackedFloat32Array()
 	var rds := PackedFloat32Array()  # Abstand zu Autobahn und Auffahrten, zu Stadtstraßen (für die Bäume)
 	var cds := PackedFloat32Array()
+	var bs := PackedFloat32Array()  # Höhe der Straßen in der Nähe (seit 2.40, near_roads)
 	dr.resize((N + 1) * (N + 1))
 	hs.resize((N + 1) * (N + 1))
 	rds.resize((N + 1) * (N + 1))
 	cds.resize((N + 1) * (N + 1))
+	bs.resize((N + 1) * (N + 1))
 	var any := false
 	for j in N + 1:
 		for i in N + 1:
 			var p := o + Vector2(i, j) * STEP
-			var rdv := road_dist(p)
-			var cdv := city_dist(p)
+			var nr := near_roads(p)
+			var rdv := nr.x
+			var cdv := nr.y
 			rds[j * (N + 1) + i] = rdv
 			cds[j * (N + 1) + i] = cdv
+			bs[j * (N + 1) + i] = nr.z
 			var d := _free_from(p, rdv, cdv)
 			if not _offroad.is_empty():
 				d = minf(d, Offroad.land_free(p, 20.0, _offroad))  # Gelände: eigener Boden, die Landschaft liegt darunter
 			dr[j * (N + 1) + i] = d
-			var h := height_at(p, d)
+			var h := height_at(p, d, nr.z)
 			hs[j * (N + 1) + i] = h
 			any = any or h > 0.0
 	if any:
 		_terrain(root, o, hs)
-	_trees(root, o, dr, rds, cds, rng)
+	_trees(root, o, dr, rds, cds, rng, bs)
 	for v in _villages:
 		if _in_chunk(v["pos"], o) and not in_offroad(v["pos"], float(v["r"])):
 			_village(root, v)
@@ -916,7 +1005,7 @@ func _terrain(root: Node3D, o: Vector2, hs: PackedFloat32Array) -> void:
 ## Wälder: dichte Bestände, wo das Waldrauschen hoch ist, Nadel- und Laubbäume gemischt; dazu einzelne Bäume
 ## und Baumreihen auf den Feldern. Nicht nah an Straßen, nicht in Stadtnähe, nicht im Dorf.
 func _trees(root: Node3D, o: Vector2, dr: PackedFloat32Array, rds: PackedFloat32Array, cds: PackedFloat32Array,
-		rng: RandomNumberGenerator) -> void:
+		rng: RandomNumberGenerator, bs := PackedFloat32Array()) -> void:
 	var lists := {"conifer": [], "leafy": []}
 	var cols := {"conifer": [], "leafy": []}
 	var trunks := []  # feste Stämme nahe der Straße: je x, Fuß-y, z, Radius, Höhe (_add_trunks)
@@ -971,14 +1060,14 @@ func _trees(root: Node3D, o: Vector2, dr: PackedFloat32Array, rds: PackedFloat32
 			for lk in _lakes:
 				if p.distance_to(lk["pos"]) < lk["r"] + 12.0:
 					skip = true
-			if _in_cut(p):
+			if _in_cut(p) or (not _hills.is_empty() and _in_hill(p)):
 				skip = true
 			for m in _marks:
 				if p.distance_to(m["pos"]) < (160.0 if m["kind"] == "kraftwerk" else 70.0):
 					skip = true
 			if skip:
 				continue
-			var h := maxf(height_at(p, d), -0.12)
+			var h := maxf(height_at(p, d, _grid_h(o, bs, p) if not bs.is_empty() else 0.0), -0.12)
 			var kind := "conifer" if _detail.get_noise_2d(p.x * 3.0, p.y * 3.0) > -0.05 else "leafy"
 			var s := rng.randf_range(0.75, 1.35)
 			var b := Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(s, s * rng.randf_range(0.85, 1.2), s))
@@ -1051,7 +1140,7 @@ func _alley_trees(o: Vector2, xfs: Array, cols: Array, holes_here: bool, trunks:
 							skip = true
 					if skip:
 						continue
-					var h := maxf(height_at(q, free_dist(q)), -0.12)
+					var h := maxf(ground_h(q), -0.12)
 					var sc := 0.9 + 0.3 * float(hq % 10) / 10.0
 					# nicht auf einer anderen Straße oder ihrem Bankett (Kreuzungen, Spangen), Stamm fest
 					var tc = _tree_clear(q, 0.35 * sc, h)
@@ -1203,7 +1292,7 @@ func _village(root: Node3D, v: Dictionary) -> void:
 	cone.rings = 1
 	sp.mesh = cone
 	var spm := StandardMaterial3D.new()
-	spm.albedo_color = Color(0.18, 0.2, 0.24)
+	spm.albedo_color = Color(0.34, 0.36, 0.4)  # Schiefer, heller als bis 2.39 (siehe _tower_mat)
 	sp.material_override = spm
 	sp.position = tower_p + Vector3(0, 33, 0)
 	sp.rotation.y = ang0 + PI / 4.0
@@ -1257,7 +1346,7 @@ func _village(root: Node3D, v: Dictionary) -> void:
 ## Wahrzeichen: Kraftwerk mit Kühltürmen und Dampf, Burg auf der Kuppe, Fernsehturm am Kreisel
 func _landmark(root: Node3D, m: Dictionary) -> void:
 	var p: Vector2 = m["pos"]
-	var h := maxf(height_at(p, free_dist(p)), 0.0) - 0.5
+	var h := maxf(ground_h(p), 0.0) - 0.5
 	var base := Vector3(p.x, h, p.y)
 	var add := func(mesh: Mesh, mat: Material, pos: Vector3, rot := 0.0) -> MeshInstance3D:
 		var mi := MeshInstance3D.new()
@@ -1306,7 +1395,7 @@ func _landmark(root: Node3D, m: Dictionary) -> void:
 			stone.albedo_color = Color(0.55, 0.5, 0.44)
 			stone.roughness = 0.95
 			var roof := StandardMaterial3D.new()
-			roof.albedo_color = Color(0.3, 0.12, 0.08)
+			roof.albedo_color = Color(0.46, 0.22, 0.15)  # heller als bis 2.39: die dunklen Dachkegel schwebten im Dunst
 			for k in 4:
 				var wall := BoxMesh.new()
 				wall.size = Vector3(70, 10, 3) if k % 2 == 0 else Vector3(3, 10, 50)
@@ -1463,8 +1552,8 @@ func _village_road(root: Node3D, v: Dictionary) -> void:
 		var p: Vector2 = pts[k]
 		var lp := p + nrm * hw
 		var rp := p - nrm * hw
-		var l3 := Vector3(lp.x, maxf(height_at(lp, free_dist(lp)), -0.12) + 0.08, lp.y)
-		var r3 := Vector3(rp.x, maxf(height_at(rp, free_dist(rp)), -0.12) + 0.08, rp.y)
+		var l3 := Vector3(lp.x, maxf(ground_h(lp), -0.12) + 0.08, lp.y)
+		var r3 := Vector3(rp.x, maxf(ground_h(rp), -0.12) + 0.08, rp.y)
 		if k > 0:
 			for vtx in [prev_l, l3, r3, prev_l, r3, prev_r]:
 				st.set_normal(Vector3.UP)
@@ -1495,7 +1584,7 @@ func _windpark(root: Node3D, pk: Dictionary) -> void:
 		if in_offroad(p, 40.0):
 			rng.randf()  # Rotorstellung verbrauchen: die übrigen Anlagen bleiben, wie sie waren
 			continue  # keine Windkraftanlage im Gelände (offroad.gd, seit 2.39)
-		var h := maxf(height_at(p, free_dist(p)), 0.0)
+		var h := maxf(ground_h(p), 0.0)
 		var base := Vector3(p.x, h - 1.0, p.y)
 		var tower := MeshInstance3D.new()
 		var cyl := CylinderMesh.new()
@@ -1608,7 +1697,7 @@ func _power_lines(root: Node3D, o: Vector2) -> void:
 			var p: Vector2 = line[k]
 			if not _in_chunk(p, o):
 				continue
-			var h := maxf(height_at(p, free_dist(p)), 0.0)
+			var h := maxf(ground_h(p), 0.0)
 			var nxt: Vector2 = line[mini(k + 1, line.size() - 1)]
 			var prv: Vector2 = line[maxi(k - 1, 0)]
 			var along := (nxt - prv).normalized()
@@ -1631,7 +1720,7 @@ func _power_lines(root: Node3D, o: Vector2) -> void:
 			# Seile zum nächsten Mast (drei je Seite), leicht durchhängend in vier Stücken
 			if k + 1 < line.size():
 				var p2: Vector2 = line[k + 1]
-				var h2 := maxf(height_at(p2, free_dist(p2)), 0.0)
+				var h2 := maxf(ground_h(p2), 0.0)
 				var b2 := Basis(Vector3.UP, yaw)
 				for arm in [[26.0, 9.0], [33.0, 7.0]]:
 					for sx in [-1.0, 1.0]:
@@ -1734,6 +1823,20 @@ func _cut_at(p: Vector2) -> Vector3:
 			continue
 		return Vector3(dist, _cut_h(ct, off), 1.0)
 	return Vector3(-1.0, 0.0, 0.0)
+
+
+## Liegt p auf dem Hügel über einem Tunnel über Land (seit 2.40)?
+func _in_hill(p: Vector2) -> bool:
+	for h in _hills:
+		var lo: Vector2 = h["lo"]
+		var hi: Vector2 = h["hi"]
+		if p.x < lo.x or p.y < lo.y or p.x > hi.x or p.y > hi.y:
+			continue
+		var w2: float = float(h["w"]) * float(h["w"])
+		for q in (h["pts"] as PackedVector2Array):
+			if p.distance_squared_to(q) < w2:
+				return true
+	return false
 
 
 ## Auf Böschung oder Hochfläche (dort keine Bäume: sie stünden unten im Hang oder ragten heraus)?

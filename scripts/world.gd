@@ -299,6 +299,18 @@ func _spawn_xf() -> Transform3D:
 							sxf.origin.y += 0.5
 							return sxf
 						parts[2] = str(int(parts[2]) - 1)
+			if parts[0] == "rline":  # --wspawn=rline:j[:m]  auf Auffahrt/Verbindung j (tools/world_map --worldlog), m Meter vom Ring
+				var rl: PackedVector2Array = layout["ramp_lines"][int(parts[1]) % layout["ramp_lines"].size()]
+				var want := float(parts[2]) if parts.size() > 2 else 60.0
+				var acc := 0.0
+				for k in rl.size() - 1:
+					var sl := rl[k].distance_to(rl[k + 1])
+					if acc + sl >= want or k == rl.size() - 2:
+						var p := rl[k].lerp(rl[k + 1], clampf((want - acc) / maxf(sl, 0.01), 0.0, 1.0))
+						var dv := (rl[k + 1] - rl[k]).normalized()
+						var gy := land.ground_h(p) + 1.1 if land != null else 0.5  # Verbindung mit Höhenprofil (seit 2.40)
+						return Transform3D(Basis.looking_at(Vector3(dv.x, 0.0, dv.y), Vector3.UP), Vector3(p.x, gy, p.y))
+					acc += sl
 			if parts[0] == "ring":
 				var ring: Array = layout["ring"]
 				var k := int(parts[1]) % ring.size()
@@ -1901,7 +1913,8 @@ func _autopilot() -> void:
 	if _wd_t > 2.0:
 		_wd_t = 0.0
 		var built := entries.filter(func(e): return e["state"] == "ready").size()
-		print("WD pos=(%.0f,%.0f) v=%d strecke=%s weg=%s d=%.0f geladen=%d baut=%s fps=%d verkehr=%d schlange=%d" % [player.global_position.x, player.global_position.z,
+		print("WD pos=(%.0f,%.0f) y=%.1f fahrbahn=%.1f luft=%s v=%d strecke=%s weg=%s d=%.0f geladen=%d baut=%s fps=%d verkehr=%d schlange=%d" % [player.global_position.x, player.global_position.z,
+			player.global_position.y, (xf * Vector3(0, Track.elev_at(c, d), 0)).y, str(player.airborne),
 			int(player.speed_fwd * 3.6), active.get("race", {}).get("name", "-"), player.loc["path"]["kind"], d, built, str(_task >= 0 or not _job.is_empty()),
 			Engine.get_frames_per_second(), traffic.size(), _tq.size()])
 

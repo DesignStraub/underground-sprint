@@ -94,6 +94,12 @@ void fragment() {
 	} else if (lanes > 1.0) {
 		white = band(xm, 0.05 * road_w, 0.12) + band(xm, 0.95 * road_w, 0.12);
 		white += band(xm, 0.5 * road_w, 0.12) * dash(y, 6.0, 3.0);
+	} else if (lanes > 0.4 && lanes < 0.6) {
+		// Sperrfläche zwischen den Richtungsfahrbahnen (seit 2.40, Poller): Randlinien und schräge Streifen
+		white = band(xm, 0.1, 0.09) + band(xm, road_w - 0.1, 0.09);
+		float sl = fract((xm + y) * 0.45);
+		float aa = fwidth(y) * 0.45;
+		white += (smoothstep(0.5 - aa, 0.5 + aa, sl) * (1.0 - smoothstep(0.95 - aa, 0.95 + aa, sl))) * 0.9;
 	}
 	// abgefahren: der Splitt schaut durch, in den Radspuren mehr
 	float worn = smoothstep(0.25, 0.65, grain * 0.6 + dt2.a * 0.5 + 0.15 - wheel * 0.25);

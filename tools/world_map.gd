@@ -9,6 +9,55 @@ const Track := preload("res://scripts/track_builder.gd")
 
 func _ready() -> void:
 	var w := Layout.build()
+	if OS.get_cmdline_user_args().has("--worldlog"):
+		# Auffahrten und Verbindungen (für world.tscn -- --wspawn=rline:j:m)
+		for j in w["ramp_lines"].size():
+			var rl: PackedVector2Array = w["ramp_lines"][j]
+			var L := 0.0
+			for k in rl.size() - 1:
+				L += rl[k].distance_to(rl[k + 1])
+			print("RAMPE %2d  %5.0f m  von (%.0f, %.0f) bis (%.0f, %.0f)" % [j, L, rl[0].x, rl[0].y, rl[rl.size() - 1].x, rl[rl.size() - 1].y])
+	if OS.get_cmdline_user_args().has("--hoehen"):
+		_probe_heights(w)
+	if OS.get_cmdline_user_args().has("--mitte"):
+		# Mittelstreifen je Autobahnstück (seit 2.40): Art und Lage (für world.tscn -- --wspawn=seg:ring:stück:meter)
+		var cnt := {}
+		var per_ring := {}
+		for sg in w["segments"]:
+			if sg["race"].get("type", "") != "autobahn":
+				continue
+			var ri: int = sg.get("ring", 0)
+			var si: int = per_ring.get(ri, 0)
+			per_ring[ri] = si + 1
+			var job := Track.begin(sg["race"])
+			(job["root"] as Node).free()
+			var tr: Dictionary = job["track"]
+			var parts := []
+			var last := ""
+			for md in tr["medians"]:
+				var s: String = md.get("style", "gruen")
+				if s != last:
+					parts.append("%s@%d" % [s, int(md["from"])])
+				last = s
+			# Anteile auf dem Stück selbst (alle 10 m), "offen" = ohne Mittelstreifen
+			var dm := 5.0
+			while dm < float(tr["length"]):
+				var sm := Track.median_style_at(tr, dm)
+				if sm == "":
+					sm = "offen"
+				cnt[sm] = cnt.get(sm, 0.0) + 0.01
+				dm += 10.0
+			print("MITTE seg:%d:%d L=%d  %s" % [ri, si, int(tr["length"]), " ".join(parts)])
+			var hl := ""
+			var dd := 0.0
+			while dd < float(tr["length"]):
+				hl += "%d " % int(round(Track.elev_at(tr["curve"], dd)))
+				dd += 200.0
+			print("HOEHE seg:%d:%d alle 200 m: %s" % [ri, si, hl])
+			for tt in tr["tunnels"]:
+				if tt.get("land", false):
+					print("TUNNEL seg:%d:%d %s von %d bis %d" % [ri, si, tt["name"], int(tt["from"]), int(tt["to"])])
+		print("MITTE Summe (km) ", cnt)
 	var png := ""
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--png="):
@@ -58,6 +107,35 @@ func _ready() -> void:
 			ci += 1
 		img.save_png(png)
 	get_tree().quit()
+
+
+## --hoehen: natürliche Geländehöhe (landscape.raw_height) entlang jedes Autobahnstücks, alle 240 m
+func _probe_heights(w: Dictionary) -> void:
+	var land := preload("res://scripts/landscape.gd").new()
+	land.layout = w
+	land._hill.seed = 2029
+	land._hill.frequency = 1.0 / 1900.0
+	land._hill.fractal_octaves = 3
+	land._detail.seed = 77
+	land._detail.frequency = 1.0 / 420.0
+	land._detail.fractal_octaves = 2
+	for sg in w["segments"]:
+		var r: Dictionary = sg["race"]
+		if r.get("type", "") != "autobahn":
+			continue
+		var pts: Array = r["pts"]
+		var line := ""
+		var hmax := -1e9
+		for k in pts.size():
+			var q: Vector3 = pts[k]
+			var h: float = land.raw_height(Vector2(q.x, q.z))
+			hmax = maxf(hmax, h)
+			if k % 3 == 0:
+				line += "%d " % int(round(h))
+		var seq: Array = r.get("district_seq", [])
+		print("SEG ring=%d %-11s land=%d/%d max=%.0f crests=%d via=%d | %s" % [sg.get("ring", 0), r["name"], seq.count("land"),
+			seq.size(), hmax, (r.get("crests", []) as Array).size(), (r.get("viaducts", []) as Array).size(), line])
+	land.free()
 
 
 func _dot(img: Image, p: Vector2i, c: Color, r: int) -> void:
