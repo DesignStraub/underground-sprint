@@ -90,6 +90,9 @@ var towns_known: Array = []
 var places_known: Array = []
 ## Wo Verstecktes gefunden wurde (seit 2.50): Schlüssel -> [x, y, z, Blickrichtung]; Werkstätten sind Sprungziele
 var secret_pos := {}
+## Umgebaute Strecken (seit 2.51): Rennen -> Version; ist die gespeicherte älter, zählt die alte Bestzeit nicht mehr
+const TRACK_REVS := {"Innenstadtring": 251}
+var track_revs := {}
 var last_town := ""  # zuletzt erreichte Stadt: Start an ihrem Eingang, falls der gemerkte Ort nicht mehr befahrbar ist
 var highway_won: Array = []  # gewonnene Autobahn-Rennen (seit 2.43, highway_race.gd): Name; Bestzeiten in best_times
 var drift_best := {}  # Driftzonen (seit 2.45): Zone ("Ort#Rennen") -> beste Punktzahl
@@ -822,7 +825,7 @@ func save_game() -> void:
 			"speed_fov": speed_fov, "cam_shake": cam_shake, "cam": cam_mode},
 		"language": language, "difficulty": difficulty,
 		"world_pos": world_pos, "towns_known": towns_known, "last_town": last_town, "highway_won": highway_won,
-		"drift_best": drift_best, "places_known": places_known, "secret_pos": secret_pos,
+		"drift_best": drift_best, "places_known": places_known, "secret_pos": secret_pos, "track_revs": track_revs,
 	}, "\t")
 	var f := FileAccess.open(save_path, FileAccess.WRITE)
 	if f:
@@ -948,6 +951,15 @@ func load_game() -> void:
 		for k in db:
 			drift_best[str(k)] = int(db[k])
 	places_known = Array(data.get("places_known", [])).map(func(t): return str(t))
+	track_revs = {}
+	var trv = data.get("track_revs", {})
+	if typeof(trv) == TYPE_DICTIONARY:
+		for k in trv:
+			track_revs[str(k)] = int(trv[k])
+	for rn in TRACK_REVS:
+		if int(track_revs.get(rn, 0)) < int(TRACK_REVS[rn]):
+			best_times.erase(rn)  # Strecke umgebaut: alte Bestzeit gilt nicht mehr
+			track_revs[rn] = int(TRACK_REVS[rn])
 	secret_pos = {}
 	var sp = data.get("secret_pos", {})
 	if typeof(sp) == TYPE_DICTIONARY:

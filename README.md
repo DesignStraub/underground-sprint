@@ -252,6 +252,17 @@ Außenring → nächste Stadt → Autobahn. Rundkurse und Drift-Kurse sind Schle
 - **Anzeigen links statt in der Mitte, ruhigere Schrift** (seit 2.48, Einzelheiten dort).
 - **Ruhigeres Grundtempo, Kamera nach echtem Tempo, neue Karte mit Zoom und Springen** (seit 2.49, Einzelheiten dort).
 - **Versteckte Werkstätten und Kennzeichen in jeder Stadt** (seit 2.50, Einzelheiten dort).
+- **Köln als Pilot für größere Städte: Innenstadtring mit Altstadt-Schleife** (seit 2.51, Einzelheiten dort).
+
+## Köln als Pilot für größere Städte (2.51)
+Rückmeldung: die Städte sind meist nur ein kurzer Rundkurs, das Spiel ist zu einfach, Strecken sollen enger und
+abwechslungsreicher sein. Plan: größere Städte (Strecke, Straßennetz bis zum Stadtrand, Wiesen-Korridor zum
+Querfeldeinfahren), erst Köln als Pilot, dann die übrigen Städte, danach Landstraßen.
+
+- **Innenstadtring umgebaut:** statt des weiten Bogens im Westen eine Altstadt-Schleife weit hinaus (von der
+  Autobahn weg): enge Gassen mit Kopfsteinpflaster, Schikanen, eine S-Kurve mit zwei engen Ecken, zurück durch das
+  Kwartier Latäng. Gut 2,6 statt knapp 1,9 km; Rheinufer mit Tunnel, Domkehre und Rhein bleiben. Drei Querstraßen in
+  der freien Fahrt, eine davon quer durch die Schleife. Die alte Bestzeit gilt nicht mehr (`GameState.TRACK_REVS`).
 
 ## Versteckte Werkstätten und Kennzeichen (2.50)
 Rückmeldung: in der offenen Welt gibt es nichts Verstecktes zu finden. Gewählt: versteckte Werkstätten (wie die
