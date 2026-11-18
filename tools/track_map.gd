@@ -1,11 +1,13 @@
 extends Control
 ## Werkzeug: Strecke von oben als Plan. Grau Hauptstraße, Farbe je Nebenweg (Gabelung, Gasse, Sackgasse),
 ## rot Wände, gelb Umfahrbares, grün Rampen, blau Seen, orange Baustellen, weiße Punkte Lampen mit Reichweite.
-## godot --path . res://tools/track_map.tscn -- --race=8 --out=/pfad/karte.png [--zoom=d0:d1]
+## godot --path . res://tools/track_map.tscn -- --race=8 --out=/pfad/karte.png [--zoom=d0:d1] [--world]
+## --world: Strecke wie in der freien Fahrt (Straßennetz, Querstraßen, Ausfahrten), dazu die Häuser echter Städte
 
 const Catalog := preload("res://scripts/catalog.gd")
 const Track := preload("res://scripts/track_builder.gd")
 const Knockable := preload("res://scripts/knockable.gd")
+const Layout := preload("res://scripts/world_layout.gd")
 
 const KIND_COL := {"main": Color(0.45, 0.45, 0.5), "fork": Color(0.2, 0.8, 1.0), "alley": Color(1.0, 0.4, 0.9),
 	"spur": Color(0.6, 0.5, 1.0), "lake": Color(0.3, 1.0, 0.6)}
@@ -16,6 +18,7 @@ var props: Array = []
 var lights: Array = []  # [pos, range]
 var out := "/tmp/track_map.png"
 var rect := Rect2()
+var fixed := Rect2()
 var _frames := 0
 
 
@@ -27,10 +30,13 @@ func _ready() -> void:
 			race_i = int(a.substr(7))
 		elif a.begins_with("--out="):
 			out = a.substr(6)
+		elif a.begins_with("--rect="):  # Ausschnitt x0:z0:x1:z1 (Streckenkoordinaten)
+			var r := a.substr(7).split(":")
+			fixed = Rect2(float(r[0]), float(r[1]), float(r[2]) - float(r[0]), float(r[3]) - float(r[1]))
 		elif a.begins_with("--zoom="):
 			var z := a.substr(7).split(":")
 			zoom = Vector2(float(z[0]), float(z[1]))
-	track = Track.build(Catalog.RACES[race_i])
+	track = Track.build(Layout.world_race(race_i) if OS.get_cmdline_user_args().has("--world") else Catalog.RACES[race_i])
 	var root: Node3D = track["node"]
 	add_child(root)  # nur für globale Lagen, wird nicht gezeichnet (kein Kamera-Viewport)
 	_collect(root)
@@ -49,6 +55,10 @@ func _ready() -> void:
 	for q in pts:
 		rect = rect.expand(q)
 	rect = rect.grow(40.0)
+	if fixed.size.x > 0.0:
+		rect = fixed
+	if OS.get_cmdline_user_args().has("--wallcheck"):
+		_wallcheck()
 	print("Karte: %s, %.0f x %.0f m, %d Wandstücke, %d Lampen" % [Catalog.RACES[race_i]["name"], rect.size.x, rect.size.y, walls.size(), lights.size()])
 
 
@@ -115,6 +125,13 @@ func _draw() -> void:
 			var q: Vector3 = c + au * k[0] + av * k[1]
 			poly.append(_px(Vector2(q.x, q.z)))
 		draw_colored_polygon(poly, Color(0.1, 0.25, 0.6, 0.8))
+	var bd: Array = track["city"].get("buildings", []) if track["city"] is Dictionary else []
+	for i in range(0, bd.size(), 6):
+		var bc := _px(Vector2(bd[i], bd[i + 1]))
+		var bs := Vector2(bd[i + 2], bd[i + 3]) * s
+		draw_set_transform(bc, float(bd[i + 4]))
+		draw_rect(Rect2(-bs / 2.0, bs), Color(0.35, 0.3, 0.25, 0.5))
+		draw_set_transform(Vector2.ZERO)
 	for p in track["paths"]:
 		var c: Curve3D = p["curve"]
 		var line := PackedVector2Array()
@@ -156,3 +173,45 @@ func _draw() -> void:
 		d += 250.0
 	var st := c0.sample_baked(track["start"])
 	draw_circle(_px(Vector2(st.x, st.z)), 5.0, Color(0.2, 1.0, 0.4))
+
+
+## --wallcheck: steht irgendwo eine Wand auf der Fahrbahn eines Weges? (Mittellinie alle 2 m gegen alle Wandstücke)
+func _wallcheck() -> void:
+	var g := {}
+	for w in walls:
+		var a: Vector2 = w[0]
+		var b: Vector2 = w[1]
+		if a.distance_to(b) > 60.0:
+			continue
+		var lo := a.min(b)
+		var hi := a.max(b)
+		for gx in range(floori(lo.x / 10.0), floori(hi.x / 10.0) + 1):
+			for gz in range(floori(lo.y / 10.0), floori(hi.y / 10.0) + 1):
+				var k := Vector2i(gx, gz)
+				if not g.has(k):
+					g[k] = []
+				g[k].append(w)
+	var bad := 0
+	for p in track["paths"]:
+		var c: Curve3D = p["curve"]
+		var L := c.get_baked_length()
+		var lim: float = float(p["half_w"]) * 0.7
+		var d := 3.0
+		var last := -100.0
+		while d < L - 3.0:
+			var q3 := c.sample_baked(d)
+			var q := Vector2(q3.x, q3.z)
+			var k := Vector2i(floori(q.x / 10.0), floori(q.y / 10.0))
+			var hit := false
+			for gx in range(k.x - 1, k.x + 2):
+				for gz in range(k.y - 1, k.y + 2):
+					for w in g.get(Vector2i(gx, gz), []):
+						if Geometry2D.get_closest_point_to_segment(q, w[0], w[1]).distance_to(q) < lim:
+							hit = true
+			if hit and d - last > 15.0:
+				print("WAND AUF WEG #%d %s %s bei %.0f m (%.0f, %.0f)" % [p["id"], p["kind"], p.get("street_name", ""), d, q.x, q.y])
+				bad += 1
+				last = d
+			d += 2.0
+	print("WANDCHECK %d Stellen" % bad)
+

@@ -19,6 +19,7 @@ extends RefCounted
 
 const Track := preload("res://scripts/track_builder.gd")
 const City := preload("res://scripts/city_builder.gd")
+const CityNet := preload("res://scripts/city_net.gd")  # echte Straßen aus OpenStreetMap (seit 2.52, tools/osm_net.py)
 
 const CLS := {
 	"gasse": {"half": 3.3, "lanes": 0.0, "walk": 1.0},
@@ -65,10 +66,15 @@ static func plan(track: Dictionary, race: Dictionary) -> void:
 				"lanes": 2.0, "cobble": 0.0, "ends": [{"at": 0, "d": p["from"]}, {"at": 0, "d": p["to"]}]})
 			p["strip_kind"] = ["", "park" if p["strip"][1] > 0.0 else ""]
 	var ctx := _ctx(track, race)
-	_pre = "Q_"
-	_plan_links(ctx, rng)
-	_pre = ""
-	_plan_parallels(ctx, rng)
+	# Echte Städte mit Straßennetz (seit 2.52): die echten Straßen statt erfundener Querverbindungen und Parallelstraßen
+	# (die waren oft nur kurze Schleifen neben dem Ring, die nirgendwohin führten)
+	if CityNet.NETS.has(race.get("city", "")):
+		_plan_osm(ctx, CityNet.NETS[race["city"]], rng)
+	else:
+		_pre = "Q_"
+		_plan_links(ctx, rng)
+		_pre = ""
+		_plan_parallels(ctx, rng)
 	_plan_plazas(ctx, rng)
 	_drop_keepout(ctx)
 	_plan_junctions(ctx)
@@ -528,6 +534,88 @@ static func _add(ctx: Dictionary, kind: String, pts: PackedVector3Array, sec: Di
 
 static func _mouth_zone(ctx: Dictionary, d: float, w: float) -> void:
 	ctx["mz"].append([d, w + 4.0])
+
+
+# --- Echtes Straßennetz (seit 2.52) -----------------------------------------------------------------------------------
+
+## Straßen aus city_net.gd (tools/osm_net.py): jede schließt an beiden Enden an (Hauptstraße oder andere Straße), die
+## Kreuzungen untereinander bleiben offen (branch_clear). Querschnitt je Klasse wie die erfundenen Straßen.
+static func _plan_osm(ctx: Dictionary, net: Array, rng: RandomNumberGenerator) -> void:
+	var track: Dictionary = ctx["track"]
+	var curve: Curve3D = ctx["curve"]
+	# Straßen quer durch den Korridor einer Ausfahrt fallen weg (die Auffahrt zur Autobahn läuft dort weiter), mit
+	# allem, was nur an ihnen hängt: so entsteht keine Sackgasse
+	var drop := {}
+	for i in net.size():
+		var raw0: Array = net[i]["pts"]
+		var rr: float = CLS[str(net[i]["cls"])]["half"] + CLS[str(net[i]["cls"])]["walk"] + STRIP_W
+		var n0 := raw0.size() / 2
+		for k in range(0, raw0.size(), 8):
+			var q := Vector2(raw0[k], raw0[k + 1])
+			for cp in ctx["caps"]:
+				var a: Vector2 = cp[0]
+				var ab: Vector2 = cp[1] - a
+				var t := clampf((q - a).dot(ab) / maxf(ab.length_squared(), 0.001), 0.0, 1.0)
+				if t > 0.0 and q.distance_to(a + ab * t) < rr + cp[2]:
+					drop[i] = true
+			# Wahrzeichen, Wasser, Parks, Hügel, Bahn (die ersten und letzten Meter liegen an der Einmündung)
+			if k / 2 > 6 and k / 2 < n0 - 6 and not drop.has(i):
+				var wb := _blocked(ctx, q, rr - 2.0)
+				if wb != "" and wb != "ausfahrt":
+					drop[i] = true
+					why["osm_" + wb] = why.get("osm_" + wb, 0) + 1
+	var changed := true
+	while changed:
+		changed = false
+		for i in net.size():
+			if drop.has(i):
+				continue
+			for e in net[i]["ends"]:
+				if e.has("street") and drop.has(int(e["street"])):
+					drop[i] = true
+					changed = true
+	why["osm_ausfahrt"] = drop.size()
+	var made := []
+	for i0 in net.size():
+		var st: Dictionary = net[i0]
+		if drop.has(i0):
+			made.append(null)
+			continue
+		var raw: Array = st["pts"]
+		var pts := PackedVector3Array()
+		for k in range(0, raw.size(), 2):
+			pts.append(Vector3(raw[k], 0.0, raw[k + 1]))
+		if pts.size() < 3:
+			made.append(null)
+			continue
+		var mid_d := curve.get_closest_offset(pts[pts.size() / 2])
+		var sec := _section(ctx, str(st["cls"]), mid_d, rng)
+		var ends: Array = st["ends"]
+		var d0 := curve.get_closest_offset(pts[0])
+		var d1 := curve.get_closest_offset(pts[pts.size() - 1])
+		var p := _add(ctx, "lane", pts, sec, d0, d1, 0.0, {"osm": true, "street_name": str(st.get("name", ""))})
+		for k in 2:
+			if ends[k].get("main", false):
+				var dm := d0 if k == 0 else d1
+				_mouth_zone(ctx, dm, sec["half"] + sec["walk"])
+		made.append(p)
+	# Enden: in die Hauptstraße oder an eine andere Straße (T-Einmündung)
+	for i in net.size():
+		var p = made[i]
+		if p == null:
+			continue
+		var ends: Array = net[i]["ends"]
+		var c: Curve3D = p["curve"]
+		var out := []
+		for k in 2:
+			var q := c.sample_baked(0.0 if k == 0 else c.get_baked_length())
+			if ends[k].get("main", false):
+				out.append({"at": 0, "d": curve.get_closest_offset(q)})
+			else:
+				var o = made[int(ends[k]["street"])]
+				if o != null:
+					out.append({"at": o["id"], "d": (o["curve"] as Curve3D).get_closest_offset(q)})
+		p["ends"] = out
 
 
 # --- Querverbindungen ------------------------------------------------------------------------------------------------

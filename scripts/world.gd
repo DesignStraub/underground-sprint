@@ -311,6 +311,23 @@ func _spawn_xf() -> Transform3D:
 			if parts[0] == "xy":  # --wspawn=xy:x:z:grad (Blickrichtung, 0 = Norden/-Z)
 				var yaw := deg_to_rad(float(parts[3]) if parts.size() > 3 else 0.0)
 				return Transform3D(Basis(Vector3.UP, -yaw), Vector3(float(parts[1]), 0.5, float(parts[2])))
+			if parts[0] == "strasse":  # --wspawn=strasse:rennen:Name[:m[:rück]]  auf einer echten Straße (city_net) der Stadt
+				for c in layout["cities"]:
+					if int(c["race_index"]) != int(parts[1]):
+						continue
+					var sj := Track.begin(c["race"])
+					(sj["root"] as Node).free()
+					for p in sj["track"]["paths"]:
+						if str(p.get("street_name", "")) == parts[2]:
+							var pc: Curve3D = p["curve"]
+							var m := clampf(float(parts[3]) if parts.size() > 3 else 40.0, 2.0, pc.get_baked_length() - 2.0)
+							var sx := Track.xform_at(pc, m, 0.0)
+							if parts.size() > 4:
+								sx.basis = sx.basis.rotated(Vector3.UP, PI)
+							sx = (c["xf"] as Transform3D) * sx
+							sx.origin.y += 0.5
+							return sx
+					push_warning("--wspawn=strasse: keine Straße %s" % parts[2])
 			if parts[0] == "gelaende":  # --wspawn=gelaende:i[:t[:s[:grad]]]  im Gelände i, t m hinter dem Tor (Flächenkoordinaten)
 				return _offroad_gate_xf(int(parts[1]), float(parts[2]) if parts.size() > 2 else 12.0,
 					float(parts[3]) if parts.size() > 3 else 0.0, float(parts[4]) if parts.size() > 4 else 0.0)
