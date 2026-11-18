@@ -11,6 +11,8 @@ extends Node
 ##   [--sketch5]         deutsches Überblick-Short (stumm), Dateien u_*.png; mit --scover=bild.png nur das Titelbild
 ##                       short_cover_ueberblick_1080x1920.png
 ##   [--trailer]         Trailer zu 2.39 im Querformat (1920x1080): Einblendungen deutsch td_*.png, englisch te_*.png
+##   [--reel48]          Reel zum Stand 2.48 (Hochformat, mit Musik): Einblendungen r_*.png in der Spielschrift Inter
+##                       (ohne --uifont), Endtafel mit itch.io und GitHub
 ## Das Fenster lässt den Inhalt frei (transparent): darunter legt ffmpeg das Querformat-Video (1000x563 bei x 40, y 700).
 
 const UiStyle := preload("res://scripts/ui_style.gd")
@@ -125,6 +127,29 @@ func _ready() -> void:
 				Color(0.78, 0.82, 0.9))
 			_sketch_line(te, "onehumanity.itch.io", 624.0, 54, Color(0.78, 0.82, 0.9))
 			await _render(te, ("td_" if li == 0 else "te_") + "end", tsz)
+		get_tree().quit()
+		return
+	if OS.get_cmdline_user_args().has("--reel48"):
+		# Reel zu 2.48 (seit 2.48): knappe Sätze, oben im Bild (über dem Fortschrittsbalken des Rennens frei), Endtafel
+		var t := Control.new()
+		t.size = SIZE
+		_sketch_line(t, "need for geschwindigkeit", 300.0, 72)
+		_sketch_line(t, "offene welt · kostenlos", 410.0, 48, Color(0.78, 0.82, 0.9))
+		await _render(t, "r_titel")
+		for c in [["autobahn-rennen von stadt zu stadt.", "r_autobahn", 330.0], ["drift-punkte mit boni.", "r_drift", 330.0],
+				["zu zweit an einem rechner.", "r_split", 360.0], ["jede stadt grüßt anders.", "r_schild", 300.0],
+				["städte entdecken, dann schnellreise.", "r_karte", 230.0], ["ein spiel von one humanity.", "r_plakat", 300.0]]:
+			await _render(_sketch_lines([c[0]], c[2], 52), c[1])
+		var e := Control.new()
+		e.size = SIZE
+		var dim := ColorRect.new()
+		dim.color = Color(0, 0, 0.01, 0.72)
+		dim.size = SIZE
+		e.add_child(dim)
+		_sketch_line(e, "need for geschwindigkeit", 790.0, 74)
+		_sketch_line(e, "kostenlos · onehumanity.itch.io", 905.0, 50, Color(0.78, 0.82, 0.9))
+		_sketch_line(e, "open source auf github", 978.0, 50, Color(0.78, 0.82, 0.9))
+		await _render(e, "r_end")
 		get_tree().quit()
 		return
 	if OS.get_cmdline_user_args().has("--sketch5"):

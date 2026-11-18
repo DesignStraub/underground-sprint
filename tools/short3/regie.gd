@@ -43,10 +43,11 @@ extends SceneTree
 ## k-fach größer (Ortsname, Musiktitel lesbar im Hochformat), --rwait=<s> vor dem Losfahren warten, --rcam=<0|1>
 ## Verfolgerkamera (1 = weit), --rkam=ampel (Kreuzung: feste Kamera vor der Ampel der Querstraße), --rvor=<m> (Start so
 ## weit vor dem Schild, dem Ende der Auffahrt, der Golfplatz-Ausfahrt bzw. dem Dom), --rv0=<m/s> (Anfangstempo),
-## --rschild=<m>:<fov> (Schild: Kamera so weit davor, Bildwinkel), --rtoast=<s> (Titel des laufenden Tracks nach s
-## Sekunden noch einmal einblenden), --rtoastk=<k> (Titel-Einblendung k-fach größer, unten in der Mitte verankert:
-## im Hochformat sonst kaum lesbar), --rfeedk=<k> (Einblendungen links über der Minikarte k-fach: "DRIFT-MODUS",
-## Drift-Punkte; dazu die laufenden Drift-Punkte unten in der Mitte). Level-Leiste unten und Tastenhilfe oben sind aus.
+## --rschild=<m>:<fov>[:<h>] (Schild: Kamera so weit davor, Bildwinkel, Höhe), --rtoast=<s> (Titel des laufenden Tracks
+## nach s Sekunden noch einmal einblenden), --rtoastk=<k> (Titel-Einblendung k-fach größer, unten in der Mitte
+## verankert: im Hochformat sonst kaum lesbar), --rfeedk=<k> (Einblendungen links über der Minikarte k-fach:
+## "DRIFT-MODUS", Drift-Punkte; dazu die laufenden Drift-Punkte unten in der Mitte). Level-Leiste unten und Tastenhilfe
+## oben sind aus.
 ## Die Titel-Einblendung der Musik läuft hier in Spielzeit (music.gd zählt sonst Echtzeit: bei --write-movie lief sie zu
 ## schnell oder war schon vorbei).
 ## Fürs Schneiden: "REGIE MARKE <was> t=<s> bild=<n> film=<f>" im Log (start, aktiv <Strecke>, anflug, ampel, halt,
@@ -91,6 +92,7 @@ var vor := -1.0
 var v0 := 0.0
 var schild_m := 30.0
 var schild_fov := 32.0
+var schild_h := 1.6
 var toast_at := -1.0
 var toast_k := 1.0
 var feed_k := 1.0
@@ -123,6 +125,7 @@ func _initialize() -> void:
 			var sp := a.substr(10).split(":")
 			schild_m = float(sp[0])
 			schild_fov = float(sp[1]) if sp.size() > 1 else 32.0
+			schild_h = float(sp[2]) if sp.size() > 2 else 1.6
 		elif a.begins_with("--rtoast="):
 			toast_at = float(a.substr(9))
 		elif a.begins_with("--rtoastk="):
@@ -444,7 +447,13 @@ func _process(delta: float) -> bool:
 			(w.hud["lvl"] as Control).visible = false
 	rt += delta
 	_events(pl)
-	if feed_k != 1.0 and w.get("_feed") != null:
+	if feed_k != 1.0 and w.get("hud") != null and (w.hud as Dictionary).has("left"):
+		# seit 2.48: Meldungen, Drift-Anzeige und Gebietsname stehen zusammen links über der Minikarte: die ganze Spalte
+		# vergrößern, Anker unten links (wächst nach oben)
+		var lc: Control = w.hud["left"]
+		lc.pivot_offset = Vector2(0.0, lc.size.y)
+		lc.scale = Vector2(feed_k, feed_k)
+	elif feed_k != 1.0 and w.get("_feed") != null:
 		# Einblendungen über der Minikarte vergrößern, Anker unten links (wachsen nach oben)
 		var fd: Control = w._feed
 		fd.pivot_offset = Vector2(0.0, fd.size.y)
@@ -961,6 +970,17 @@ func _tuning(delta: float) -> bool:
 	return false
 
 
+## Lage des Autos auf der Strecke (m) vor dem Ziel d_ziel: liegt der Start auf einem Rundkurs kurz vor der Ziellinie und
+## das Ziel kurz dahinter (Kölner Schild bei 80 m, Start 135 m davor), zählt er negativ. Sonst fuhr die Route von gut
+## 1900 m rückwärts bis 240 m, also gewendet und vom Schild weg.
+func _d_before(tr: Dictionary, xf: Transform3D, pl, d_ziel: float) -> float:
+	var c: Curve3D = tr["curve"]
+	var d := c.get_closest_offset(xf.affine_inverse() * (pl.global_position as Vector3))
+	if bool(tr["loop"]) and d > d_ziel:
+		d -= c.get_baked_length()
+	return d
+
+
 ## Am gelben Ortsschild vorbei: Kamera fest am rechten Bordstein schild_m vor dem Schild, lange Brennweite (schild_fov),
 ## schaut knapp links am Schild vorbei die Straße entlang. Das Auto fährt auf der rechten Spur dicht am Bordstein, kommt
 ## von hinten links ins Bild und fährt am Schild vorbei; Schrift groß genug zum Lesen
@@ -969,13 +989,13 @@ func _begin_schild(pl) -> void:
 	var tr: Dictionary = e["track"]
 	var xf: Transform3D = e["xf"]
 	var ds := _sign_d(tr)
-	var d_pl: float = (tr["curve"] as Curve3D).get_closest_offset(xf.affine_inverse() * pl.global_position)
+	var d_pl := _d_before(tr, xf, pl, ds)
 	route = _along(e, 0, d_pl + 3.0, ds + 160.0, 8.0, 17.0)
 	var f: Dictionary = Track.frame_at(tr["curve"], ds)
 	var sign_p: Vector3 = xf * ((f["pos"] as Vector3) + (f["right"] as Vector3) * (Track.hw(tr, ds) + Track.WALK - 1.2) + Vector3(0, 2.6, 0))
 	var dc := ds - schild_m
 	var fc: Dictionary = Track.frame_at(tr["curve"], dc)
-	var cam_p: Vector3 = xf * ((fc["pos"] as Vector3) + (fc["right"] as Vector3) * (Track.hw(tr, dc) + 1.0) + Vector3(0, 1.6, 0))
+	var cam_p: Vector3 = xf * ((fc["pos"] as Vector3) + (fc["right"] as Vector3) * (Track.hw(tr, dc) + 1.0) + Vector3(0, schild_h, 0))
 	var fa: Dictionary = Track.frame_at(tr["curve"], ds + 12.0)
 	var aim: Vector3 = xf * ((fa["pos"] as Vector3) + (fa["right"] as Vector3) * (Track.hw(tr, ds + 12.0) + 0.5) + Vector3(0, 1.9, 0))
 	info["cam_xf"] = Transform3D(Basis.IDENTITY, cam_p).looking_at(aim.lerp(sign_p, 0.25), Vector3.UP)
@@ -1086,7 +1106,7 @@ func _begin_dom(pl) -> void:
 	var tr: Dictionary = e["track"]
 	var xf: Transform3D = e["xf"]
 	var dd := _dom_d(tr)
-	var d_pl: float = (tr["curve"] as Curve3D).get_closest_offset(xf.affine_inverse() * pl.global_position)
+	var d_pl := _d_before(tr, xf, pl, dd)
 	route = _along(e, 0, d_pl + 3.0, dd + 200.0, 2.25, 15.0)
 	for lm in tr["city"].get("landmarks", []):
 		if lm["kind"] == "aachen_dom":

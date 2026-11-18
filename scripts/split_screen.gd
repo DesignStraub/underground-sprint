@@ -50,6 +50,9 @@ func setup(r: Node, pv1: TextureRect) -> void:
 	view2.world.add_child(cam2)
 	cam2.make_current()
 	var id: String = GameState.p2_car if Catalog.CARS.has(GameState.p2_car) else GameState.current_car
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--p2car=") and Catalog.CARS.has(a.substr(8)):  # Test, Aufnahmen: Auto von Spieler 2
+			id = a.substr(8)
 	p2 = PlayerCar.new()
 	p2.process_mode = Node.PROCESS_MODE_PAUSABLE
 	p2.input_prefix = "p2_"
