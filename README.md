@@ -250,6 +250,27 @@ Außenring → nächste Stadt → Autobahn. Rundkurse und Drift-Kurse sind Schle
 - **Charme je Stadt: Gruß in Mundart am Ortsschild, Läden mit Ortskolorit** (seit 2.46, Einzelheiten dort).
 - **Splitscreen für zwei in Rennen** (seit 2.47, Einzelheiten dort).
 - **Anzeigen links statt in der Mitte, ruhigere Schrift** (seit 2.48, Einzelheiten dort).
+- **Ruhigeres Grundtempo, Kamera nach echtem Tempo, neue Karte mit Zoom und Springen** (seit 2.49, Einzelheiten dort).
+
+## Ruhigeres Grundtempo, neue Karte mit Zoom und Springen (2.49)
+Rückmeldung: das Grundtempo ist noch zu hoch, Vergleich mit Underground (Tempo-Effekte); die Karte (M) sieht nicht
+gut aus, Gebiete sollen erkennbar sein, beim Öffnen nah, mit Maus oder Bild↑/↓ heraus, und mit Sprüngen überall hin.
+
+- **Grundtempo:** Die Tempo-Stufe (für alle gleich: du, Gegner, Herausforderer, Autobahn-Rennen) läuft jetzt von
+  66 % bis 90 % statt von 72 % bis 100 %, der Schub ist etwas geringer (`GameState.accel_k`). Mit 7 Siegen fährt die
+  Kitsune knapp 160 statt gut 170 km/h. Rundenzeiten in der Stadt steigen nur um gut 3 % (Kurven bestimmen sie).
+- **Wie in Underground:** Tempo kommt dort aus Unschärfe, Lichtspuren und Kamera, nicht aus mehr km/h. Darum:
+  Sichtfeld, Abstand und Zittern der Kamera richten sich nach dem echten Tempo (30 bis 280 km/h) statt nach dem
+  Anteil am Endtempo; bis 2.48 stand das Sichtfeld eines langsamen Autos bei 170 km/h schon ganz offen. Die
+  Verfolgerkamera fällt beim Beschleunigen ein Stück zurück und rückt beim Bremsen auf. Die Bewegungsunschärfe mit
+  Lichtspuren setzt ab 75 statt 90 km/h ein und ist bei 225 km/h voll da.
+- **Karte:** Vollbild, öffnet nah um dein Auto. Mausrad (zum Zeiger hin), Bild↑/↓, +/−, Trackpad oder Gamepad-Trigger
+  zoomen; WASD, Pfeile, Stick oder Ziehen verschieben; H zurück zu dir. Städte als bebaute Flächen entlang ihrer
+  Straßen, nah mit Häusern aus OpenStreetMap, unentdeckte dunkler; Gelände, Dörfer, Seen, Autobahn kräftig in
+  Bernstein; nah einzelne Rennen, Dorf- und Viertelnamen; Maßstab unten links.
+- **Springen:** an jeden Ort, an dem man schon war: Stadteingang, Tor eines Geländes, vor dem Start eines
+  Autobahn-Rennens (neu entdeckt mit „NEU AUF DER KARTE“, Gelände 300 XP). Q/E oder Klick wählt, Leertaste, Doppelklick
+  oder Knopf springt, Enter setzt ein Ziel (auch ohne Rennen).
 
 ## Anzeigen links statt in der Mitte, ruhigere Schrift (2.48)
 Rückmeldung: die Drift-Anzeige (2.45) und die Gebietsnamen standen oben in der Mitte im Sichtfeld; im Rennen steht

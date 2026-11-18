@@ -58,6 +58,10 @@ const GOOD_SHIFT := 6200.0
 const CAM_NAMES := ["Verfolger", "Verfolger weit", "Stoßstange", "Motorhaube"]
 ## Verfolger: Abstand, Höhe (je bei Stand, mit Tempo etwas weiter und flacher) und Blickpunkt vor dem Auto.
 ## Seit 2.24 ein Stück höher (wie in NFSU, vorher 4,4 m / 1,6 m), dazu eine weite Stufe.
+## Kamera (Sichtfeld, Abstand, Zittern) nach dem echten Tempo, nicht nach dem Anteil am Endtempo (seit 2.49): bis
+## 2.48 stand das Sichtfeld eines langsamen Autos bei seinen 170 km/h schon ganz offen, als führe es 300. So wirkt
+## ein schnelleres Auto auch schneller (wie in Underground). Ab 30 km/h, voll bei 280 km/h.
+const CAM_KMH := Vector2(30.0, 280.0)
 const CHASE := [{"dist": 4.6, "height": 1.95, "look_y": 1.0, "look_z": -7.5},
 	{"dist": 6.4, "height": 2.55, "look_y": 1.0, "look_z": -8.5}]
 ## Sprungkamera wie in NFSU: bei hohen, langen Sprüngen schneidet das Bild auf eine feste Kamera knapp über dem
@@ -168,6 +172,7 @@ var _steer_k := 1.0  # wie schnell eingelenkt wird
 var _roll_k := 1.0  # wie stark die Karosserie wankt und nickt
 var _cam_k := 1.0  # wie eng die Verfolgerkamera folgt
 var _cam_drift := 0.0  # wie weit die Kamera im Drift in Fahrtrichtung schaut (geglättet)
+var _acc_s := 0.0  # Längsbeschleunigung (m/s², geglättet): die Verfolgerkamera bleibt beim Beschleunigen etwas zurück
 var _shake_t := 0.0
 var _wall_cool := 0.0
 var _wall_turn := 0.0  # Restdrehung parallel zur Wand (rad), wird über einige Bilder abgebaut
@@ -742,6 +747,7 @@ func _physics_process(dt: float) -> void:
 	# Gewichtsverlagerung: Nase taucht beim Bremsen ein, hebt sich beim Beschleunigen; Wanken nach der echten
 	# Querbeschleunigung (Gierrate * Tempo) nach außen, im Rutschen zusätzlich zur Rutschseite
 	var pitch := clampf(a * 0.0026 * _roll_k, -0.045 * _roll_k, 0.03 * _roll_k)
+	_acc_s = lerpf(_acc_s, clampf(a, -25.0, 15.0), 1.0 - exp(-dt * 4.0))
 	if airborne:
 		pitch = 0.0  # in der Luft dreht sich das ganze Auto (unten), nicht die Karosserie
 	var yaw_now := wrapf(global_rotation.y - _yaw_prev, -PI, PI) / maxf(dt, 0.0001)
@@ -784,7 +790,7 @@ func _physics_process(dt: float) -> void:
 		_air_roll += _air_roll_v * dt
 		model.rotation.x = _air_pitch
 		model.rotation.z = _air_roll
-	_update_camera(dt, sf)
+	_update_camera(dt, clampf((spd * 3.6 - CAM_KMH.x) / (CAM_KMH.y - CAM_KMH.x), 0.0, 1.0))
 
 	audio.rpm = rpm
 	audio.throttle = 1.0 if nitro_on else (0.0 if finished else (_rev_s if reverse_gear else Input.get_action_strength(input_prefix + "accelerate")))
@@ -1701,6 +1707,7 @@ func _update_sinking(dt: float) -> void:
 		place(_respawn_xf)
 
 
+## sf: Tempo 0..1 nach CAM_KMH (echte km/h, seit 2.49)
 func _update_camera(dt: float, sf: float) -> void:
 	if jump_cam:
 		_update_jump_cam(dt)
@@ -1712,7 +1719,7 @@ func _update_camera(dt: float, sf: float) -> void:
 	var target_fov := base + zoom
 	_fov = lerpf(_fov, target_fov, dt * (6.0 if nitro_on else 2.5))
 	cam.fov = _fov
-	# Kein Dauerwackeln bei Tempo: nur kurze, weiche Stöße bei Einschlägen und Landungen, dazu ab gut 80 % Tempo ein
+	# Kein Dauerwackeln bei Tempo: nur kurze, weiche Stöße bei Einschlägen und Landungen, dazu ab gut 220 km/h ein
 	# feines Zittern wie in NFS (wenige Millimeter, mit Nitro etwas mehr; mit "Kamerawackeln aus" nichts)
 	var amp := _shake * (0.06 if GameState.cam_shake else 0.0)
 	if GameState.cam_shake and not airborne:
@@ -1727,6 +1734,9 @@ func _update_camera(dt: float, sf: float) -> void:
 			yaw = lerp_angle(yaw, atan2(-velocity.x, -velocity.z), _cam_drift)
 		var cs: Dictionary = CHASE[cam_mode]
 		var dist: float = cs["dist"] + sf * 0.6 + (0.4 if nitro_on else 0.0)
+		# wie die Verfolgerkamera in Underground: beim Beschleunigen fällt sie ein Stück zurück, beim Bremsen rückt sie
+		# auf (höchstens gut 0,3 bzw. 0,4 m, weich): man spürt Schub und Bremse, ohne dass das Bild wackelt
+		dist += clampf(_acc_s / 12.0, -1.0, 1.0) * (0.32 if _acc_s > 0.0 else 0.4)
 		var height: float = cs["height"] - sf * 0.2
 		if not _cam_init:
 			_cam_yaw = yaw

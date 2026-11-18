@@ -154,7 +154,7 @@ func _ready() -> void:
 	pc.drag_mode = event_type == "drag"
 	# Tempo-Stufe gilt für alle gleich (Spieler und Gegner)
 	pc.top_speed *= GameState.pace()
-	pc.accel *= 0.8 + 0.2 * GameState.pace()
+	pc.accel *= GameState.accel_k()
 	pc.place(Track.xform_at(curve, track["start"], Track.LANES[2]))
 	player = pc  # erst fertig eingerichtet sichtbar machen (Testwerkzeug fragt race.player ab)
 	# Splitscreen (seit 2.47): nur am Rechner, nur Sprint und Rundkurs
@@ -221,7 +221,7 @@ func _ready() -> void:
 		# Abkürzungen sparen bis zu einem Fünftel der Zeit: in den ersten Rennen (1 Stern) kennen die Gegner
 		# sie noch nicht, danach nehmen sie sie auf Leicht selten
 		ai.shortcut_k = 0.0 if tier <= 1 else [0.3, 0.8, 1.0][diff]
-		ai.accel *= (0.8 + 0.2 * GameState.pace()) * Catalog.ACCEL_SCALE
+		ai.accel *= GameState.accel_k() * Catalog.ACCEL_SCALE
 		ai.set_meta("hud_col", _hud_col(Builder.paint_color(id, cfg)))
 		ais.append(ai)
 		_loading.progress = 0.77 + 0.05 * (i + 1)
@@ -1219,8 +1219,7 @@ func _bank_drift() -> void:
 
 
 func _update_hud() -> void:
-	var sf := clampf(absf(player.speed_fwd) / player.top_speed, 0.0, 1.0)
-	_update_speed_fx(sf)
+	_update_speed_fx()
 
 	var info = hud["info"]
 	info.place = _place()
@@ -1520,7 +1519,7 @@ func _fmt(t: float) -> String:
 const BLUR_LEVEL := [0.0, 0.55, 1.0, 1.6]
 
 
-func _update_speed_fx(sf: float) -> void:
+func _update_speed_fx() -> void:
 	var dt := get_process_delta_time()
 	var lvl: float = BLUR_LEVEL[GameState.motion_blur]
 	_nitro_fx = move_toward(_nitro_fx, 1.0 if player.nitro_on else 0.0, dt * 4.0)
@@ -1529,9 +1528,11 @@ func _update_speed_fx(sf: float) -> void:
 	_cam_yaw_prev = yaw
 	_swing = lerpf(_swing, clampf(rate * 0.012, -0.03, 0.03), 1.0 - exp(-dt * 10.0))
 	var kmh: float = player.velocity.length() * 3.6
-	var sk := smoothstep(90.0, 235.0, kmh)
+	# seit 2.49 ab 75 km/h, voll bei 225 (vorher 90 bis 235): weniger km/h, das Tempogefühl kommt wie in Underground
+	# aus Unschärfe und Lichtspuren
+	var sk := smoothstep(75.0, 225.0, kmh)
 	var blur := lvl * (0.115 * sk * sk + 0.075 * _nitro_fx)
-	var sw := lvl * _swing * smoothstep(0.2, 0.5, sf)
+	var sw := lvl * _swing * smoothstep(0.2, 0.5, sk)
 	var nit := _nitro_fx if lvl > 0.0 else 0.0
 	if _bars_k > 0.0 or state != State.RACING:
 		blur = 0.0  # Sprungkamera, Countdown, Ziel: ruhiges Bild

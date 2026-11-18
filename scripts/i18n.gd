@@ -392,6 +392,13 @@ const EN := {
 	"nicht im Ziel": "did not finish", "RUNDE %d/%d": "LAP %d/%d",
 	"Splitscreen an einem Rechner: Spieler 1 oben (WASD, Leertaste Handbremse, linke Umschalttaste Nitro oder erstes Gamepad), Spieler 2 unten (Pfeiltasten, rechte Umschalttaste Handbremse, Enter Nitro, Rücktaste zurücksetzen oder zweites Gamepad). Spieler 2 fährt: %s.":
 		"Split screen on one computer: player 1 on top (WASD, space handbrake, left shift nitro or first gamepad), player 2 below (arrow keys, right shift handbrake, enter nitro, backspace reset or second gamepad). Player 2 drives: %s.",
+	# --- Karte mit Zoom und Springen (2.49) ---
+	"STÄDTE %d / %d   ·   GELÄNDE %d / %d   ·   AUTOBAHN-RENNEN %d / %d": "CITIES %d / %d   ·   OFF-ROAD %d / %d   ·   AUTOBAHN RACES %d / %d",
+	"Verschieben": "Move", "Zoom": "Zoom", "Ort wechseln": "Next place", "Zu dir": "To you", "Springen": "Jump", "Ziel": "Target",
+	"GELÄNDE": "OFF-ROAD", "AUTOBAHN-RENNEN": "AUTOBAHN RACE", "Golfplatz zum Austoben": "Golf course to tear up",
+	"Kiesgrube zum Austoben": "Gravel pit to tear up", "SPRINGEN: FREI": "JUMP: UNLOCKED", "SPRINGEN: ERST HINFAHREN": "JUMP: DRIVE THERE FIRST",
+	"Als Ziel": "Set target", "Ziel löschen": "Clear target", "MAUSRAD": "WHEEL", "BILD↑ BILD↓": "PGUP PGDN", "LEERTASTE": "SPACE",
+	"NEU AUF DER KARTE: %s": "NEW ON THE MAP: %s", "Springen hierher frei (Karte: M)": "Jump here unlocked (map: M)",
 }
 
 static var _added := false

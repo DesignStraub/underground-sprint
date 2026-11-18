@@ -60,7 +60,7 @@ func setup(r: Node, pv1: TextureRect) -> void:
 	race.world.add_child(p2)
 	p2.setup(id, GameState.get_config(id))
 	p2.top_speed *= GameState.pace()
-	p2.accel *= 0.8 + 0.2 * GameState.pace()
+	p2.accel *= GameState.accel_k()
 	p2.place(Track.xform_at(race.curve, float(race.track["start"]) - 6.0, Track.LANES[1]))
 	p2.controls_enabled = false
 	p2.set_meta("hud_col", Color(1.0, 0.85, 0.2))
