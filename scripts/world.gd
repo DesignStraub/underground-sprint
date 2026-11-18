@@ -1575,6 +1575,16 @@ func _process(dt: float) -> void:
 			_wcam.global_position = cp - fwd * float(cc[0]) + Vector3.UP * float(cc[1])
 			_wcam.look_at(cp + fwd * float(cc[2]), Vector3.UP)
 			_wcam.make_current()
+		if a.begins_with("--camat=") and player:  # Test: freie Kamera bei x:y:z, Blick auf tx:ty:tz (Plakate, Wände)
+			var cv := a.substr(8).split(":")
+			if _wcam == null:
+				_wcam = Camera3D.new()
+				_wcam.far = 6000.0
+				_wcam.fov = 50.0
+				world.add_child(_wcam)
+			_wcam.global_position = Vector3(float(cv[0]), float(cv[1]), float(cv[2]))
+			_wcam.look_at(Vector3(float(cv[3]), float(cv[4]), float(cv[5])), Vector3.UP)
+			_wcam.make_current()
 		if a.begins_with("--ctest="):
 			if _ct.is_empty():
 				_ctest_setup(a.substr(8))

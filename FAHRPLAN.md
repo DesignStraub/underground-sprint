@@ -34,11 +34,14 @@ Stand 2.43: sieben Sprints von Stadt zu Stadt über den inneren Ring, mit drei G
 - Schnellreise muss man sich erfahren: erst wer eine Stadt erreicht hat, kann dorthin reisen. Nur zu Städten, nicht
   direkt zu Rennen. Rennen dürfen auch draußen liegen, etwa an der Autobahn.
 
-## 4. Deko und Werbung statt Graffiti
+## 4. Deko und Werbung statt Graffiti (erledigt in 2.44, bis auf die Artworks)
 - Die Graffiti am Straßenrand sehen nach Müll aus. Lieber normale Deko, gern etwas Echtes, angelehnt an die eigenen
   Artworks von ONE HUMANITY (auch auf Instagram).
 - Das ONE-HUMANITY-Logo, „One Humanity Lab“ und die eigene Website als Werbetafeln (die Adresse vor dem Einbau genau
   prüfen; genannt wurde „OnePlanet1Humanity.com“).
+Stand 2.44: Efeu und das ONE-HUMANITY-Herz als Wandbild statt Graffiti, drei echte Plakate (Logo, ONE HUMANITY LAB,
+Website); die Adresse laut eigener Website ist oneplanetonehumanity.com. Offen: die eigenen Artworks als Wandbilder,
+sobald die Bilddateien da sind.
 
 ## 5. Driften süchtiger machen
 Driften soll sich im Rennen lohnen und in der freien Welt richtig Spaß machen. Beim Test kam als Vorbild ein Spiel

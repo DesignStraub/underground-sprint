@@ -27,6 +27,7 @@ const BLINK_SHADER := preload("res://shaders/blink.gdshader")
 const LIGHT_SHADER := preload("res://shaders/traffic_light.gdshader")
 const TUNNEL_SHADER := preload("res://shaders/tunnel.gdshader")
 const PANEL_SHADER := preload("res://shaders/panel_wall.gdshader")
+const MURAL_TEX := preload("res://assets/murals/onehumanity_heart.png")  # Wandbild auf Lärmschutzwänden (seit 2.44)
 const SCREEN_SHADER := preload("res://shaders/screen.gdshader")
 const HILL_SHADER := preload("res://shaders/hill.gdshader")
 const ElevatedRail := preload("res://scripts/elevated_rail.gd")
@@ -5795,7 +5796,7 @@ static func _build_posters(root: Node3D, track: Dictionary) -> void:
 							Posters.uv(_poster_pick(pos), false))
 						n_big += 1
 						if OS.get_cmdline_user_args().has("--posterlog"):
-							print("PLAKAT autobahn d=%.0f seite=%d welt=%s" % [d, int(side), str(track["xf"] * pos)])
+							print("PLAKAT autobahn d=%.0f seite=%d welt=%s blick=%s" % [d, int(side), str(track["xf"] * pos), str(face)])
 			elif ok and not dist.get("rural", false):
 				var off := hwd + WALK - 0.3
 				var pos: Vector3 = f["pos"] + f["right"] * side * off + Vector3(0, _lift(track, d), 0)
@@ -5837,6 +5838,9 @@ static func poster_warm() -> MeshInstance3D:
 
 ## Plakat Nummer für einen Ort (ohne Zufallszahl: die übrige Strecke bleibt, wie sie war)
 static func _poster_pick(pos: Vector3) -> int:
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--plakat="):  # Test: überall dieses Plakat (Bilder der Plakate in der Welt)
+			return int(a.substr(9)) % Posters.N
 	return posmod(int(floor(pos.x * 0.37)) * 31 + int(floor(pos.z * 0.29)) * 17, Posters.N)
 
 
@@ -7587,11 +7591,16 @@ static func _overpass(root: Node3D, track: Dictionary, d: float, rng: RandomNumb
 	return occ
 
 
-## Lärmschutzwand mit Graffiti am Rand der Schnellstraße (in 60-m-Stücken)
+## Lärmschutzwand am Rand der Schnellstraße (in 60-m-Stücken). Seit 2.44 mit Efeu und selten dem ONE-HUMANITY-Herz als
+## Wandbild statt bunter Graffiti-Flecken (shaders/panel_wall.gdshader, deco)
 static func _sound_walls(root: Node3D, track: Dictionary, d0: float, d1: float) -> void:
 	var curve: Curve3D = track["curve"]
 	var pm := ShaderMaterial.new()
 	pm.shader = PANEL_SHADER
+	pm.set_shader_parameter("deco", 1.0)
+	pm.set_shader_parameter("mural", MURAL_TEX)
+	if OS.get_cmdline_user_args().has("--wandbild"):
+		pm.set_shader_parameter("murals", 0.35)  # Test: viele Wandbilder (für Bilder)
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var quads := 0

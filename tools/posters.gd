@@ -46,6 +46,18 @@ const POSTERS := [
 	{"head": "NUR BARGELD.", "sub": "Kartenzahlung ab 50 €. Vielleicht.", "small": "Kartenlesegerät seit 2016 außer Betrieb.",
 		"brand": "KIOSK KLEINGELD", "icon": "coins", "font": "saira",
 		"bg": "#ffd600", "head_c": "#141414", "sub_c": "#141414", "small_c": "#3a3a3a", "bar": "#141414", "bar_c": "#ffd600"},
+	# seit 2.44 echt: ONE HUMANITY (Texte von der eigenen Website oneplanetonehumanity.com)
+	{"head": "ONE PLANET. ONE HUMANITY.", "sub": "Verschiedene Projekte, eine Haltung.", "small": "oneplanetonehumanity.com",
+		"brand": "ONE HUMANITY", "icon": "onehumanity_white", "font": "din",
+		"bg": "#131313", "head_c": "#ffffff", "sub_c": "#d8d8d8", "small_c": "#9a9a9a", "bar": "#ffffff", "bar_c": "#131313"},
+	{"head": "ONE HUMANITY LAB", "sub": "Robotics, Games, Tools und 3D-Design. Aus Aachen.",
+		"small": "Offen, lokal und für Menschen gemacht.",
+		"brand": "ONE HUMANITY LAB", "icon": "onehumanity_dark", "font": "din",
+		"bg": "#f2f0ea", "head_c": "#131313", "sub_c": "#2a2a2a", "small_c": "#5a5a5a", "bar": "#131313", "bar_c": "#f2f0ea"},
+	{"head": "oneplanet onehumanity.com", "sub": "Need for Geschwindigkeit ist ein Spiel von ONE HUMANITY.",
+		"small": "Robotics, Games, Tools und 3D-Design.",
+		"brand": "ONEPLANETONEHUMANITY.COM", "icon": "onehumanity_white", "font": "inter",
+		"bg": "#1d3557", "head_c": "#ffffff", "sub_c": "#e0e7f0", "small_c": "#a8b8cc", "bar": "#ffffff", "bar_c": "#1d3557"},
 ]
 
 const FONTS := {
@@ -71,17 +83,22 @@ func _init() -> void:
 		var img := Image.new()
 		img.load_svg_from_string(src, 1.0)
 		_icons[p["icon"]] = ImageTexture.create_from_image(img)
+		if str(p["icon"]).begins_with("onehumanity"):
+			# Logo: aus dem Original (226,77 Einheiten) groß genug für 170 px gerendert
+			img = Image.new()
+			img.load_svg_from_string(src, 1.6)
+			_icons[p["icon"]] = ImageTexture.create_from_image(img)
 	for k in FONTS:
 		_fonts[k] = load(FONTS[k])
 	_fonts["body"] = load(BODY)
 	_fonts["bar"] = load(BAR)
 	var vp := SubViewport.new()
-	vp.size = Vector2i(int(Atlas.SIZE), int(Atlas.SIZE))
+	vp.size = Vector2i(int(Atlas.SIZE), int(Atlas.HEIGHT))
 	vp.transparent_bg = false
 	vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 	root.add_child(vp)
 	var c := Control.new()
-	c.size = Vector2(Atlas.SIZE, Atlas.SIZE)
+	c.size = Vector2(Atlas.SIZE, Atlas.HEIGHT)
 	c.draw.connect(func(): _draw_all(c))
 	vp.add_child(c)
 	for i in 4:
@@ -94,7 +111,7 @@ func _init() -> void:
 
 
 func _draw_all(c: Control) -> void:
-	c.draw_rect(Rect2(0, 0, Atlas.SIZE, Atlas.SIZE), Color(0.1, 0.1, 0.1))
+	c.draw_rect(Rect2(0, 0, Atlas.SIZE, Atlas.HEIGHT), Color(0.1, 0.1, 0.1))
 	for i in POSTERS.size():
 		for portrait in [true, false]:
 			_poster(c, POSTERS[i], Atlas.rect_px(i, portrait), portrait)

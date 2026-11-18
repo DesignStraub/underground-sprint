@@ -1,6 +1,6 @@
 shader_type spatial;
 // Fassaden in mehreren Stilen. style: 0 Raster, 1 Bandfenster (Büro), 2 Halle/Industrie, 3 Glasturm,
-// 4 Backstein-Wohnhaus, 5 Fachwerk, 6 Putzfassade (Altbau, Barock), 7 Ziegeldach, 8 Altbau mit Graffiti, 9 Laden.
+// 4 Backstein-Wohnhaus, 5 Fachwerk, 6 Putzfassade (Altbau, Barock), 7 Ziegeldach, 8 Altbau mit Sockel (bis 2.43 mit Graffiti), 9 Laden.
 // Die Häuser einer Gegend sind ein gemeinsames Mesh; die Werte je Haus stehen in den Vertexdaten
 // (COLOR = Farbton + Anteil beleuchteter Fenster, UV2 = Seed, Stil + 10 * Schaufenster).
 // Seit 2.15 in Fassadenkoordinaten (track_builder._bb_box): UV = Strecke ab der linken Kante und Höhe über der
@@ -226,21 +226,10 @@ void fragment() {
 		albedo *= 1.0 - 0.18 * slab * facade * detail;
 	}
 	if (graffiti) {
-		// Stücke von 3–4 m Breite in Hüfthöhe: bauchige Buchstaben (schmale, hohe Formen) mit dunkler Kontur und
-		// hellem Glanz, je Stück eine Farbe; dazwischen freie Wand
-		float piece = floor(u / 3.6);
-		float pu = fract(u / 3.6);
-		float on = step(0.3, hash(vec2(piece, seed))) * smoothstep(0.02, 0.1, pu) * smoothstep(0.02, 0.1, 1.0 - pu);
-		float band = smoothstep(0.3, 0.5, y) * (1.0 - smoothstep(1.9, 2.3 + hash(vec2(piece, seed + 2.0)) * 0.6, y));
-		float n = noise(vec2(u * 2.4, y * 1.1) + seed * 3.0 + piece * 7.0) * band * on;
-		float fill = smoothstep(0.42, 0.46, n);
-		float rim = smoothstep(0.36, 0.4, n) * (1.0 - fill);
-		float shine = smoothstep(0.62, 0.66, n) * step(0.5, fract(y * 3.0 + u * 0.5));
-		float hsel = hash(vec2(piece, seed + 5.0));
-		vec3 tc = hsel < 0.2 ? vec3(0.9, 0.2, 0.55) : (hsel < 0.4 ? vec3(0.15, 0.7, 0.9) : (hsel < 0.6 ? vec3(0.95, 0.8, 0.15) : (hsel < 0.8 ? vec3(0.3, 0.85, 0.35) : vec3(0.85, 0.85, 0.85))));
-		vec3 gcol = mix(tc * 0.75, vec3(0.95), shine * 0.6);
-		albedo = mix(albedo, vec3(0.03), rim * wall * detail);
-		albedo = mix(albedo, gcol, fill * wall * mix(0.5, 1.0, detail));
+		// seit 2.44 ohne Graffiti (sahen nach Müll aus): Altbau mit dunklerem Sockel aus Naturstein bis gut 1 m
+		float plinth = 1.0 - smoothstep(1.0, 1.06, y);
+		float stone = 0.8 + 0.3 * noise(vec2(u * 1.7, y * 3.1) + seed);
+		albedo = mix(albedo, vec3(0.3, 0.29, 0.27) * stone, plinth * wall * detail);
 	}
 	// Fassade nicht ganz gleichmäßig: leichte Flecken, Schmutzfahnen unter den Fenstern
 	albedo *= 0.88 + 0.24 * noise(vec2(u * 0.12, y * 0.08) + seed);

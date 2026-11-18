@@ -239,6 +239,26 @@ Außenring → nächste Stadt → Autobahn. Rundkurse und Drift-Kurse sind Schle
 - **Verkehr mit Details, Ampeln für den Verkehr, Kleinkram zum Umfahren** (seit 2.41, Einzelheiten dort).
 - **Weiter, wo man war; Schnellreise erst nach dem ersten Besuch** (seit 2.42, Einzelheiten dort).
 - **Autobahn-Rennen von Stadt zu Stadt** (seit 2.43, Einzelheiten dort).
+- **Efeu und ONE-HUMANITY-Wandbilder statt Graffiti, echte Werbung von ONE HUMANITY** (seit 2.44, Einzelheiten dort).
+
+## Deko und Werbung statt Graffiti (2.44)
+Aus dem Fahrplan (Punkt 4): die Graffiti am Straßenrand sahen nach Müll aus; lieber normale Deko und echte Werbung von
+ONE HUMANITY.
+
+- **Lärmschutzwände** (`shaders/panel_wall.gdshader`): statt bunter Zufallsflecken wächst Efeu in Flecken vom Boden
+  hoch (blättriger Rand, Lücken, unterschiedlich hoch), und selten (etwa alle 450 m je Seite) steht das
+  ONE-HUMANITY-Herz als weißes, leicht verwittertes Wandbild darauf (`assets/murals/onehumanity_heart.png`, aus dem
+  Logo erzeugt mit `tools/mural_gen.gd`). Das Bild ist von beiden Seiten der Straße richtig herum (Amerika links): die
+  Richtung von UV.x auf dem Bildschirm entscheidet. Brücken und Tunnelportale sind schlichter Beton.
+- **Altbau** (Fassadenart 8, `shaders/building.gdshader`): statt Graffiti in Hüfthöhe ein dunkler Sockel aus
+  Naturstein.
+- **Echte Werbung:** drei Plakate von ONE HUMANITY kommen zu den zwölf ausgedachten dazu (`tools/posters.gd`, Bild jetzt
+  2048 x 3072, `scripts/poster_atlas.gd`): das Herz mit „ONE PLANET. ONE HUMANITY.“, „ONE HUMANITY LAB“ (Robotics,
+  Games, Tools und 3D-Design aus Aachen) und die Website. Die Texte stammen von der eigenen Website, die Adresse ist dort
+  geprüft: **oneplanetonehumanity.com** (im Fahrplan stand „OnePlanet1Humanity.com“). Jedes fünfte Plakat in Städten,
+  an Haltestellen und an der Autobahn ist damit ONE HUMANITY.
+- **Tests:** `--wandbild` (viele Wandbilder für Bilder), `--plakat=i` (überall Plakat i), `--camat=x:y:z:tx:ty:tz`
+  (freie Kamera), `--posterlog` (Lage und Blickrichtung der Tafeln an der Autobahn); `--worldcheck` 0 Überschneidungen.
 
 ## Autobahn-Rennen von Stadt zu Stadt (2.43)
 Aus dem Fahrplan (Punkt 2): Rennen über die Autobahn, die in einer Stadt enden.
