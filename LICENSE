@@ -19,17 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
----
-
-This license covers the source code of Need for Geschwindigkeit (scripts, shaders,
-scenes, tools). It does not cover:
-
-- the game's own images, graphics, screenshots and texts: Creative Commons
-  Attribution 4.0 International (CC BY 4.0), see LICENSE-INHALTE.md;
-- third-party files (engine sound recordings, sound effects, music, fonts):
-  their own licenses, listed in CREDITS.md;
-- data derived from OpenStreetMap in scripts/city_data.gd: Open Database
-  License 1.0 (ODbL), © OpenStreetMap contributors;
-- the ONE HUMANITY name and heart logo: trademarks of ONE HUMANITY, not
-  licensed for reuse (see CREDITS.md).

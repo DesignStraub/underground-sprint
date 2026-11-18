@@ -1,6 +1,7 @@
 # Lizenzen der Inhalte
 
-Need for Geschwindigkeit ist ein Spiel von ONE HUMANITY. Was für welche Dateien gilt:
+Need for Geschwindigkeit ist ein Spiel von ONE HUMANITY. Die MIT-Lizenz in [`LICENSE`](LICENSE) gilt für den Code;
+was für welche Dateien gilt:
 
 | Was | Lizenz |
 |---|---|
