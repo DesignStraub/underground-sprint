@@ -66,7 +66,7 @@ Gamepad wird unterstützt.
 
 Ein Spiel von **ONE HUMANITY**.
 
-Musik: Tracks von Pixabay (Pixabay Content License). Stadt-Track Aachen: Bruder Jakob x Jonas Platin, „AC“, mit freundlicher Genehmigung der Künstler. Kartendaten der Städte © OpenStreetMap-Mitwirkende (ODbL).
+Open Source: Quellcode auf GitHub, https://github.com/DesignStraub/need-for-geschwindigkeit (Code MIT, eigene Inhalte CC BY 4.0). Musik: Tracks von Pixabay (Pixabay Content License). Stadt-Track Aachen: Bruder Jakob x Jonas Platin, „AC“, mit freundlicher Genehmigung der Künstler. Kartendaten der Städte © OpenStreetMap-Mitwirkende (ODbL).
 Motorklänge: echte Aufnahmen von Wikimedia Commons (CC BY 3.0/4.0) von prone, Y Racing, Tyler Riddle, Great Explorer, NEW CARS 2015 Official, Fabio Rojas Pichardo, Taz Ringer, asTUBE, Super Cars for you und Work With Sounds / Technisches Museum Slowenien, bearbeitet (geschnitten, geglättet, gefiltert). Reifenquietschen: Joseph Sardin, BigSoundBank (CC0).
 
 
@@ -106,5 +106,5 @@ Gamepad supported.
 
 Tagline: Illegal street racing at night through real German towns. Tuning, nitro, drift. Free.
 
-Music: tracks from Pixabay (Pixabay Content License). Aachen city track: Bruder Jakob x Jonas Platin, "AC", used with kind permission of the artists. Map data of the cities © OpenStreetMap contributors (ODbL).
+Open source: source code on GitHub, https://github.com/DesignStraub/need-for-geschwindigkeit (code MIT, own content CC BY 4.0). Music: tracks from Pixabay (Pixabay Content License). Aachen city track: Bruder Jakob x Jonas Platin, "AC", used with kind permission of the artists. Map data of the cities © OpenStreetMap contributors (ODbL).
 Engine sounds: real recordings from Wikimedia Commons (CC BY 3.0/4.0) by prone, Y Racing, Tyler Riddle, Great Explorer, NEW CARS 2015 Official, Fabio Rojas Pichardo, Taz Ringer, asTUBE, Super Cars for you and Work With Sounds / Technical Museum of Slovenia, edited (cut, smoothed, filtered). Tyre squeal: Joseph Sardin, BigSoundBank (CC0).

@@ -48,6 +48,8 @@ Dateien stehen in [`CREDITS.md`](CREDITS.md).
 1. ✓ LICENSE-Dateien angelegt, README mit Abschnitt „Open Source“ (Lizenzen, Bauen mit Godot 4.7).
 2. ✓ Öffentlichen Stand vorbereiten: `tools/oeffentlich.sh <Zielordner>` legt einen sauberen Ordner mit einem
    einzigen Commit an (nur die heute eingecheckten Dateien, ohne `.claude/`, Builds und das Aachen-Lied).
-3. Neues öffentliches Repo auf GitHub anlegen und den Ordner hochladen (nach ausdrücklichem Go des Users).
-4. itch-Seite: Link zum Repo und den Lizenzen ergänzen.
+3. ✓ Öffentlich seit 18. November 2026: [github.com/DesignStraub/need-for-geschwindigkeit](https://github.com/DesignStraub/need-for-geschwindigkeit) (Stand 2.47, ein Commit; die Geschichte bleibt im privaten Repo).
+   Spätere Stände: `tools/oeffentlich.sh` erneut ausführen und den Inhalt als neuen Commit ins öffentliche Repo
+   übernehmen (oder das private Repo direkt dorthin spiegeln).
+4. itch-Seite: Link zum Repo und den Lizenzen ergänzen (Text steht in `release/ITCH_PAGE.md`, einfügen macht der User).
 5. Zum Abschluss das Reel bzw. Video über das Spiel.
