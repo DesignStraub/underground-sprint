@@ -382,6 +382,10 @@ const EN := {
 	"PLATZ %d / %d": "POS %d / %d", "NOCH %.1f KM": "%.1f KM TO GO", "%d. PLATZ": "%d. PLACE",
 	"%d. PLATZ: %s": "%d. PLACE: %s", "NEUE BESTZEIT": "NEW BEST TIME", "ZURÜCK AUF DIE STRECKE": "BACK ON THE ROUTE",
 	"RENNEN ABGEBROCHEN": "RACE CANCELLED", "RENNEN AUFGEGEBEN": "RACE ABANDONED", "Rennen aufgeben": "Abandon race",
+	# 2.45: Driften
+	"GROSSER WINKEL": "BIG ANGLE", "SCHNELL": "FAST", "NAH AM RAND": "CLOSE TO THE EDGE", "DRIFTZONE": "DRIFT ZONE",
+	"DRIFTZONE %s": "DRIFT ZONE %s", "DRIFTZONE ABGEBROCHEN": "DRIFT ZONE CANCELLED", "BESTE %s": "BEST %s",
+	"GOLD %s": "GOLD %s", "BRONZE": "BRONZE", "SILBER": "SILVER", "GOLD": "GOLD", "KEINE MEDAILLE": "NO MEDAL",
 }
 
 static var _added := false

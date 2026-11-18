@@ -43,9 +43,12 @@ Stand 2.44: Efeu und das ONE-HUMANITY-Herz als Wandbild statt Graffiti, drei ech
 Website); die Adresse laut eigener Website ist oneplanetonehumanity.com. Offen: die eigenen Artworks als Wandbilder,
 sobald die Bilddateien da sind.
 
-## 5. Driften süchtiger machen
+## 5. Driften süchtiger machen (erster Schritt in 2.45)
 Driften soll sich im Rennen lohnen und in der freien Welt richtig Spaß machen. Beim Test kam als Vorbild ein Spiel
 namens „Dragmania“ zur Sprache (Name unsicher).
+Stand 2.45: Drift-Anzeige mit Multiplikator und Frist, Boni (großer Winkel, schnell, nah am Rand, knapp vorbei),
+eine Driftzone mit Bronze, Silber und Gold in jeder Stadt, Nitro schon während des Drifts im Rennen. Offen: das
+Vorbild „Dragmania“ ansehen, sobald der Name klar ist; Bestenlisten der Zonen auf der großen Karte.
 
 ## 6. Charme für jede Stadt
 

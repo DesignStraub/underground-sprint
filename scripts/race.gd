@@ -16,6 +16,7 @@ const Traffic := preload("res://scripts/traffic_car.gd")
 const SKY_SHADER := preload("res://shaders/night_sky.gdshader")
 const RaceShow := preload("res://scripts/race_show.gd")
 const UI := preload("res://scripts/ui_style.gd")
+const DriftMeter := preload("res://scripts/drift_meter.gd")  # Drift-Wertung mit Anzeige (seit 2.45)
 const TOUCH := preload("res://scripts/touch_controls.gd")
 const Moods := preload("res://scripts/moods.gd")
 const Loading := preload("res://scripts/loading_screen.gd")
@@ -63,13 +64,10 @@ var _last_rollovers := 0
 ## Punkte-Anzeige unten links (statt Einblendungen in der Bildmitte): Drift, knapp vorbei, Sprung; Punkte füllen
 ## Nitro ein wenig auf. Jede Zeile blendet nach ein paar Sekunden aus.
 var _feed: VBoxContainer
-var _style_chain := 0.0  # laufender Drift im Rennen (Punkte, noch nicht gutgeschrieben)
+var _meter: Control  # Drift im Rennen (nicht im Drift-Event): Wertung und Anzeige wie in der freien Fahrt (seit 2.45)
 var _race_xp := 0  # Stilpunkte dieses Rennens (seit 2.32: werden am Ziel zu Fahrer-Erfahrung)
 var _xp_gain := 0
 var _xp_lines := []
-var _style_idle := 0.0
-var _style_crashes := 0
-var _style_walls := 0
 var pause_panel: Control
 var env: Environment
 var moon: DirectionalLight3D
@@ -816,6 +814,20 @@ func _build_hud() -> void:
 	_feed.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_feed.add_theme_constant_override("separation", -2)
 	corner.add_child(_feed)
+	if event_type != "drift" and event_type != "drag":
+		_meter = DriftMeter.new()
+		_meter.anchor_left = 0.5
+		_meter.anchor_right = 0.5
+		_meter.offset_left = -210.0
+		_meter.offset_right = 210.0
+		_meter.offset_top = 70.0
+		_meter.offset_bottom = 140.0
+		_meter.player = player
+		_meter.grace = 0.8
+		_meter.visible = false
+		_meter.banked.connect(_on_style_banked)
+		_meter.lost.connect(_on_style_lost)
+		root.add_child(_meter)
 	hud["drift"] = _label(corner, 16)
 	hud["drift"].label_settings.font = UI.font("cond", 0.2)
 	hud["drift"].label_settings.font_color = Color(1.0, 0.85, 0.2)
@@ -1537,24 +1549,26 @@ func _update_feed(dt: float) -> void:
 			l.queue_free()
 
 
-## Drift im Rennen (nicht im Drift-Event): Punkte wie im Drift-Event, gutgeschrieben, wenn der Drift sauber zu Ende
-## ist; Wand oder Crash kosten die Kette.
+## Drift im Rennen (nicht im Drift-Event): Wertung und Anzeige wie in der freien Fahrt (drift_meter.gd, seit 2.45),
+## gutgeschrieben, wenn der Drift sauber zu Ende ist; Wand oder Crash kosten die Kette. Driften lohnt sich: schon
+## während des Drifts füllt sich Nitro (bei 30° und 80 km/h gut 3 % je Sekunde, mit Boni bis etwa doppelt so viel),
+## dazu wie bisher die Gutschrift am Ende (_flash).
 func _update_style(dt: float) -> void:
-	if state != State.RACING:
-		_style_chain = 0.0
+	if _meter == null:
 		return
-	if player.crashes != _style_crashes or player.wall_hits != _style_walls:
-		_style_crashes = player.crashes
-		_style_walls = player.wall_hits
-		_style_chain = 0.0
-	var kmh := player.velocity.length() * 3.6
-	if player.drifting and player.drift_angle >= 12.0 and kmh > 35.0 and not player.airborne:
-		_style_chain += (clampf(player.drift_angle, 0.0, 60.0) - 10.0) * kmh / 100.0 * dt * 10.0
-		_style_idle = 0.0
-	else:
-		_style_idle += dt
-		if _style_chain > 0.0 and _style_idle > 0.8:
-			var pts := int(_style_chain / 10.0) * 10
-			if pts >= 50:
-				_flash(tr("DRIFT"), Color(1.0, 0.85, 0.2), pts)
-			_style_chain = 0.0
+	if state != State.RACING:
+		_meter.reset()
+		_meter.visible = false
+		return
+	_meter.step(dt)
+	if _meter.drift_rate > 0.0:
+		player.nitro = minf(player.nitro + dt * _meter.drift_rate / 5000.0 / player.nitro_cap, 1.0)
+
+
+func _on_style_banked(pts: int, _raw: float, m: int) -> void:
+	_flash(tr("DRIFT") + ("  x%d" % m if m > 1 else ""), Color(1.0, 0.85, 0.2), pts)
+
+
+func _on_style_lost(pts: int) -> void:
+	if pts >= 150:
+		_flash(tr("KETTE VERLOREN"), Color(1.0, 0.35, 0.3))

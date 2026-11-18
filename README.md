@@ -240,6 +240,29 @@ Außenring → nächste Stadt → Autobahn. Rundkurse und Drift-Kurse sind Schle
 - **Weiter, wo man war; Schnellreise erst nach dem ersten Besuch** (seit 2.42, Einzelheiten dort).
 - **Autobahn-Rennen von Stadt zu Stadt** (seit 2.43, Einzelheiten dort).
 - **Efeu und ONE-HUMANITY-Wandbilder statt Graffiti, echte Werbung von ONE HUMANITY** (seit 2.44, Einzelheiten dort).
+- **Driften mit Ketten, Boni und einer Driftzone in jeder Stadt** (seit 2.45, Einzelheiten dort).
+
+## Driften süchtiger: Ketten, Boni, Driftzonen, Nitro im Rennen (2.45)
+Aus dem Fahrplan (Punkt 5): Driften soll sich im Rennen lohnen und in der freien Welt richtig Spaß machen.
+
+- **Drift-Anzeige** (`scripts/drift_meter.gd`, in der freien Fahrt und in Sprints und Rundkursen): oben in der Mitte
+  die laufende Kette als Zahl in der Farbe des Multiplikators (weiß, grün, blau, pink, gold), daneben „x3“, darunter
+  ein Balken (beim Driften der Weg zur nächsten Stufe, danach die ablaufende Frist bis zur Gutschrift) und die aktiven
+  Boni; nach der Gutschrift steht „+3.350“ kurz in Gold. Bis 2.44 war es eine Textzeile unten. Kein eigener Ton.
+- **Boni im Drift:** GROSSER WINKEL (über 38°) x1,3, SCHNELL (über 110 km/h) x1,25, NAH AM RAND (höchstens 1,8 m bis
+  zur Kante der Fahrbahn) x1,5; KNAPP VORBEI im Drift legt 60 % seiner Punkte in die Kette und hält sie offen. Der
+  Multiplikator wächst wie bisher mit der Driftzeit (Welt alle 3 s, bis x5); Wand oder Crash kosten die Kette.
+- **Driftzonen** (`scripts/drift_zones.gd`): in jeder Stadt der kurvigste Abschnitt der Hauptstraße (bis 650 m, nicht
+  über dem Start des Rennens), Anfang und Ende als orange Linie quer über die Fahrbahn mit kleinen Pfosten, am Anfang
+  ein Schild mit der Bestleistung, orange auf der Minikarte. Wer vorwärts über die erste Linie fährt, startet die Zone;
+  die Anzeige zeigt Stand und nächstes Ziel. Bronze, Silber, Gold je nach Länge (650 m: 3.000, 7.000, 12.000; ein
+  guter Drift von 7 s bei 30° und 80 km/h bringt 3.350), neue Medaillen je 400 XP, die Bestleistung wird gespeichert
+  (`GameState.drift_best`). Rückwärts, über 3 s von der Hauptstraße ab oder im Autobahn-Rennen: abgebrochen.
+- **Im Rennen lohnt es sich:** schon während des Drifts füllt sich Nitro (bei 30° und 80 km/h gut 3 % je Sekunde, mit
+  Boni bis etwa doppelt so viel), dazu wie bisher die Gutschrift am Ende.
+- **Tests:** Rechentest der Wertung (7 s Drift: 1.120 Punkte, x3, gutgeschrieben 3.350; Crash setzt zurück),
+  `--wstart=4 --dzone=4 --wdrive --botdrift` (vor der Driftzone Köln, Zone startet und endet), `--metertest`
+  (laufende Kette vortäuschen, für Bilder der Anzeige).
 
 ## Deko und Werbung statt Graffiti (2.44)
 Aus dem Fahrplan (Punkt 4): die Graffiti am Straßenrand sahen nach Müll aus; lieber normale Deko und echte Werbung von

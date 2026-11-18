@@ -6,6 +6,7 @@ extends "res://scripts/minimap.gd"
 
 var _areas := []  # Gelände (seit 2.39): [Umriss, Farbe, Name, Teiche]
 var _route := PackedVector2Array()  # Strecke des laufenden Autobahn-Rennens (seit 2.43), über den Straßen
+var _zones := {}  # Driftzonen (seit 2.45): Schlüssel -> Linienzug, orange über den Straßen
 
 
 ## roads: [[Linienzug (Welt x, z), Art 0 Haupt / 1 Auffahrt / 2 Nebenweg], ...]; pins: Node3D mit meta "hud_col";
@@ -31,6 +32,15 @@ func set_target(p: Vector3, on: bool) -> void:
 	show_flag = on
 
 
+## Driftzone einzeichnen (einmal je Zone; die Lage ändert sich nicht)
+func add_zone(key: String, pts: PackedVector2Array) -> void:
+	if _zones.has(key):
+		return
+	_zones[key] = pts
+	if _world:
+		_world.queue_redraw()
+
+
 ## Strecke eines Autobahn-Rennens hervorheben (leer: keine)
 func set_route(pts: PackedVector2Array) -> void:
 	_route = pts
@@ -49,5 +59,8 @@ func _draw_world() -> void:
 		for pd in ar[3]:
 			_world.draw_colored_polygon(pd, COL_WATER)
 	super()
+	for pl in _zones.values():
+		if (pl as PackedVector2Array).size() > 1:
+			_world.draw_polyline(pl, Color(1.0, 0.55, 0.12, 0.9), 2.6 * PX, true)
 	if _route.size() > 1:
 		_world.draw_polyline(_route, Color(0.25, 0.52, 1.0, 0.95), 3.2 * PX, true)

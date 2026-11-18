@@ -18,6 +18,8 @@ const SKY_SHADER := preload("res://shaders/night_sky.gdshader")
 const WorldMinimap := preload("res://scripts/world_minimap.gd")
 const MapView := preload("res://scripts/world_map_view.gd")
 const HighwayRace := preload("res://scripts/highway_race.gd")  # Autobahn-Rennen von Stadt zu Stadt (seit 2.43)
+const DriftMeter := preload("res://scripts/drift_meter.gd")  # Drift-Wertung mit Anzeige (seit 2.45)
+const DriftZones := preload("res://scripts/drift_zones.gd")  # Driftzone in jeder Stadt (seit 2.45)
 const Traffic := preload("res://scripts/traffic_car.gd")
 const Challenger := preload("res://scripts/challenger_car.gd")
 const Builder := preload("res://scripts/car_builder.gd")
@@ -88,11 +90,7 @@ var _near := {}  # Verkehrsautos, für die es schon „knapp vorbei“ gab
 var _near_chain := 0  # Knapp-vorbei-Kette (je höchstens 4 s Abstand)
 var _near_chain_t := 0.0
 # Drift in der freien Fahrt (seit 2.32, _update_world_drift): laufende Kette, Driftzeit (Multiplikator), Pause
-var _dr_chain := 0.0
-var _dr_time := 0.0
-var _dr_idle := 0.0
-var _dr_walls := 0
-var _dr_crashes := 0
+var drift_meter: Control  # Drift-Wertung und Anzeige oben in der Mitte (seit 2.45)
 var _dr_landings := 0
 var _xp_save_t := 0.0
 var _lu_t := 0.0  # Level-Einblendung
@@ -229,6 +227,8 @@ func _ready() -> void:
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--hwrace=") and not hw_defs.is_empty():
 			get_tree().create_timer(1.0).timeout.connect(_start_highway.bind(int(a.substr(9)) % hw_defs.size()))
+		if a.begins_with("--dzone="):  # Test: 40 m vor der Driftzone der Stadt von Rennen i (mit --wstart=i)
+			get_tree().create_timer(0.5).timeout.connect(_dzone_test.bind(int(a.substr(8))))
 	if OS.get_cmdline_user_args().has("--lvltest"):  # Test: Bild der Level-Anzeige
 		get_tree().create_timer(1.0).timeout.connect(func(): _show_level_up([tr("LEVEL %d") % 18, tr("Auto: ") + "Ryujin 30Z",
 			tr("Titel: ") + tr("Drift-Samurai"), tr("Vinyl: ") + tr("Glitch")]))
@@ -584,6 +584,7 @@ func _finish(e: Dictionary, job: Dictionary) -> void:
 	e["feet"] = job.get("buildings", []) + job.get("occupied", [])  # Häuser und Bauwerke (für --worldcheck)
 	if e["kind"] == "city":
 		_add_marker(e)
+		_add_drift_zone(e)
 	_plan_traffic(e)
 	if player and tr["crossing"]:
 		tr["crossing"].player = player
@@ -1182,7 +1183,19 @@ func _build_hud() -> void:
 	dm.add_theme_font_override("font", UI.font("wide", 0.15))
 	dm.add_theme_color_override("font_color", Color(1.0, 0.85, 0.2))
 	dm.visible = false
-	hud["drift"] = dm
+	hud["drift"] = dm  # seit 2.45 ungenutzt (drift_meter zeigt den Drift)
+	drift_meter = DriftMeter.new()
+	drift_meter.anchor_left = 0.5
+	drift_meter.anchor_right = 0.5
+	drift_meter.offset_left = -210.0
+	drift_meter.offset_right = 210.0
+	drift_meter.offset_top = 82.0
+	drift_meter.offset_bottom = 152.0
+	drift_meter.player = player
+	drift_meter.visible = false
+	drift_meter.banked.connect(_on_drift_banked)
+	drift_meter.lost.connect(_on_drift_lost)
+	root.add_child(drift_meter)
 	# Level aufgestiegen (seit 2.35 dezent unten über der Leiste statt groß in der Mitte): Level und das Wichtigste,
 	# was es freischaltet; alles Weitere steht in der Garage unter Fahrer
 	var lu := _label(root, 14, HORIZONTAL_ALIGNMENT_CENTER)
@@ -1236,6 +1249,10 @@ func _build_hud() -> void:
 		hw_pins.append(rp)
 	_ch_t = 3.0 if OS.get_cmdline_user_args().has("--challenger") else randf_range(70.0, 160.0)
 	minimap.setup_world(layout["roads"], player, open_pins, _offroad_map())
+	for ri in _dz:  # Driftzonen der Städte, die schon hinter dem Ladebild gebaut wurden
+		var dze: Dictionary = _dz[ri]["e"]
+		if dze["state"] == "ready":
+			minimap.add_zone(_dz[ri]["key"], DriftZones.polyline(dze["track"], _dz[ri], dze["xf"]))
 	minimap.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
 	minimap.offset_left = 8.0
 	minimap.offset_right = 8.0 + WorldMinimap.SIZE
@@ -1607,6 +1624,7 @@ func _process(dt: float) -> void:
 	_update_feed(dt)
 	_update_level_banner(dt)
 	_update_last_spot(dt)
+	_update_drift_zones(dt)
 	_prof_mark("rest")
 	var tacho = hud["tacho"]
 	tacho.rpm = player.rpm
@@ -1720,6 +1738,8 @@ func _check_near_miss() -> void:
 		if _near_chain > 1:
 			txt += "  x%d" % _near_chain
 		_flash(txt, Color(1.0, 0.55, 0.15) if gap < 0.5 else Color(1.0, 0.85, 0.2), pts)
+		if drift_meter:
+			drift_meter.add_bonus(pts * 0.6, "KNAPP VORBEI")  # im Drift: Extrapunkte für die Kette (seit 2.45)
 		Sfx.play("whoosh", -9.0 if gap < 0.5 else -12.0, randf_range(1.1, 1.3))
 
 
@@ -1743,6 +1763,147 @@ func _flash(text: String, col: Color, pts := 0, xp := -1) -> void:
 		if not lines.is_empty():
 			_show_level_up(lines)
 		_update_level_hud()
+
+
+# --- Driftzonen (seit 2.45, drift_zones.gd) ------------------------------------------------------------------
+
+## In jeder Stadt der kurvigste Abschnitt der Hauptstraße: wer vorwärts über die orange Linie fährt, startet die Zone;
+## alle Drifts bis zur zweiten Linie zählen (die laufende Kette wird dort gutgeschrieben). Bronze, Silber, Gold je nach
+## Länge; neue Medaillen bringen Erfahrung, die Bestleistung steht am Schild. Abgebrochen: rückwärts, von der
+## Hauptstraße ab (über 3 s), im Autobahn-Rennen.
+const DZ_STAR_XP := 400
+var _dz := {}  # Rennen (Stadt) -> Zone {e, d0, d1, targets, key, name, label}
+var _dz_on: Dictionary = {}
+var _dz_score := 0
+var _dz_last := 0.0
+var _dz_prev := -1.0
+var _dz_off_t := 0.0
+
+
+func _add_drift_zone(e: Dictionary) -> void:
+	var tr: Dictionary = e["track"]
+	var z := DriftZones.plan(tr)
+	if z.is_empty():
+		return
+	var ri: int = e["race_index"]
+	var town := str(Catalog.RACES[ri].get("town", ""))
+	z["e"] = e
+	z["key"] = "%s#%d" % [town, ri]
+	z["name"] = town
+	z["targets"] = DriftZones.targets(z)
+	var best := int(GameState.drift_best.get(z["key"], 0))
+	z["label"] = DriftZones.build_gates(tr, z, tr("DRIFTZONE"), _dz_best_line(best, z["targets"]))
+	_dz[ri] = z
+	if minimap:
+		minimap.add_zone(z["key"], DriftZones.polyline(tr, z, e["xf"]))
+
+
+func _dz_best_line(best: int, tg: Array) -> String:
+	if best <= 0:
+		return tr("GOLD %s") % DriftMeter.fmt(int(tg[2]))
+	var st := DriftZones.stars(best, tg)
+	return tr("BESTE %s") % DriftMeter.fmt(best) + ("  ·  " + tr(DriftZones.STARS[st - 1]) if st > 0 else "")
+
+
+func _dzone_test(ri: int) -> void:
+	if not _dz.has(ri):
+		print("DZTEST: keine Driftzone für Rennen ", ri)
+		return
+	var z: Dictionary = _dz[ri]
+	var e: Dictionary = z["e"]
+	var tr: Dictionary = e["track"]
+	var d := float(z["d0"]) - 40.0
+	var xf: Transform3D = (e["xf"] as Transform3D) * Track.xform_at(tr["curve"], d, Track.lane_lat(tr, d, 2.25), true)
+	xf.origin.y += 0.5
+	player.place(xf)
+	player.track = tr
+	_set_active(e)
+	print("DZTEST Zone %s: %.0f bis %.0f m, Ziele %s" % [z["name"], z["d0"], z["d1"], str(z["targets"])])
+
+
+func _dz_add(pts: int) -> void:
+	if not _dz_on.is_empty():
+		_dz_score += pts
+
+
+func _update_drift_zones(dt: float) -> void:
+	if player == null or drift_meter == null:
+		return
+	if hrace != null or not player.controls_enabled:
+		if not _dz_on.is_empty():
+			_dz_cancel()
+		_dz_prev = -1.0
+		return
+	if _dz_on.is_empty():
+		# Einfahrt: auf der Hauptstraße dieser Stadt vorwärts über die erste Linie
+		if active.is_empty() or active["kind"] != "city" or player.path_id != 0 or not _dz.has(active["race_index"]):
+			_dz_prev = -1.0
+			return
+		var z: Dictionary = _dz[active["race_index"]]
+		if not is_same(z["e"], active):
+			return
+		var p: float = player.progress
+		if _dz_prev >= 0.0 and _dz_prev < float(z["d0"]) and p >= float(z["d0"]) and p - _dz_prev < 30.0:
+			_dz_on = z
+			_dz_score = 0
+			_dz_last = p
+			_dz_off_t = 0.0
+			hud["area"].text = tr("DRIFTZONE %s") % str(z["name"]).to_upper()
+			_area_t = 3.0
+		_dz_prev = p
+		return
+	var zz := _dz_on
+	if is_same(active, zz["e"]) and player.path_id == 0:
+		var p: float = player.progress
+		if p >= float(zz["d1"]):
+			_dz_finish()
+			return
+		if p < _dz_last - 25.0:
+			_dz_cancel()
+			return
+		_dz_last = maxf(_dz_last, p)
+		_dz_off_t = 0.0
+	else:
+		_dz_off_t += dt
+		if _dz_off_t > 3.0:
+			_dz_cancel()
+			return
+	var tg: Array = zz["targets"]
+	var cur: int = _dz_score + int(drift_meter.value())
+	var nxt := ""
+	for k in tg.size():
+		if cur < int(tg[k]):
+			nxt = tr(DriftZones.STARS[k]) + " " + DriftMeter.fmt(int(tg[k]))
+			break
+	drift_meter.zone_text = "%s  ·  %s%s" % [tr("DRIFTZONE %s") % str(zz["name"]).to_upper(), DriftMeter.fmt(cur),
+		("  /  " + nxt) if nxt != "" else "  ·  " + tr("GOLD")]
+
+
+func _dz_finish() -> void:
+	drift_meter.bank_now()  # die laufende Kette zählt noch (banked -> _dz_add)
+	var z := _dz_on
+	_dz_on = {}
+	drift_meter.zone_text = ""
+	var tg: Array = z["targets"]
+	var best := int(GameState.drift_best.get(z["key"], 0))
+	var st := DriftZones.stars(_dz_score, tg)
+	var xp := maxi(st - DriftZones.stars(best, tg), 0) * DZ_STAR_XP
+	if _dz_score > best:
+		GameState.drift_best[z["key"]] = _dz_score
+		best = _dz_score
+		GameState.save_game()
+	var medal := tr(DriftZones.STARS[st - 1]) if st > 0 else tr("KEINE MEDAILLE")
+	_flash("%s: %s  ·  %s" % [tr("DRIFTZONE %s") % str(z["name"]).to_upper(), DriftMeter.fmt(_dz_score), medal],
+		UI.GOLD if st == 3 else Color(1.0, 0.6, 0.2), xp, xp)
+	if is_instance_valid(z.get("label")):
+		(z["label"] as Label3D).text = tr("DRIFTZONE") + "\n" + _dz_best_line(best, tg)
+	print("DRIFTZONE %s: %d Punkte, %s (Ziele %s), %d XP" % [z["name"], _dz_score, medal, str(tg), xp])
+
+
+func _dz_cancel() -> void:
+	_dz_on = {}
+	drift_meter.zone_text = ""
+	_flash(tr("DRIFTZONE ABGEBROCHEN"), Color(1.0, 0.35, 0.3))
 
 
 # --- Autobahn-Rennen (seit 2.43, highway_race.gd) -------------------------------------------------------------
@@ -2017,34 +2178,19 @@ func _update_world_drift(dt: float) -> void:
 		_dr_landings = player.landings
 		if player.last_air > 0.6:
 			_flash(tr("SPRUNG  %.1f s") % player.last_air, Color(0.4, 0.85, 1.0), int(player.last_air * 300.0 / 10.0) * 10)
-	if player.crashes != _dr_crashes or player.wall_hits != _dr_walls:
-		_dr_crashes = player.crashes
-		_dr_walls = player.wall_hits
-		if _dr_chain >= 150.0:
-			_flash(tr("KETTE VERLOREN"), Color(1.0, 0.35, 0.3))
-		_dr_chain = 0.0
-		_dr_time = 0.0
-	var kmh := player.velocity.length() * 3.6
-	var mult := clampi(1 + int(_dr_time / 3.0), 1, 5)
-	if player.drifting and player.drift_angle >= 12.0 and kmh > 35.0 and not player.airborne:
-		_dr_chain += (clampf(player.drift_angle, 0.0, 60.0) - 10.0) * kmh / 100.0 * dt * 10.0
-		_dr_time += dt
-		_dr_idle = 0.0
-	else:
-		_dr_idle += dt
-		if _dr_chain > 0.0 and _dr_idle > 0.9:
-			var pts := int(_dr_chain * mult / 10.0) * 10
-			if pts >= 50:
-				# Erfahrung ohne den Ketten-Multiplikator (der zählt für Punkte und Nitro): eine Minute gutes Driften
-				# bringt so gut 600 XP, ein Rennsieg 3000 bis 7500
-				_flash(tr("DRIFT") + ("  x%d" % mult if mult > 1 else ""), Color(1.0, 0.85, 0.2), pts, int(_dr_chain * DRIFT_XP))
-			_dr_chain = 0.0
-			_dr_time = 0.0
-	var dm: Label = hud["drift"]
-	dm.visible = _dr_chain >= 30.0
-	if dm.visible:
-		dm.text = tr("DRIFT  %d") % (int(_dr_chain * mult / 10.0) * 10) + ("  x%d" % mult if mult > 1 else "")
-		dm.modulate.a = 1.0 if _dr_idle < 0.05 else 0.6
+	drift_meter.step(dt)
+
+
+## Drift gutgeschrieben (drift_meter): Zeile über der Minikarte mit Nitro und Erfahrung (ohne Multiplikator: eine
+## Minute gutes Driften bringt so gut 600 XP, ein Rennsieg 3000 bis 7500); in einer Driftzone zählt er dort mit
+func _on_drift_banked(pts: int, raw: float, m: int) -> void:
+	_flash(tr("DRIFT") + ("  x%d" % m if m > 1 else ""), Color(1.0, 0.85, 0.2), pts, int(raw * DRIFT_XP))
+	_dz_add(pts)
+
+
+func _on_drift_lost(pts: int) -> void:
+	if pts >= 150:
+		_flash(tr("KETTE VERLOREN"), Color(1.0, 0.35, 0.3))
 
 
 func _update_feed(dt: float) -> void:
