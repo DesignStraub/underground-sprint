@@ -214,4 +214,20 @@ func _wallcheck() -> void:
 				last = d
 			d += 2.0
 	print("WANDCHECK %d Stellen" % bad)
+	# offene Enden: Anfang oder Ende eines Nebenweges, das an keinem anderen Weg liegt (Sackgasse)
+	var open := 0
+	for p in track["paths"]:
+		if p["id"] == 0 or p["kind"] in ["platz", "ramp"]:
+			continue
+		var c: Curve3D = p["curve"]
+		for q3 in [c.sample_baked(0.0), c.sample_baked(c.get_baked_length())]:
+			var best := 1e9
+			for o in track["paths"]:
+				if o["id"] == p["id"]:
+					continue
+				best = minf(best, Track._flat(q3 - (o["curve"] as Curve3D).get_closest_point(q3)).length())
+			if best > 3.0:
+				print("OFFENES ENDE #%d %s %s bei (%.0f, %.0f), %.0f m vom nächsten Weg" % [p["id"], p["kind"], p.get("street_name", ""), q3.x, q3.z, best])
+				open += 1
+	print("ENDENCHECK %d offene Enden" % open)
 

@@ -36,7 +36,9 @@ REACH = 300.0  # so weit von der Strecke reicht das Netz (Häuser gibt es bis 33
 STEP = 2.5
 CORNER_R = 11.0
 MIN_LEN = 24.0
+LOOP_MIN = 140.0  # kürzere Schleifen an dieselbe Straße fallen weg
 BLOCK_PAD = 9.0  # Abstand der Straßenmitte zu Sperrflächen
+DUAL_GAP = 28.0  # Richtungsfahrbahnen höchstens so weit auseinander
 DENSE = 4.0  # Wege dazwischen alle so viele Meter ein Knoten (sonst übersieht man Kreuzungen mit der Strecke)  # kürzere Straßen (zwischen zwei Enden) lohnen nicht
 MOUTH_MIN_ANG = 38.0  # flacher darf eine Straße nicht in die Hauptstraße münden (Grad)
 CLS = {"primary": "breit", "secondary": "strasse", "tertiary": "strasse", "unclassified": "strasse",
@@ -183,6 +185,10 @@ def simplify(line, tol=1.2):
     """Douglas-Peucker: kleine Zacken der OSM-Linie weg, damit die Rundung echte Ecken trifft"""
     if len(line) < 3:
         return line
+    if math.dist(line[0], line[-1]) < 1.0 and len(line) > 3:
+        # geschlossener Ring (Kreisverkehr): am weitesten entfernten Punkt teilen, sonst fiele er zu einem Punkt zusammen
+        k = max(range(len(line)), key=lambda i: math.dist(line[0], line[i]))
+        return simplify(line[:k + 1], tol)[:-1] + simplify(line[k:], tol)
     a, b = line[0], line[-1]
     ab = (b[0] - a[0], b[1] - a[1])
     lab = math.hypot(*ab) or 1e-6
@@ -204,7 +210,7 @@ def seg_dist(q, a, b):
     return math.dist(q, (a[0] + ab[0] * t, a[1] + ab[1] * t))
 
 
-def add_way(ways, fake, node_ids, geo, name, cls):
+def add_way(ways, fake, node_ids, geo, name, cls, oneway=False):
     """Weg mit Zwischenknoten alle DENSE m (negative IDs) anlegen"""
     nodes, dgeo = [node_ids[0]], [geo[0]]
     for k in range(1, len(geo)):
@@ -217,7 +223,7 @@ def add_way(ways, fake, node_ids, geo, name, cls):
             dgeo.append((a[0] + (b[0] - a[0]) * tt, a[1] + (b[1] - a[1]) * tt))
         nodes.append(node_ids[k])
         dgeo.append(b)
-    ways.append({"nodes": nodes, "geo": dgeo, "name": name, "cls": cls})
+    ways.append({"nodes": nodes, "geo": dgeo, "name": name, "cls": cls, "oneway": oneway})
 
 
 def osm_ways(folder, city, ways, fake):
@@ -236,7 +242,46 @@ def osm_ways(folder, city, ways, fake):
                 or t.get("access") in ("private", "no") or t.get("layer", "0") not in ("0", ""):
             continue
         geo = [proj(g["lat"], g["lon"]) for g in e["geometry"]]
-        add_way(ways, fake, e["nodes"], geo, t.get("name", ""), CLS.get(hw, "gasse"))
+        add_way(ways, fake, e["nodes"], geo, t.get("name", ""), CLS.get(hw, "gasse"), t.get("oneway") == "yes")
+    merge_duals(ways)
+
+
+def merge_duals(ways):
+    """Richtungsfahrbahnen (zwei Einbahn-Wege gleichen Namens nebeneinander): nur die längere bleibt, als Straße in
+    beide Richtungen. Was an der anderen hing (Seitenstraßen), mündet am nächsten Knoten der bleibenden ein."""
+    order = sorted(range(len(ways)), key=lambda i: -len(ways[i]["nodes"]))
+    kept, drop = [], {}
+    for i in order:
+        w = ways[i]
+        if w.get("oneway") and w["name"]:
+            for k in kept:
+                w2 = ways[k]
+                if not w2.get("oneway") or w2["name"] != w["name"]:
+                    continue
+                g2 = w2["geo"]
+                close = sum(1 for q in w["geo"] if min(math.dist(q, x) for x in g2) < DUAL_GAP)
+                if close >= 0.7 * len(w["geo"]):
+                    drop[i] = k
+                    break
+            if i in drop:
+                continue
+        kept.append(i)
+    alias = {}  # Knoten der weggefallenen Fahrbahn -> nächster Knoten der bleibenden
+    for i, k in drop.items():
+        w, w2 = ways[i], ways[k]
+        for n, q in zip(w["nodes"], w["geo"]):
+            j = min(range(len(w2["geo"])), key=lambda m: math.dist(q, w2["geo"][m]))
+            alias[n] = (w2["nodes"][j], w2["geo"][j])
+    out = []
+    for i, w in enumerate(ways):
+        if i in drop:
+            continue
+        if any(n in alias for n in w["nodes"]):
+            w["geo"] = [alias[n][1] if n in alias else q for n, q in zip(w["nodes"], w["geo"])]
+            w["nodes"] = [alias[n][0] if n in alias else n for n in w["nodes"]]
+        out.append(w)
+    ways[:] = out
+
 
 
 def design_ways(cfg, main, ways, fake):
@@ -417,7 +462,9 @@ def build(folder, city):
         if len(adj.get(node, [])) == 2:
             for j in adj[node]:
                 if not used[j]:
-                    return j
+                    p2, _ = oriented(j, node)
+                    dh = abs((heading(p2[0], p2[1]) - h0 + math.pi) % (2 * math.pi) - math.pi)
+                    return j if dh < math.radians(115) else -1  # spitze Kehre: zwei Straßen, sonst ein Zacken
             return -1
         best, bi = 1e9, -1
         for j in adj.get(node, []):
@@ -505,8 +552,15 @@ def build(folder, city):
         d = abs((sdir - tdir + math.pi) % (2 * math.pi) - math.pi)
         return math.degrees(min(d, math.pi - d))
     drop = set()
+    carried = set(e["street"] for st in out for e in st["ends"] if "street" in e)  # an diesen hängen andere
     for si, st in enumerate(out):
         if st["len"] < MIN_LEN or not st["ok"]:
+            drop.add(si)
+        # kurze Schleife zurück an dieselbe Straße (Wendeschleife, Zwickel): führt nirgendwohin, und im engen Zwickel
+        # stünden die Wände auf der Fahrbahn
+        e0, e1 = st["ends"]
+        if st["len"] < LOOP_MIN and (e0.get("main") and e1.get("main") or e0.get("street", -1) == e1.get("street", -2)) \
+                and si not in carried:
             drop.add(si)
         for k in (0, 1):
             if st["ends"][k].get("main") and mouth_angle(st, k) < MOUTH_MIN_ANG:
@@ -526,6 +580,8 @@ def build(folder, city):
     for si in keep:
         st = out[si]
         line = fillet(simplify(st["pts"]), CORNER_R, STEP)
+        if len(line) < 6:
+            print("  WARNUNG: %s nach dem Runden nur %d Punkte" % (st["name"], len(line)))
         ends = [({"main": True} if e.get("main") else {"street": remap[e["street"]]}) for e in st["ends"]]
         res.append({"name": st["name"], "cls": st["cls"], "ends": ends,
                     "pts": [v for q in line for v in (round(q[0], 1), round(q[1], 1))]})
