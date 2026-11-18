@@ -4789,6 +4789,23 @@ static func _build_city_signs(root: Node3D, track: Dictionary, race: Dictionary)
 		l.double_sided = false
 		l.transform = Transform3D(bf, base + Vector3(0, CURB_H + 2.35 + txt[1], 0) + bf.z * 0.04)
 		root.add_child(l)
+	# Gruß in Mundart als weiße Zusatztafel unter dem Ortsschild (seit 2.46): „KÖLLE ALAAF!“, „MOIN MOIN!“, „GLÜCK AUF!“
+	var greet: String = race.get("greet", "")
+	if greet != "":
+		var gw := maxf(1.4, _text_w(greet, 44, 0.0042) + 0.4)
+		var gy := CURB_H + 1.38
+		_part(groups, black, Builder.box(Vector3(gw + 0.08, 0.5, 0.05)), Transform3D(bf, base + Vector3(0, gy, 0) - bf.z * 0.04))
+		_part(groups, white, Builder.box(Vector3(gw, 0.42, 0.06)), Transform3D(bf, base + Vector3(0, gy, 0)))
+		var gl := Label3D.new()
+		gl.text = greet
+		gl.font_size = 44
+		gl.pixel_size = 0.0042
+		gl.modulate = Color(0.02, 0.02, 0.02)
+		gl.outline_size = 0
+		gl.shaded = true
+		gl.double_sided = false
+		gl.transform = Transform3D(bf, base + Vector3(0, gy, 0) + bf.z * 0.04)
+		root.add_child(gl)
 	var sl := OmniLight3D.new()
 	sl.position = base + Vector3(0, 4.5, 0) - f["fwd"] * 3.0
 	sl.light_color = Color(1.0, 0.85, 0.6)
@@ -5258,6 +5275,8 @@ static func _building(root: Node3D, center: Vector3, basis: Basis, w: float, dep
 	var names: Array = dist.get("names", SHOPS)
 	if dist.has("de") and not _city_names.is_empty():
 		names = _city_names + _city_names + names
+	elif not dist.has("names") and not _city_names.is_empty():
+		names = _city_names + names  # seit 2.46: Läden mit Ortskolorit auch in den entworfenen Städten (Kölsch, Fischbrötchen)
 	if shop and dist.has("lanterns"):
 		# Zwei Lampions vor dem Laden
 		var lm := Builder.mat(Color(0.9, 0.1, 0.05), 0.0, 0.5, Color(1.0, 0.15, 0.05), 1.8)

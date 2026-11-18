@@ -50,7 +50,10 @@ Stand 2.45: Drift-Anzeige mit Multiplikator und Frist, Boni (großer Winkel, sch
 eine Driftzone mit Bronze, Silber und Gold in jeder Stadt, Nitro schon während des Drifts im Rennen. Offen: das
 Vorbild „Dragmania“ ansehen, sobald der Name klar ist; Bestenlisten der Zonen auf der großen Karte.
 
-## 6. Charme für jede Stadt
+## 6. Charme für jede Stadt (erster Schritt in 2.46)
+Stand 2.46: Gruß in Mundart unter jedem Ortsschild, Läden mit Ortskolorit in allen Städten, dazu seit 2.45 eine
+Driftzone je Stadt. Offen, wenn mehr gewünscht: ein typisches Geräusch oder Lied je Stadt (wie in Aachen), eine
+kleine Besonderheit je Stadt (Fischbude am Hafen, Biergarten, Kölsch-Kneipe als begehbares Bauwerk).
 
 ## 6a. Verkehr, Ampeln, Schilder, Kleinkram (nachgereicht am 17.11.2026; erledigt in 2.41)
 - Die Autos, Busse und Transporter im Verkehr sollen mehr Details bekommen.

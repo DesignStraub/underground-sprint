@@ -698,32 +698,32 @@ static func rating(car_id: String, cfg: Dictionary) -> int:
 const RACES := [
 	# seit 2.36 entworfen (track_design.gd, LAYOUTS["frankfurt"]): Hochhausschlucht, Theatertunnel, Mainufer, Brücke,
 	# Gasse durch Alt-Sachsenhausen
-	{"name": "Bankenviertel-Sprint", "town": "Frankfurt am Main", "region": "Kreisfreie Stadt", "geo": Vector2(50.1109, 8.6821), "mood": "neon",  "type": "sprint", "tier": 1, "seed": 11, "layout": "frankfurt",
+	{"name": "Bankenviertel-Sprint", "town": "Frankfurt am Main", "greet": "EI GUDE!", "shops": ["APFELWEIN", "EBBELWOI", "GRIE SOSS", "HANDKÄS", "BÖRSENCAFÉ", "SACHSENHAUSEN", "MESSE-IMBISS", "BETHMÄNNCHEN"], "region": "Kreisfreie Stadt", "geo": Vector2(50.1109, 8.6821), "mood": "neon",  "type": "sprint", "tier": 1, "seed": 11, "layout": "frankfurt",
 		"districts": {"downtown": 0.45, "shops": 0.3, "chinatown": 0.25}},
 	# seit 2.36 entworfen (LAYOUTS["muenchen"]): Ludwigstraße durchs Siegestor, Englischer Garten, Isar, Friedensengel
-	{"name": "Prachtallee-Sprint", "town": "München", "region": "Landeshauptstadt", "geo": Vector2(48.1351, 11.582), "mood": "daemmerung",  "type": "sprint", "tier": 1, "seed": 23, "layout": "muenchen",
+	{"name": "Prachtallee-Sprint", "town": "München", "greet": "SERVUS!", "shops": ["WEISSWURST", "BIERGARTEN", "BREZN", "LEBERKAS", "OBATZDA", "TRACHTEN", "BRÄUSTÜBERL", "DIRNDL"], "region": "Landeshauptstadt", "geo": Vector2(48.1351, 11.582), "mood": "daemmerung",  "type": "sprint", "tier": 1, "seed": 23, "layout": "muenchen",
 		"districts": {"boulevard": 0.45, "downtown": 0.25, "shops": 0.3}},
 	# seit 2.36 entworfen (LAYOUTS["hafenrunde"]): Reeperbahn, Landungsbrücken, Speicherstadt, Köhlbrandbrücke
-	{"name": "Hafenrunde", "town": "Hamburg", "region": "Freie und Hansestadt Hamburg", "geo": Vector2(53.5459, 9.9665), "mood": "regen",  "type": "sprint", "tier": 2, "seed": 42, "layout": "hafenrunde",
+	{"name": "Hafenrunde", "town": "Hamburg", "greet": "MOIN MOIN!", "shops": ["FISCHBRÖTCHEN", "LABSKAUS", "FRANZBRÖTCHEN", "HAFENKNEIPE", "SCHIFFSBEDARF", "KIEZ-IMBISS", "SEEMANNSHEIM", "ALSTERCAFÉ"], "region": "Freie und Hansestadt Hamburg", "geo": Vector2(53.5459, 9.9665), "mood": "regen",  "type": "sprint", "tier": 2, "seed": 42, "layout": "hafenrunde",
 		"districts": {"industrial": 0.45, "shops": 0.35, "residential": 0.2}},
 	# seit 2.36 entworfen (LAYOUTS["dortmund"]): Hochofen, Schnellstraße mit Tunnel, Hochstraße übers Gleisfeld, Wall
-	{"name": "Schnellstraßen-Sprint", "town": "Dortmund", "region": "Kreisfreie Stadt", "geo": Vector2(51.5136, 7.4653), "mood": "natrium",  "type": "sprint", "tier": 3, "seed": 7, "layout": "dortmund",
+	{"name": "Schnellstraßen-Sprint", "town": "Dortmund", "greet": "GLÜCK AUF!", "shops": ["CURRYWURST", "BÜDCHEN", "TRINKHALLE", "PILSSTUBE", "ZECHENGRILL", "STAHLWERK", "PÜTTCAFÉ"], "region": "Kreisfreie Stadt", "geo": Vector2(51.5136, 7.4653), "mood": "natrium",  "type": "sprint", "tier": 3, "seed": 7, "layout": "dortmund",
 		"districts": {"highway": 0.4, "downtown": 0.2, "industrial": 0.2, "boulevard": 0.2}},
 	# seit 2.36 entworfen (track_design.gd, LAYOUTS["koeln"]): Rheinufer mit Tunnel, Spitzkehre vor dem Dom, Ring
-	{"name": "Innenstadtring", "town": "Köln", "region": "Kreisfreie Stadt", "geo": Vector2(50.9375, 6.9603), "mood": "mitternacht",  "type": "circuit", "tier": 1, "laps": 2, "seed": 101, "layout": "koeln",
+	{"name": "Innenstadtring", "town": "Köln", "greet": "KÖLLE ALAAF!", "shops": ["KÖLSCH", "BRAUHAUS", "HALVER HAHN", "BÜDCHEN", "KARNEVAL", "DOMCAFÉ", "RHEINTERRASSE", "JECKENLADEN"], "region": "Kreisfreie Stadt", "geo": Vector2(50.9375, 6.9603), "mood": "mitternacht",  "type": "circuit", "tier": 1, "laps": 2, "seed": 101, "layout": "koeln",
 		"districts": {"downtown": 0.35, "boulevard": 0.25, "chinatown": 0.4}},
 	# seit 2.36 entworfen (LAYOUTS["bremen"]): Schlachte an der Weser, Brücke über das Hafenbecken, Kai, Schnoor mit Roland
-	{"name": "Hafenring", "town": "Bremen", "region": "Freie Hansestadt Bremen", "geo": Vector2(53.0793, 8.8017), "mood": "regen",  "type": "circuit", "tier": 2, "laps": 2, "seed": 202, "layout": "bremen",
+	{"name": "Hafenring", "town": "Bremen", "greet": "MOIN!", "shops": ["SCHNOOR-CAFÉ", "KAFFEERÖSTEREI", "KLABEN", "KNIPP", "HAFENSCHÄNKE", "STADTMUSIKANTEN", "WESERBLICK"], "region": "Freie Hansestadt Bremen", "geo": Vector2(53.0793, 8.8017), "mood": "regen",  "type": "circuit", "tier": 2, "laps": 2, "seed": 202, "layout": "bremen",
 		"districts": {"industrial": 0.5, "highway": 0.25, "shops": 0.25}},
 	# seit 2.36 entworfen (LAYOUTS["stuttgart"]): Kulturmeile im Kessel, Weinsteige mit zwei Kehren, Kamm am Fernsehturm
-	{"name": "Nachtschicht", "town": "Stuttgart", "region": "Landeshauptstadt", "geo": Vector2(48.7758, 9.1829), "mood": "mitternacht",  "type": "circuit", "tier": 3, "laps": 2, "seed": 303, "layout": "stuttgart",
+	{"name": "Nachtschicht", "town": "Stuttgart", "greet": "GRÜSS GOTT!", "shops": ["MAULTASCHEN", "BREZEL", "BESENWIRTSCHAFT", "SPÄTZLE", "WEINSTUBE", "KEHRWOCHE", "VIERTELE"], "region": "Landeshauptstadt", "geo": Vector2(48.7758, 9.1829), "mood": "mitternacht",  "type": "circuit", "tier": 3, "laps": 2, "seed": 303, "layout": "stuttgart",
 		"districts": {"highway": 0.3, "boulevard": 0.3, "downtown": 0.4}},
 	# seit 2.36 entworfen (LAYOUTS["hafen_drift"]): Containerterminal an der Elbe; corners bleibt für die Punkte-Ziele
-	{"name": "Hafen-Drift", "town": "Hamburg", "region": "Freie und Hansestadt Hamburg", "geo": Vector2(53.5459, 9.9665), "mood": "nebel",  "type": "drift", "tier": 2, "laps": 2, "seed": 502, "corners": 12, "layout": "hafen_drift",
+	{"name": "Hafen-Drift", "town": "Hamburg", "greet": "MOIN MOIN!", "shops": ["FISCHBRÖTCHEN", "HAFENKNEIPE", "SCHIFFSBEDARF", "KAFFEEKLAPPE", "CONTAINERGRILL", "ELBBLICK"], "region": "Freie und Hansestadt Hamburg", "geo": Vector2(53.5459, 9.9665), "mood": "nebel",  "type": "drift", "tier": 2, "laps": 2, "seed": 502, "corners": 12, "layout": "hafen_drift",
 		"districts": {"industrial": 0.7, "highway": 0.3}},
 	# seit 2.36 entworfen (LAYOUTS["stadion_drift"]): Bogen um die Arena, Parkplatzwechsel, Parkdeck mit Kehre oben;
 	# corners bleibt für die Punkte-Ziele
-	{"name": "Stadion-Drift", "town": "Gelsenkirchen", "region": "Kreisfreie Stadt", "geo": Vector2(51.5177, 7.0857), "mood": "natrium",  "type": "drift", "tier": 3, "laps": 2, "seed": 603, "corners": 14, "layout": "stadion_drift",
+	{"name": "Stadion-Drift", "town": "Gelsenkirchen", "greet": "GLÜCK AUF!", "shops": ["TRINKHALLE", "POMMESBUDE", "KUMPEL-KIOSK", "STADIONGRILL", "ZECHENSTUBE", "FANSHOP"], "region": "Kreisfreie Stadt", "geo": Vector2(51.5177, 7.0857), "mood": "natrium",  "type": "drift", "tier": 3, "laps": 2, "seed": 603, "corners": 14, "layout": "stadion_drift",
 		"districts": {"downtown": 0.4, "boulevard": 0.6}},
 	# --- neu: Drag-Rennen (geradeaus, Handschaltung) und weitere Strecken; hinten angehängt, damit gespeicherte
 	# Event-Nummern gültig bleiben
@@ -734,44 +734,45 @@ const RACES := [
 	{"name": "Schnellstraßen-Drag", "town": "Hockenheim", "region": "Rhein-Neckar-Kreis", "geo": Vector2(49.322, 8.547), "mood": "mitternacht",  "type": "drag", "tier": 3, "seed": 703, "segments": 13, "max_turn": 5.0,
 		"districts": {"highway": 0.6, "boulevard": 0.4}},
 	# seit 2.36 entworfen (LAYOUTS["heidelberg"]): Alte Brücke mit Brückentor, Altstadt, Schlossberg mit Kehre, Neckar
-	{"name": "Altstadt-Hügel", "town": "Heidelberg", "region": "Kreisfreie Stadt", "geo": Vector2(49.3988, 8.6724), "mood": "daemmerung",  "type": "sprint", "tier": 2, "seed": 61, "layout": "heidelberg",
+	{"name": "Altstadt-Hügel", "town": "Heidelberg", "greet": "HERZLICH WILLKOMMEN!", "shops": ["STUDENTENKUSS", "ALTSTADTCAFÉ", "UNI-KNEIPE", "SCHLOSSBLICK", "NECKARCAFÉ", "ANTIQUARIAT", "KARZER-BAR"], "region": "Kreisfreie Stadt", "geo": Vector2(49.3988, 8.6724), "mood": "daemmerung",  "type": "sprint", "tier": 2, "seed": 61, "layout": "heidelberg",
 		"districts": {"residential": 0.45, "shops": 0.55}},
 	# seit 2.36 entworfen (LAYOUTS["rostock"]): Kröpeliner Tor, Stadthafen, Warnowtunnel, Überseehafen, Leuchtturm
-	{"name": "Hafen-Sprint", "town": "Rostock", "region": "Hanse- und Universitätsstadt", "geo": Vector2(54.0924, 12.0991), "mood": "nebel",  "type": "sprint", "tier": 3, "seed": 77, "layout": "rostock",
+	{"name": "Hafen-Sprint", "town": "Rostock", "greet": "MOIN!", "shops": ["FISCHKUTTER", "BACKFISCH", "MATJES", "SANDDORN", "HAFENKIOSK", "WARNOW-IMBISS", "LEUCHTTURMCAFÉ"], "region": "Hanse- und Universitätsstadt", "geo": Vector2(54.0924, 12.0991), "mood": "nebel",  "type": "sprint", "tier": 3, "seed": 77, "layout": "rostock",
 		"districts": {"industrial": 0.5, "highway": 0.3, "residential": 0.2}},
 	# seit 2.36 entworfen (LAYOUTS["nuernberg"]): Ring an der Stadtmauer, Laufer Tor, Burgberg mit Kaiserburg, Pegnitz
-	{"name": "Altstadtring", "town": "Nürnberg", "region": "Kreisfreie Stadt", "geo": Vector2(49.4521, 11.0767), "mood": "mitternacht",  "type": "circuit", "tier": 2, "laps": 2, "seed": 131, "layout": "nuernberg",
+	{"name": "Altstadtring", "town": "Nürnberg", "greet": "GRÜSS GOTT!", "shops": ["LEBKUCHEN", "BRATWURSTSTUBE", "SCHÄUFELE", "SPIELWAREN", "BURGCAFÉ", "PEGNITZ-STUBE", "ZWETSCHGENMÄNNLE"], "region": "Kreisfreie Stadt", "geo": Vector2(49.4521, 11.0767), "mood": "mitternacht",  "type": "circuit", "tier": 2, "laps": 2, "seed": 131, "layout": "nuernberg",
 		"districts": {"residential": 0.5, "boulevard": 0.3, "downtown": 0.2}},
 	# --- Orts-Strecken: echte Straßenverläufe (OpenStreetMap, tools/osm_city.py), Wahrzeichen an ihrem Platz.
 	# city = Schlüssel in city_data.gd, town = Ortsschild, shops = Ladennamen der Stadt, station = Haltestelle am Bahnübergang
-	{"name": "Aachen Grabenring", "geo": Vector2(50.7753, 6.0839), "mood": "regen",  "type": "circuit", "tier": 2, "laps": 2, "seed": 801, "city": "aachen", "town": "Aachen",
+	# greet (seit 2.46): Gruß in Mundart unter dem Ortsschild; shops haben seit 2.46 auch die entworfenen Städte
+	{"name": "Aachen Grabenring", "geo": Vector2(50.7753, 6.0839), "mood": "regen",  "type": "circuit", "tier": 2, "laps": 2, "seed": 801, "city": "aachen", "town": "Aachen", "greet": "WILLKOMMEN IN OCHE!",
 		"shops": ["PRINTEN", "ÖCHER BRAUHAUS", "CAMPUS BAR", "DOMCAFÉ", "PONTSTRASSE", "THERMALBAD", "MENSA", "KAISERCAFÉ"],
 		"districts": {"altstadt_de": 0.35, "innenstadt_de": 0.45, "campus_de": 0.2},
 		"desc": "Über den Grabenring am SuperC der RWTH, am Elisenbrunnen und am Theater vorbei. In der Mitte Dom und Rathaus."},
-	{"name": "Würzburg Mainufer", "geo": Vector2(49.7913, 9.9534), "mood": "daemmerung",  "type": "sprint", "tier": 3, "seed": 802, "city": "wuerzburg", "town": "Würzburg",
+	{"name": "Würzburg Mainufer", "geo": Vector2(49.7913, 9.9534), "mood": "daemmerung",  "type": "sprint", "tier": 3, "seed": 802, "city": "wuerzburg", "town": "Würzburg", "greet": "SERVUS!",
 		"shops": ["BOCKSBEUTEL", "FRANKENWEIN", "BRÜCKENSCHOPPEN", "WEINHAUS", "KILIANI", "MAINFRANKEN", "SCHOPPEN"],
 		"districts": {"altstadt_de": 0.35, "innenstadt_de": 0.45, "vorstadt_de": 0.2},
 		"desc": "Rennweg an der Residenz, über die Ludwigsbrücke, unter der Festung Marienberg entlang, über die Friedensbrücke zum Alten Kranen."},
-	{"name": "Bad Kissingen Kurmeile", "geo": Vector2(50.2, 10.077), "mood": "daemmerung",  "type": "sprint", "tier": 1, "seed": 803, "city": "badkissingen", "town": "Bad Kissingen",
+	{"name": "Bad Kissingen Kurmeile", "geo": Vector2(50.2, 10.077), "mood": "daemmerung",  "type": "sprint", "tier": 1, "seed": 803, "city": "badkissingen", "town": "Bad Kissingen", "greet": "GRÜSS GOTT!",
 		"shops": ["KURCAFÉ", "KURAPOTHEKE", "RAKOCZY", "TRINKHALLE", "KONZERTCAFÉ", "KURHAUS", "SALINE"],
 		"districts": {"kurviertel_de": 0.55, "innenstadt_de": 0.2, "vorstadt_de": 0.25},
 		"desc": "Vom Regentenbau am Kurgarten über die Saale, dann am Fluss entlang zum Gradierbau der Oberen Saline."},
-	{"name": "Tauberbischofsheim Altstadt", "geo": Vector2(49.6236, 9.6627), "mood": "nebel",  "type": "circuit", "tier": 1, "laps": 3, "seed": 804, "city": "tbb", "town": "Tauberbischofsheim",
+	{"name": "Tauberbischofsheim Altstadt", "geo": Vector2(49.6236, 9.6627), "mood": "nebel",  "type": "circuit", "tier": 1, "laps": 3, "seed": 804, "city": "tbb", "town": "Tauberbischofsheim", "greet": "GRÜSS GOTT!",
 		"shops": ["FECHTCLUB", "TAUBERWEIN", "FECHTERSTADT", "TAUBERTAL", "LIOBA CAFÉ", "SCHLOSSCAFÉ"],
 		"districts": {"altstadt_de": 0.6, "vorstadt_de": 0.4},
 		"desc": "Rund um die Altstadt der Fechterstadt, Türmersturm, Rathaus und St. Martin immer im Blick."},
-	{"name": "Hammelburg Saaleck", "geo": Vector2(50.1162, 9.8906), "mood": "daemmerung",  "type": "sprint", "tier": 2, "seed": 805, "city": "hammelburg", "town": "Hammelburg",
+	{"name": "Hammelburg Saaleck", "geo": Vector2(50.1162, 9.8906), "mood": "daemmerung",  "type": "sprint", "tier": 2, "seed": 805, "city": "hammelburg", "town": "Hammelburg", "greet": "GRÜSS GOTT!",
 		"station": "HAMMELBURG",
 		"shops": ["WEINSTADT", "HÄCKERWIRTSCHAFT", "SAALETAL", "WEINFEST", "WINZERSTUBE", "STADTSCHÄNKE"],
 		"districts": {"altstadt_de": 0.5, "vorstadt_de": 0.5},
 		"desc": "Über die Bahnlinie in die Altstadt, am Rathaus mit Marktbrunnen vorbei, über die Saale hinauf zu Schloss Saaleck."},
 	{"name": "Berlin Kreuzberg", "geo": Vector2(52.4990, 13.4300), "mood": "kiez", "type": "circuit", "tier": 3, "laps": 2,
-		"seed": 806, "city": "kreuzberg", "town": "Berlin",
+		"seed": 806, "city": "kreuzberg", "town": "Berlin", "greet": "NA, ALLET JUT?",
 		"shops": ["SPÄTI", "DÖNER", "CURRYWURST", "PLATTENLADEN", "VEGAN", "SHISHA BAR", "KIEZKNEIPE", "FAHRRADLADEN", "TATTOO"],
 		"districts": {"kiez_de": 0.7, "innenstadt_de": 0.3},
 		"desc": "Unter der Hochbahn der U1 durch die Skalitzer Straße, über die Oberbaumbrücke, an der East Side Gallery entlang und über die Schillingbrücke zurück zum Kotti."},
 	# Waldstrecke (seit 2.29): Landstraße durch den Schwarzwald, keine Häuser, dichter Wald, Kuppen
-	{"name": "Freudenstadt Waldpass", "town": "Freudenstadt", "region": "Landkreis Freudenstadt", "geo": Vector2(48.4633, 8.4111),
+	{"name": "Freudenstadt Waldpass", "town": "Freudenstadt", "greet": "GRÜSS GOTT!", "region": "Landkreis Freudenstadt", "geo": Vector2(48.4633, 8.4111),
 		"mood": "nebel", "type": "sprint", "tier": 2, "seed": 901, "segments": 24, "max_turn": 62.0, "forest": true,
 		"crests": [[0.12, 0.3, 8.0], [0.42, 0.58, 6.0], [0.68, 0.88, 10.0]],
 		"districts": {"wald": 1.0},
@@ -781,7 +782,7 @@ const RACES := [
 	# LAYOUTS["driftberg"]: Stützpunkte, Höhen, Berg). Beide Ausfahrten liegen unten im Tal.
 	# Außerhalb der Karriere, immer offen ("free"); in der Welt mit zwei Ausfahrten zum Durchfahren.
 	# corners bleibt für die Punkte-Ziele (Catalog.drift_targets).
-	{"name": "Driftberg", "town": "Harz", "region": "Landkreis Goslar", "geo": Vector2(51.80, 10.62),
+	{"name": "Driftberg", "town": "Harz", "greet": "GLÜCK AUF!", "region": "Landkreis Goslar", "geo": Vector2(51.80, 10.62),
 		"mood": "mitternacht", "type": "drift", "tier": 2, "laps": 2, "seed": 1207, "corners": 16, "free": true,
 		"forest": true, "layout": "driftberg",
 		"bulges": {}, "districts": {"wald": 1.0},

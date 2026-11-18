@@ -241,6 +241,24 @@ Außenring → nächste Stadt → Autobahn. Rundkurse und Drift-Kurse sind Schle
 - **Autobahn-Rennen von Stadt zu Stadt** (seit 2.43, Einzelheiten dort).
 - **Efeu und ONE-HUMANITY-Wandbilder statt Graffiti, echte Werbung von ONE HUMANITY** (seit 2.44, Einzelheiten dort).
 - **Driften mit Ketten, Boni und einer Driftzone in jeder Stadt** (seit 2.45, Einzelheiten dort).
+- **Charme je Stadt: Gruß in Mundart am Ortsschild, Läden mit Ortskolorit** (seit 2.46, Einzelheiten dort).
+
+## Charme für jede Stadt: Gruß am Ortsschild, Läden mit Ortskolorit (2.46)
+Aus dem Fahrplan (Punkt 6): ein bisschen Charme für jede Stadt.
+
+- **Gruß in Mundart** unter dem gelben Ortsschild, als weiße Zusatztafel wie „Partnerstadt …“ (`Catalog.RACES`,
+  `greet`; `track_builder._build_city_signs`): KÖLLE ALAAF! (Köln), MOIN MOIN! (Hamburg), MOIN! (Bremen, Rostock),
+  EI GUDE! (Frankfurt), SERVUS! (München, Würzburg), GRÜSS GOTT! (Stuttgart, Nürnberg, Bad Kissingen,
+  Tauberbischofsheim, Hammelburg, Freudenstadt), GLÜCK AUF! (Dortmund, Gelsenkirchen, Harz), WILLKOMMEN IN OCHE!
+  (Aachen), NA, ALLET JUT? (Berlin), HERZLICH WILLKOMMEN! (Heidelberg).
+- **Läden mit Ortskolorit** auch in den entworfenen Städten (bisher nur in denen aus echten Straßendaten): je Stadt
+  sechs bis acht eigene Namen zwischen den übrigen, z. B. KÖLSCH, HALVER HAHN und JECKENLADEN in Köln, FISCHBRÖTCHEN
+  und FRANZBRÖTCHEN in Hamburg, APFELWEIN und HANDKÄS in Frankfurt, WEISSWURST und OBATZDA in München, MAULTASCHEN und
+  BESENWIRTSCHAFT in Stuttgart, TRINKHALLE und POMMESBUDE im Ruhrgebiet, LEBKUCHEN und SCHÄUFELE in Nürnberg,
+  STUDENTENKUSS in Heidelberg, MATJES und SANDDORN in Rostock. Ausgewählt wird mit derselben Zufallszahl wie vorher:
+  die Städte bleiben sonst, wie sie waren (nur andere Namen über den Läden).
+- **Tests:** `--worldcheck` 0 Überschneidungen, `--signlog` (alle 20 Ortsschilder), Bild vom Start des
+  Innenstadtrings in Köln (Ortsschild mit Zusatztafel).
 
 ## Driften süchtiger: Ketten, Boni, Driftzonen, Nitro im Rennen (2.45)
 Aus dem Fahrplan (Punkt 5): Driften soll sich im Rennen lohnen und in der freien Welt richtig Spaß machen.
