@@ -372,6 +372,11 @@ const EN := {
 	"Kurze Stöße bei Einschlägen und Landungen, die Kamera neigt sich beim Lenken. Aus: ruhige Kamera.": "Short jolts on impacts and landings, the camera tilts when steering. Off: steady camera.",
 	"Bei hohen Sprüngen schaut eine Kamera schräg von vorn zu, wie in NFS Underground, dazu Zeitlupe.":
 		"On big jumps a camera watches from ahead at an angle, like in NFS Underground, in slow motion.",
+	# 2.42: Start am letzten Ort, Schnellreise nur in entdeckte Städte
+	"STADT ENTDECKT: %s": "CITY DISCOVERED: %s", "Schnellreise hierher frei (Karte: M)": "Fast travel here unlocked (map: M)",
+	"STÄDTE ENTDECKT  %d / %d": "CITIES DISCOVERED  %d / %d", "SCHNELLREISE: FREI": "FAST TRAVEL: UNLOCKED",
+	"SCHNELLREISE: ERST HINFAHREN": "FAST TRAVEL: DRIVE THERE FIRST",
+	"←/→ Stadt wählen\nEnter: Rennen als Ziel\nM / Esc: zurück": "←/→ Pick city\nEnter: race as target\nM / Esc: back",
 }
 
 static var _added := false

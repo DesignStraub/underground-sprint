@@ -237,6 +237,34 @@ Außenring → nächste Stadt → Autobahn. Rundkurse und Drift-Kurse sind Schle
 - **Städte mit Hinterland, Straßennetz mit Kreuzungen, Gelände zum Austoben** (seit 2.39, Einzelheiten dort).
 - **Verbindungen mit Höhen und Tiefen, 15 Tunnel, Mittelstreifen in Abschnitten** (seit 2.40, Einzelheiten dort).
 - **Verkehr mit Details, Ampeln für den Verkehr, Kleinkram zum Umfahren** (seit 2.41, Einzelheiten dort).
+- **Weiter, wo man war; Schnellreise erst nach dem ersten Besuch** (seit 2.42, Einzelheiten dort).
+
+## Weiter, wo man war; Schnellreise in entdeckte Städte (2.42)
+Aus dem Fahrplan (Punkt 3, Test von 2.39.1): keine Auswahl des Startpunkts mehr, das Spiel merkt sich den letzten Ort;
+Schnellreise muss man sich erfahren, nur zu Städten, nicht direkt zu Rennen.
+
+- **Losfahren ohne Startstadt:** Garage → Losfahren führt direkt in die Welt, an die Stelle, an der man zuletzt war
+  (bis 2.41 kam erst die Wahl der Startstadt). Die Welt merkt sich alle 3 s eine sichere Stelle: das Auto steht oder
+  fährt aufrecht auf einer Fahrbahn oder im Gelände, nicht in der Luft, im Wasser, beim Überschlag oder beim Anflug
+  (`world._note_spot`, `GameState.world_pos`). In den Spielstand kommt sie höchstens alle 20 s, dazu vor Rennen,
+  Garage und Schnellreise und beim Schließen des Fensters; im Browser liegt sie mit im localStorage. Wer ein Rennen
+  aus der Welt startet und dann beendet, steht beim nächsten Mal am Marker; nach einer Schnellreise am Stadteingang.
+- **Gemerkter Ort wird geprüft:** nach dem Bau der Umgebung muss dort noch eine Fahrbahn in passender Höhe liegen oder
+  ein Gelände sein (`world._spot_ok`); sonst, etwa wenn ein Update die Karte geändert hat, startet man am Eingang der
+  zuletzt erreichten Stadt (`GameState.last_town`). Ganz neues Spiel: am Start des ersten Rennens in Frankfurt.
+- **Städte entdecken:** wer zum ersten Mal in eine Stadt fährt, sieht über der Minikarte „STADT ENTDECKT: KÖLN +500“
+  und „Schnellreise hierher frei“ (500 XP, etwas Nitro; ein Rennsieg bringt 3000 bis 7500). Ältere Spielstände: Städte
+  mit einem gewonnenen Rennen oder einer Bestzeit gelten als entdeckt (`GameState.towns_known`).
+- **Karte:** oben „STÄDTE ENTDECKT 3 / 19“; entdeckte Städte stehen weiß, die übrigen grau. Im Infofeld steht
+  „SCHNELLREISE: FREI“ oder „ERST HINFAHREN“; die Leertaste reist nur in entdeckte Städte (sonst kurzer Hinweis und
+  der Klang für Gesperrtes). Als Ziel setzen (Enter) geht weiter überall, so findet man den Weg zur neuen Stadt.
+  Die Schnellreise kommt wie seit 2.33 am Stadteingang an, nie direkt an einem Rennen.
+- **Tests:** `--wspawn=rline:19:20 --wdrive` (Auffahrt nach Köln: „STADT entdeckt: Köln“, +500 XP, Ort gemerkt);
+  danach ohne `--wspawn` „START gemerkter Ort“ auf derselben Auffahrt; ein Ort im freien Feld führt zu „Stadteingang
+  statt gemerktem Ort“; `--wtravel=15` prüft erst die Sperre (Leertaste bei Aachen tut nichts, Karte bleibt offen),
+  dann die Reise (40 m hinter dem Stadteingang); `--worldcheck` 0 Überschneidungen. Jeder Start gibt aus, woher der
+  Startpunkt kommt (`START …`); `--nosavedpos` ignoriert den gemerkten Ort, `--wstart=i` startet am Eingang der Stadt
+  von Rennen i. `tools/world_map.tscn -- --worldlog` listet jetzt auch die Stadteingänge (`STADT …`).
 
 ## Verkehr mit Details, Ampeln, Kleinkram zum Umfahren, Schilderbrücken (2.41)
 Nachgereicht zum Test von 2.39.1: der Verkehr sollte mehr Details bekommen; es fehlen Ampeln für den Verkehr; die

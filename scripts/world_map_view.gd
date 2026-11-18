@@ -1,8 +1,9 @@
 extends Control
 ## Große Karte der Open World (Tab oder Esc-Menü > Karte): Ring, Auffahrten und alle Straßen der Städte, die Rennen
 ## als Punkte in der Farbe ihrer Art (gewonnen golden, gesperrt grau), du als Pfeil. Links/rechts wählt eine Stadt,
-## Leertaste reist dorthin (an den Stadteingang, nicht an ein Rennen: seit 2.33), Enter setzt das nächste offene Rennen
-## der Stadt als Ziel (Flagge auf der Minikarte), Tab/Esc schließt.
+## Leertaste reist dorthin (an den Stadteingang, nicht an ein Rennen: seit 2.33; nur in Städte, in denen man schon war:
+## seit 2.42, GameState.towns_known), Enter setzt das nächste offene Rennen der Stadt als Ziel (Flagge auf der
+## Minikarte, auch für Städte, die man erst noch entdecken muss), Tab/Esc schließt.
 
 const Catalog := preload("res://scripts/catalog.gd")
 const UI := preload("res://scripts/ui_style.gd")
@@ -17,6 +18,7 @@ var towns: Array = []  # {name, pins: [Index in pins], pos (Vector3)}; Auswahl u
 var player: Node3D
 var target := -1
 var sel := 0  # gewählte Stadt (towns)
+var _deny_t := 0.0  # Leertaste bei einer noch nicht entdeckten Stadt: Hinweis im Infofeld leuchtet kurz auf
 
 var relief: Texture2D  # Reliefkarte der Landschaft (Landscape.map_texture)
 var villages: Array = []  # [Lage, Name]
@@ -75,6 +77,11 @@ func town_of(ri: int) -> int:
 	return -1
 
 
+## Stadt k schon erreicht? Nur dorthin geht die Schnellreise (seit 2.42)
+func known(k: int) -> bool:
+	return GameState.town_known(str(towns[k]["name"]))
+
+
 ## Rennen, an dessen Ausfahrt die Schnellreise in Stadt k ankommt (das erste der Stadt)
 func travel_race(k: int) -> int:
 	return pins[towns[k]["pins"][0]]["race_index"]
@@ -113,8 +120,9 @@ func open(select := -1) -> void:
 	queue_redraw()
 
 
-func _process(_dt: float) -> void:
+func _process(dt: float) -> void:
 	if visible:
+		_deny_t = maxf(_deny_t - dt, 0.0)
 		queue_redraw()
 
 
@@ -134,6 +142,11 @@ func _handle(event: InputEvent) -> bool:
 		# enthält die Leertaste auch, bis 2.31 schaltete sie deshalb nur das Ziel um und die Schnellreise kam nie dran.
 		# vor dem Signal: der Szenenwechsel nimmt die Karte sofort aus dem Baum (danach gibt es kein Viewport mehr)
 		get_viewport().set_input_as_handled()
+		if not known(sel):
+			Sfx.ui("locked")  # erst hinfahren (seit 2.42)
+			_deny_t = 1.6
+			queue_redraw()
+			return true
 		Sfx.ui("go")
 		fast_travel.emit(travel_race(sel))
 		return true
@@ -159,6 +172,14 @@ func _draw() -> void:
 	draw_string(_title_font, Vector2(20, 30), tr("KARTE"), HORIZONTAL_ALIGNMENT_LEFT, -1, 18, UI.TEXT)
 	draw_rect(Rect2(21, 37, 14, 2), UI.ACCENT)
 	draw_rect(Rect2(38, 37.5, size.x * 0.68 - 58.0, 1), UI.LINE)
+	if not towns.is_empty():
+		var nk := 0
+		for k in towns.size():
+			if known(k):
+				nk += 1
+		var cnt := tr("STÄDTE ENTDECKT  %d / %d") % [nk, towns.size()]
+		var cw := _small_spaced.get_string_size(cnt, HORIZONTAL_ALIGNMENT_LEFT, -1, 6).x
+		draw_string(_small_spaced, Vector2(size.x * 0.68 - 20.0 - cw, 31), cnt, HORIZONTAL_ALIGNMENT_LEFT, -1, 6, UI.DIM)
 	var area := Rect2(Vector2(20, 46), Vector2(size.x * 0.68 - 40, size.y - 86))
 	draw_style_box(UI.panel_box(0.6), area)
 	if relief:
@@ -244,8 +265,10 @@ func _draw() -> void:
 		if i in sel_pins:
 			draw_arc(sp, 13.0 + breathe, 0.0, TAU, 28, Color(UI.ACCENT.r, UI.ACCENT.g, UI.ACCENT.b, 0.6 + 0.35 * breathe), 1.5, true)
 		if labels.has(i):
+			# noch nicht entdeckte Städte blasser (seit 2.42)
+			var lc: Color = UI.TEXT if GameState.town_known(str(p["town"])) else UI.FAINT
 			draw_string(_wide, sp + Vector2(10, 4), str(p["town"]).to_upper(), HORIZONTAL_ALIGNMENT_LEFT, -1, 7,
-				Color(UI.TEXT.r, UI.TEXT.g, UI.TEXT.b, 0.95 if i in sel_pins else 0.5))
+				Color(lc.r, lc.g, lc.b, 0.95 if i in sel_pins else 0.5))
 	# du
 	if player:
 		var pp := _to_screen(Vector2(player.global_position.x, player.global_position.z))
@@ -284,7 +307,13 @@ func _draw_info() -> void:
 	y += 22
 	var km := (town["pos"] as Vector3).distance_to(player.global_position) / 1000.0 if player else 0.0
 	draw_string(_body, Vector2(ix, y), tr("Luftlinie: %.1f km") % km, HORIZONTAL_ALIGNMENT_LEFT, iw, 8, UI.DIM)
-	y += 26
+	y += 15
+	# Schnellreise frei oder erst hinfahren (seit 2.42); nach der Leertaste bei einer neuen Stadt kurz in der Akzentfarbe
+	var kn := known(sel)
+	var tcol: Color = Color(0.45, 1.0, 0.6) if kn else (UI.ACCENT if _deny_t > 0.0 else UI.FAINT)
+	draw_string(_small_spaced, Vector2(ix, y), tr("SCHNELLREISE: FREI") if kn else tr("SCHNELLREISE: ERST HINFAHREN"),
+		HORIZONTAL_ALIGNMENT_LEFT, iw, 6, tcol)
+	y += 22
 	# Rennen der Stadt: Art, Name, Stand (gewonnen, offen, ab Level n), Bestwert
 	for i in town["pins"]:
 		var race: Dictionary = Catalog.RACES[pins[i]["race_index"]]
@@ -309,6 +338,10 @@ func _draw_info() -> void:
 	var hint := tr("←/→ Stadt wählen\nLeertaste: Schnellreise\nEnter: Rennen als Ziel\nM / Esc: zurück")
 	if town_of(target) == sel:
 		hint = tr("Ziel gesetzt. Enter: Ziel löschen\nLeertaste: Schnellreise\nM / Esc: zurück")
+	if not kn:  # noch nicht entdeckt: keine Schnellreise, aber als Ziel setzen geht
+		hint = tr("←/→ Stadt wählen\nEnter: Rennen als Ziel\nM / Esc: zurück")
+		if town_of(target) == sel:
+			hint = tr("Ziel gesetzt. Enter: Ziel löschen\nM / Esc: zurück")
 	var lines := hint.split("\n")
 	var yy := size.y - 46.0 - lines.size() * 15.0
 	draw_rect(Rect2(ix, yy - 9, iw, 1), UI.LINE)

@@ -79,7 +79,13 @@ var drift_wins := 0
 var current_car := "kaizen"
 var race_index := 0
 var world_drift := false  # Open World: Drift-Modus (Q), bleibt über Rennen und Garage hinweg
-var world_start := -1  # Open World: Rennen, an dessen Stadt-Ausfahrt man startet (-1 = Frankfurt, erstes Rennen)
+## Open World (seit 2.42): letzter sicherer Ort [x, y, z, Blickrichtung], dort geht es beim Losfahren weiter (leer: noch
+## nie gefahren, Start in Frankfurt). Die Welt merkt ihn alle paar Sekunden, auf einer Fahrbahn oder im Gelände.
+var world_pos: Array = []
+## Entdeckte Städte (seit 2.42): Schnellreise geht nur dorthin. Ältere Spielstände: Städte, in denen man schon ein Rennen
+## gewonnen oder eine Bestzeit hat, gelten als entdeckt.
+var towns_known: Array = []
+var last_town := ""  # zuletzt erreichte Stadt: Start an ihrem Eingang, falls der gemerkte Ort nicht mehr befahrbar ist
 var world_menu := ""  # Open World > Esc > Tuning/Autohaus: Garage öffnet dort, "Fertig" führt zurück in die Welt
 var in_world := false  # Rennen aus der Open World gestartet: danach zurück in die Welt (nicht gespeichert)
 var best_times := {}  # Rennname -> Sekunden
@@ -729,6 +735,7 @@ func save_game() -> void:
 			"touch": touch_mode, "show_fps": show_fps, "jump_cam": jump_cam, "motion_blur": motion_blur,
 			"speed_fov": speed_fov, "cam_shake": cam_shake, "cam": cam_mode},
 		"language": language, "difficulty": difficulty,
+		"world_pos": world_pos, "towns_known": towns_known, "last_town": last_town,
 	}, "\t")
 	var f := FileAccess.open(save_path, FileAccess.WRITE)
 	if f:
@@ -738,6 +745,22 @@ func save_game() -> void:
 	# nicht dauerhaft, den localStorage aber schon)
 	if OS.has_feature("web") and save_path == SAVE_PATH:
 		JavaScriptBridge.eval("try { localStorage.setItem('%s', %s); } catch (e) {}" % [WEB_KEY, JSON.stringify(text)], true)
+
+
+## Stadt entdeckt? (Schnellreise dorthin frei)
+func town_known(town: String) -> bool:
+	return town in towns_known
+
+
+## Stadt erreicht: merkt sie als letzte; true, wenn sie neu entdeckt ist (dann frei für die Schnellreise)
+func reach_town(town: String) -> bool:
+	if town == "":
+		return false
+	last_town = town
+	if town in towns_known:
+		return false
+	towns_known.append(town)
+	return true
 
 
 ## Im Browser: bleibt der Spielstand erhalten? (false: das Spiel läuft in einem Rahmen, dessen Speicher der Browser
@@ -813,6 +836,19 @@ func load_game() -> void:
 	cam_shake = bool(g.get("cam_shake", true))
 	cam_mode = clampi(int(g.get("cam", 0)), 0, 3)
 	difficulty = clampi(int(data.get("difficulty", 1)), 0, 2)
+	world_pos = []
+	var wp = data.get("world_pos", [])
+	if typeof(wp) == TYPE_ARRAY and wp.size() == 4:
+		world_pos = Array(wp).map(func(v): return float(v))
+	last_town = str(data.get("last_town", ""))
+	if data.has("towns_known"):
+		towns_known = Array(data["towns_known"]).map(func(t): return str(t))
+	else:
+		towns_known = []
+		for r in Catalog.RACES:
+			var t: String = r.get("town", "")
+			if t != "" and not t in towns_known and (r["name"] in won_events or best_times.has(r["name"])):
+				towns_known.append(t)
 	if int(data.get("prog", 1)) < PROG:
 		_migrate_prog()
 	# Bis 2.12 hatte jedes Auto sein eigenes Tuning: übernommen wird das des zuletzt gefahrenen Autos
@@ -878,6 +914,9 @@ func reset_progress() -> void:
 	kept_stages = []
 	title = 0
 	xp = 0
+	world_pos = []
+	towns_known = []
+	last_town = ""
 	save_game()
 
 

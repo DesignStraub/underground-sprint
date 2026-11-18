@@ -43,6 +43,9 @@ static var _tt_stage := 0  # Test --wtravel: 0 Karte öffnen, 1 Leertaste drück
 var _tt_t := 0.0
 static var target := -1  # auf der Karte gewähltes Ziel (Rennen), gilt für diese Sitzung
 static var _travel_arrival := false  # Schnellreise: beim Neuladen den kurzen Anflug zeigen
+static var _travel_to := -1  # Schnellreise (seit 2.42): Rennen, an dessen Stadteingang man nach dem Neuladen ankommt
+var _spawn_saved := false  # Start am gemerkten Ort (GameState.world_pos), nach dem Bau der Umgebung geprüft
+var _spawn_src := "test"  # woher der Startpunkt kommt (Ausgabe beim Laden)
 
 var world: SubViewport
 var player: CharacterBody3D
@@ -148,17 +151,14 @@ func _ready() -> void:
 
 	var returning := has_return  # Rückkehr aus Rennen oder Garage (_spawn_xf setzt es zurück)
 	var spawn := _spawn_xf()
-	# alles in der Nähe gleich bauen (hinter dem Ladebild)
-	var near := entries.filter(func(e): return _dist(e, spawn.origin) < LOAD_PAD * 0.6)
-	near.sort_custom(func(a, b): return _dist(a, spawn.origin) < _dist(b, spawn.origin))
-	for i in near.size():
-		cover.get_meta("label").text = tr("Welt wird gebaut … %d / %d") % [i + 1, near.size()]
-		await get_tree().process_frame
-		var job := Track.begin(near[i]["race"])
-		job["nobatch"] = true
-		while Track.step(job) < 1.0:
-			pass
-		_finish(near[i], job)
+	await _build_near(spawn.origin, cover)
+	# gemerkter Ort (seit 2.42): nur, wenn dort noch eine Fahrbahn oder ein Gelände ist (nach einem Update kann dort jetzt
+	# ein Haus stehen oder die Straße anders liegen), sonst am Eingang der zuletzt erreichten Stadt
+	if _spawn_saved and not _spot_ok(spawn.origin):
+		print("START: gemerkter Ort (%.0f, %.0f) nicht mehr befahrbar, Start am Stadteingang" % [spawn.origin.x, spawn.origin.z])
+		spawn = _fallback_xf()
+		_spawn_src = "Stadteingang statt gemerktem Ort"
+		await _build_near(spawn.origin, cover)
 
 	cover.get_meta("label").text = tr("Welt wird gebaut … Landschaft")
 	await get_tree().process_frame
@@ -173,6 +173,10 @@ func _ready() -> void:
 	pc.accel *= 0.8 + 0.2 * GameState.pace()
 	pc.place(spawn)
 	pc.drift_mode = GameState.world_drift or OS.get_cmdline_user_args().has("--botdrift")
+	print("START %s: (%.0f, %.1f, %.0f), Stadt zuletzt %s, entdeckt %d" % [_spawn_src, spawn.origin.x, spawn.origin.y,
+		spawn.origin.z, GameState.last_town, GameState.towns_known.size()])
+	_note_spot(spawn, true)  # hier geht es weiter, falls man gleich wieder beendet (etwa nach einer Schnellreise)
+	_save_spot()
 	var zoom := _intro_kind(returning)
 	pc.controls_enabled = zoom == ""  # mit Anflug erst, wenn die Kamera hinter dem Auto ist
 	player = pc
@@ -269,8 +273,16 @@ func _exit_tree() -> void:
 		_task = -1
 	Builder.async_vinyls = false
 	Offroad.areas = []  # im Rennen gibt es kein Gelände
-	if GameState.xp_dirty:
+	if GameState.xp_dirty or _spot_dirty:
 		GameState.save_game()
+
+
+## Fenster schließen (Rechner): den Ort noch merken und speichern
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST and _ready_done and player != null:
+		_note_spot()
+		if _spot_dirty or GameState.xp_dirty:
+			_save_spot()
 
 
 ## Startpunkt: nach einem Rennen am Marker, sonst am Start des ersten Rennens, Blick zur Ausfahrt (zur Autobahn)
@@ -328,17 +340,34 @@ func _spawn_xf() -> Transform3D:
 					return Transform3D(Basis.looking_at(-n, Vector3.UP), ex + n * (float(parts[2]) if parts.size() > 2 else 30.0))
 	if has_return:
 		has_return = false
+		_spawn_src = "Rückkehr"
 		return return_xf
 	for a in OS.get_cmdline_user_args():
-		if a.begins_with("--wstart="):  # Test: Startstadt wie aus der Garage (Rennen-Nummer)
-			GameState.world_start = int(a.substr(9))
-	# Startstadt aus der Garage: an ihrer Ausfahrt, 40 m in die Stadt hinein, Blick in die Stadt
-	if GameState.world_start >= 0:
-		for c in layout["cities"]:
-			if c["race_index"] == GameState.world_start:
-				var ex: Vector3 = c["exit_world"]
-				var n := Vector3(ex.x, 0, ex.z).normalized()
-				return Transform3D(Basis.looking_at(n, Vector3.UP), ex + n * 40.0 + Vector3(0, 0.5, 0))
+		if a.begins_with("--wstart="):  # Test: Start am Eingang der Stadt dieses Rennens (wie nach einer Schnellreise)
+			_travel_to = int(a.substr(9))
+	if _travel_to >= 0:
+		var ri := _travel_to
+		_travel_to = -1
+		if _has_city(ri):
+			_spawn_src = "Schnellreise"
+			return _gate_xf(ri)
+	# Losfahren (seit 2.42): wo man zuletzt war, ohne Auswahl der Startstadt
+	if GameState.world_pos.size() == 4 and not OS.get_cmdline_user_args().has("--nosavedpos"):
+		var wp: Array = GameState.world_pos
+		_spawn_saved = true
+		_spawn_src = "gemerkter Ort"
+		return Transform3D(Basis(Vector3.UP, float(wp[3])), Vector3(float(wp[0]), float(wp[1]), float(wp[2])))
+	return _fallback_xf()
+
+
+## Start ohne (passenden) gemerkten Ort: am Eingang der zuletzt erreichten Stadt; ganz neues Spiel: am Start des ersten
+## Rennens in Frankfurt, Blick zur Ausfahrt
+func _fallback_xf() -> Transform3D:
+	var tri := _town_race(GameState.last_town)
+	_spawn_src = "Stadteingang"
+	if tri >= 0:
+		return _gate_xf(tri)
+	_spawn_src = "neues Spiel"
 	var c: Dictionary = layout["cities"][0]
 	for cc in layout["cities"]:
 		if cc["race_index"] == 0:
@@ -349,6 +378,60 @@ func _spawn_xf() -> Transform3D:
 	var xf: Transform3D = c["xf"] * Track.xform_at(tr["curve"], tr["start"] - 8.0, Track.LANES[1])
 	xf.basis = xf.basis * Basis(Vector3.UP, PI)
 	return xf
+
+
+func _has_city(ri: int) -> bool:
+	return layout["cities"].any(func(c): return c["race_index"] == ri)
+
+
+## Stadteingang (Schnellreise, Neustart in einer Stadt): an der Ausfahrt der Stadt dieses Rennens, 40 m hinein, Blick
+## in die Stadt
+func _gate_xf(ri: int) -> Transform3D:
+	for c in layout["cities"]:
+		if c["race_index"] == ri:
+			var ex: Vector3 = c["exit_world"]
+			var n := Vector3(ex.x, 0, ex.z).normalized()
+			return Transform3D(Basis.looking_at(n, Vector3.UP), ex + n * 40.0 + Vector3(0, 0.5, 0))
+	return Transform3D.IDENTITY
+
+
+## Rennen, an dessen Eingang man in dieser Stadt ankommt: wie auf der Karte das erste der Stadt (kleinster Winkel);
+## -1: keine solche Stadt
+func _town_race(town: String) -> int:
+	var best := -1
+	var bphi := 1e9
+	for c in layout["cities"]:
+		if town != "" and str(Catalog.RACES[c["race_index"]].get("town", "")) == town and float(c["phi_w"]) < bphi:
+			bphi = float(c["phi_w"])
+			best = c["race_index"]
+	return best
+
+
+## Alles in der Nähe gleich bauen (hinter dem Ladebild)
+func _build_near(at: Vector3, cover: Node) -> void:
+	var near := entries.filter(func(e): return e["state"] == "none" and _dist(e, at) < LOAD_PAD * 0.6)
+	near.sort_custom(func(a, b): return _dist(a, at) < _dist(b, at))
+	for i in near.size():
+		cover.get_meta("label").text = tr("Welt wird gebaut … %d / %d") % [i + 1, near.size()]
+		await get_tree().process_frame
+		var job := Track.begin(near[i]["race"])
+		job["nobatch"] = true
+		while Track.step(job) < 1.0:
+			pass
+		_finish(near[i], job)
+
+
+## Ist p (gemerkter Ort) befahrbar? Auf einer fertig gebauten Fahrbahn in passender Höhe (_score: unter 0 heißt
+## innerhalb der Fahrbahn, eine Fahrbahn weit darüber oder darunter zählt nicht) oder in einem Gelände
+func _spot_ok(p: Vector3) -> bool:
+	for e in entries:
+		if e["state"] == "ready" and _dist(e, p) < 50.0 and _score(e, p) < -0.3:
+			return true
+	var a := Offroad.find(Vector2(p.x, p.z))
+	if not a.is_empty():
+		var l := Offroad.local(a, Vector2(p.x, p.z))
+		return Offroad.area_sd(a, l) < -4.0 and absf(p.y - Offroad.base_h(a, l)) < 4.0
+	return false
 
 
 func _dist(e: Dictionary, p: Vector3) -> float:
@@ -602,6 +685,8 @@ func _set_active(e: Dictionary) -> void:
 	Track.apply_street_light(e["track"])
 	var name := _area_title(e)
 	Music.city("" if e["kind"] == "seg" else str(Catalog.RACES[e["race_index"]].get("town", "")))
+	if e["kind"] != "seg":
+		_reach_town(str(Catalog.RACES[e["race_index"]].get("town", "")))
 	if name != _area_name and hud.has("area"):
 		_area_name = name
 		hud["area"].text = name
@@ -734,6 +819,8 @@ func _start_race(i: int) -> void:
 	xf.basis = xf.basis * Basis(Vector3.UP, PI)
 	return_xf = xf
 	has_return = true
+	_note_spot(xf, true)  # wer im Rennen beendet, startet beim nächsten Mal am Marker
+	_save_spot()
 	GameState.race_index = i
 	get_tree().change_scene_to_file("res://scenes/race.tscn")
 
@@ -1226,7 +1313,7 @@ func _build_pause(root: Control) -> void:
 	for entry in [["Weiter", _toggle_pause], ["Karte", func(): _toggle_pause(); _open_map()],
 			["Tuning", _to_garage.bind("tuning")], ["Auto wechseln", _to_garage.bind("cars")], ["Fahrer", _to_garage.bind("driver")],
 			["Vollbild", GameState.toggle_fullscreen],
-			["Garage", func(): _unpause(); GameState.in_world = false; get_tree().change_scene_to_file("res://scenes/garage.tscn")]]:
+			["Garage", _leave_to_garage]]:
 		var b := Button.new()
 		b.text = tr(entry[0]).to_upper()  # wie in der Garage: Großbuchstaben, linksbündig
 		b.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
@@ -1236,9 +1323,20 @@ func _build_pause(root: Control) -> void:
 		UI.menu_fx(b)  # Auswahl gleitet ein, Maus darüber wählt aus (wie in der Garage)
 
 
+## Esc > Garage: ins Hauptmenü der Garage; "Losfahren" bringt einen an die gemerkte Stelle zurück (seit 2.42)
+func _leave_to_garage() -> void:
+	_unpause()
+	_note_spot()
+	_save_spot()
+	GameState.in_world = false
+	get_tree().change_scene_to_file("res://scenes/garage.tscn")
+
+
 ## Esc > Tuning / Auto wechseln: Garage öffnet direkt dort, "Fertig" bringt einen an dieselbe Stelle zurück
 func _to_garage(menu: String) -> void:
 	_unpause()
+	_note_spot()
+	_save_spot()
 	return_xf = player.global_transform
 	has_return = true
 	GameState.world_menu = menu
@@ -1254,7 +1352,7 @@ func _open_map() -> void:
 
 ## Schnellreise (Karte, Leertaste): Welt neu laden, Start an der Ausfahrt dieser Stadt (wie die Startstadt)
 func _fast_travel(ri: int) -> void:
-	GameState.world_start = ri
+	_travel_to = ri
 	has_return = false
 	_travel_arrival = true  # kurzer Anflug von oben am Ziel
 	get_tree().paused = false
@@ -1290,13 +1388,18 @@ func _travel_test(dt: float) -> void:
 		_tt_t = 0.0
 	elif _tt_stage == 1 and _tt_t > 0.8 and map_view.visible:
 		map_view.sel = map_view.town_of(ri)
-		print("TRAVEL map open, town ", map_view.towns[map_view.sel]["name"], ", focus ", get_viewport().gui_get_focus_owner())
-		for pressed in [true, false]:
-			var e := InputEventKey.new()
-			e.physical_keycode = KEY_SPACE
-			e.keycode = KEY_SPACE
-			e.pressed = pressed
-			Input.parse_input_event(e)
+		var town: String = map_view.towns[map_view.sel]["name"]
+		print("TRAVEL map open, town ", town, ", focus ", get_viewport().gui_get_focus_owner())
+		# seit 2.42: erst eine noch nicht entdeckte Stadt (Leertaste darf nichts tun), dann entdeckt und echt reisen
+		GameState.towns_known.erase(town)
+		_tt_press(KEY_SPACE)
+		_tt_stage = 4
+		_tt_t = 0.0
+	elif _tt_stage == 4 and _tt_t > 1.0:
+		var town: String = map_view.towns[map_view.sel]["name"]
+		print("TRAVEL gesperrt %s: Karte offen=%s" % ["OK" if map_view.visible else "FAIL", map_view.visible])
+		GameState.reach_town(town)
+		_tt_press(KEY_SPACE)
 		_tt_stage = 2
 		_tt_t = 0.0
 	elif _tt_stage == 1 and _tt_t > 3.0:
@@ -1310,6 +1413,15 @@ func _travel_test(dt: float) -> void:
 		var d := Vector2(player.global_position.x - want.x, player.global_position.z - want.z).length()
 		print("TRAVEL %s: %.0f m vom Stadteingang (Rennen %d), paused=%s" % ["OK" if d < 120.0 else "FAIL", d, ri, get_tree().paused])
 		get_tree().quit()
+
+
+func _tt_press(key: Key) -> void:
+	for pressed in [true, false]:
+		var e := InputEventKey.new()
+		e.physical_keycode = key
+		e.keycode = key
+		e.pressed = pressed
+		Input.parse_input_event(e)
 
 
 func _close_map() -> void:
@@ -1434,6 +1546,7 @@ func _process(dt: float) -> void:
 	_update_challenger(dt)
 	_update_feed(dt)
 	_update_level_banner(dt)
+	_update_last_spot(dt)
 	_prof_mark("rest")
 	var tacho = hud["tacho"]
 	tacho.rpm = player.rpm
@@ -1570,6 +1683,67 @@ func _flash(text: String, col: Color, pts := 0, xp := -1) -> void:
 		if not lines.is_empty():
 			_show_level_up(lines)
 		_update_level_hud()
+
+
+# --- Letzter Ort und entdeckte Städte (seit 2.42) -----------------------------------------------------------------
+
+## Beim Losfahren geht es dort weiter, wo man zuletzt war. Gemerkt wird alle 3 s eine sichere Stelle: das Auto steht
+## oder fährt aufrecht auf einer Fahrbahn oder im Gelände (nicht in der Luft, im Wasser, beim Überschlag oder Anflug).
+## In die Datei (im Browser auch in den localStorage) höchstens alle 20 s, dazu vor Rennen, Garage und Schnellreise
+## und beim Schließen des Fensters.
+const SPOT_EVERY := 3.0
+const SPOT_SAVE := 20.0
+## Erfahrung für eine neu entdeckte Stadt (ein Rennsieg bringt 3000 bis 7500, eine Minute Driften gut 600)
+const TOWN_XP := 500
+var _spot_t := 0.0
+var _spot_save_t := 0.0
+var _spot_dirty := false
+
+
+func _update_last_spot(dt: float) -> void:
+	_spot_t += dt
+	_spot_save_t += dt
+	if _spot_t >= SPOT_EVERY:
+		_spot_t = 0.0
+		_note_spot()
+	if _spot_dirty and _spot_save_t > SPOT_SAVE:
+		_save_spot()
+
+
+## Stelle merken: xf mit force (Rennen-Marker, Ankunft), sonst wo das Auto gerade ist, wenn das sicher ist
+func _note_spot(xf := Transform3D(), force := false) -> void:
+	if not force:
+		if player == null or _intro != null or not player.controls_enabled or player.airborne or player.sinking > 0.0 \
+				or player.tumbling or player.global_basis.y.y < 0.9:
+			return
+		var on_road: bool = not player.loc.is_empty() and float(player.loc.get("score", 1.0)) < -0.3
+		if not on_road and player.offroad.is_empty():
+			return
+		xf = player.global_transform
+	var f := -xf.basis.z
+	GameState.world_pos = [snappedf(xf.origin.x, 0.01), snappedf(xf.origin.y, 0.01), snappedf(xf.origin.z, 0.01),
+		snappedf(atan2(-f.x, -f.z), 0.001)]
+	_spot_dirty = true
+
+
+func _save_spot() -> void:
+	_spot_save_t = 0.0
+	_spot_dirty = false
+	GameState.save_game()
+
+
+## Stadt erreicht: als letzte merken; beim ersten Mal ist die Schnellreise dorthin frei (Zeile über der Minikarte, etwas
+## Erfahrung). Beim Laden (noch kein HUD) still, etwa die Startstadt eines neuen Spiels.
+func _reach_town(town: String) -> void:
+	if not GameState.reach_town(town):
+		return
+	print("STADT entdeckt: ", town)
+	_spot_dirty = true
+	if _feed == null:
+		return
+	_flash(tr("STADT ENTDECKT: %s") % town.to_upper(), UI.GOLD, TOWN_XP, TOWN_XP)
+	_flash(tr("Schnellreise hierher frei (Karte: M)"), Color(0.75, 0.8, 0.88))
+	GameState.save_game()
 
 
 # --- Fahrer-Level und Drift in der freien Fahrt (seit 2.32) ------------------------------------------------------

@@ -26,7 +26,7 @@ Die Strecken zwischen den Städten (innerer Ring, Außenring, Querspangen, Spang
 ## 2. Rennen über die Autobahn
 Rennen auf den Verbindungen, z. B. ein Sprint über die Autobahn, der in einer Stadt endet.
 
-## 3. Startpunkt und Schnellreise
+## 3. Startpunkt und Schnellreise (erledigt in 2.42)
 - Keine Auswahl des Startpunkts mehr: das Spiel merkt sich den letzten Ort (zuletzt durchfahrene Stelle oder letzte
   Schnellreise) und startet dort.
 - Schnellreise muss man sich erfahren: erst wer eine Stadt erreicht hat, kann dorthin reisen. Nur zu Städten, nicht

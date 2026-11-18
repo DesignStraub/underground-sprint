@@ -5,6 +5,7 @@ extends Node
 
 const Layout := preload("res://scripts/world_layout.gd")
 const Track := preload("res://scripts/track_builder.gd")
+const Catalog := preload("res://scripts/catalog.gd")
 
 
 func _ready() -> void:
@@ -17,6 +18,11 @@ func _ready() -> void:
 			for k in rl.size() - 1:
 				L += rl[k].distance_to(rl[k + 1])
 			print("RAMPE %2d  %5.0f m  von (%.0f, %.0f) bis (%.0f, %.0f)" % [j, L, rl[0].x, rl[0].y, rl[rl.size() - 1].x, rl[rl.size() - 1].y])
+		# Städte (seit 2.42): Rennen, Ort, Stadteingang (Ausfahrt) für --wstart / --wspawn=xy
+		for c in w["cities"]:
+			var ex: Vector3 = c["exit_world"]
+			print("STADT %2d  %-20s Ausfahrt (%.0f, %.1f, %.0f)  Winkel %.3f" % [c["race_index"],
+				str(Catalog.RACES[c["race_index"]].get("town", "")), ex.x, ex.y, ex.z, c["phi_w"]])
 	if OS.get_cmdline_user_args().has("--hoehen"):
 		_probe_heights(w)
 	if OS.get_cmdline_user_args().has("--mitte"):
