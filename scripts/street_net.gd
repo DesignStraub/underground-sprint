@@ -50,6 +50,7 @@ const HOUSE_ROOM := 13.0  # hinter einer Nebenstraße muss noch eine Häuserreih
 
 ## Test (Prüfwerkzeuge): Gründe, warum Kandidaten nicht passten (Q_ = Querverbindungen)
 static var why := {}
+static var no_net := false  # tools/net_blocks.gd: Strecke ohne das eigene Netz planen (dessen Einmündungen wären sonst Sperren)
 static var _pre := ""
 
 
@@ -57,6 +58,8 @@ static var _pre := ""
 
 ## Straßennetz einer Welt-Stadt planen (nach Ausfahrten und Querstraßen der Entwürfe)
 static func plan(track: Dictionary, race: Dictionary) -> void:
+	if no_net:
+		return  # tools/net_blocks.gd: nur die Hauptstraße mit ihren Ausfahrten
 	var rng := RandomNumberGenerator.new()
 	rng.seed = int(race["seed"]) * 31 + 7
 	# Querstraßen der Entwürfe (track_design.plan_cross): Gehwege, Parkbuchten, Ampeln wie die neuen Straßen
@@ -68,8 +71,9 @@ static func plan(track: Dictionary, race: Dictionary) -> void:
 	var ctx := _ctx(track, race)
 	# Echte Städte mit Straßennetz (seit 2.52): die echten Straßen statt erfundener Querverbindungen und Parallelstraßen
 	# (die waren oft nur kurze Schleifen neben dem Ring, die nirgendwohin führten)
-	if CityNet.NETS.has(race.get("city", "")):
-		_plan_osm(ctx, CityNet.NETS[race["city"]], rng)
+	var net := net_for(race)
+	if not net.is_empty():
+		_plan_osm(ctx, net, rng)
 	else:
 		_pre = "Q_"
 		_plan_links(ctx, rng)
@@ -81,6 +85,16 @@ static func plan(track: Dictionary, race: Dictionary) -> void:
 	for z in ctx["mz"]:
 		track["zones"].append({"from": z[0] - z[1], "to": z[0] + z[1]})
 	track["net"] = true
+
+
+## Straßennetz aus city_net.gd: echte Städte nach "city", entworfene nach "layout" (leer: keins)
+static func net_for(race: Dictionary) -> Array:
+	if no_net:
+		return []
+	for k in [str(race.get("city", "")), str(race.get("layout", ""))]:
+		if k != "" and CityNet.NETS.has(k):
+			return CityNet.NETS[k]
+	return []
 
 
 static func _w(k: String) -> bool:
@@ -283,7 +297,7 @@ static func _osm_cost(ctx: Dictionary, pts: PackedVector2Array, reach: float) ->
 
 ## Kann die Hauptstraße bei d eine Einmündung zur Seite s aufnehmen? (flach, kein Tunnel/Trog/Brücke, keine Hochbahn
 ## auf der Seite, kein Mittelstreifen, kein Bahnübergang, kein anderer Abzweig, nicht zu kurvig)
-static func _mouth_ok(ctx: Dictionary, d: float, s: float, w: float, allow_d := -1e9) -> bool:
+static func _mouth_ok(ctx: Dictionary, d: float, s: float, w: float, allow_d := -1e9, min_r := 45.0) -> bool:
 	var track: Dictionary = ctx["track"]
 	# eigene Einmündungen (Abstand zueinander); an allow_d mündet gegenüber schon eine (Kreuzung in einer Flucht)
 	for z in ctx["mz"]:
@@ -305,7 +319,7 @@ static func _mouth_ok(ctx: Dictionary, d: float, s: float, w: float, allow_d := 
 		dd += 5.0
 	if track["crossing_d"] >= 0.0 and absf(d - track["crossing_d"]) < 70.0:
 		return _w("mund_bahn")
-	if Track._min_radius(curve, d, ctx["loop"]) < 45.0:
+	if Track._min_radius(curve, d, ctx["loop"]) < min_r:
 		return _w("mund_kurve")
 	return true
 
@@ -314,6 +328,8 @@ static func _zone(ctx: Dictionary, d: float) -> bool:
 	var track: Dictionary = ctx["track"]
 	var L: float = track["length"]
 	for z in track["zones"]:
+		if z.get("clear", false):
+			continue  # Schikanen der Entwürfe: dort nur keine Poller und Hydranten, Straßen dürfen einmünden
 		var skip := false
 		for jd in ctx["skip_zones"]:
 			if is_equal_approx(z["from"], jd - 40.0) and is_equal_approx(z["to"], jd + 40.0):

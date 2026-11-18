@@ -379,10 +379,11 @@ static func begin(race: Dictionary) -> Dictionary:
 		# (bei 9,3 m) an jeder Naht zwischen zwei Stücken quer durch die äußere Spur liefen, im Kreisel mitten auf die
 		# Fahrbahn
 		_drop_spurs(track)
+		track["layout_key"] = str(race.get("layout", ""))
 		_plan_world_exit(track)
 		if (type == "sprint" or type == "circuit") and not race.get("forest", false):
-			if race.has("layout"):
-				Design.plan_cross(track, race)  # Querstraßen durch das Innere (entworfene Städte)
+			if race.has("layout") and not Streets.CityNet.NETS.has(str(race["layout"])):
+				Design.plan_cross(track, race)  # Querstraßen durch das Innere (entworfene Städte ohne eigenes Straßennetz)
 			if OS.get_cmdline_user_args().has("--oldlanes"):
 				_plan_lanes(track, int(race["seed"]))  # Vergleich: Nebenstraßen wie bis 2.38
 			else:
@@ -1661,7 +1662,9 @@ static func _plan_world_exit(track: Dictionary) -> void:
 	for q in pts:
 		centroid += q
 	centroid /= maxf(pts.size(), 1)
-	var pick := _loop_exit_pick(track, centroid, {})
+	var pick := _design_exit(track, "exit")
+	if pick.is_empty():
+		pick = _loop_exit_pick(track, centroid, {})
 	if pick.is_empty():
 		pick = _apex_exit(track, centroid)
 	if pick.is_empty():
@@ -1671,13 +1674,28 @@ static func _plan_world_exit(track: Dictionary) -> void:
 	# Weg zurück. Jetzt eine zweite auf der anderen Seite der Stadt; world_layout._connect_ends verbindet sie mit dem
 	# inneren oder äußeren Ring, findet es keinen Weg, plant die Stadt ohne sie neu (race["no_exit2"]).
 	if not track["no_exit2"]:
-		var pick2 := _loop_exit_pick(track, centroid, pick)
+		var pick2 := _design_exit(track, "exit2")
+		if pick2.is_empty():
+			pick2 = _loop_exit_pick(track, centroid, pick)
 		if pick2.is_empty():
 			pick2 = _loop_exit_pick(track, centroid, pick, true)  # enge Kurse (Drift): mit kleinerem Abstand
 		if pick2.is_empty():
 			pick2 = _apex_exit(track, centroid, pick)  # ohne gerades Stück: an der äußersten Kurve
 		if not pick2.is_empty():
 			_add_loop_exit(track, pick2, "world_exit2")
+
+
+## Ausfahrt nach Entwurf (track_design "exit"/"exit2": {"at": Stützpunkt, "dir": [x, z]}, seit 2.52): Köln fand
+## als zweite selbst nur eine Stelle mitten in der Stadt, die nach innen zeigte, und blieb ohne Weg zum Außenring
+static func _design_exit(track: Dictionary, key: String) -> Dictionary:
+	var lay: Dictionary = Design.LAYOUTS.get(track.get("layout_key", ""), {})
+	if not lay.has(key) or not track.has("ctrl_offs"):
+		return {}
+	var d: float = track["ctrl_offs"][int(lay[key]["at"])]
+	var f := frame_at(track["curve"], d)
+	var want := Vector3(float(lay[key]["dir"][0]), 0.0, float(lay[key]["dir"][1]))
+	var out: Vector3 = f["right"] * signf((f["right"] as Vector3).dot(want))
+	return {"d": d, "f": f, "out": out, "tip": f["pos"] + out * (hw(track, d) + WALK + EXIT_LEN)}
 
 
 static func _add_loop_exit(track: Dictionary, pick: Dictionary, key: String) -> void:

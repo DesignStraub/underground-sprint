@@ -20,6 +20,7 @@ Ablauf:
 import json
 import math
 import os
+import random
 import re
 import sys
 
@@ -41,7 +42,23 @@ MOUTH_MIN_ANG = 38.0  # flacher darf eine Straße nicht in die Hauptstraße mün
 CLS = {"primary": "breit", "secondary": "strasse", "tertiary": "strasse", "unclassified": "strasse",
        "residential": "strasse", "primary_link": "strasse", "secondary_link": "strasse", "tertiary_link": "strasse",
        "living_street": "gasse", "pedestrian": "gasse"}
-CITIES = ["aachen"]
+CITIES = ["aachen", "koeln"]
+REACH_D = 250.0  # entworfene Städte: so weit von der Strecke
+# Entworfene Städte (track_design-Layout statt OSM): Raster und Straßennamen
+DESIGN = {
+    "koeln": {
+        "seed": 51, "spacing": (84.0, 74.0), "angle": 0.21, "warp": 24.0, "jitter": 8.0, "drop": 0.15, "diag": 0.07,
+        "arterial": 4, "main_band": 30.0, "gasse_x": -330.0, "west_of": -52.0,  # Rhein: nur das linke Ufer
+        "rows": ["Hohe Straße", "Schildergasse", "Breite Straße", "Ehrenstraße", "Zülpicher Straße", "Aachener Straße",
+                 "Venloer Straße", "Severinstraße", "Apostelnstraße", "Mittelstraße", "Friesenstraße", "Komödienstraße",
+                 "Gereonstraße", "Hahnenstraße", "Richmodstraße", "Glockengasse", "Brückenstraße", "Sternengasse"],
+        "cols": ["Cäcilienstraße", "Weyerstraße", "Pfeilstraße", "Benesisstraße", "Lindenstraße", "Roonstraße",
+                 "Kyffhäuserstraße", "Engelbertstraße", "Händelstraße", "Brüsseler Straße", "Bismarckstraße",
+                 "Moltkestraße", "Lütticher Straße", "Maastrichter Straße", "Limburger Straße", "Flandrische Straße",
+                 "Antwerpener Straße", "Genter Straße", "Lübecker Straße", "Luxemburger Straße", "Bonner Straße",
+                 "Vorgebirgstraße", "Eifelstraße", "Volksgartenstraße"],
+    },
+}
 
 
 class Proj:
@@ -187,32 +204,27 @@ def seg_dist(q, a, b):
     return math.dist(q, (a[0] + ab[0] * t, a[1] + ab[1] * t))
 
 
-def build(folder, city):
-    org, ctrl, loop = city_block(city)
+def add_way(ways, fake, node_ids, geo, name, cls):
+    """Weg mit Zwischenknoten alle DENSE m (negative IDs) anlegen"""
+    nodes, dgeo = [node_ids[0]], [geo[0]]
+    for k in range(1, len(geo)):
+        a, b = geo[k - 1], geo[k]
+        n = int(math.dist(a, b) / DENSE)
+        for j in range(1, n + 1):
+            tt = j / (n + 1)
+            fake[0] -= 1
+            nodes.append(fake[0])
+            dgeo.append((a[0] + (b[0] - a[0]) * tt, a[1] + (b[1] - a[1]) * tt))
+        nodes.append(node_ids[k])
+        dgeo.append(b)
+    ways.append({"nodes": nodes, "geo": dgeo, "name": name, "cls": cls})
+
+
+def osm_ways(folder, city, ways, fake):
+    org, _, _ = city_block(city)
     proj = Proj(org[0], org[1])
-    main = densify(ctrl + ([ctrl[0]] if loop else []), 2.0)
-    # Sperrflächen aus dem Spiel (tools/net_blocks.gd): Korridore der Ausfahrten (nach hinten bis zur Hauptstraße
-    # verlängert), Wahrzeichen, Hügel; dazu die genaue Mittellinie
-    blocked = lambda q: False
-    bp = os.path.join(folder, city + "_blocks.json")
-    if os.path.exists(bp):
-        blk = json.load(open(bp, encoding="utf-8"))
-        main = [tuple(q) for q in blk["main"]]
-        caps = []
-        for c in blk["caps"]:
-            a, b, r = (c[0], c[1]), (c[2], c[3]), c[4]
-            dl = math.dist(a, b) or 1.0
-            a = (a[0] - (b[0] - a[0]) / dl * 70.0, a[1] - (b[1] - a[1]) / dl * 70.0)
-            caps.append((a, b, r + BLOCK_PAD))
-        circ = [((c[0], c[1]), c[2] + BLOCK_PAD) for c in blk["circles"]]
-        blocked = lambda q: any(seg_dist(q, a, b) < r for a, b, r in caps) or any(math.dist(q, c) < r for c, r in circ)
-    else:
-        print("  (keine Sperrflächen: %s fehlt)" % bp)
-    near = Near(main)
     data = json.load(open(os.path.join(folder, city + "_streets.json"), encoding="utf-8"))
-    # Knoten -> Lage; Wege (ohne Zufahrten/Parkplätze: "service" nur mit Namen)
-    ways = []
-    fake = [0]  # Zwischenknoten: negative IDs
+    # ohne Zufahrten/Parkplätze: "service" nur mit Namen
     for e in data["elements"]:
         t = e.get("tags", {})
         hw = t.get("highway", "")
@@ -224,18 +236,91 @@ def build(folder, city):
                 or t.get("access") in ("private", "no") or t.get("layer", "0") not in ("0", ""):
             continue
         geo = [proj(g["lat"], g["lon"]) for g in e["geometry"]]
-        nodes, dgeo = [e["nodes"][0]], [geo[0]]
-        for k in range(1, len(geo)):
-            a, b = geo[k - 1], geo[k]
-            n = int(math.dist(a, b) / DENSE)
-            for j in range(1, n + 1):
-                tt = j / (n + 1)
-                fake[0] -= 1
-                nodes.append(fake[0])
-                dgeo.append((a[0] + (b[0] - a[0]) * tt, a[1] + (b[1] - a[1]) * tt))
-            nodes.append(e["nodes"][k])
-            dgeo.append(b)
-        ways.append({"nodes": nodes, "geo": dgeo, "name": t.get("name", ""), "cls": CLS.get(hw, "gasse"), "hw": hw})
+        add_way(ways, fake, e["nodes"], geo, t.get("name", ""), CLS.get(hw, "gasse"))
+
+
+def design_ways(cfg, main, ways, fake):
+    """Entworfene Städte: unregelmäßiges Raster (gedreht, verbogen, verschoben, einzelne Stücke fehlen, ein paar
+    Diagonalen), Namen je Rasterlinie; was zu weit draußen, im Fluss oder in Sperrflächen liegt, kappt build()"""
+    rng = random.Random(cfg["seed"])
+    sx, sz = cfg["spacing"]
+    ca, sa = math.cos(cfg["angle"]), math.sin(cfg["angle"])
+    xs = [q[0] for q in main]
+    zs = [q[1] for q in main]
+    pad = REACH_D + 120.0
+    lo = (min(xs) - pad, min(zs) - pad)
+    hi = (max(xs) + pad, max(zs) + pad)
+    cx, cz = (lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2
+    ext = max(hi[0] - lo[0], hi[1] - lo[1]) * 0.75
+    ni, nj = int(ext / sx) + 1, int(ext / sz) + 1
+    w = cfg["warp"]
+    grid = {}
+    for i in range(-ni, ni + 1):
+        for j in range(-nj, nj + 1):
+            u, v = i * sx, j * sz
+            x = cx + u * ca - v * sa
+            z = cz + u * sa + v * ca
+            x += w * math.sin(z * 0.0105 + 1.3) + w * 0.5 * math.sin(z * 0.031 + x * 0.004)
+            z += w * math.sin(x * 0.0125 + 0.4) + w * 0.5 * math.sin(x * 0.027 - z * 0.005)
+            x += rng.uniform(-cfg["jitter"], cfg["jitter"])
+            z += rng.uniform(-cfg["jitter"], cfg["jitter"])
+            if lo[0] <= x <= hi[0] and lo[1] <= z <= hi[1]:
+                grid[(i, j)] = (len(grid) + 1, (x, z))
+    rows, cols = cfg["rows"], cfg["cols"]
+    def cls_for(i, j, horiz, q):
+        k = j if horiz else i
+        if k % cfg["arterial"] == 0:
+            return "breit" if k % (cfg["arterial"] * 2) == 0 and q[0] > cfg["gasse_x"] else "strasse"
+        return "gasse" if q[0] < cfg["gasse_x"] and rng.random() < 0.6 else "strasse"
+    for (i, j), (nid, q) in grid.items():
+        for di, dj, horiz in ((1, 0, True), (0, 1, False)):
+            o = grid.get((i + di, j + dj))
+            if o is None or rng.random() < cfg["drop"]:
+                continue
+            name = rows[j % len(rows)] if horiz else cols[i % len(cols)]
+            mid = ((q[0] + o[1][0]) / 2, (q[1] + o[1][1]) / 2)
+            add_way(ways, fake, [nid, o[0]], [q, o[1]], name, cls_for(i, j, horiz, mid))
+        o = grid.get((i + 1, j + 1))
+        if o is not None and rng.random() < cfg["diag"]:
+            add_way(ways, fake, [nid, o[0]], [q, o[1]], "", "gasse")
+
+
+def build(folder, city):
+    cfg = DESIGN.get(city)
+    main_cut = cfg["main_band"] if cfg else MAIN_CUT
+    reach = REACH_D if cfg else REACH
+    blocked = lambda q: False
+    main = None
+    nomouth = []
+    bp = os.path.join(folder, city + "_blocks.json")
+    if os.path.exists(bp):
+        # Sperrflächen aus dem Spiel (tools/net_blocks.gd): Korridore der Ausfahrten (nach hinten bis zur Hauptstraße
+        # verlängert), Wahrzeichen, Hügel; die genaue Mittellinie und wo nichts einmünden darf
+        blk = json.load(open(bp, encoding="utf-8"))
+        main = [tuple(q) for q in blk["main"]]
+        nomouth = blk.get("nomouth", [])
+        caps = []
+        for c in blk["caps"]:
+            a, b, r = (c[0], c[1]), (c[2], c[3]), c[4]
+            dl = math.dist(a, b) or 1.0
+            a = (a[0] - (b[0] - a[0]) / dl * 70.0, a[1] - (b[1] - a[1]) / dl * 70.0)
+            caps.append((a, b, r + BLOCK_PAD))
+        circ = [((c[0], c[1]), c[2] + BLOCK_PAD) for c in blk["circles"]]
+        west = cfg.get("west_of", 1e9) if cfg else 1e9
+        blocked = lambda q: q[0] > west or any(seg_dist(q, a, b) < r for a, b, r in caps) or any(math.dist(q, c) < r for c, r in circ)
+    elif cfg:
+        sys.exit("entworfene Stadt braucht %s (tools/net_blocks.gd)" % bp)
+    else:
+        print("  (keine Sperrflächen: %s fehlt)" % bp)
+        _, ctrl, loop = city_block(city)
+        main = densify(ctrl + ([ctrl[0]] if loop else []), 2.0)
+    near = Near(main)
+    ways = []
+    fake = [0]  # Zwischenknoten: negative IDs
+    if cfg:
+        design_ways(cfg, main, ways, fake)
+    else:
+        osm_ways(folder, city, ways, fake)
     pos = {}
     for w in ways:
         for n, q in zip(w["nodes"], w["geo"]):
@@ -244,7 +329,12 @@ def build(folder, city):
     state = {}
     for n, q in pos.items():
         d = far_dist(near, q)
-        state[n] = "M" if d < MAIN_CUT else ("F" if d > REACH or blocked(q) else "")
+        st = "M" if d < main_cut else ("F" if d > reach or blocked(q) else "")
+        if st != "F" and d < main_cut + 14.0 and nomouth:
+            _, mk = near(q, 60.0)
+            if mk >= 0 and nomouth[mk]:
+                st = "F"  # hier darf nichts in die Hauptstraße münden (Tunnel, Mittelstreifen, enge Kurve ...)
+        state[n] = st
     # Kanten: zwischen zwei Netz-Knoten; an einem M-Knoten: Einmündung (Ende wird bis zur Mittellinie verlängert)
     edges = []  # {a, b, pts, name, cls}; a/b: Knoten-ID oder ("main", Index auf main)
     for w in ways:
@@ -322,6 +412,13 @@ def build(folder, city):
     def continue_from(node, pts, name):
         """nächste unbenutzte Kante an node, die am geradesten weiterführt (höchstens 50° Knick)"""
         h0 = heading(pts[-2], pts[-1]) if len(pts) > 1 else 0.0
+        # Ecke ohne Kreuzung (nur zwei Kanten): immer weiter, auch rechtwinklig (wird gerundet); sonst bliebe dort ein
+        # Ende am Ende, und an der Außenseite der Ecke fehlte die Wand
+        if len(adj.get(node, [])) == 2:
+            for j in adj[node]:
+                if not used[j]:
+                    return j
+            return -1
         best, bi = 1e9, -1
         for j in adj.get(node, []):
             if used[j]:
@@ -459,17 +556,21 @@ def gd(v, ind=1):
 def main():
     folder = sys.argv[1]
     cities = sys.argv[2:] or CITIES
-    old = {}
+    # nur die genannten Städte neu, die übrigen aus der vorhandenen Datei behalten (als Text)
+    keep_txt = {}
     if os.path.exists(OUT):
         src = open(OUT, encoding="utf-8").read()
-        for c in re.findall(r'^\t"([a-z]+)": \[', src, re.M):
-            old[c] = True
+        for m in re.finditer(r'^\t"([a-z]+)": \[\n.*?^\t\],$', src, re.M | re.S):
+            if m.group(1) not in cities:
+                keep_txt[m.group(1)] = m.group(0)
     res = {c: build(folder, c) for c in cities}
     lines = ["extends RefCounted", "## Automatisch erzeugt von tools/osm_net.py, nicht von Hand ändern.",
              "## Kartendaten © OpenStreetMap-Mitwirkende, Lizenz ODbL (openstreetmap.org/copyright).",
              "## Echte Straßen um die Strecke als Nebenstraßen der freien Fahrt: pts (x0, z0, x1, z1, ... wie city_data),",
              "## cls (gasse/strasse/breit), ends: [{main: true} = Einmündung in die Hauptstraße | {street: i} = an Straße i].",
              "", "const NETS := {"]
+    for c, txt in keep_txt.items():
+        lines.append(txt)
     for c, streets in res.items():
         lines.append(f'\t"{c}": ' + gd(streets, 1) + ",")
     lines.append("}")

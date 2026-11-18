@@ -67,7 +67,8 @@ const LAYOUTS := {
 	# Spitzkehre, dann der Ring nach Westen und seit 2.51 die Altstadt-Schleife (vorher ein weiter Bogen, der Kurs war
 	# knapp 1,9 km): weit hinaus durch enge Gassen, Schikanen, eine S-Kurve mit zwei engen Ecken und zurück durch das
 	# Kwartier Latäng im Süden ans Ufer, gut 2,6 km. Der Rhein fließt neben der Geraden, über ihn die Hohenzollernbrücke.
-	# In der Welt kreuzen drei Querstraßen: Altstadt–Rheinufer, Ring Nord–Süd und quer durch die Schleife.
+	# In der Welt seit 2.52 ein ganzes Straßennetz drumherum und quer durch (city_net.gd, tools/osm_net.py) statt drei
+	# Querstraßen.
 	"koeln": {
 		"k": 0.2,
 		"pts": [
@@ -103,8 +104,9 @@ const LAYOUTS := {
 		# Fluss nur so breit und lang, dass er in der Welt nicht unter die Nachbarstadt reicht (Seitenabstand der Städte)
 		"rivers": [{"name": "RHEIN", "width": 60.0, "pts": [-11, 480, -11, 300, -11, 100, -11, -100, -10, -300, -8, -430]}],
 		"landmarks": [{"kind": "koelner_dom", "x": -95.0, "z": -335.0}, {"kind": "hohenzollernbruecke", "x": -10.0, "z": -310.0}],
-		"cross": [[116, 4], [36, 165], [56, 102]],
 		"clear": [[17, 26], [45, 156]],  # Altstadt-Schleife ohne Mittelstreifen (Schikanen, Gassen)
+		"exit": {"at": 31, "dir": [0, -1]},  # Ausfahrt zur Autobahn neben dem Dom (wie bis 2.51 von selbst gewählt)
+		"exit2": {"at": 165, "dir": [0, 1]},  # zweite Ausfahrt am Nordrand, nach außen zum Außenring
 	},
 	# Bremen (Hafenring): Schlachte an der Weser (Start, Martinitunnel), Spitzkurve hinauf über die Brücke am Europahafen,
 	# schneller Bogen auf die Kaistraße mit Kränen und Containern, ein Knick am Becken entlang, dann das Zickzack durch
@@ -585,7 +587,7 @@ static func _plan_town(track: Dictionary, lay: Dictionary, offs: PackedFloat32Ar
 	# Schikanen und Kehren ("clear": Stützpunkt von–bis): dort keine Poller, Hydranten, Bänke am inneren Bordstein, über
 	# den man die Kurve schneidet (der Autopilot krachte in Köln in der Schikane frontal in einen Hydranten)
 	for cl in lay.get("clear", []):
-		track["zones"].append({"from": offs[cl[0]] - 10.0, "to": offs[cl[1]] + 10.0})
+		track["zones"].append({"from": offs[cl[0]] - 10.0, "to": offs[cl[1]] + 10.0, "clear": true})  # Einmündungen erlaubt
 	# Einmündungen der Querstraßen (Open World) auch im Rennen freihalten: kein Mittelstreifen, keine Sackgasse,
 	# kein Tunnel dort; so liegen Mittelstreifen und Abzweige im Rennen und in der Welt gleich
 	for cr in lay.get("cross", []):
