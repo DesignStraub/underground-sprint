@@ -48,8 +48,10 @@ Dateien stehen in [`CREDITS.md`](CREDITS.md).
 1. ✓ LICENSE-Dateien angelegt, README mit Abschnitt „Open Source“ (Lizenzen, Bauen mit Godot 4.7).
 2. ✓ Öffentlichen Stand vorbereiten: `tools/oeffentlich.sh <Zielordner>` legt einen sauberen Ordner mit einem
    einzigen Commit an (nur die heute eingecheckten Dateien, ohne `.claude/`, Builds und das Aachen-Lied).
-3. ✓ Öffentlich seit 18. November 2026: [github.com/DesignStraub/need-for-geschwindigkeit](https://github.com/DesignStraub/need-for-geschwindigkeit) (Stand 2.47, ein Commit; die Geschichte bleibt im privaten Repo).
-   Spätere Stände: `tools/oeffentlich.sh` erneut ausführen und den Inhalt als neuen Commit ins öffentliche Repo
-   übernehmen (oder das private Repo direkt dorthin spiegeln).
+3. ✓ Öffentlich seit 18. November 2026: [github.com/DesignStraub/need-for-geschwindigkeit](https://github.com/DesignStraub/need-for-geschwindigkeit) (erst Stand 2.47 als ein Commit, am selben Tag 2.48 nachgezogen; die Geschichte bleibt im privaten Repo).
+   Spätere Stände: das öffentliche Repo klonen, dort alle Dateien durch `git archive HEAD` des privaten Repos
+   ersetzen und als neuen Commit „Need for Geschwindigkeit <Version>“ hochladen (nur eingecheckte Dateien, also ohne
+   `.claude/`, Builds und das Aachen-Lied).
 4. itch-Seite: Link zum Repo und den Lizenzen ergänzen (Text steht in `release/ITCH_PAGE.md`, einfügen macht der User).
-5. Zum Abschluss das Reel bzw. Video über das Spiel.
+5. ✓ Reel zum Stand 2.48 (18. November 2026): `release/need_for_geschwindigkeit_reel_2_48.mp4` (nicht im Repo, `*.mp4`
+   ist ausgenommen), Aufnahmen und Schnitt mit `tools/short3/rec_r.sh` und `cut_r.py`.
