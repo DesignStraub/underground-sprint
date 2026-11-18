@@ -13,3 +13,6 @@ tools/short3/arbeit/
 # Stadt-Tracks von Künstlern: im Spiel (lokal und im Export), aber nicht im öffentlichen Repo
 music/staedte/*.mp3
 music/staedte/*.mp3.import
+
+# Arbeitsdateien von Claude Code (Testskripte mit lokalen Pfaden)
+.claude/

@@ -44,7 +44,10 @@ frei nutzbar, keine Namensnennung nötig; trotzdem hier aufgeführt). Seit 2.30:
 | Metal | alex-morgan „Thrash Metal“; alexgrohl „Void Construct – Epic Metal“; strawberry_candy „Powerful Heavy Metal – Heavy Force“; williamsmyname „Alternative Metal – Macfly“ |
 
 Stadt-Track Aachen: Bruder Jakob x Jonas Platin, „AC“, mit freundlicher Genehmigung der Künstler (nicht im
-öffentlichen Repo, `music/staedte/`).
+öffentlichen Repo, `music/staedte/`, war nie eingecheckt).
+
+Hinweis zur Weitergabe: Die Pixabay-Lizenz erlaubt die Nutzung im Spiel, aber nicht, die Dateien unverändert einzeln
+weiterzugeben oder anzubieten. Wie die Tracks im öffentlichen Repo behandelt werden, steht in `OPEN_SOURCE.md`.
 
 ## Schrift
 Menüs und Anzeigen seit 2.30: Inter von Rasmus Andersson, SIL Open Font License 1.1 (`assets/fonts/inter/LICENSE.txt`).
@@ -53,16 +56,32 @@ Zum Vergleich liegen Rajdhani (Indian Type Foundry, OFL, `assets/fonts/rajdhani/
 Chakra Petch (The Chakra Petch Project Authors, OFL, `assets/fonts/chakrapetch/`) und Saira Condensed (Omnibus-Type,
 OFL, `assets/fonts/saira/`) bei.
 
-## Piktogramme und Landschaft
+## Piktogramme, Landschaft, Texturen
 Ladenpiktogramme, Markenzeichen, Bäume, Dörfer, Windräder und Strommasten: selbst gezeichnet bzw. im Code erzeugt.
+Asphalt und Gehwege: `assets/textures/asphalt*.png`, erzeugt mit `tools/gen_ground_tex.gd`. Autos, Verkehr, Menschen,
+Häuser und Strecken: im Code gebaut (keine fremden 3D-Modelle).
 
 ## Kartendaten
 Straßen und Gebäude der Städte-Strecken: © OpenStreetMap-Mitwirkende, ODbL (openstreetmap.org/copyright).
+Die daraus abgeleiteten Daten in `scripts/city_data.gd` (erzeugt mit `tools/osm_city.py`) stehen unter der
+[Open Database License 1.0](https://opendatacommons.org/licenses/odbl/1-0/): wer sie weitergibt oder verändert, muss
+sie ebenfalls unter der ODbL anbieten und OpenStreetMap nennen.
 
 ## Alle anderen Klänge
 Synthetisch erzeugt (`tools/make_sfx.py`).
 
+## ONE HUMANITY
+Name und Herz-Logo von ONE HUMANITY (`assets/one_humanity_logo.svg`, das Wandbild `assets/murals/onehumanity_heart.png`,
+die drei echten Plakate in `assets/posters/posters.png`, `tools/poster_icons/onehumanity_*.svg`,
+`release/itch_seite/onehumanity_*`) sind Kennzeichen von ONE HUMANITY. Sie liegen bei, damit das Spiel vollständig
+ist, sind aber nicht Teil der freien Lizenz: wer das Spiel verändert weitergibt, entfernt oder ersetzt sie. Die Texte
+der Plakate stammen von der eigenen Website oneplanetonehumanity.com.
+
+## Engine
+[Godot Engine](https://godotengine.org) 4.7, MIT-Lizenz (© Juan Linietsky, Ariel Manzur und die Godot-Mitwirkenden).
+Exportierte Spiele enthalten Godot und dessen Drittbibliotheken (Lizenzen: godotengine.org/license).
+
 ## Vinyls, Embleme, Werbeplakate
 Eigene Vektorgrafiken, im Code erzeugt (`tools/vinyl_gen.py`, `tools/poster_gen.py`), ohne fremde Vorlagen. Schrift
 auf den Vinyls aus eigenen Strichen, auf den Plakaten Saira, D-DIN, Chakra Petch und Inter (OFL). Alle Marken und
-Sprüche auf den Plakaten sind ausgedacht.
+Sprüche auf den ersten zwölf Plakaten sind ausgedacht; die drei weiteren sind echte Werbung von ONE HUMANITY (siehe oben).

@@ -1,6 +1,6 @@
 #!/bin/bash
 # rec.sh <tag> <scene> [args…] – Szene als AVI (30 fps, Musik aus). Fenstergröße kommt aus override.cfg (batch.sh)
-P="/Users/marcello/Projekte/Need for Geschwindigkeit"; D="$(cd "$(dirname "$0")" && pwd)"
+P="$(cd "$(dirname "$0")/../.." && pwd)"; D="$(cd "$(dirname "$0")" && pwd)"  # Projektordner, Ordner dieses Skripts
 G=/Applications/Godot.app/Contents/MacOS/Godot
 TAG="$1"; SC="$2"; shift 2
 cd "$P"

@@ -7,6 +7,12 @@ Nächtliches Straßenrennen im Stil der frühen 2000er (früher „Underground S
 Ein Spiel von **ONE HUMANITY** – kostenlos auf [itch.io](https://onehumanity.itch.io/need-for-geschwindigkeit) für
 Windows, macOS, Linux und im Browser. Was noch kommt, steht im [Fahrplan](FAHRPLAN.md).
 
+**Open Source:** der Code steht unter der [MIT-Lizenz](LICENSE), die eigenen Inhalte unter [CC BY 4.0](LICENSE-INHALTE.md);
+fremde Motorklänge, Geräusche, Musik und Schriften unter ihren eigenen Lizenzen ([CREDITS.md](CREDITS.md)), die
+Kartendaten der Städte unter der ODbL. Name und Logo von ONE HUMANITY sind nicht frei lizenziert. Selbst bauen: mit
+[Godot 4.7](https://godotengine.org) den Ordner öffnen und starten (F5); Exportvorlagen für Windows, macOS, Linux und Web
+stehen in `export_presets.cfg`. Stand der Freigabe: [OPEN_SOURCE.md](OPEN_SOURCE.md).
+
 ![Würzburg Mainufer im Kitsune 18S](release/screenshots/12_wuerzburg_kitsune.jpg)
 
 <table>
