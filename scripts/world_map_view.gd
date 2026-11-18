@@ -287,6 +287,7 @@ func open(select := -1) -> void:
 	_gliding = false
 	_drag = false
 	_districts = district_fn.call() if district_fn.is_valid() else []
+	_add_found_shops()
 	# Auswahl: die Stadt des gewählten Rennens, sonst der nächste entdeckte Ort
 	sel = 0
 	var ts := town_of(select) if select >= 0 else -1
@@ -308,6 +309,18 @@ func open(select := -1) -> void:
 					sel = i
 	_lod = -999
 	_apply_view()
+
+
+## Gefundene Werkstätten (seit 2.50, GameState.secret_pos) als Sprungziele, Ankunft dort, wo man sie gefunden hat
+func _add_found_shops() -> void:
+	for key in GameState.secret_pos:
+		var k := str(key)
+		if not k.begins_with("werkstatt:") or places.any(func(p): return p["key"] == k):
+			continue
+		var a: Array = GameState.secret_pos[k]
+		var xf := Transform3D(Basis(Vector3.UP, float(a[3])), Vector3(float(a[0]), float(a[1]) + 0.5, float(a[2])))
+		places.append({"kind": "shop", "name": k.get_slice(":", 1), "key": k, "town": -1,
+			"pos": Vector2(float(a[0]), float(a[2])), "xf": xf})
 
 
 # --- Ansicht ------------------------------------------------------------------------------------------------------
@@ -710,6 +723,11 @@ func _draw_over() -> void:
 		if not Rect2(Vector2(-10, -10), size + Vector2(20, 20)).has_point(sp):
 			continue
 		var kn := known(i)
+		if pl["kind"] == "shop":
+			o.draw_circle(sp, 6.0, Color(0, 0, 0, 0.85))
+			o.draw_circle(sp, 4.4, Color(1.0, 0.62, 0.16))
+			o.draw_string(_f_wide, sp + Vector2(-2.9, 2.6), "W", HORIZONTAL_ALIGNMENT_LEFT, -1, 7, Color(0.05, 0.03, 0.0))
+			continue
 		if pl["kind"] == "hw":
 			var won: bool = str(pl["name"]) in GameState.highway_won
 			var c := COL_HW if kn else Color(0.35, 0.45, 0.6)
@@ -778,7 +796,14 @@ func _draw_ui() -> void:
 		elif places[i]["kind"] == "hw":
 			th += 1
 			nh += 1 if known(i) else 0
-	var cnt := tr("STÄDTE %d / %d   ·   GELÄNDE %d / %d   ·   AUTOBAHN-RENNEN %d / %d") % [nt, towns.size(), na, ta, nh, th]
+	var ns := 0
+	var np := 0
+	for k in towns.size():
+		var tn := str(towns[k]["name"])
+		ns += 1 if GameState.place_known("werkstatt:" + tn) else 0
+		np += 1 if GameState.place_known("kennzeichen:" + tn) else 0
+	var cnt := tr("STÄDTE %d / %d  ·  GELÄNDE %d / %d  ·  AUTOBAHN %d / %d  ·  WERKSTÄTTEN %d / %d  ·  KENNZEICHEN %d / %d") % [
+		nt, towns.size(), na, ta, nh, th, ns, towns.size(), np, towns.size()]
 	var cw := _f_wide.get_string_size(cnt, HORIZONTAL_ALIGNMENT_LEFT, -1, 6).x
 	u.draw_string(_f_wide, Vector2(size.x - 20.0 - cw, 24), cnt, HORIZONTAL_ALIGNMENT_LEFT, -1, 6, UI.DIM)
 	# Fußleiste: Tasten
@@ -815,9 +840,9 @@ func _draw_info(u: Control) -> void:
 	var y := 66.0
 	# Höhe vorab: Städte mit Rennen länger
 	var n_r := (towns[p["town"]]["pins"] as Array).size() if p["kind"] == "town" else 0
-	var h := (150.0 if p["kind"] == "town" else 128.0) + n_r * 33.0
+	var h := (166.0 if p["kind"] == "town" else 128.0) + n_r * 33.0
 	u.draw_style_box(UI.panel_box(0.92), Rect2(x, 50, w, h))
-	var kind_t: String = {"town": tr("STADT"), "area": tr("GELÄNDE"), "hw": tr("AUTOBAHN-RENNEN")}.get(p["kind"], "")
+	var kind_t: String = {"town": tr("STADT"), "area": tr("GELÄNDE"), "hw": tr("AUTOBAHN-RENNEN"), "shop": tr("VERSTECKTE WERKSTATT")}.get(p["kind"], "")
 	u.draw_string(_f_wide, Vector2(ix, y), kind_t, HORIZONTAL_ALIGNMENT_LEFT, -1, 6, UI.FAINT)
 	y += 20
 	var name := str(p["name"]).to_upper()
@@ -835,7 +860,9 @@ func _draw_info(u: Control) -> void:
 	u.draw_string(_f_body, Vector2(ix, y), tr("Luftlinie: %.1f km") % km, HORIZONTAL_ALIGNMENT_LEFT, iw, 8, UI.DIM)
 	y += 14
 	var sub := ""
-	if p["kind"] == "area":
+	if p["kind"] == "shop":
+		sub = tr("Exklusiver Lack in der Garage")
+	elif p["kind"] == "area":
 		sub = tr("Golfplatz zum Austoben") if p.get("akind", "") == "golf" else tr("Kiesgrube zum Austoben")
 	elif p["kind"] == "hw":
 		var won: bool = str(p["name"]) in GameState.highway_won
@@ -850,6 +877,12 @@ func _draw_info(u: Control) -> void:
 	var tcol: Color = Color(0.45, 1.0, 0.6) if kn else (UI.ACCENT if _deny_t > 0.0 else UI.FAINT)
 	u.draw_string(_f_wide, Vector2(ix, y + 2), tr("SPRINGEN: FREI") if kn else tr("SPRINGEN: ERST HINFAHREN"), HORIZONTAL_ALIGNMENT_LEFT, iw, 6, tcol)
 	y += 18
+	if p["kind"] == "town":
+		var tn := str(p["name"])
+		var ws := tr("WERKSTATT ✓") if GameState.place_known("werkstatt:" + tn) else tr("WERKSTATT ?")
+		var ks := tr("KENNZEICHEN ✓") if GameState.place_known("kennzeichen:" + tn) else tr("KENNZEICHEN ?")
+		u.draw_string(_f_wide, Vector2(ix, y), ws + "   " + ks, HORIZONTAL_ALIGNMENT_LEFT, iw, 6, UI.DIM)
+		y += 16
 	# Rennen der Stadt: Art, Name, Stand, Bestwert
 	if p["kind"] == "town":
 		for i in towns[p["town"]]["pins"]:

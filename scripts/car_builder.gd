@@ -622,7 +622,7 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 	# Kennzeichen: Schild mit dunklem Rand und Schrift
 	_add(rbm, box(Vector3(0.33, 0.165, 0.01)), mat(Color(0.85, 0.85, 0.8), 0.0, 0.5), Vector3(0, CLEARANCE + 0.3, zr + 0.004))
 	_add(rbm, box(Vector3(0.342, 0.177, 0.006)), dark, Vector3(0, CLEARANCE + 0.3, zr + 0.001))
-	_near(_add(rbm, _plate_text(plate_text(car_id)), dark, Vector3(0, CLEARANCE + 0.296, zr + 0.0095)))
+	_near(_add(rbm, _plate_text(plate_text(car_id, cfg)), dark, Vector3(0, CLEARANCE + 0.296, zr + 0.0095)))
 	_add(rbm, box(Vector3(rw * 1.1, 0.07, 0.05)), dark, Vector3(0, CLEARANCE + 0.04, zr - 0.01))
 	for k in 5:  # Diffusor-Finnen
 		_add(rbm, box(Vector3(0.012, 0.09, 0.22)), dark, Vector3((k - 2) * rw * 0.22, CLEARANCE + 0.03, zr - 0.1))
@@ -1335,12 +1335,15 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 
 
 ## Kennzeichen je Auto (Kürzel für "Need for Geschwindigkeit", dahinter eine Nummer mit Bezug zum Vorbild)
-static func plate_text(car_id: String) -> String:
+static func plate_text(car_id: String, cfg := {}) -> String:
 	var nums := {"kaizen": "92", "hachi": "86", "sakura": "15", "hayate": "88", "kitsune": "18", "tsubame": "99",
 		"mirai": "240", "tenshi": "91", "kumo": "100", "raijin": "4", "vortex": "34", "ronin": "33", "shiden": "1",
 		"ryujin": "300", "kaze": "7", "chibi": "660", "hotaru": "64", "tanuki": "20", "kaido": "73", "hakone": "24",
 		"kagura": "10", "falke": "911", "furia": "12", "yari": "8", "tatsumaki": "13"}
-	return "NF-G " + str(nums.get(car_id, str(absi(hash(car_id)) % 900 + 100)))
+	var num := str(nums.get(car_id, str(absi(hash(car_id)) % 900 + 100)))
+	# seit 2.50: gefundenes Kennzeichen einer Stadt (Garage, Optik > Kennzeichen): "K-NG 18" statt "NF-G 18"
+	var code := str(Catalog.part_of(cfg, "plate").get("code", "")) if not cfg.is_empty() else ""
+	return (code + "-NG " + num) if code != "" else ("NF-G " + num)
 
 
 ## Lackfarbe: "Werkslack" (Stufe 0) ist je Auto eigen (Kaizen in Championship-Weiß), sonst die gewählte Farbe

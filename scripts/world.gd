@@ -17,6 +17,7 @@ const SPEED_FX := preload("res://shaders/speed_fx.gdshader")
 const SKY_SHADER := preload("res://shaders/night_sky.gdshader")
 const WorldMinimap := preload("res://scripts/world_minimap.gd")
 const MapView := preload("res://scripts/world_map_view.gd")
+const Secrets := preload("res://scripts/secrets.gd")
 const HighwayRace := preload("res://scripts/highway_race.gd")  # Autobahn-Rennen von Stadt zu Stadt (seit 2.43)
 const DriftMeter := preload("res://scripts/drift_meter.gd")  # Drift-Wertung mit Anzeige (seit 2.45)
 const DriftZones := preload("res://scripts/drift_zones.gd")  # Driftzone in jeder Stadt (seit 2.45)
@@ -597,6 +598,7 @@ func _finish(e: Dictionary, job: Dictionary) -> void:
 	if e["kind"] == "city":
 		_add_marker(e)
 		_add_drift_zone(e)
+		_add_secrets(e)
 	_plan_traffic(e)
 	if player and tr["crossing"]:
 		tr["crossing"].player = player
@@ -1669,6 +1671,7 @@ func _process(dt: float) -> void:
 	_prof_mark("spawn")
 	_update_traffic_sound(dt)
 	_update_markers()
+	_update_secrets(dt)
 	_check_near_miss()
 	_update_world_drift(dt)
 	_update_challenger(dt)
@@ -2153,6 +2156,85 @@ func _reach_town(town: String) -> void:
 		return
 	_flash(tr("STADT ENTDECKT: %s") % town.to_upper(), UI.GOLD, TOWN_XP, TOWN_XP)
 	_flash(tr("Springen hierher frei (Karte: M)"), Color(0.75, 0.8, 0.88))
+	GameState.save_game()
+
+
+# --- Verstecktes: Werkstätten und Kennzeichen (seit 2.50, secrets.gd) -------------------------------------------
+
+const SHOP_XP := 800
+const PLATE_XP := 400
+var _secrets: Array = []  # {key, kind ("shop"/"plate"), town, e, pos (Welt), node, xf (Ankunft)}
+
+
+## Stadt gebaut: Werkstatt und Kennzeichen der Stadt (nur in ihrer ersten Strecke, mehrere Rennen teilen sich die Stadt)
+func _add_secrets(e: Dictionary) -> void:
+	var town := str(Catalog.RACES[e["race_index"]].get("town", ""))
+	if town == "" or _town_race(town) != e["race_index"]:
+		return
+	var trk: Dictionary = e["track"]
+	var root: Node3D = trk["node"]
+	var xf: Transform3D = e["xf"]
+	var pl := Secrets.plan(trk, int(e["race"].get("seed", 1)))
+	var ks := "werkstatt:" + town
+	if Catalog.find_option("paint", ks) >= 0:
+		var shop: Dictionary = pl["shop"]
+		var n := Secrets.build_shop(shop, GameState.place_known(ks))
+		root.add_child(n)
+		var wp: Vector3 = xf * (shop["p"] as Vector3)
+		var away: Vector3 = xf.basis * (shop["face"] as Vector3)
+		_secrets.append({"key": ks, "kind": "shop", "town": town, "e": e, "pos": wp, "node": n,
+			"yaw": atan2(-away.z, away.x)})
+	var kp := "kennzeichen:" + town
+	var pi := Catalog.find_option("plate", kp)
+	if pi >= 0 and not GameState.place_known(kp):
+		var plate: Dictionary = pl["plate"]
+		var n2 := Secrets.build_plate(plate, str(Catalog.PARTS["plate"]["options"][pi]["code"]))
+		root.add_child(n2)
+		_secrets.append({"key": kp, "kind": "plate", "town": town, "e": e, "pos": xf * (plate["p"] as Vector3), "node": n2})
+	if OS.get_cmdline_user_args().has("--worldlog"):
+		for sx in _secrets:
+			if sx["town"] == town:
+				print("VERSTECK %s %s bei %s" % [town, sx["kind"], str(sx["pos"])])
+
+
+func _update_secrets(dt: float) -> void:
+	if player == null or _secrets.is_empty():
+		return
+	var pp := player.global_position
+	for i in range(_secrets.size() - 1, -1, -1):
+		var s: Dictionary = _secrets[i]
+		if s["e"]["state"] != "ready" or not is_instance_valid(s["node"]):
+			_secrets.remove_at(i)  # Stadt entladen: kommt beim nächsten Bau wieder
+			continue
+		var q: Vector3 = s["pos"]
+		if s["kind"] == "plate":
+			(s["node"] as Node3D).get_node("Spin").rotate_y(dt * 1.4)
+			if Vector2(pp.x - q.x, pp.z - q.z).length() < Secrets.PLATE_R and absf(pp.y + 1.0 - q.y) < 3.0:
+				_found_secret(s)
+				(s["node"] as Node3D).queue_free()
+				_secrets.remove_at(i)
+		elif not GameState.place_known(s["key"]):
+			if Vector2(pp.x - q.x, pp.z - q.z).length() < Secrets.SHOP_R:
+				_found_secret(s)
+
+
+func _found_secret(s: Dictionary) -> void:
+	if not GameState.reach_place(s["key"]):
+		return
+	var f := -player.global_basis.z
+	GameState.secret_pos[s["key"]] = [snappedf(player.global_position.x, 0.01), snappedf(player.global_position.y, 0.01),
+		snappedf(player.global_position.z, 0.01), snappedf(atan2(-f.x, -f.z), 0.001)]
+	print("VERSTECK gefunden: ", s["key"])
+	Sfx.ui("install")
+	if s["kind"] == "shop":
+		var opt: Dictionary = Catalog.PARTS["paint"]["options"][Catalog.find_option("paint", s["key"])]
+		_flash(tr("VERSTECKTE WERKSTATT: %s") % str(s["town"]).to_upper(), Color(1.0, 0.62, 0.16), SHOP_XP, SHOP_XP)
+		_flash(tr("Neuer Lack in der Garage: %s") % tr(str(opt["name"])), Color(0.75, 0.8, 0.88))
+		_flash(tr("Springen hierher frei (Karte: M)"), Color(0.75, 0.8, 0.88))
+	else:
+		var po: Dictionary = Catalog.PARTS["plate"]["options"][Catalog.find_option("plate", s["key"])]
+		_flash(tr("KENNZEICHEN GEFUNDEN: %s") % str(po["code"]), UI.GOLD, PLATE_XP, PLATE_XP)
+		_flash(tr("In der Garage: Optik > Kennzeichen"), Color(0.75, 0.8, 0.88))
 	GameState.save_game()
 
 

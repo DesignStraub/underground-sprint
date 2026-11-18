@@ -88,6 +88,8 @@ var towns_known: Array = []
 ## Entdeckte Orte außer Städten (seit 2.49): "gelaende:<Name>", "hw:<Name>" (Start eines Autobahn-Rennens); die große
 ## Karte springt nur dorthin, wo man schon war
 var places_known: Array = []
+## Wo Verstecktes gefunden wurde (seit 2.50): Schlüssel -> [x, y, z, Blickrichtung]; Werkstätten sind Sprungziele
+var secret_pos := {}
 var last_town := ""  # zuletzt erreichte Stadt: Start an ihrem Eingang, falls der gemerkte Ort nicht mehr befahrbar ist
 var highway_won: Array = []  # gewonnene Autobahn-Rennen (seit 2.43, highway_race.gd): Name; Bestzeiten in best_times
 var drift_best := {}  # Driftzonen (seit 2.45): Zone ("Ort#Rennen") -> beste Punktzahl
@@ -623,7 +625,20 @@ func unlock_text(car_id: String) -> String:
 
 
 func is_part_unlocked(category: String, index: int) -> bool:
-	return level() >= int(Catalog.PARTS[category]["options"][index].get("level", 0)) or "%s:%d" % [category, index] in kept_parts
+	var opt: Dictionary = Catalog.PARTS[category]["options"][index]
+	if opt.has("find"):  # seit 2.50: Werkstatt-Lack, Kennzeichen: erst nach dem Fund in der Welt
+		return place_known(str(opt["find"]))
+	return level() >= int(opt.get("level", 0)) or "%s:%d" % [category, index] in kept_parts
+
+
+## Sperrtext eines Teils: "AB LEVEL 8" bzw. bei versteckten Teilen, wo sie liegen
+func part_lock_text(category: String, index: int) -> String:
+	var opt: Dictionary = Catalog.PARTS[category]["options"][index]
+	if opt.has("find"):
+		var f := str(opt["find"])
+		var town := f.substr(f.find(":") + 1)
+		return (tr("VERSTECKTE WERKSTATT IN %s") if f.begins_with("werkstatt:") else tr("KENNZEICHEN VERSTECKT IN %s")) % town.to_upper()
+	return tr("AB LEVEL %d") % int(opt.get("level", 1))
 
 
 ## Titel t (Catalog.TITLES) ist frei
@@ -807,7 +822,7 @@ func save_game() -> void:
 			"speed_fov": speed_fov, "cam_shake": cam_shake, "cam": cam_mode},
 		"language": language, "difficulty": difficulty,
 		"world_pos": world_pos, "towns_known": towns_known, "last_town": last_town, "highway_won": highway_won,
-		"drift_best": drift_best, "places_known": places_known,
+		"drift_best": drift_best, "places_known": places_known, "secret_pos": secret_pos,
 	}, "\t")
 	var f := FileAccess.open(save_path, FileAccess.WRITE)
 	if f:
@@ -933,6 +948,11 @@ func load_game() -> void:
 		for k in db:
 			drift_best[str(k)] = int(db[k])
 	places_known = Array(data.get("places_known", [])).map(func(t): return str(t))
+	secret_pos = {}
+	var sp = data.get("secret_pos", {})
+	if typeof(sp) == TYPE_DICTIONARY:
+		for k in sp:
+			secret_pos[str(k)] = Array(sp[k])
 	if data.has("towns_known"):
 		towns_known = Array(data["towns_known"]).map(func(t): return str(t))
 	else:
@@ -1009,6 +1029,7 @@ func reset_progress() -> void:
 	world_pos = []
 	towns_known = []
 	places_known = []
+	secret_pos = {}
 	last_town = ""
 	highway_won = []
 	drift_best = {}

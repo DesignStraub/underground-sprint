@@ -315,6 +315,58 @@ const PARTS := {
 			{"name": "Perlweiß", "wins": 3, "level": 6, "color": Color(0.93, 0.92, 0.9), "finish": "pearl"},
 			{"name": "Gold", "wins": 4, "level": 8, "color": Color(0.85, 0.62, 0.2), "finish": "metal"},
 			{"name": "Chrom", "wins": 6, "level": 11, "color": Color(0.85, 0.86, 0.88), "finish": "chrome"},
+			# seit 2.50: je Stadt ein Lack aus ihrer versteckten Werkstatt (find: erst nach dem Fund frei)
+			{"name": "Mainhattan-Silber", "wins": 0, "color": Color(0.62, 0.66, 0.72), "finish": "metal", "find": "werkstatt:Frankfurt am Main"},
+			{"name": "Weißblau", "wins": 0, "color": Color(0.32, 0.58, 0.9), "find": "werkstatt:München"},
+			{"name": "Hafenkran-Rot", "wins": 0, "color": Color(0.62, 0.12, 0.08), "find": "werkstatt:Hamburg"},
+			{"name": "Zechen-Gelb", "wins": 0, "color": Color(0.98, 0.8, 0.05), "find": "werkstatt:Dortmund"},
+			{"name": "Kölsch-Gold", "wins": 0, "color": Color(0.86, 0.64, 0.24), "finish": "pearl", "find": "werkstatt:Köln"},
+			{"name": "Weser-Grün", "wins": 0, "color": Color(0.1, 0.42, 0.32), "find": "werkstatt:Bremen"},
+			{"name": "Kessel-Anthrazit", "wins": 0, "color": Color(0.16, 0.17, 0.19), "finish": "matt", "find": "werkstatt:Stuttgart"},
+			{"name": "Spree-Violett", "wins": 0, "color": Color(0.36, 0.2, 0.55), "finish": "pearl", "find": "werkstatt:Berlin"},
+			{"name": "Ostsee-Türkis", "wins": 0, "color": Color(0.05, 0.55, 0.6), "find": "werkstatt:Rostock"},
+			{"name": "Printen-Braun", "wins": 0, "color": Color(0.36, 0.2, 0.1), "finish": "metal", "find": "werkstatt:Aachen"},
+			{"name": "Schloss-Sandstein", "wins": 0, "color": Color(0.72, 0.42, 0.32), "finish": "matt", "find": "werkstatt:Heidelberg"},
+			{"name": "Lebkuchen-Kupfer", "wins": 0, "color": Color(0.66, 0.33, 0.16), "finish": "metal", "find": "werkstatt:Nürnberg"},
+			{"name": "Bocksbeutel-Grün", "wins": 0, "color": Color(0.16, 0.32, 0.12), "finish": "pearl", "find": "werkstatt:Würzburg"},
+			{"name": "Kurpark-Mint", "wins": 0, "color": Color(0.55, 0.82, 0.7), "find": "werkstatt:Bad Kissingen"},
+			{"name": "Revier-Blau", "wins": 0, "color": Color(0.05, 0.2, 0.6), "find": "werkstatt:Gelsenkirchen"},
+			{"name": "Weinberg-Rosé", "wins": 0, "color": Color(0.85, 0.5, 0.55), "finish": "pearl", "find": "werkstatt:Hammelburg"},
+			{"name": "Brocken-Nebel", "wins": 0, "color": Color(0.6, 0.63, 0.62), "finish": "matt", "find": "werkstatt:Harz"},
+			{"name": "Startflaggen-Weiß", "wins": 0, "color": Color(0.95, 0.95, 0.93), "find": "werkstatt:Hockenheim"},
+			{"name": "Förde-Marine", "wins": 0, "color": Color(0.06, 0.1, 0.25), "finish": "metal", "find": "werkstatt:Kiel"},
+			{"name": "Messe-Orange", "wins": 0, "color": Color(0.95, 0.45, 0.08), "find": "werkstatt:Leipzig"},
+			{"name": "Schwarzwald-Tanne", "wins": 0, "color": Color(0.05, 0.18, 0.1), "finish": "matt", "find": "werkstatt:Freudenstadt"},
+			{"name": "Tauber-Ocker", "wins": 0, "color": Color(0.78, 0.6, 0.25), "find": "werkstatt:Tauberbischofsheim"},
+		],
+	},
+	# Kennzeichen (seit 2.50): Unterscheidungszeichen der Stadt, deren versteckt liegendes Schild man gefunden hat
+	"plate": {
+		"label": "Kennzeichen",
+		"options": [
+			{"name": "NF-G (Serie)", "wins": 0, "code": ""},
+			{"name": "Frankfurt am Main", "wins": 0, "code": "F", "find": "kennzeichen:Frankfurt am Main"},
+			{"name": "München", "wins": 0, "code": "M", "find": "kennzeichen:München"},
+			{"name": "Hamburg", "wins": 0, "code": "HH", "find": "kennzeichen:Hamburg"},
+			{"name": "Dortmund", "wins": 0, "code": "DO", "find": "kennzeichen:Dortmund"},
+			{"name": "Köln", "wins": 0, "code": "K", "find": "kennzeichen:Köln"},
+			{"name": "Bremen", "wins": 0, "code": "HB", "find": "kennzeichen:Bremen"},
+			{"name": "Stuttgart", "wins": 0, "code": "S", "find": "kennzeichen:Stuttgart"},
+			{"name": "Berlin", "wins": 0, "code": "B", "find": "kennzeichen:Berlin"},
+			{"name": "Rostock", "wins": 0, "code": "HRO", "find": "kennzeichen:Rostock"},
+			{"name": "Aachen", "wins": 0, "code": "AC", "find": "kennzeichen:Aachen"},
+			{"name": "Heidelberg", "wins": 0, "code": "HD", "find": "kennzeichen:Heidelberg"},
+			{"name": "Nürnberg", "wins": 0, "code": "N", "find": "kennzeichen:Nürnberg"},
+			{"name": "Würzburg", "wins": 0, "code": "WÜ", "find": "kennzeichen:Würzburg"},
+			{"name": "Bad Kissingen", "wins": 0, "code": "KG", "find": "kennzeichen:Bad Kissingen"},
+			{"name": "Gelsenkirchen", "wins": 0, "code": "GE", "find": "kennzeichen:Gelsenkirchen"},
+			{"name": "Hammelburg", "wins": 0, "code": "HAB", "find": "kennzeichen:Hammelburg"},
+			{"name": "Harz", "wins": 0, "code": "HZ", "find": "kennzeichen:Harz"},
+			{"name": "Hockenheim", "wins": 0, "code": "HOC", "find": "kennzeichen:Hockenheim"},
+			{"name": "Kiel", "wins": 0, "code": "KI", "find": "kennzeichen:Kiel"},
+			{"name": "Leipzig", "wins": 0, "code": "L", "find": "kennzeichen:Leipzig"},
+			{"name": "Freudenstadt", "wins": 0, "code": "FDS", "find": "kennzeichen:Freudenstadt"},
+			{"name": "Tauberbischofsheim", "wins": 0, "code": "TBB", "find": "kennzeichen:Tauberbischofsheim"},
 		],
 	},
 	# Lackart (car_builder.FINISH): Standard nimmt die der Farbe bzw. den Werkslack des Autos
@@ -646,11 +698,20 @@ const PARTS := {
 ## "spur" (seit 2.37) steht hinten: die Gegner würfeln ihr Tuning in dieser Reihenfolge (race.gd), so bleiben ihre übrigen
 ## Teile gleich
 const PART_ORDER := ["paint", "finish", "rims", "rimcol", "rimsize", "spoiler", "bodykit", "hood", "exhaust", "vinyl", "vinylcol", "neon", "tint",
-	"lights", "engine", "turbo", "nitro", "suspension", "tires", "spur"]
+	"lights", "engine", "turbo", "nitro", "suspension", "tires", "spur", "plate"]
 ## Tuning-Menü wie in NFS: erst Optik oder Leistung, dann die Kategorie, dann das Teil
 const PART_GROUPS := {"optik": ["paint", "finish", "rims", "rimcol", "rimsize", "spur", "spoiler", "bodykit", "hood", "exhaust", "vinyl", "vinylcol",
-	"neon", "tint", "lights"],
+	"neon", "tint", "lights", "plate"],
 	"leistung": ["engine", "turbo", "nitro", "suspension", "tires"]}
+
+
+## Versteckte Werkstatt bzw. Kennzeichen einer Stadt: Option (Index) in "paint" bzw. "plate", -1 wenn es keine gibt
+static func find_option(cat: String, key: String) -> int:
+	var opts: Array = PARTS[cat]["options"]
+	for i in opts.size():
+		if str(opts[i].get("find", "")) == key:
+			return i
+	return -1
 
 
 ## Option der Kategorie Zoll mit dieser festen Größe (13" bis 24"), -1 wenn es sie nicht gibt

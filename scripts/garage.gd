@@ -556,6 +556,9 @@ func _view_for(cat: String) -> Array:
 			return [Vector3(W / 2.0 + 1.6, 0.55, fz - 0.6), Vector3(W / 2.0 - 0.1, 0.42, fz + 0.1)]
 		"spoiler":
 			return [Vector3(1.7, 1.55, L / 2.0 + 1.7), Vector3(0.0, 0.95, L / 2.0 - 0.35)]
+		"plate":
+			# Kennzeichen (seit 2.50): von hinten, leicht seitlich auf Höhe des Schilds
+			return [Vector3(0.9, 0.75, L / 2.0 + 1.9), Vector3(0.0, 0.42, L / 2.0)]
 		"hood":
 			return [Vector3(1.6, 1.9, -L / 2.0 - 1.9), Vector3(0.0, 0.75, -L / 2.0 + 1.0)]
 		"exhaust":
@@ -2294,7 +2297,7 @@ func _color_title(cat: String, idx: int) -> String:
 	if idx == GameState.get_config(preview_car).get(cat, 0):
 		t += "   ·   " + tr("EINGEBAUT")
 	elif not GameState.is_part_unlocked(cat, idx):
-		t += "   ·   " + tr("AB LEVEL %d") % int(opt.get("level", 1))
+		t += "   ·   " + GameState.part_lock_text(cat, idx)
 	return t
 
 
@@ -2313,7 +2316,7 @@ func _refresh_parts(cat: String) -> void:
 		if i == installed:
 			sub = tr("EINGEBAUT")
 		elif locked:
-			sub = tr("AB LEVEL %d") % int(opt.get("level", 1))
+			sub = GameState.part_lock_text(cat, i)
 		var c2 := GameState.get_config(preview_car).duplicate()
 		c2[cat] = i
 		if sub == "" and (cat == "rimsize" or cat == "spur"):
@@ -2682,7 +2685,10 @@ func _part_info(cat: String, idx: int) -> void:
 					t += " " + tr("Damit sie Platz haben, liegt das Auto %d mm höher.") % roundi((float(fi["drop_in"]) - float(fi["drop"])) * 1000.0)
 			elif cat == "spur" and idx > 0 and Builder.kit_flare(c2) == 0.0:
 				t += "\n" + tr("Mit dem Breitbau-Kit rücken die Räder in die Verbreiterungen.")
-	if not GameState.is_part_unlocked(cat, idx):
+	if not GameState.is_part_unlocked(cat, idx) and opt.has("find"):
+		t += "\n" + (tr("Gesperrt: liegt in einer versteckten Werkstatt in %s. Halte nach bernsteinfarbenem Licht an einer Gasse Ausschau.")
+			if str(opt["find"]).begins_with("werkstatt:") else tr("Gesperrt: das Schild liegt irgendwo in %s versteckt.")) % str(opt["find"]).get_slice(":", 1)
+	elif not GameState.is_part_unlocked(cat, idx):
 		t += "\n" + tr("Gesperrt: kommt mit Fahrer-Level %d (du bist Level %d).") % [int(opt.get("level", 1)), GameState.level()]
 	elif idx != (_vinyl_installed() if cat == "vinyl" else GameState.get_config(preview_car).get(cat, 0)):
 		t += "\n" + tr("ENTER: einbauen")

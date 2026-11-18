@@ -251,6 +251,21 @@ Außenring → nächste Stadt → Autobahn. Rundkurse und Drift-Kurse sind Schle
 - **Splitscreen für zwei in Rennen** (seit 2.47, Einzelheiten dort).
 - **Anzeigen links statt in der Mitte, ruhigere Schrift** (seit 2.48, Einzelheiten dort).
 - **Ruhigeres Grundtempo, Kamera nach echtem Tempo, neue Karte mit Zoom und Springen** (seit 2.49, Einzelheiten dort).
+- **Versteckte Werkstätten und Kennzeichen in jeder Stadt** (seit 2.50, Einzelheiten dort).
+
+## Versteckte Werkstätten und Kennzeichen (2.50)
+Rückmeldung: in der offenen Welt gibt es nichts Verstecktes zu finden. Gewählt: versteckte Werkstätten (wie die
+versteckten Läden in Underground 2) und Kennzeichen sammeln (`scripts/secrets.gd`).
+
+- **Werkstatt:** in jeder Stadt an einer Gasse oder einem Abzweig abseits der Rennlinie ein Rolltor mit Leuchtschrift
+  „WERKSTATT“; wie in Underground 2 verrät sie farbiges Licht (Bernstein), das auf die Straße fällt. Vorbeifahren
+  entdeckt sie: exklusiver Lack der Stadt (Kölsch-Gold, Hafenkran-Rot, Zechen-Gelb …), 800 XP, danach ein Sprungziel
+  auf der Karte. In der Garage stehen die Lacke gesperrt mit dem Hinweis, wo sie liegen.
+- **Kennzeichen:** in jeder Stadt schwebt ein großes, leuchtendes Schild mit dem Unterscheidungszeichen (K, HH, DO …)
+  über einer Fahrbahn; durchfahren sammelt es ein (400 XP). Neue Kategorie Optik > Kennzeichen: aus „NF-G 18“ wird
+  „K-NG 18“.
+- **Karte:** Zähler für Werkstätten und Kennzeichen, im Infofeld einer Stadt „WERKSTATT ✓/?“ und „KENNZEICHEN ✓/?“,
+  gefundene Werkstätten mit eigenem Symbol.
 
 ## Ruhigeres Grundtempo, neue Karte mit Zoom und Springen (2.49)
 Rückmeldung: das Grundtempo ist noch zu hoch, Vergleich mit Underground (Tempo-Effekte); die Karte (M) sieht nicht
