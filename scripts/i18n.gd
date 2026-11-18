@@ -377,6 +377,11 @@ const EN := {
 	"STÄDTE ENTDECKT  %d / %d": "CITIES DISCOVERED  %d / %d", "SCHNELLREISE: FREI": "FAST TRAVEL: UNLOCKED",
 	"SCHNELLREISE: ERST HINFAHREN": "FAST TRAVEL: DRIVE THERE FIRST",
 	"←/→ Stadt wählen\nEnter: Rennen als Ziel\nM / Esc: zurück": "←/→ Pick city\nEnter: race as target\nM / Esc: back",
+	# 2.43: Autobahn-Rennen
+	"Enter: Autobahn-Rennen starten": "Enter: start motorway race", "Bestzeit: %s": "Best time: %s",
+	"PLATZ %d / %d": "POS %d / %d", "NOCH %.1f KM": "%.1f KM TO GO", "%d. PLATZ": "%d. PLACE",
+	"%d. PLATZ: %s": "%d. PLACE: %s", "NEUE BESTZEIT": "NEW BEST TIME", "ZURÜCK AUF DIE STRECKE": "BACK ON THE ROUTE",
+	"RENNEN ABGEBROCHEN": "RACE CANCELLED", "RENNEN AUFGEGEBEN": "RACE ABANDONED", "Rennen aufgeben": "Abandon race",
 }
 
 static var _added := false

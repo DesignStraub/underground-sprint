@@ -238,6 +238,36 @@ Außenring → nächste Stadt → Autobahn. Rundkurse und Drift-Kurse sind Schle
 - **Verbindungen mit Höhen und Tiefen, 15 Tunnel, Mittelstreifen in Abschnitten** (seit 2.40, Einzelheiten dort).
 - **Verkehr mit Details, Ampeln für den Verkehr, Kleinkram zum Umfahren** (seit 2.41, Einzelheiten dort).
 - **Weiter, wo man war; Schnellreise erst nach dem ersten Besuch** (seit 2.42, Einzelheiten dort).
+- **Autobahn-Rennen von Stadt zu Stadt** (seit 2.43, Einzelheiten dort).
+
+## Autobahn-Rennen von Stadt zu Stadt (2.43)
+Aus dem Fahrplan (Punkt 2): Rennen über die Autobahn, die in einer Stadt enden.
+
+- **Sieben Sprints über den inneren Ring** (`scripts/highway_race.gd`): A1 Dortmund–Köln (1,7 km), A3 Köln–Frankfurt
+  (2,6 km), A1 Hamburg–Bremen, A6 Heidelberg–Stuttgart (je 2,2 km), A20 Rostock–Hamburg (3,4 km), A9 München–Berlin
+  (4,5 km), A7 Bad Kissingen–Würzburg (4,9 km). Start ist eine blaue Lichtsäule (Blau wie die Autobahnschilder) auf der
+  Auffahrt kurz vor dem Ortsausgang, Enter startet. Man fährt die Auffahrt hinunter, auf den Ring, im echten Verkehr
+  über ein bis drei Autobahnstücke, an der Ausfahrt der Zielstadt ab, Ziel kurz vor dem Ortseingang. Alle Rennen laufen
+  in der Richtung, in der die Städte rechts liegen: Auf- und Abfahrt sind Rechtskurven, niemand kreuzt die
+  Gegenfahrbahn. Kein Szenenwechsel, die Welt läuft weiter (Verkehr, Nachladen, Tageszeit).
+- **Drei Gegner** (`scripts/highway_racer.gd`, aufgebaut auf dem Herausforderer): Spurwechsel um den Verkehr, kein Wrack
+  beim Rempeln. Sie fahren eine feste Route aus Abschnitten (Auffahrt, Ringstücke, Ausfahrt) und rechnen beim Wechsel
+  ihre Lage auf den neuen Weg um, die Drehung baut sich weich ab. Vor beiden Abbiegungen bremsen sie auf gut 50 km/h,
+  vor der Ausfahrt wechseln sie rechtzeitig nach rechts, hinter dem Ziel rollen sie am Rand aus. Tempo etwa wie dein
+  Auto ohne Nitro (Leicht 94 %, Schwer 105 %), dazu ein Gummiband: wer weit vorn liegt, wird etwas langsamer (bis
+  85 %), wer zurückliegt, etwas schneller (bis 122 %).
+- **Anzeige:** oben Name, Platz, Zeit und Restweg, Countdown mit den Tönen der Startampel, die Strecke blau auf der
+  Minikarte mit Zielflagge, Gegner als rote Punkte. Im Ziel Platz und Zeit groß, Erfahrung wie bei einem Rennen
+  (`Catalog.race_xp`, erster Sieg mal 1,5), Bestzeit gespeichert; gewonnene Rennen haben eine goldene Säule
+  (`GameState.highway_won`). Fortschritt: Lage auf der Route als Linienzug, nur in einem Fenster um den letzten Stand
+  gesucht, eine Abkürzung durch die Mitte zählt also nicht. Weit weg von der Strecke steht „ZURÜCK AUF DIE STRECKE“,
+  nach 25 s ist das Rennen abgebrochen. Esc zeigt im Rennen „Rennen aufgeben“ statt Karte und Garage; Karte (M),
+  Herausforderer und die übrigen Startsäulen ruhen solange.
+- **Tests:** `world.tscn -- --hwrace=i --hwbot --hwquit` (Start an Rennen i, der Testfahrer fährt selbst, Stand alle
+  2 s): A3 Köln–Frankfurt Platz 2 in 0:51,0, A1 Dortmund–Köln Platz 2 in 0:38,5, A9 München–Berlin nach einem Unfall
+  im Verkehr Platz 4; die Gegner fahren alle Abschnitte richtig ab und rollen hinter dem Ziel aus. `--hwabort` drückt
+  „Rennen aufgeben“ im Esc-Menü. `tools/world_map.tscn -- --worldlog` listet die Rennen (`AUTOBAHNRENNEN …`).
+  `--worldcheck` 0 Überschneidungen.
 
 ## Weiter, wo man war; Schnellreise in entdeckte Städte (2.42)
 Aus dem Fahrplan (Punkt 3, Test von 2.39.1): keine Auswahl des Startpunkts mehr, das Spiel merkt sich den letzten Ort;

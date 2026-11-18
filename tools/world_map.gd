@@ -18,6 +18,12 @@ func _ready() -> void:
 			for k in rl.size() - 1:
 				L += rl[k].distance_to(rl[k + 1])
 			print("RAMPE %2d  %5.0f m  von (%.0f, %.0f) bis (%.0f, %.0f)" % [j, L, rl[0].x, rl[0].y, rl[rl.size() - 1].x, rl[rl.size() - 1].y])
+		# Autobahn-Rennen (seit 2.43): Richtung (Städte rechts), Länge, Start
+		var hw: Array = load("res://scripts/highway_race.gd").plan(w)
+		for i in hw.size():
+			var df: Dictionary = hw[i]
+			print("AUTOBAHNRENNEN %d  %-28s %5.0f m  Ring %+d  Start (%.0f, %.0f)" % [i, df["name"], df["length"], df["dirk"],
+				(df["start_xf"] as Transform3D).origin.x, (df["start_xf"] as Transform3D).origin.z])
 		# Städte (seit 2.42): Rennen, Ort, Stadteingang (Ausfahrt) für --wstart / --wspawn=xy
 		for c in w["cities"]:
 			var ex: Vector3 = c["exit_world"]

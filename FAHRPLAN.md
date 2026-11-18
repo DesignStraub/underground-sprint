@@ -23,8 +23,10 @@ Die Strecken zwischen den Städten (innerer Ring, Außenring, Querspangen, Spang
 - Dazu: die grauen Kegel, die bei Tag über dem Horizont schweben (Kirchturmspitzen und Burgdächer der Landschaft;
   in 2.40 behoben).
 
-## 2. Rennen über die Autobahn
+## 2. Rennen über die Autobahn (erster Schritt in 2.43)
 Rennen auf den Verbindungen, z. B. ein Sprint über die Autobahn, der in einer Stadt endet.
+Stand 2.43: sieben Sprints von Stadt zu Stadt über den inneren Ring, mit drei Gegnern im echten Verkehr. Offen: Rennen
+über den Außenring und die Querspangen (mit Höhen und Tunneln), Rennen mit Start an der Autobahn selbst.
 
 ## 3. Startpunkt und Schnellreise (erledigt in 2.42)
 - Keine Auswahl des Startpunkts mehr: das Spiel merkt sich den letzten Ort (zuletzt durchfahrene Stelle oder letzte

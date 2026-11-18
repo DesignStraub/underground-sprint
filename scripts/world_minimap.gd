@@ -5,6 +5,7 @@ extends "res://scripts/minimap.gd"
 
 
 var _areas := []  # Gelände (seit 2.39): [Umriss, Farbe, Name, Teiche]
+var _route := PackedVector2Array()  # Strecke des laufenden Autobahn-Rennens (seit 2.43), über den Straßen
 
 
 ## roads: [[Linienzug (Welt x, z), Art 0 Haupt / 1 Auffahrt / 2 Nebenweg], ...]; pins: Node3D mit meta "hud_col";
@@ -30,6 +31,13 @@ func set_target(p: Vector3, on: bool) -> void:
 	show_flag = on
 
 
+## Strecke eines Autobahn-Rennens hervorheben (leer: keine)
+func set_route(pts: PackedVector2Array) -> void:
+	_route = pts
+	if _world:
+		_world.queue_redraw()
+
+
 ## Gelände als getönte Flächen mit Rand und Teichen unter den Straßen (seit 2.39)
 func _draw_world() -> void:
 	for ar in _areas:
@@ -41,3 +49,5 @@ func _draw_world() -> void:
 		for pd in ar[3]:
 			_world.draw_colored_polygon(pd, COL_WATER)
 	super()
+	if _route.size() > 1:
+		_world.draw_polyline(_route, Color(0.25, 0.52, 1.0, 0.95), 3.2 * PX, true)

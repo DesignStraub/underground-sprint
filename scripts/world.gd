@@ -17,6 +17,7 @@ const SPEED_FX := preload("res://shaders/speed_fx.gdshader")
 const SKY_SHADER := preload("res://shaders/night_sky.gdshader")
 const WorldMinimap := preload("res://scripts/world_minimap.gd")
 const MapView := preload("res://scripts/world_map_view.gd")
+const HighwayRace := preload("res://scripts/highway_race.gd")  # Autobahn-Rennen von Stadt zu Stadt (seit 2.43)
 const Traffic := preload("res://scripts/traffic_car.gd")
 const Challenger := preload("res://scripts/challenger_car.gd")
 const Builder := preload("res://scripts/car_builder.gd")
@@ -46,6 +47,12 @@ static var _travel_arrival := false  # Schnellreise: beim Neuladen den kurzen An
 static var _travel_to := -1  # Schnellreise (seit 2.42): Rennen, an dessen Stadteingang man nach dem Neuladen ankommt
 var _spawn_saved := false  # Start am gemerkten Ort (GameState.world_pos), nach dem Bau der Umgebung geprüft
 var _spawn_src := "test"  # woher der Startpunkt kommt (Ausgabe beim Laden)
+## Autobahn-Rennen (seit 2.43, highway_race.gd): geplante Rennen, das laufende, Startsäulen, Punkte der Gegner
+var hw_defs: Array = []
+var hrace: Node = null
+var _hw_markers := {}  # Rennen -> Lichtsäule am Start
+var _near_hw := -1
+var hw_pins: Array = []  # Gegner auf der Minikarte (meta "off", solange kein Rennen läuft)
 
 var world: SubViewport
 var player: CharacterBody3D
@@ -132,6 +139,7 @@ func _ready() -> void:
 	await get_tree().process_frame
 
 	layout = Layout.build()
+	hw_defs = HighwayRace.plan(layout)
 	for c in layout["cities"]:
 		entries.append({"kind": "city", "race": c["race"], "xf": c["xf"], "center": c["center"], "radius": c["radius"],
 			"state": "none", "track": {}, "race_index": c["race_index"], "start": c["start_world"], "exit": c["exit_world"],
@@ -218,6 +226,9 @@ func _ready() -> void:
 		_intro.start()
 	if OS.get_cmdline_user_args().has("--worldcheck"):
 		_world_check()
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--hwrace=") and not hw_defs.is_empty():
+			get_tree().create_timer(1.0).timeout.connect(_start_highway.bind(int(a.substr(9)) % hw_defs.size()))
 	if OS.get_cmdline_user_args().has("--lvltest"):  # Test: Bild der Level-Anzeige
 		get_tree().create_timer(1.0).timeout.connect(func(): _show_level_up([tr("LEVEL %d") % 18, tr("Auto: ") + "Ryujin 30Z",
 			tr("Titel: ") + tr("Drift-Samurai"), tr("Vinyl: ") + tr("Glitch")]))
@@ -243,7 +254,7 @@ func _intro_kind(returning: bool) -> String:
 	for a in args:
 		if a.begins_with("--zkind="):  # Test: Art erzwingen
 			return a.substr(8)
-		if a in ["--nozoom", "--wdrive", "--worldcheck", "--wmap", "--lvltest"] or a.begins_with("--wtour") \
+		if a in ["--nozoom", "--wdrive", "--worldcheck", "--wmap", "--lvltest"] or a.begins_with("--wtour") or a.begins_with("--hwrace") \
 				or a.begins_with("--drivebot") or a.begins_with("--ctest") or a.begins_with("--wcam") or a.begins_with("--otest"):
 			return ""
 	return "short" if travel or returning else "start"
@@ -288,6 +299,8 @@ func _notification(what: int) -> void:
 ## Startpunkt: nach einem Rennen am Marker, sonst am Start des ersten Rennens, Blick zur Ausfahrt (zur Autobahn)
 func _spawn_xf() -> Transform3D:
 	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--hwrace=") and not hw_defs.is_empty():  # Test: am Start dieses Autobahn-Rennens
+			return hw_defs[int(a.substr(9)) % hw_defs.size()]["start_xf"]
 		# Test: --wspawn=ring:k (auf dem Ring bei Punkt k, in Fahrtrichtung) oder --wspawn=exit:i (an der Ausfahrt
 		# der Stadt von Rennen i, Blick zur Autobahn)
 		if a.begins_with("--wspawn="):
@@ -787,7 +800,16 @@ func _add_marker(e: Dictionary) -> void:
 
 
 func _update_markers() -> void:
+	if hrace != null:
+		if _near_marker != -1 or _near_hw != -1:
+			_near_marker = -1
+			_near_hw = -1
+			hud["prompt"].visible = false
+		return
 	var p := player.global_position
+	_update_hw_markers(p)
+	if _near_hw >= 0:
+		return
 	var near := -1
 	for i in _markers:
 		var m: Node3D = _markers[i]
@@ -1197,6 +1219,21 @@ func _build_hud() -> void:
 	_ch_pin.set_meta("off", true)
 	world.add_child(_ch_pin)
 	open_pins.append(_ch_pin)
+	# Autobahn-Rennen (seit 2.43): Start als blauer Punkt, Gegner im Rennen als rote Punkte
+	for i in hw_defs.size():
+		var hp := Node3D.new()
+		hp.position = (hw_defs[i]["start_xf"] as Transform3D).origin
+		hp.set_meta("hud_col", HighwayRace.AB_COL)
+		world.add_child(hp)
+		open_pins.append(hp)
+		_add_hw_marker(i)
+	for i in HighwayRace.GEGNER:
+		var rp := Node3D.new()
+		rp.set_meta("hud_col", Color(1.0, 0.3, 0.2))
+		rp.set_meta("off", true)
+		world.add_child(rp)
+		open_pins.append(rp)
+		hw_pins.append(rp)
 	_ch_t = 3.0 if OS.get_cmdline_user_args().has("--challenger") else randf_range(70.0, 160.0)
 	minimap.setup_world(layout["roads"], player, open_pins, _offroad_map())
 	minimap.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
@@ -1313,12 +1350,13 @@ func _build_pause(root: Control) -> void:
 	for entry in [["Weiter", _toggle_pause], ["Karte", func(): _toggle_pause(); _open_map()],
 			["Tuning", _to_garage.bind("tuning")], ["Auto wechseln", _to_garage.bind("cars")], ["Fahrer", _to_garage.bind("driver")],
 			["Vollbild", GameState.toggle_fullscreen],
-			["Garage", _leave_to_garage]]:
+			["Garage", _leave_to_garage], ["Rennen aufgeben", _give_up]]:
 		var b := Button.new()
 		b.text = tr(entry[0]).to_upper()  # wie in der Garage: Großbuchstaben, linksbündig
 		b.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		b.pressed.connect(entry[1])
+		b.set_meta("key", entry[0])
 		pause_panel.add_child(b)
 		UI.menu_fx(b)  # Auswahl gleitet ein, Maus darüber wählt aus (wie in der Garage)
 
@@ -1443,6 +1481,14 @@ func _toggle_pause() -> void:
 	var p := not get_tree().paused
 	get_tree().paused = p
 	pause_panel.visible = p
+	# im Autobahn-Rennen: "Rennen aufgeben" statt Karte und Garage (seit 2.43)
+	for b in pause_panel.get_children():
+		if b is Button:
+			var key: String = b.get_meta("key", "")
+			if key == "Rennen aufgeben":
+				b.visible = hrace != null
+			elif key in ["Karte", "Tuning", "Auto wechseln", "Fahrer", "Garage"]:
+				b.visible = hrace == null
 	Music.set_paused(p)
 	if p:
 		(pause_panel.get_child(1) as Button).grab_focus()
@@ -1474,12 +1520,16 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		_start_duel()
 		return
+	if _near_hw >= 0 and hrace == null and not get_tree().paused and accept:
+		get_viewport().set_input_as_handled()
+		_start_highway(_near_hw)
+		return
 	if _near_marker >= 0 and not get_tree().paused and accept \
 			and GameState.career_open(Catalog.RACES[_near_marker]["name"]):
 		get_viewport().set_input_as_handled()
 		_start_race(_near_marker)
 		return
-	if event.is_action_pressed("map") and not get_tree().paused:
+	if event.is_action_pressed("map") and not get_tree().paused and hrace == null:  # im Autobahn-Rennen keine Karte
 		_open_map()
 		return
 	if event.is_action_pressed("camera") and not get_tree().paused:
@@ -1685,6 +1735,140 @@ func _flash(text: String, col: Color, pts := 0, xp := -1) -> void:
 		_update_level_hud()
 
 
+# --- Autobahn-Rennen (seit 2.43, highway_race.gd) -------------------------------------------------------------
+
+## Blaue Lichtsäule am Start (auf der Auffahrt, kurz vor dem Ortsausgang), Name darüber; gewonnen: golden
+func _add_hw_marker(i: int) -> void:
+	var df: Dictionary = hw_defs[i]
+	var won: bool = df["name"] in GameState.highway_won
+	var col: Color = UI.GOLD if won else HighwayRace.AB_COL
+	var m := Node3D.new()
+	m.transform = df["start_xf"]
+	m.position.y = 0.0
+	var cyl := CylinderMesh.new()
+	cyl.top_radius = MARKER_R
+	cyl.bottom_radius = MARKER_R
+	cyl.height = 26.0
+	cyl.cap_top = false
+	cyl.cap_bottom = false
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	mat.albedo_color = Color(col.r, col.g, col.b, 0.16)
+	var mi := MeshInstance3D.new()
+	mi.name = "Beam"
+	mi.mesh = cyl
+	mi.material_override = mat
+	mi.position.y = 13.0
+	m.add_child(mi)
+	var ring := TorusMesh.new()
+	ring.inner_radius = MARKER_R - 0.35
+	ring.outer_radius = MARKER_R
+	var rmat := StandardMaterial3D.new()
+	rmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	rmat.albedo_color = col
+	rmat.emission_enabled = true
+	rmat.emission = col
+	rmat.emission_energy_multiplier = 3.0
+	var rmi := MeshInstance3D.new()
+	rmi.mesh = ring
+	rmi.material_override = rmat
+	rmi.position.y = 0.15
+	m.add_child(rmi)
+	var lbl := Label3D.new()
+	lbl.text = str(df["name"]).to_upper()
+	lbl.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	lbl.font = UI.font("wide", 0.15)
+	lbl.font_size = 96
+	lbl.pixel_size = 0.02
+	lbl.modulate = col
+	lbl.outline_size = 12
+	lbl.outline_modulate = Color(0, 0, 0, 0.8)
+	lbl.position.y = 9.0
+	m.add_child(lbl)
+	var ol := OmniLight3D.new()
+	ol.light_color = col
+	ol.light_energy = 2.0
+	ol.omni_range = 16.0
+	ol.position.y = 3.0
+	m.add_child(ol)
+	world.add_child(m)
+	_hw_markers[i] = m
+
+
+func _update_hw_markers(p: Vector3) -> void:
+	var near := -1
+	for i in _hw_markers:
+		var m: Node3D = _hw_markers[i]
+		var q: Vector3 = m.global_position
+		var dd := Vector2(p.x - q.x, p.z - q.z).length()
+		if dd < MARKER_R:
+			near = i
+		var beam: MeshInstance3D = m.get_node("Beam")
+		var a := 0.16 * clampf((dd - MARKER_R - 2.0) / 25.0, 0.0, 1.0)
+		(beam.material_override as StandardMaterial3D).albedo_color.a = a
+		beam.visible = a > 0.005
+	if near != _near_hw:
+		_near_hw = near
+		if near >= 0:
+			var df: Dictionary = hw_defs[near]
+			var line := tr("Enter: Autobahn-Rennen starten")
+			if GameState.best_times.has(df["name"]):
+				line += "\n" + tr("Bestzeit: %s") % HighwayRace._fmt(float(GameState.best_times[df["name"]]))
+			hud["prompt"].text = "%s\n%s" % [str(df["name"]).to_upper(), line]
+			hud["prompt"].visible = true
+		else:
+			hud["prompt"].visible = false
+			_near_marker = -2  # Hinweis an einem Rennen-Marker neu zeigen
+
+
+func _start_highway(i: int) -> void:
+	if hrace != null or player == null:
+		return
+	_remove_challenger()
+	hud["prompt"].visible = false
+	if map_view and map_view.visible:
+		map_view.visible = false
+		_unpause()
+	for k in _hw_markers:
+		(_hw_markers[k] as Node3D).visible = false  # im Rennen keine Startsäulen
+	hrace = HighwayRace.new()
+	hrace.w = self
+	add_child(hrace)
+	hrace.start(hw_defs[i])
+
+
+## highway_race.gd: Rennen vorbei (Ziel, aufgegeben, abgebrochen); Startsäule golden, wenn gewonnen
+func _highway_done() -> void:
+	hrace = null
+	_near_hw = -2
+	_set_target(target)
+	for k in _hw_markers:
+		(_hw_markers[k] as Node3D).visible = true
+	for i in _hw_markers:
+		if hw_defs[i]["name"] in GameState.highway_won:
+			var m: Node3D = _hw_markers[i]
+			for c in m.get_children():
+				if c is Label3D:
+					(c as Label3D).modulate = UI.GOLD
+				elif c is OmniLight3D:
+					(c as OmniLight3D).light_color = UI.GOLD
+				elif c is MeshInstance3D:
+					var mt := (c as MeshInstance3D).material_override as StandardMaterial3D
+					var a: float = mt.albedo_color.a
+					mt.albedo_color = Color(UI.GOLD.r, UI.GOLD.g, UI.GOLD.b, a)
+					if mt.emission_enabled:
+						mt.emission = UI.GOLD
+
+
+## Esc > Rennen aufgeben
+func _give_up() -> void:
+	_toggle_pause()
+	if hrace != null:
+		hrace.abort(tr("RENNEN AUFGEGEBEN"))
+
+
 # --- Letzter Ort und entdeckte Städte (seit 2.42) -----------------------------------------------------------------
 
 ## Beim Losfahren geht es dort weiter, wo man zuletzt war. Gemerkt wird alle 3 s eine sichere Stelle: das Auto steht
@@ -1870,7 +2054,7 @@ func _update_feed(dt: float) -> void:
 ## Im Duell fährt er so schnell wie dein Auto (Schwierigkeit: 92/97/100 %) und schlängelt sich durch den Verkehr.
 ## 300 m Vorsprung gewinnt, 300 m Rückstand verliert; wer die Autobahn verlässt, gibt auf.
 func _update_challenger(dt: float) -> void:
-	if not _ct.is_empty() or not _ready_done or quiet:
+	if not _ct.is_empty() or not _ready_done or quiet or hrace != null:
 		return
 	if challenger != null and not is_instance_valid(challenger):
 		_remove_challenger()  # mit seinem Autobahnstück entfernt

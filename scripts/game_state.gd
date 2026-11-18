@@ -86,6 +86,7 @@ var world_pos: Array = []
 ## gewonnen oder eine Bestzeit hat, gelten als entdeckt.
 var towns_known: Array = []
 var last_town := ""  # zuletzt erreichte Stadt: Start an ihrem Eingang, falls der gemerkte Ort nicht mehr befahrbar ist
+var highway_won: Array = []  # gewonnene Autobahn-Rennen (seit 2.43, highway_race.gd): Name; Bestzeiten in best_times
 var world_menu := ""  # Open World > Esc > Tuning/Autohaus: Garage öffnet dort, "Fertig" führt zurück in die Welt
 var in_world := false  # Rennen aus der Open World gestartet: danach zurück in die Welt (nicht gespeichert)
 var best_times := {}  # Rennname -> Sekunden
@@ -735,7 +736,7 @@ func save_game() -> void:
 			"touch": touch_mode, "show_fps": show_fps, "jump_cam": jump_cam, "motion_blur": motion_blur,
 			"speed_fov": speed_fov, "cam_shake": cam_shake, "cam": cam_mode},
 		"language": language, "difficulty": difficulty,
-		"world_pos": world_pos, "towns_known": towns_known, "last_town": last_town,
+		"world_pos": world_pos, "towns_known": towns_known, "last_town": last_town, "highway_won": highway_won,
 	}, "\t")
 	var f := FileAccess.open(save_path, FileAccess.WRITE)
 	if f:
@@ -841,6 +842,7 @@ func load_game() -> void:
 	if typeof(wp) == TYPE_ARRAY and wp.size() == 4:
 		world_pos = Array(wp).map(func(v): return float(v))
 	last_town = str(data.get("last_town", ""))
+	highway_won = Array(data.get("highway_won", [])).map(func(n): return str(n))
 	if data.has("towns_known"):
 		towns_known = Array(data["towns_known"]).map(func(t): return str(t))
 	else:
@@ -917,6 +919,7 @@ func reset_progress() -> void:
 	world_pos = []
 	towns_known = []
 	last_town = ""
+	highway_won = []
 	save_game()
 
 
