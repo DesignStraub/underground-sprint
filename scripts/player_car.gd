@@ -76,6 +76,7 @@ const TRAFFIC_BOUNCE := 0.25  # Stoßzahl gegen Verkehr: 0 klebt zusammen, 1 pra
 
 var controls_enabled := false
 var finished := false
+var input_prefix := ""  # Splitscreen (seit 2.47): Spieler 2 liest "p2_accelerate" usw. (GameState.split_input)
 var cam_mode := 0
 
 var model: Node3D
@@ -391,11 +392,12 @@ func _on_prop_hit(body: Node) -> void:
 
 
 func _physics_process(dt: float) -> void:
-	var thr := Input.get_action_strength("accelerate")
-	var brk := Input.get_action_strength("brake")
-	var steer_in := Input.get_action_strength("steer_right") - Input.get_action_strength("steer_left")
-	var hb := Input.is_action_pressed("handbrake")
-	var want_nitro := Input.is_action_pressed("nitro")
+	var ip := input_prefix
+	var thr := Input.get_action_strength(ip + "accelerate")
+	var brk := Input.get_action_strength(ip + "brake")
+	var steer_in := Input.get_action_strength(ip + "steer_right") - Input.get_action_strength(ip + "steer_left")
+	var hb := Input.is_action_pressed(ip + "handbrake")
+	var want_nitro := Input.is_action_pressed(ip + "nitro")
 	if _bot != "" and controls_enabled:
 		var bi := _bot_inputs(dt)
 		thr = bi[0]
@@ -436,13 +438,13 @@ func _physics_process(dt: float) -> void:
 		# Drag: Spur per Tipp wechseln, gelenkt wird automatisch; geschaltet wird von Hand
 		hb = false
 		if controls_enabled and not blown:
-			if Input.is_action_just_pressed("steer_left"):
+			if Input.is_action_just_pressed(input_prefix + "steer_left"):
 				drag_lane = maxi(drag_lane - 1, 0)
-			elif Input.is_action_just_pressed("steer_right"):
+			elif Input.is_action_just_pressed(input_prefix + "steer_right"):
 				drag_lane = mini(drag_lane + 1, 3)
-			if Input.is_action_just_pressed("shift_up") and gear < 6:
+			if Input.is_action_just_pressed(input_prefix + "shift_up") and gear < 6:
 				_drag_shift(1)
-			elif Input.is_action_just_pressed("shift_down") and gear > 1:
+			elif Input.is_action_just_pressed(input_prefix + "shift_down") and gear > 1:
 				_drag_shift(-1)
 		steer_in = 0.0  # gelenkt wird von der Schiene (_drag_rail)
 		if controls_enabled:
@@ -785,7 +787,7 @@ func _physics_process(dt: float) -> void:
 	_update_camera(dt, sf)
 
 	audio.rpm = rpm
-	audio.throttle = 1.0 if nitro_on else (0.0 if finished else (_rev_s if reverse_gear else Input.get_action_strength("accelerate")))
+	audio.throttle = 1.0 if nitro_on else (0.0 if finished else (_rev_s if reverse_gear else Input.get_action_strength(input_prefix + "accelerate")))
 	audio.nitro = nitro_on
 	# Reifen (0..1): bis 2.15 nur aus dem Querrutschen in m/s – das reichte im normalen Rennen nie, selbst mit
 	# Handbremse rutscht das Auto bei Tempo nur 2–3 m/s quer. Jetzt wie in NFSU: der Rutschwinkel, Kurvenfahrt am

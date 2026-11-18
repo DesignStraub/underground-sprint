@@ -90,6 +90,8 @@ var highway_won: Array = []  # gewonnene Autobahn-Rennen (seit 2.43, highway_rac
 var drift_best := {}  # Driftzonen (seit 2.45): Zone ("Ort#Rennen") -> beste Punktzahl
 var world_menu := ""  # Open World > Esc > Tuning/Autohaus: Garage öffnet dort, "Fertig" führt zurück in die Welt
 var in_world := false  # Rennen aus der Open World gestartet: danach zurück in die Welt (nicht gespeichert)
+var split := false  # Splitscreen für zwei (seit 2.47, nur am Rechner): das nächste Rennen mit Spieler 2
+var p2_car := ""  # Auto von Spieler 2 im Splitscreen
 var best_times := {}  # Rennname -> Sekunden
 var outruns := 0  # Open World: abgehängte Herausforderer (Duelle auf der Autobahn)
 var xp := 0  # Fahrer-Erfahrung (seit 2.32): Stilpunkte aus Driften, knapp vorbei, Sprüngen, Duellen und Rennen
@@ -435,6 +437,62 @@ func setting_text(key: String) -> String:
 	if GFX.has(key):
 		return tr(GFX[key]["label"]) + ": " + tr(GFX[key]["levels"][gfx[key]])
 	return key
+
+
+## Splitscreen (seit 2.47): Spieler 1 fährt mit WASD, Leertaste, linker Umschalttaste und dem ersten Gamepad, Spieler 2
+## mit den Pfeiltasten, rechter Umschalttaste (Handbremse), Enter (Nitro), Rücktaste (zurücksetzen) und dem zweiten
+## Gamepad. on=false stellt die normale Belegung wieder her.
+const SPLIT_P1 := ["accelerate", "brake", "steer_left", "steer_right", "handbrake", "nitro", "shift_up", "shift_down", "reset_car"]
+var _split_saved := {}
+
+
+func split_input(on: bool) -> void:
+	if on and _split_saved.is_empty():
+		for a in SPLIT_P1:
+			_split_saved[a] = InputMap.action_get_events(a)
+			InputMap.action_erase_events(a)
+			for ev in _split_saved[a]:
+				if ev is InputEventKey and (ev as InputEventKey).physical_keycode in [KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT]:
+					continue  # Pfeiltasten gehören Spieler 2
+				var e2: InputEvent = ev.duplicate()
+				if e2 is InputEventKey and (e2 as InputEventKey).physical_keycode == KEY_SHIFT:
+					(e2 as InputEventKey).location = KEY_LOCATION_LEFT
+				if e2 is InputEventJoypadButton or e2 is InputEventJoypadMotion:
+					e2.device = 0
+				InputMap.action_add_event(a, e2)
+		var p2 := {"accelerate": [[KEY_UP], [], [JOY_AXIS_TRIGGER_RIGHT, 1.0]], "brake": [[KEY_DOWN], [], [JOY_AXIS_TRIGGER_LEFT, 1.0]],
+			"steer_left": [[KEY_LEFT], [], [JOY_AXIS_LEFT_X, -1.0]], "steer_right": [[KEY_RIGHT], [], [JOY_AXIS_LEFT_X, 1.0]],
+			"handbrake": [[KEY_SHIFT], [JOY_BUTTON_B], []], "nitro": [[KEY_ENTER, KEY_KP_ENTER], [JOY_BUTTON_A], []],
+			"shift_up": [[KEY_PAGEUP], [JOY_BUTTON_RIGHT_SHOULDER], []], "shift_down": [[KEY_PAGEDOWN], [JOY_BUTTON_LEFT_SHOULDER], []],
+			"reset_car": [[KEY_BACKSPACE], [JOY_BUTTON_BACK], []]}
+		for a in p2:
+			var name: String = "p2_" + str(a)
+			if InputMap.has_action(name):
+				InputMap.erase_action(name)
+			InputMap.add_action(name, 0.15)
+			for k in p2[a][0]:
+				var ev := InputEventKey.new()
+				ev.physical_keycode = k
+				if k == KEY_SHIFT:
+					ev.location = KEY_LOCATION_RIGHT
+				InputMap.action_add_event(name, ev)
+			for b in p2[a][1]:
+				var jb := InputEventJoypadButton.new()
+				jb.button_index = b
+				jb.device = 1
+				InputMap.action_add_event(name, jb)
+			if p2[a][2].size() == 2:
+				var jm := InputEventJoypadMotion.new()
+				jm.axis = p2[a][2][0]
+				jm.axis_value = p2[a][2][1]
+				jm.device = 1
+				InputMap.action_add_event(name, jm)
+	elif not on and not _split_saved.is_empty():
+		for a in _split_saved:
+			InputMap.action_erase_events(a)
+			for ev in _split_saved[a]:
+				InputMap.action_add_event(a, ev)
+		_split_saved = {}
 
 
 func _add_action(action: String, keys: Array, buttons: Array, axis: Array) -> void:

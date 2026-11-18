@@ -21,6 +21,8 @@ var _calm := 0.0  # wie lange die Bildrate schon im Ziel liegt
 ## Garage: nur ein Auto im Bild, also volle Fensterauflösung (bis 1440 Zeilen, Handy 900) und 4x MSAA (Handy 2x),
 ## damit Felgen, Schrift und Kanten scharf sind; die Einstellung "3D-Auflösung" gilt erst im Rennen
 var showroom := false
+## Splitscreen (seit 2.47): 1 obere, 2 untere Bildhälfte (die 3D-Auflösung rechnet mit der halben Höhe)
+var half := 0
 
 
 func _init() -> void:
@@ -49,6 +51,8 @@ func _exit_tree() -> void:
 
 func _resize() -> void:
 	var px := Vector2(DisplayServer.window_get_size())
+	if half > 0:
+		px.y *= 0.5
 	if GameState.pixel_look:
 		var shrink := maxf(1.0, roundf(px.y / GameState.PIXEL_H))
 		world.size = Vector2i(maxi(int(px.x / shrink), 16), maxi(int(px.y / shrink), 16))

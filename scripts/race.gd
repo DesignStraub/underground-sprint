@@ -17,6 +17,7 @@ const SKY_SHADER := preload("res://shaders/night_sky.gdshader")
 const RaceShow := preload("res://scripts/race_show.gd")
 const UI := preload("res://scripts/ui_style.gd")
 const DriftMeter := preload("res://scripts/drift_meter.gd")  # Drift-Wertung mit Anzeige (seit 2.45)
+const SplitScreen := preload("res://scripts/split_screen.gd")  # Splitscreen für zwei (seit 2.47)
 const TOUCH := preload("res://scripts/touch_controls.gd")
 const Moods := preload("res://scripts/moods.gd")
 const Loading := preload("res://scripts/loading_screen.gd")
@@ -65,6 +66,7 @@ var _last_rollovers := 0
 ## Nitro ein wenig auf. Jede Zeile blendet nach ein paar Sekunden aus.
 var _feed: VBoxContainer
 var _meter: Control  # Drift im Rennen (nicht im Drift-Event): Wertung und Anzeige wie in der freien Fahrt (seit 2.45)
+var _split: Node = null  # Splitscreen (seit 2.47, split_screen.gd): Spieler 2 unten
 var _race_xp := 0  # Stilpunkte dieses Rennens (seit 2.32: werden am Ziel zu Fahrer-Erfahrung)
 var _xp_gain := 0
 var _xp_lines := []
@@ -155,6 +157,13 @@ func _ready() -> void:
 	pc.accel *= 0.8 + 0.2 * GameState.pace()
 	pc.place(Track.xform_at(curve, track["start"], Track.LANES[2]))
 	player = pc  # erst fertig eingerichtet sichtbar machen (Testwerkzeug fragt race.player ab)
+	# Splitscreen (seit 2.47): nur am Rechner, nur Sprint und Rundkurs
+	if (GameState.split or OS.get_cmdline_user_args().has("--split")) and not OS.has_feature("web") \
+			and event_type in ["sprint", "circuit"]:
+		GameState.split_input(true)
+		_split = SplitScreen.new()
+		add_child(_split)
+		_split.setup(self, pv)
 	if land:
 		land.target = pc
 	_loading.progress = 0.77
@@ -178,7 +187,7 @@ func _ready() -> void:
 		# Drift: allein, Zielpunkte je nach Stufe, Schwierigkeit und Zahl der Kurven
 		drift_targets = Catalog.drift_targets(race, diff)
 		_build_drift_zones()
-	for i in (0 if event_type == "drift" else 3):
+	for i in (0 if event_type == "drift" else (2 if _split else 3)):
 		var id: String = pool[rng.randi() % pool.size()]
 		var cfg := {}
 		for cat in Catalog.PART_ORDER:
@@ -224,6 +233,8 @@ func _ready() -> void:
 		track["crossing"].player = player
 	_setup_hall()
 	player.audio.bus = "Hall"
+	if _split and _split.p2.audio:
+		_split.p2.audio.bus = "Hall"
 	for ai in ais:
 		ai.set_bus("Hall")
 	for n in get_tree().get_nodes_in_group("ambient"):
@@ -231,7 +242,7 @@ func _ready() -> void:
 	# Verkehr nach Schwierigkeit: leicht ohne, mittel wenig, schwer voll
 	if event_type == "drag" and race.get("tier", 1) >= 2:
 		_spawn_drag_traffic()
-	elif event_type != "drift" and race.get("tier", 1) >= 2:
+	elif event_type != "drift" and race.get("tier", 1) >= 2 and _split == null:  # Splitscreen ohne Verkehr
 		_spawn_traffic()
 	if not traffic.is_empty():
 		Traffic.prepare_sound()
@@ -453,6 +464,8 @@ func _setup_hall() -> void:
 
 
 func _exit_tree() -> void:
+	if _split:
+		GameState.split_input(false)
 	Music.hold_toast(false)
 	if _reverb:
 		_reverb.wet = 0.0
@@ -706,11 +719,14 @@ func _build_hud() -> void:
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	layer.add_child(root)
+	if _split:
+		root.anchor_bottom = 0.5  # Splitscreen: Anzeige von Spieler 1 oben, Spieler 2 hat unten seine eigene
+		_split.build_hud(layer)
 
 	# Platz, Zeit, Runde oben links, Fortschritt mit allen Fahrern oben mittig
 	var info := HUD_INFO.new()
 	info.drift = event_type == "drift"
-	info.racers = ais.size() + 1
+	info.racers = ais.size() + (2 if _split else 1)
 	info.laps = track["laps"]
 	info.bar_laps = track["laps"] if track["loop"] else 1
 	info.title = tr(race["name"]).to_upper()
@@ -747,6 +763,14 @@ func _build_hud() -> void:
 	tacho.drag = event_type == "drag"
 	# Drag: größer, mit grünem Schaltbereich und Temperatur
 	_place_tacho(tacho, 1.1 if event_type == "drag" else 1.0, false)
+	if _split:
+		# Splitscreen: halbe Höhe, also kleinerer Drehzahlmesser, Radar kleiner, ohne Tastaturhilfe
+		_place_tacho(tacho, 0.62, false)
+		hud["help"].visible = false
+
+		if hud.has("map"):
+			(hud["map"] as Control).scale = Vector2(0.62, 0.62)
+			(hud["map"] as Control).offset_top = -MINIMAP.SIZE * 0.62 - 8.0
 
 	if GameState.touch_ui():
 		# Handy/Tablet: Knöpfe links und rechts unten, Drehzahlmesser klein oben rechts (unten wäre das Auto
@@ -766,7 +790,7 @@ func _build_hud() -> void:
 			mm.offset_right = mm.offset_left + MINIMAP.SIZE
 			mm.offset_bottom = mm.offset_top + MINIMAP.SIZE
 
-	hud["center"] = _label(root, 64, HORIZONTAL_ALIGNMENT_CENTER)
+	hud["center"] = _label(root, 36 if _split else 64, HORIZONTAL_ALIGNMENT_CENTER)  # Splitscreen: halbe Höhe
 	hud["center"].label_settings.font = UI.font("wide", 0.2)
 	hud["center"].anchor_left = 0.5
 	hud["center"].anchor_right = 0.5
@@ -803,6 +827,11 @@ func _build_hud() -> void:
 	corner.offset_right = 290.0
 	corner.offset_bottom = -12.0 - (MINIMAP.SIZE if hud.has("map") else 0.0)
 	corner.offset_top = corner.offset_bottom - 150.0
+	if _split:  # Splitscreen: Meldungen neben dem kleinen Radar, nicht über der Platzanzeige
+		corner.offset_left = 20.0 + MINIMAP.SIZE * 0.62
+		corner.offset_right = corner.offset_left + 280.0
+		corner.offset_bottom = -10.0
+		corner.offset_top = -130.0
 	if GameState.touch_ui():
 		corner.anchor_top = 0.0
 		corner.anchor_bottom = 0.0
@@ -883,6 +912,8 @@ func _process(dt: float) -> void:
 			hud["goal"].visible = true
 			if countdown <= 1.0 and not player.controls_enabled:
 				player.controls_enabled = true
+				if _split:
+					_split.go()
 				_launch_check()
 				for ai in ais:
 					ai.running = true
@@ -933,12 +964,14 @@ func _process(dt: float) -> void:
 		_check_near_miss()
 	if event_type == "drag":
 		_update_drag()
-	if state == State.RACING and player_progress >= track["finish"]:
+	if state == State.RACING and player_progress >= track["finish"] and not player.finished:
 		_on_player_finished()
 
 	_update_world(dt)
 	_update_hud()
 	_update_cinema(dt)
+	if _split:
+		_split.step(dt)
 
 
 ## Verkehr hören: die nächsten paar Autos im Umkreis von 80 m haben Motor und Abrollen an (Dopplereffekt im
@@ -1012,6 +1045,8 @@ func _show_area(text: String) -> void:
 
 
 func _place() -> int:
+	if _split and state != State.FINISHED:
+		return _split.place_of(player)
 	if event_type == "drift":
 		var pts := drift_score + drift_chain * _drift_mult()
 		var place := 4
@@ -1251,6 +1286,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("camera"):
 		player.toggle_camera()
 		_flash(tr("Kamera: ") + tr(player.CAM_NAMES[player.cam_mode]), Color(0.85, 0.9, 1.0))
+	elif _split and event.is_action_pressed("p2_reset_car") and state == State.RACING:
+		_split.reset_p2()
 	elif event.is_action_pressed("reset_car") and state == State.RACING and event_type != "drag":
 		var loc := Track.locate(track, player.global_position)
 		var p: Dictionary = loc["path"]
@@ -1312,6 +1349,9 @@ func _on_player_dnf(reason: String) -> void:
 
 
 func _on_player_finished() -> void:
+	if _split:
+		_split.p1_finished()  # Splitscreen: gemeinsame Wertung, wenn beide durch sind (split_screen.gd)
+		return
 	state = State.FINISHED
 	finish_order.append("player")
 	player.controls_enabled = false

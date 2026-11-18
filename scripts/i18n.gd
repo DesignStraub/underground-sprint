@@ -386,6 +386,12 @@ const EN := {
 	"GROSSER WINKEL": "BIG ANGLE", "SCHNELL": "FAST", "NAH AM RAND": "CLOSE TO THE EDGE", "DRIFTZONE": "DRIFT ZONE",
 	"DRIFTZONE %s": "DRIFT ZONE %s", "DRIFTZONE ABGEBROCHEN": "DRIFT ZONE CANCELLED", "BESTE %s": "BEST %s",
 	"GOLD %s": "GOLD %s", "BRONZE": "BRONZE", "SILBER": "SILVER", "GOLD": "GOLD", "KEINE MEDAILLE": "NO MEDAL",
+	# 2.47: Splitscreen
+	"Zu zweit": "Two players", "ZU ZWEIT": "TWO PLAYERS", "SPIELER 1": "PLAYER 1", "SPIELER 2": "PLAYER 2",
+	"SPIELER 1 GEWINNT!": "PLAYER 1 WINS!", "SPIELER 2 GEWINNT!": "PLAYER 2 WINS!", "DIE GEGNER WAREN SCHNELLER": "THE RIVALS WERE FASTER",
+	"nicht im Ziel": "did not finish", "RUNDE %d/%d": "LAP %d/%d",
+	"Splitscreen an einem Rechner: Spieler 1 oben (WASD, Leertaste Handbremse, linke Umschalttaste Nitro oder erstes Gamepad), Spieler 2 unten (Pfeiltasten, rechte Umschalttaste Handbremse, Enter Nitro, Rücktaste zurücksetzen oder zweites Gamepad). Spieler 2 fährt: %s.":
+		"Split screen on one computer: player 1 on top (WASD, space handbrake, left shift nitro or first gamepad), player 2 below (arrow keys, right shift handbrake, enter nitro, backspace reset or second gamepad). Player 2 drives: %s.",
 }
 
 static var _added := false

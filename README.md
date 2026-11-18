@@ -242,6 +242,28 @@ Außenring → nächste Stadt → Autobahn. Rundkurse und Drift-Kurse sind Schle
 - **Efeu und ONE-HUMANITY-Wandbilder statt Graffiti, echte Werbung von ONE HUMANITY** (seit 2.44, Einzelheiten dort).
 - **Driften mit Ketten, Boni und einer Driftzone in jeder Stadt** (seit 2.45, Einzelheiten dort).
 - **Charme je Stadt: Gruß in Mundart am Ortsschild, Läden mit Ortskolorit** (seit 2.46, Einzelheiten dort).
+- **Splitscreen für zwei in Rennen** (seit 2.47, Einzelheiten dort).
+
+## Splitscreen für zwei (2.47)
+Aus dem Fahrplan (Punkt 7): Splitscreen nur in Rennen (in der offenen Welt wären zu viele Orte gleichzeitig geladen)
+und nur am Rechner, nicht im Browser.
+
+- **Garage → Zu zweit** (nicht im Browser und nicht auf Touch-Geräten): Liste der offenen Sprints und Rundkurse.
+  Spieler 2 fährt das freie Auto, das deinem im Tempo am nächsten kommt (sonst dasselbe). Ein Spaßrennen: ohne
+  Erfahrung und Karriere, ohne Verkehr (der bremst nur für Spieler 1), mit zwei Gegnern statt drei.
+- **Bild geteilt** (`scripts/split_screen.gd`): Spieler 1 oben, Spieler 2 unten. Die zweite Bildfläche (`PixelView`,
+  `half`) rechnet mit halber Höhe und teilt sich die 3D-Welt mit der ersten (`find_world_3d`); ihre Kamera folgt jedes
+  Bild der Kamera von Spieler 2. Oben die gewohnte Anzeige, kleiner (Drehzahlmesser, Radar, Meldungen neben dem
+  Radar), unten Platz, Runde, Tempo und Nitro von Spieler 2; Countdown und Zielplatz in beiden Hälften.
+- **Tasten** (`GameState.split_input`): Spieler 1 WASD, Leertaste Handbremse, linke Umschalttaste Nitro, R
+  zurücksetzen, erstes Gamepad; Spieler 2 Pfeiltasten, rechte Umschalttaste Handbremse, Enter Nitro, Rücktaste
+  zurücksetzen, zweites Gamepad. Beim Verlassen des Rennens gilt wieder die normale Belegung. Das Auto liest seine
+  Tasten mit einem Kürzel (`player_car.input_prefix`, Spieler 2 „p2_“).
+- **Ziel:** sind beide durch (oder 25 s nach dem ersten), eine gemeinsame Wertung mit Platz und Zeit beider
+  Spieler, NOCHMAL oder GARAGE.
+- **Tests:** `race.tscn -- --race=i --split --drive --p2bot --splitquit` (beide fahren selbst, Ausgabe „SPLIT Ziel …“):
+  Bankenviertel-Sprint bis ins Ziel ohne Fehler (Spieler 2 Platz 3 in 1:21,0, Spieler 1 Platz 4 in 1:30,6),
+  Innenstadtring Köln mit Rundenanzeige; beide Bildhälften zeigen dieselbe Welt mit eigenen Kameras.
 
 ## Charme für jede Stadt: Gruß am Ortsschild, Läden mit Ortskolorit (2.46)
 Aus dem Fahrplan (Punkt 6): ein bisschen Charme für jede Stadt.

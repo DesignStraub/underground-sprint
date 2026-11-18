@@ -61,8 +61,10 @@ kleine Besonderheit je Stadt (Fischbude am Hafen, Biergarten, Kölsch-Kneipe als
 - Schilder sind falsch ausgerichtet und zeigen immer nur in eine Richtung.
 - Kleinkram am Straßenrand soll man wie Laternen umfahren können, und Treffer sollen den Drift nicht unterbrechen.
 
-## 7. Splitscreen für zwei
+## 7. Splitscreen für zwei (erledigt in 2.47)
 Nur in Rennen, sonst wären zu viele Orte gleichzeitig geladen; nur am Rechner, nicht im Browser.
+Stand 2.47: Garage → Zu zweit, Bild oben und unten geteilt, Tastatur und zwei Gamepads, gemeinsame Wertung. Offen,
+wenn gewünscht: Auto für Spieler 2 selbst wählen, Verkehr, der auch für Spieler 2 bremst.
 
 ## Später
 - Echter Mehrspieler: mit mehreren Leuten auf einer Karte fahren und zusammen Rennen starten (mit Einladungen).

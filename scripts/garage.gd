@@ -1317,6 +1317,7 @@ func _menu_in() -> void:
 
 
 func _show_main() -> void:
+	GameState.split = false  # Splitscreen gilt nur für das gewählte Rennen (und NOCHMAL)
 	if GameState.world_menu != "":
 		# aus der Open World gekommen (Tuning, Autohaus): zurück dorthin statt ins Hauptmenü
 		GameState.world_menu = ""
@@ -1333,6 +1334,8 @@ func _show_main() -> void:
 	# Seit 2.28: Open World statt Rennen-Liste. Die Rennen findet man als Marker in den Städten. Seit 2.42 ohne Auswahl
 	# der Startstadt: es geht dort weiter, wo man zuletzt war (world.gd, GameState.world_pos)
 	_button("Losfahren", _drive_world)
+	if not OS.has_feature("web") and not GameState.touch_ui():  # Splitscreen nur am Rechner (seit 2.47)
+		_button("Zu zweit", _show_split)
 	_button("Tuning", _show_tuning)
 	_button("Auto wechseln", _show_cars)
 	_button("Fahrer", _show_driver)
@@ -1787,6 +1790,43 @@ func _show_events(type: String) -> void:
 ## Rennen starten: sofort den Ladebildschirm zeigen (das Rennen übernimmt ihn), Musik leiser, dann Szene wechseln.
 ## Ohne das stand das Menü einige Sekunden still, während die Strecke gebaut wurde.
 var _starting := false
+
+
+## Splitscreen für zwei (seit 2.47): ein Sprint oder Rundkurs (die offenen), Spieler 2 unten. Er fährt das freie Auto,
+## das deinem im Tempo am nächsten kommt (sonst dasselbe). Ohne Erfahrung und Karriere, ohne Verkehr.
+func _show_split() -> void:
+	_clear_menu()
+	_back = _show_main
+	_set_section("ZU ZWEIT")
+	var p2 := _p2_car()
+	for i in Catalog.RACES.size():
+		var r: Dictionary = Catalog.RACES[i]
+		if not r.get("type", "sprint") in ["sprint", "circuit"] or not GameState.career_open(r["name"]):
+			continue
+		var idx := i
+		var b := _button(tr(r["name"]), func():
+			GameState.split = true
+			GameState.p2_car = p2
+			_start_race(idx))
+		b.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
+		b.set_meta("quiet", true)
+	_button("< Zurück", _show_main)
+	info.text = tr("Splitscreen an einem Rechner: Spieler 1 oben (WASD, Leertaste Handbremse, linke Umschalttaste Nitro oder erstes Gamepad), Spieler 2 unten (Pfeiltasten, rechte Umschalttaste Handbremse, Enter Nitro, Rücktaste zurücksetzen oder zweites Gamepad). Spieler 2 fährt: %s.") % str(Catalog.CARS[p2]["name"])
+	_focus_first()
+
+
+func _p2_car() -> String:
+	var mine: float = Catalog.CARS[GameState.current_car]["top_speed"]
+	var best := GameState.current_car
+	var bd := 1e9
+	for id in Catalog.CAR_ORDER:
+		if id == GameState.current_car or not GameState.is_car_unlocked(id):
+			continue
+		var d := absf(float(Catalog.CARS[id]["top_speed"]) - mine)
+		if d < bd:
+			bd = d
+			best = id
+	return best
 
 
 func _drive_world() -> void:
