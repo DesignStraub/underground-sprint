@@ -249,6 +249,20 @@ Außenring → nächste Stadt → Autobahn. Rundkurse und Drift-Kurse sind Schle
 - **Driften mit Ketten, Boni und einer Driftzone in jeder Stadt** (seit 2.45, Einzelheiten dort).
 - **Charme je Stadt: Gruß in Mundart am Ortsschild, Läden mit Ortskolorit** (seit 2.46, Einzelheiten dort).
 - **Splitscreen für zwei in Rennen** (seit 2.47, Einzelheiten dort).
+- **Anzeigen links statt in der Mitte, ruhigere Schrift** (seit 2.48, Einzelheiten dort).
+
+## Anzeigen links statt in der Mitte, ruhigere Schrift (2.48)
+Rückmeldung: die Drift-Anzeige (2.45) und die Gebietsnamen standen oben in der Mitte im Sichtfeld; im Rennen steht
+Driften links. Und die Schrift noch einmal überarbeiten.
+
+- **Links über dem Radar wie im Rennen:** Meldungen, die Drift-Anzeige (jetzt kompakt und linksbündig: DRIFT, Zahl,
+  „x3“, schmaler Balken, Boni, Driftzone) und der Gebiets- oder Stadtname klein in Versalien mit Laufweite. Bis 2.47
+  stand der Name groß oben in der Mitte; die Ortsschilder zeigen ohnehin, wo man ist. Im Rennen sitzt die
+  Drift-Anzeige ebenso links unter den Meldungen.
+- **Oben links:** Autobahn-Rennen (Name, Platz, Zeit, Restweg) und die Duell-Leiste mit ihrem Hinweis, wo im Rennen
+  Platz und Zeit stehen. In der Mitte bleiben nur Countdown und Ergebnis; Hinweise an den Startsäulen sind kleiner.
+- **Schrift wie in den Menüs:** HUD-Texte in Inter mit dünner, halbdurchsichtiger Kontur und weichem Schatten statt
+  der dicken schwarzen Kontur, kleinere Größen (Meldungen 11 statt 15 Punkt bei 640 x 360).
 
 ## Splitscreen für zwei (2.47)
 Aus dem Fahrplan (Punkt 7): Splitscreen nur in Rennen (in der offenen Welt wären zu viele Orte gleichzeitig geladen)

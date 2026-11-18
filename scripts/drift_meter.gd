@@ -5,9 +5,10 @@ extends Control
 ## 1,8 m bis zur Kante der Fahrbahn) x1,5; KNAPP VORBEI im Drift gibt Extrapunkte (add_bonus). Der Multiplikator wächst
 ## mit der Driftzeit der Kette (alle mult_every Sekunden +1, bis x5). Nach grace Sekunden ohne Drift wird die Kette
 ## gutgeschrieben (banked), Wand oder Crash kosten sie (lost).
-## Anzeige oben in der Mitte: große Zahl in der Farbe des Multiplikators, Abzeichen „x3“, darunter ein Balken (beim
-## Driften: Weg zur nächsten Stufe; danach: die Frist, die abläuft), die aktiven Boni und eine Zeile für die Driftzone.
-## Kein eigener Ton (Effekte dezent, keine künstlichen Klänge).
+## Anzeige links über dem Radar wie im Rennen (seit 2.48; 2.45 stand sie oben in der Mitte im Sichtfeld): „DRIFT“,
+## die Zahl in der Farbe des Multiplikators, Abzeichen „x3“, darunter ein schmaler Balken (beim Driften: Weg zur
+## nächsten Stufe; danach: die Frist, die abläuft), die aktiven Boni und eine Zeile für die Driftzone. Linksbündig,
+## klein, weicher Schatten statt Kontur. Kein eigener Ton (Effekte dezent, keine künstlichen Klänge).
 
 const UI := preload("res://scripts/ui_style.gd")
 const MULT_COL := [Color(0.94, 0.95, 0.97), Color(0.45, 1.0, 0.3), Color(0.35, 0.85, 1.0), Color(1.0, 0.25, 0.7),
@@ -30,16 +31,15 @@ var _flash_t := 0.0  # nach der Gutschrift: „+1.234“ kurz stehen lassen
 var _flash_pts := 0
 var _crashes := -1
 var _walls := -1
-var _big: Font
-var _small: Font
+var _num: Font
+var _lab: Font
 
 
 func _ready() -> void:
-	_big = UI.font("wide", 0.15)
-	_small = UI.font("cond", 0.2)
+	_num = UI.font("cond", 0.0)
+	_lab = UI.font("bold", 0.0, 1)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	custom_minimum_size = Vector2(420, 70)
-	size = custom_minimum_size
+	custom_minimum_size = Vector2(230, 0)
 
 
 func mult() -> int:
@@ -120,6 +120,11 @@ func step(dt: float) -> void:
 	_shown = target if absf(target - _shown) < 5.0 else lerpf(_shown, target, minf(dt * 12.0, 1.0))
 	_flash_t = maxf(_flash_t - dt, 0.0)
 	visible = chain >= 3.0 or _flash_t > 0.0 or zone_text != ""
+	# Höhe nach Inhalt (die Spalte links rückt nach): Zahlzeile, Boni, Driftzone
+	var h := (26.0 if value() >= 10 or (chain <= 0.0 and _flash_t > 0.0) else 0.0) + (11.0 if not _tags.is_empty() else 0.0) \
+		+ (11.0 if zone_text != "" else 0.0)
+	if absf(custom_minimum_size.y - h) > 0.5:
+		custom_minimum_size = Vector2(230, h)
 	queue_redraw()
 
 
@@ -146,43 +151,42 @@ func _near_edge() -> bool:
 
 
 func _draw() -> void:
-	var w := size.x
-	var cx := w / 2.0
 	var m := mult()
 	var col: Color = MULT_COL[m - 1]
 	var drifting := chain > 0.0 and idle < 0.05
+	var y := 0.0
 	if value() >= 10 or (chain <= 0.0 and _flash_t > 0.0):
 		var a := 1.0 if chain > 0.0 else clampf(_flash_t / 0.3, 0.0, 1.0)
 		var txt := fmt(int(_shown))
 		if chain <= 0.0:
 			txt = "+" + txt
 			col = UI.GOLD
-		var fs := 22
-		var tw := _big.get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
-		var x0 := cx - tw / 2.0
-		draw_string(_big, Vector2(x0 + 1, 23), txt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(0, 0, 0, 0.55 * a))
-		draw_string(_big, Vector2(x0, 22), txt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(col.r, col.g, col.b, a))
-		draw_string(_small, Vector2(x0 - _small.get_string_size(tr("DRIFT"), HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x - 6, 20),
-			tr("DRIFT"), HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color(1, 1, 1, 0.75 * a))
+		_text(_lab, Vector2(0, 14), tr("DRIFT"), 8, Color(1, 1, 1, 0.72 * a))
+		var x := _lab.get_string_size(tr("DRIFT"), HORIZONTAL_ALIGNMENT_LEFT, -1, 8).x + 6.0
+		_text(_num, Vector2(x, 16), txt, 16, Color(col.r, col.g, col.b, a))
+		x += _num.get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x + 6.0
 		if chain > 0.0 and m > 1:
-			var bx := x0 + tw + 7.0
-			draw_rect(Rect2(bx, 7, 24, 15), Color(0, 0, 0, 0.55))
-			draw_rect(Rect2(bx, 7, 24, 15), col, false, 1.0)
-			draw_string(_small, Vector2(bx + 4, 19), "x%d" % m, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, col)
+			draw_rect(Rect2(x, 4, 20, 13), Color(0, 0, 0, 0.45))
+			draw_rect(Rect2(x, 4, 20, 13), col, false, 1.0)
+			draw_string(_lab, Vector2(x + 3, 14), "x%d" % m, HORIZONTAL_ALIGNMENT_LEFT, -1, 9, col)
 		if chain > 0.0:
 			# Balken: beim Driften der Weg zur nächsten Stufe, danach die ablaufende Frist
-			var bw := 140.0
-			var bxl := cx - bw / 2.0
-			draw_rect(Rect2(bxl, 28, bw, 2.5), Color(0, 0, 0, 0.5))
+			var bw := 110.0
+			draw_rect(Rect2(0, 21, bw, 2), Color(0, 0, 0, 0.45))
 			var k := (fmod(chain_t, mult_every) / mult_every if m < 5 else 1.0) if drifting else clampf(1.0 - idle / grace, 0.0, 1.0)
-			draw_rect(Rect2(bxl, 28, bw * k, 2.5), col if drifting else Color(1, 1, 1, 0.8))
-	var ty := 43.0
+			draw_rect(Rect2(0, 21, bw * k, 2), col if drifting else Color(1, 1, 1, 0.8))
+		y = 26.0
 	if not _tags.is_empty():
-		var tags := " · ".join(_tags.keys().map(func(t): return tr(t)))
-		draw_string(_small, Vector2(0, ty), tags, HORIZONTAL_ALIGNMENT_CENTER, w, 9, Color(1.0, 0.85, 0.3, 0.95))
-		ty += 12.0
+		_text(_lab, Vector2(0, y + 8), " · ".join(_tags.keys().map(func(t): return tr(t))), 7, Color(1.0, 0.85, 0.3, 0.95))
+		y += 11.0
 	if zone_text != "":
-		draw_string(_small, Vector2(0, ty), zone_text, HORIZONTAL_ALIGNMENT_CENTER, w, 9, Color(1.0, 0.6, 0.2, 0.95))
+		_text(_lab, Vector2(0, y + 8), zone_text, 7, Color(1.0, 0.62, 0.22, 0.95))
+
+
+## Schrift mit weichem Schatten (wie die Menüs, statt dicker Kontur)
+func _text(f: Font, pos: Vector2, t: String, sz: int, col: Color) -> void:
+	draw_string(f, pos + Vector2(0.8, 0.8), t, HORIZONTAL_ALIGNMENT_LEFT, -1, sz, Color(0, 0, 0, 0.6 * col.a))
+	draw_string(f, pos, t, HORIZONTAL_ALIGNMENT_LEFT, -1, sz, col)
 
 
 ## 12345 -> „12.345“ (deutsch) bzw. „12,345“ (englisch)

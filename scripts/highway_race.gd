@@ -281,13 +281,12 @@ func _route2d() -> PackedVector2Array:
 
 func _build_hud() -> void:
 	var root: Control = w.hud["root"]
-	_info = w._label(root, 16, HORIZONTAL_ALIGNMENT_CENTER)
-	_info.anchor_left = 0.5
-	_info.anchor_right = 0.5
-	_info.offset_left = -300.0
-	_info.offset_right = 300.0
-	_info.offset_top = 84.0
-	_center = w._label(root, 44, HORIZONTAL_ALIGNMENT_CENTER)
+	# oben links wie Platz und Zeit im Rennen (seit 2.48; bis 2.47 oben in der Mitte im Sichtfeld)
+	_info = w._label(root, 12)
+	_info.offset_left = 12.0
+	_info.offset_top = 10.0
+	_info.offset_right = 320.0
+	_center = w._label(root, 32, HORIZONTAL_ALIGNMENT_CENTER)
 	_center.anchor_left = 0.5
 	_center.anchor_right = 0.5
 	_center.anchor_top = 0.3

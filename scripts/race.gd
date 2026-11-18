@@ -651,12 +651,16 @@ func _goal_text() -> String:
 	return tr(Catalog.EVENT_TYPES.get(event_type, Catalog.EVENT_TYPES["sprint"])["goal"])
 
 
+## HUD-Schrift (seit 2.48 wie die Menüs): dünne halbdurchsichtige Kontur und weicher Schatten statt dicker Kontur
 func _label(parent: Node, size: int, align := HORIZONTAL_ALIGNMENT_LEFT) -> Label:
 	var l := Label.new()
 	var ls := LabelSettings.new()
 	ls.font_size = size
-	ls.outline_size = 4
-	ls.outline_color = Color(0, 0, 0, 0.9)
+	ls.outline_size = 2
+	ls.outline_color = Color(0, 0, 0, 0.45)
+	ls.shadow_size = 1
+	ls.shadow_color = Color(0, 0, 0, 0.55)
+	ls.shadow_offset = Vector2(1, 1)
 	l.label_settings = ls
 	l.horizontal_alignment = align
 	parent.add_child(l)
@@ -844,19 +848,13 @@ func _build_hud() -> void:
 	_feed.add_theme_constant_override("separation", -2)
 	corner.add_child(_feed)
 	if event_type != "drift" and event_type != "drag":
-		_meter = DriftMeter.new()
-		_meter.anchor_left = 0.5
-		_meter.anchor_right = 0.5
-		_meter.offset_left = -210.0
-		_meter.offset_right = 210.0
-		_meter.offset_top = 70.0
-		_meter.offset_bottom = 140.0
+		_meter = DriftMeter.new()  # links unter den Meldungen wie im Drift-Event (seit 2.48; 2.45 oben in der Mitte)
 		_meter.player = player
 		_meter.grace = 0.8
 		_meter.visible = false
 		_meter.banked.connect(_on_style_banked)
 		_meter.lost.connect(_on_style_lost)
-		root.add_child(_meter)
+		corner.add_child(_meter)
 	hud["drift"] = _label(corner, 16)
 	hud["drift"].label_settings.font = UI.font("cond", 0.2)
 	hud["drift"].label_settings.font_color = Color(1.0, 0.85, 0.2)

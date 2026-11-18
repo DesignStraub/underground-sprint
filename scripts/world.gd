@@ -1069,13 +1069,18 @@ func _cover() -> CanvasLayer:
 	return cl
 
 
+## HUD-Schrift (seit 2.48 wie die Menüs): Inter, dünne halbdurchsichtige Kontur und weicher Schatten statt der dicken
+## schwarzen Kontur (wirkte grob)
 func _label(parent: Node, size: int, align := HORIZONTAL_ALIGNMENT_LEFT) -> Label:
 	var l := Label.new()
 	l.horizontal_alignment = align
-	l.add_theme_font_override("font", UI.font("cond", 0.2))
+	l.add_theme_font_override("font", UI.font("cond", 0.0))
 	l.add_theme_font_size_override("font_size", size)
-	l.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
-	l.add_theme_constant_override("outline_size", 4)
+	l.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.45))
+	l.add_theme_constant_override("outline_size", 2)
+	l.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.55))
+	l.add_theme_constant_override("shadow_offset_x", 1)
+	l.add_theme_constant_override("shadow_offset_y", 1)
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	parent.add_child(l)
 	return l
@@ -1116,15 +1121,26 @@ func _build_hud() -> void:
 	tacho.offset_top = -s - 2.0
 	tacho.offset_bottom = tacho.offset_top + s
 	hud["tacho"] = tacho
-	var area := _label(root, 30, HORIZONTAL_ALIGNMENT_CENTER)
-	area.anchor_left = 0.5
-	area.anchor_right = 0.5
-	area.offset_left = -300.0
-	area.offset_right = 300.0
-	area.offset_top = 40.0
-	area.add_theme_font_override("font", UI.font("wide", 0.15))
+	# Links über dem Radar wie im Rennen (seit 2.48): Meldungen, Drift, Gebietsname klein; bis 2.47 stand der Name groß
+	# oben in der Mitte (im Sichtfeld, die Ortsschilder zeigen ohnehin, wo man ist)
+	var left := VBoxContainer.new()
+	left.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	left.alignment = BoxContainer.ALIGNMENT_END
+	left.add_theme_constant_override("separation", 2)
+	left.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+	left.offset_left = 14.0
+	left.offset_right = 14.0 + 250.0
+	left.offset_bottom = -WorldMinimap.SIZE - 12.0
+	left.offset_top = left.offset_bottom - 200.0
+	root.add_child(left)
+	hud["left"] = left
+	var area := _label(left, 11)
+	area.add_theme_font_override("font", UI.font("wide", 0.0, 1))
+	area.add_theme_color_override("font_color", Color(0.86, 0.9, 0.96))
+	area.uppercase = true
+	area.visible = false
 	hud["area"] = area
-	var prompt := _label(root, 20, HORIZONTAL_ALIGNMENT_CENTER)
+	var prompt := _label(root, 15, HORIZONTAL_ALIGNMENT_CENTER)
 	prompt.anchor_left = 0.5
 	prompt.anchor_right = 0.5
 	prompt.anchor_top = 0.24
@@ -1185,17 +1201,11 @@ func _build_hud() -> void:
 	dm.visible = false
 	hud["drift"] = dm  # seit 2.45 ungenutzt (drift_meter zeigt den Drift)
 	drift_meter = DriftMeter.new()
-	drift_meter.anchor_left = 0.5
-	drift_meter.anchor_right = 0.5
-	drift_meter.offset_left = -210.0
-	drift_meter.offset_right = 210.0
-	drift_meter.offset_top = 82.0
-	drift_meter.offset_bottom = 152.0
 	drift_meter.player = player
 	drift_meter.visible = false
 	drift_meter.banked.connect(_on_drift_banked)
 	drift_meter.lost.connect(_on_drift_lost)
-	root.add_child(drift_meter)
+	left.add_child(drift_meter)
 	# Level aufgestiegen (seit 2.35 dezent unten über der Leiste statt groß in der Mitte): Level und das Wichtigste,
 	# was es freischaltet; alles Weitere steht in der Garage unter Fahrer
 	var lu := _label(root, 14, HORIZONTAL_ALIGNMENT_CENTER)
@@ -1260,35 +1270,27 @@ func _build_hud() -> void:
 	minimap.offset_bottom = -8.0
 	_feed = VBoxContainer.new()
 	_feed.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_feed.add_theme_constant_override("separation", -2)
+	_feed.add_theme_constant_override("separation", -1)
 	_feed.alignment = BoxContainer.ALIGNMENT_END
-	_feed.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
-	_feed.offset_left = 14.0
-	_feed.offset_right = 14.0 + 300.0
-	_feed.offset_top = -WorldMinimap.SIZE - 8.0 - 96.0
-	_feed.offset_bottom = -WorldMinimap.SIZE - 12.0
-	root.add_child(_feed)
-	var dp := _label(root, 20, HORIZONTAL_ALIGNMENT_CENTER)
-	dp.anchor_left = 0.5
-	dp.anchor_right = 0.5
-	dp.anchor_top = 0.3
-	dp.anchor_bottom = 0.3
-	dp.offset_left = -300.0
-	dp.offset_right = 300.0
+	left.add_child(_feed)
+	left.move_child(_feed, 0)  # oben die Meldungen, darunter Drift und Gebietsname (wie im Rennen)
+	left.move_child(hud["area"], left.get_child_count() - 1)
+	var dp := _label(root, 12)  # oben links statt in der Mitte (seit 2.48)
+	dp.offset_left = 12.0
+	dp.offset_top = 10.0
+	dp.offset_right = 340.0
 	dp.add_theme_color_override("font_color", Color(1.0, 0.35, 0.3))
 	dp.visible = false
 	hud["duel_prompt"] = dp
-	var duel := Control.new()
+	var duel := Control.new()  # Duell-Leiste oben links statt oben in der Mitte (seit 2.48)
 	duel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	duel.anchor_left = 0.5
-	duel.anchor_right = 0.5
-	duel.offset_left = -170.0
-	duel.offset_right = 170.0
-	duel.offset_top = 84.0
-	duel.offset_bottom = 130.0
+	duel.offset_left = 2.0
+	duel.offset_right = 342.0
+	duel.offset_top = 8.0
+	duel.offset_bottom = 54.0
 	duel.visible = false
 	root.add_child(duel)
-	var dl := _label(duel, 16, HORIZONTAL_ALIGNMENT_CENTER)
+	var dl := _label(duel, 13, HORIZONTAL_ALIGNMENT_CENTER)
 	dl.size = Vector2(340, 24)
 	var bg := ColorRect.new()
 	bg.color = Color(0, 0, 0, 0.55)
@@ -1636,9 +1638,11 @@ func _process(dt: float) -> void:
 	_update_district()
 	if _area_t > 0.0:
 		_area_t -= dt
-		hud["area"].modulate.a = 0.85 * clampf(_area_t / 0.6, 0.0, 1.0)
+		hud["area"].modulate.a = 0.9 * clampf(_area_t / 0.6, 0.0, 1.0)
+		hud["area"].visible = true
 	else:
 		hud["area"].modulate.a = 0.0
+		hud["area"].visible = false
 	if _intro != null:
 		_intro.step(dt)  # nach dem Tageslicht (setzt den Nebel nach Höhe), vor der Unschärfe
 	_update_speed_fx(dt)
@@ -1747,7 +1751,7 @@ func _check_near_miss() -> void:
 func _flash(text: String, col: Color, pts := 0, xp := -1) -> void:
 	if _feed == null:
 		return
-	var l := _label(_feed, 15)
+	var l := _label(_feed, 11)
 	l.add_theme_color_override("font_color", col)
 	l.text = text + ("   +%d" % pts if pts > 0 else "")
 	l.set_meta("t", 3.2)
