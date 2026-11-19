@@ -799,14 +799,21 @@ static func material() -> ShaderMaterial:
 ## Gruppe aus Figuren an den Transformationen xfs (Blick = lokales -Z). modes: Liste möglicher Bewegungen.
 ## far: Sichtweite (0 = ohne Grenze). Liefert einen Knoten mit je Zelle zwei MultiMeshes (nah detailliert, fern als
 ## Blockfigur); set_mode() kann später umschalten.
-static func crowd(parent: Node3D, xfs: Array, modes: Array, rng: RandomNumberGenerator, far := 0.0) -> Node3D:
+## slots: wenn übergeben, je Figur (Reihenfolge wie xfs) eine Liste [[MultiMesh, Index], ...] aller Fassungen und
+## [Hemdfarbe, Custom-Daten] (knock_person.gd nimmt eine angefahrene Figur so aus dem Bündel)
+static func crowd(parent: Node3D, xfs: Array, modes: Array, rng: RandomNumberGenerator, far := 0.0, slots = null) -> Node3D:
 	var holder := Node3D.new()
 	parent.add_child(holder)
 	var mat := material()
 	# Detaildichte Niedrig bis Ultra: 30 / 42 / 60 / 96 m
 	var near := maxf(30.0, GameState.gv("detail")[2] * 1.2)
 	var cells := {}
-	for xf in xfs:
+	if slots != null:
+		slots.resize(xfs.size())
+		for j in xfs.size():
+			slots[j] = [[], Color(), Color()]
+	for j in xfs.size():
+		var xf: Transform3D = xfs[j]
 		var p: Vector3 = xf.origin
 		var key := Vector2i(floori(p.x / CELL), floori(p.z / CELL))
 		if not cells.has(key):
@@ -815,7 +822,7 @@ static func crowd(parent: Node3D, xfs: Array, modes: Array, rng: RandomNumberGen
 		var s := rng.randf_range(0.925, 1.075)
 		var b: Basis = xf.basis.scaled(Vector3(s, s, s))
 		cells[key].append([Transform3D(b, p), SHIRTS[rng.randi() % SHIRTS.size()],
-			Color(rng.randf(), rng.randf(), modes[rng.randi() % modes.size()] / 10.0, rng.randf())])
+			Color(rng.randf(), rng.randf(), modes[rng.randi() % modes.size()] / 10.0, rng.randf()), j])
 	for key in cells:
 		var list: Array = cells[key]
 		for lod in 2:
@@ -829,6 +836,11 @@ static func crowd(parent: Node3D, xfs: Array, modes: Array, rng: RandomNumberGen
 				mm.set_instance_transform(i, list[i][0])
 				mm.set_instance_color(i, list[i][1])
 				mm.set_instance_custom_data(i, list[i][2])
+				if slots != null:
+					var sl: Array = slots[list[i][3]]
+					sl[0].append([mm, i])
+					sl[1] = list[i][1]
+					sl[2] = list[i][2]
 			var mmi := MultiMeshInstance3D.new()
 			mmi.multimesh = mm
 			mmi.material_override = mat

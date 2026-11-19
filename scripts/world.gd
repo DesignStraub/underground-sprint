@@ -80,6 +80,7 @@ var map_view: Control
 var _pins := {}  # race_index -> Node3D am Start (für die Minikarte, immer da)
 var pause_panel: Control
 var settings_panel: PauseSettings  # Esc > Einstellungen (seit 2.52)
+var _knocked_test := false
 var fx_mat: ShaderMaterial
 var _fx_rect: ColorRect
 var _nitro_fx := 0.0
@@ -1668,6 +1669,20 @@ func _process(dt: float) -> void:
 	_travel_test(dt)
 	if OS.get_cmdline_user_args().has("--wmap") and _shot_t < 0.0 and map_view and not map_view.visible:
 		_open_map()
+	if OS.get_cmdline_user_args().has("--knocktest") and _intro == null and _shot_t >= 0.0 and _shot_t < 0.7 and not _knocked_test:
+		# Test: den nächsten Passanten auf dem Gehweg vom Auto aus anstoßen (Bild kurz danach mit --wshot)
+		_knocked_test = true
+		var best: Node3D = null
+		for n in get_tree().get_nodes_in_group("knock_person"):
+			if best == null or (n as Node3D).global_position.distance_to(player.global_position) < best.global_position.distance_to(player.global_position):
+				best = n
+		if best:
+			var to := (best.global_position - player.global_position)
+			to.y = 0.0
+			print("KNOCKTEST Passant %.0f m entfernt" % to.length())
+			player.global_position = best.global_position - to.normalized() * 6.0 + Vector3(0, 0.5, 0)
+			player.look_at(best.global_position + Vector3(0, 0.5, 0), Vector3.UP)
+			best.knock(to.normalized() * 22.0, best.global_position + Vector3(0, 0.55, 0))
 	if OS.get_cmdline_user_args().has("--wsettings") and _intro == null and not settings_panel.visible and not get_tree().paused:  # Test: Esc > Einstellungen
 		_toggle_pause()
 		_open_settings()

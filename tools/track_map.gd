@@ -68,6 +68,14 @@ func _ready() -> void:
 		_wallcheck()
 	if OS.get_cmdline_user_args().has("--leakcheck"):
 		_leakcheck()
+	print("HÖFE Rasen/Pflaster/Kies ", Track.yards_dbg, "  Passanten auf Gehwegen ", track.get("sidewalk_people", 0))
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--streetat="):  # Name:m -> Lage in Streckenkoordinaten
+			var sp := a.substr(11).split(":")
+			for p in track["paths"]:
+				if str(p.get("street_name", "")) == sp[0]:
+					var f := Track.frame_at(p["curve"], float(sp[1]))
+					print("STRASSE %s@%s bei (%.1f, %.1f) rechts (%.2f, %.2f)" % [sp[0], sp[1], f["pos"].x, f["pos"].z, f["right"].x, f["right"].z])
 	print("Karte: %s, %.0f x %.0f m, %d Wandstücke, %d Lampen" % [Catalog.RACES[race_i]["name"], rect.size.x, rect.size.y, walls.size(), lights.size()])
 
 

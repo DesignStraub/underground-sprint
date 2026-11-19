@@ -1577,7 +1577,7 @@ static func build_street(root: Node3D, track: Dictionary, p: Dictionary, rng: Ra
 	walls.name = "WallsBranch%d" % p["id"]
 	root.add_child(walls)
 	var up := Vector3(0, Track.CURB_H, 0)
-	var lift := Vector3(0, 0.004, 0)  # Gehweg der Nebenstraße knapp über dem der Hauptstraße (an der Ecke liegen beide)
+	var lift := Vector3(0, 0.012, 0)  # Gehweg der Nebenstraße knapp über dem der Hauptstraße (an der Ecke liegen beide; 0,4 cm flackerten von weitem)
 	var runs := [[], []]  # je Seite: gebaute Stücke des Streifens [d0, d1]
 	var wall_runs := [[], []]  # je Seite: Wandstücke [Punkt a, Punkt b, d] (für Hecken, Mauern, Poller am Platz)
 	var own: int = p["id"]
@@ -1604,8 +1604,32 @@ static func build_street(root: Node3D, track: Dictionary, p: Dictionary, rng: Ra
 			var reach_all: float = half + maxf(float(sw[0]), float(sw[1])) + walk + 1.0
 			var mc0 := main_clear(track, mid)
 			var free := mc0 > reach_all + Track.WALK + 2.0 and branch_clear(track, mid, true, true, own) > reach_all + 1.5
-			if mc0 > -0.3:
+			# Fahrbahn genau an der Kante der Hauptstraße abschneiden (seit 2.52): vorher ragte sie bis 3,5 m als dunkles
+			# Rechteck in die Hauptstraße und flackerte mit deren Asphalt. Gemessen an beiden Rändern des Stücks.
+			var e0 := minf(main_clear(track, c0 - r0 * half), main_clear(track, c0 + r0 * half))
+			var e1 := minf(main_clear(track, c1 - r1 * half), main_clear(track, c1 + r1 * half))
+			if e0 >= 0.0 and e1 >= 0.0:
 				Track._strip(road, c0 - r0 * half, c0 + r0 * half, c1 - r1 * half, c1 + r1 * half, prev["d"], d)
+			elif e0 >= 0.0 or e1 >= 0.0:
+				# Kante im Stück: auf den Teil außerhalb der Hauptstraße kürzen (Halbierung)
+				var lo := 0.0 if e0 >= 0.0 else 1.0
+				var hi := 1.0 if e0 >= 0.0 else 0.0
+				for it in 10:
+					var tm := (lo + hi) / 2.0
+					var cm := c0.lerp(c1, tm)
+					var rmm := r0.lerp(r1, tm).normalized()
+					if minf(main_clear(track, cm - rmm * half), main_clear(track, cm + rmm * half)) >= 0.0:
+						lo = tm
+					else:
+						hi = tm
+				var tc := lo
+				var cc := c0.lerp(c1, tc)
+				var rc := r0.lerp(r1, tc).normalized()
+				var dc: float = lerpf(prev["d"], d, tc)
+				if e0 >= 0.0:
+					Track._strip(road, c0 - r0 * half, c0 + r0 * half, cc - rc * half, cc + rc * half, prev["d"], dc)
+				else:
+					Track._strip(road, cc - rc * half, cc + rc * half, c1 - r1 * half, c1 + r1 * half, dc, d)
 			for i in 2:
 				var sd := -1.0 if i == 0 else 1.0
 				var a1: float = half + float(sw[i])

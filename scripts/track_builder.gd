@@ -34,6 +34,7 @@ const ElevatedRail := preload("res://scripts/elevated_rail.gd")
 const AmbientSound := preload("res://scripts/ambient_sound.gd")
 const CityData := preload("res://scripts/city_data.gd")
 const People := preload("res://scripts/people.gd")
+const KnockPerson := preload("res://scripts/knock_person.gd")
 const City := preload("res://scripts/city_builder.gd")
 const Design := preload("res://scripts/track_design.gd")  # entworfene Strecken (Driftberg-Pass, seit 2.36)
 const CityFill := preload("res://scripts/city_fill.gd")  # Stadtfüllung hinter der Straßenfront (seit 2.39)
@@ -468,6 +469,8 @@ static func step(job: Dictionary) -> float:
 			if not city.is_empty():
 				_box_tag = "osm"
 				job["buildings"].append_array(_build_osm_buildings(root, track, rng, job["occupied"] + job["buildings"]))
+				if track["world"]:
+					_build_yards(root, track, job["occupied"] + job["buildings"])
 				_box_tag = ""
 			elif CityFill.wanted(track, race) and not CityFill.step(root, track, job):
 				# Stadtfüllung hinter der Front (seit 2.39, city_fill.gd): in Stücken, eigener Zufall
@@ -489,6 +492,8 @@ static func step(job: Dictionary) -> float:
 			if type != "autobahn":
 				_build_spectators(root, track, rng)
 				_build_walkers(root, track)
+				if track["world"]:
+					_build_sidewalk_people(root, track)
 				if track["world"] and town_won(race.get("town", "")):
 					_build_celebration(root, track)
 			if type == "drag":
@@ -2072,6 +2077,7 @@ static func _dbg_near(q: Vector3) -> bool:
 
 static func _stitch_walls(root: Node3D, track: Dictionary) -> void:
 	_drop_road_walls(root, track)
+	fill_n = 0
 	var segs := []  # [a, b]
 	var stack: Array = [root]
 	while not stack.is_empty():
@@ -2150,6 +2156,8 @@ static func _stitch_walls(root: Node3D, track: Dictionary) -> void:
 	for pp in track["paths"]:
 		if pp["kind"] == "platz":
 			platz_ids[int(pp["id"])] = true
+	var fill := SurfaceTool.new()  # Gehweg in den Ecken vor den Nähten (seit 2.52; vorher nackter, flackernder Boden)
+	fill.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var body := StaticBody3D.new()
 	body.name = "WallsStitch"
 	root.add_child(body)
@@ -2199,6 +2207,8 @@ static func _stitch_walls(root: Node3D, track: Dictionary) -> void:
 			continue
 		used[str(pr[1])] = true
 		used[str(pr[2])] = true
+		if via == Vector3.INF and float(pr[0]) > 1.5 and float(pr[0]) < 16.0:
+			_corner_fill(track, fill, a, b, platz_ids)
 		var legs := [[a, b]] if via == Vector3.INF else [[a, via], [via, b]]
 		for lg in legs:
 			var la: Vector3 = lg[0]
@@ -2208,6 +2218,8 @@ static func _stitch_walls(root: Node3D, track: Dictionary) -> void:
 			if dir.length() > 0.5:
 				vis.append(Transform3D(Basis.looking_at(dir, Vector3.UP) * Basis.from_scale(Vector3(1, 1, _flat(lb - la).length() + 0.3)), (la + lb) / 2.0 + Vector3(0, CURB_H + 0.45, 0)))
 	stitch_dbg = vis.size()
+	if fill_n > 0:
+		_flush(root, fill, _walk_mat(1000.0, track["districts"][0] if not track["districts"].is_empty() else ""))
 	if not vis.is_empty():
 		_multi(root, Builder.box(Vector3(0.45, 0.9, 1.0)), Builder.mat(Color(0.47, 0.43, 0.38), 0.0, 0.9), vis)
 
@@ -2237,6 +2249,42 @@ static func _drop_road_walls(root: Node3D, track: Dictionary) -> void:
 			if not bad:
 				keep.append_array(f.slice(k, k + 6))
 		c.set_meta("faces", keep)
+
+
+static var fill_n := 0
+
+
+## Ecke vor einer Naht pflastern: Dreieck aus beiden Wandenden und dem Punkt, an dem man von der Mitte der Naht aus
+## zur Straße hin die erste Fahrbahn erreicht (Bordsteinecke). 2,5 cm über dem Gehweg (sonst flackern beide), UV in
+## Weltmetern (Platten laufen durch).
+static func _corner_fill(track: Dictionary, st: SurfaceTool, a: Vector3, b: Vector3, skip: Dictionary) -> void:
+	var m := (a + b) / 2.0
+	var nrm := Vector3(-(b - a).z, 0, (b - a).x).normalized()
+	var nc := _nearest_center(track, m, skip)
+	if nc == Vector3.INF:
+		return
+	if Vector3(nc.x - m.x, 0, nc.z - m.z).dot(nrm) < 0.0:
+		nrm = -nrm  # zur Straße hin
+	var q := m
+	var t := 0.0
+	while t < 12.0:
+		var c := m + nrm * (t + 0.5)
+		if _carriage_clear(track, c, skip) < 0.0 or (Streets.main_clear(track, c) if track.has("sgrid") else _main_clearance(track, c)) < 0.0:
+			break
+		t += 0.5
+		q = c
+	if t < 0.6 or t >= 12.0:
+		return
+	var y := Vector3(0, CURB_H + 0.025, 0)
+	var tri := [a, b, q]
+	# von oben im Uhrzeigersinn (Vorderseite nach oben)
+	if (b - a).cross(q - a).y > 0.0:
+		tri = [a, q, b]
+	for v in tri:
+		var w: Vector3 = v
+		st.set_uv(Vector2((w.x + 500.0) / 1000.0, w.z))
+		st.add_vertex(Vector3(w.x, 0.0, w.z) + y)
+	fill_n += 1
 
 
 ## Nächster Punkt einer Fahrbahnmitte (Nebenwege ohne skip, und die Hauptstraße)
@@ -4996,7 +5044,34 @@ static func _build_osm_buildings(root: Node3D, track: Dictionary, rng: RandomNum
 		# echte Grundrisse als umschließende Rechtecke überlappen sich (Winkelbauten): bis 2,5 m ist das ein Häuserblock,
 		# mehr hieße, ein Haus steckt im anderen; an der Straßenfront und am Wasser zählt jeder Meter
 		if not _lot_free(track, foot, grid, WALK + 4.0, 0.3, 2.5):
-			continue
+			# seit 2.52: unsere Straßen (Fahrbahn, Parkstreifen, Gehweg) sind breiter als die echten, ganze Häuserzeilen
+			# fielen weg und ließen leere Flächen. Jetzt das Haus von einer Seite her kürzen (bis 60 %), bis es passt.
+			var fit := {}
+			for cut in [2.0, 4.0, 6.0, 8.0, 10.0, 13.0]:
+				for ax in [0, 1]:
+					var full: float = W if ax == 0 else L
+					if full - cut < maxf(6.0, full * 0.4):
+						continue
+					for sg in [-1.0, 1.0]:
+						var axv: Vector3 = basis.x if ax == 0 else basis.z
+						var p2: Vector3 = pos + axv * sg * cut * 0.5
+						var W2: float = W - cut if ax == 0 else W
+						var L2: float = L if ax == 0 else L - cut
+						var f2 := _foot(p2, basis, W2, L2)
+						if _lot_free(track, f2, grid, WALK + 4.0, 0.3, 2.5):
+							fit = {"pos": p2, "W": W2, "L": L2, "foot": f2}
+							break
+					if not fit.is_empty():
+						break
+				if not fit.is_empty():
+					break
+			if fit.is_empty():
+				continue
+			pos = fit["pos"]
+			W = fit["W"]
+			L = fit["L"]
+			foot = fit["foot"]
+			r = Vector2(L, W).length() * 0.5
 		var dist := _district_at(track, curve.get_closest_offset(pos))
 		_box_id += 1
 		var styles: Array = dist["styles"]
@@ -5413,6 +5488,170 @@ static func _back_row(root: Node3D, track: Dictionary, rng: RandomNumberGenerato
 
 
 ## Grundriss eines Hauses: [Mitte 2D, Achse quer (x), Achse entlang (z), halbe Tiefe, halbe Breite]
+## Höfe und Gärten (seit 2.52): zwischen den echten Häusern (OSM-Städte) lag nur leerer, dunkler Boden ("viel von der
+## Karte ist planlos leer"). Jetzt je freier Fläche (Raster 14 m, nur hinter den Wänden, nicht auf Wegen, Wasser oder
+## Häusern) ein Hof: Rasen mit Bäumen und Büschen, gepflasterter Hof mit Mülltonnen und einem Auto, Kies-Stellplatz mit
+## Autos oder ein Garten mit Gartenhaus. Fest aus Lage und Seed (gleich bei jedem Laden), nur Meshes ohne Kollision
+## (man kommt nicht hin), Bäume und Autos wie an den Straßen.
+static func _build_yards(root: Node3D, track: Dictionary, blockers: Array) -> void:
+	var grid := {}
+	for o in blockers:
+		_grid_add(grid, o)
+	var curve: Curve3D = track["curve"]
+	var lo := Vector2(1e9, 1e9)
+	var hi := Vector2(-1e9, -1e9)
+	for q in curve.get_baked_points():
+		lo = lo.min(Vector2(q.x, q.z))
+		hi = hi.max(Vector2(q.x, q.z))
+	lo -= Vector2(260, 260)
+	hi += Vector2(260, 260)
+	var lawn := SurfaceTool.new()
+	lawn.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var pave := SurfaceTool.new()
+	pave.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var gravel := SurfaceTool.new()
+	gravel.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var n := [0, 0, 0]
+	var bushes := []
+	var bins := []
+	var sheds := []
+	var roofs := []
+	var cars := []
+	var trees := []
+	const C := 14.0
+	var x := lo.x
+	while x < hi.x:
+		var z := lo.y
+		while z < hi.y:
+			var h := posmod(hash([int(x), int(z), int(track["length"])]), 10000)
+			var pos := Vector3(x + float(h % 7) - 3.0, 0, z + float((h / 7) % 7) - 3.0)
+			z += C
+			var mc := Streets.main_clear(track, pos, 280.0) if track.has("sgrid") else _main_clearance(track, pos)
+			var dbg := not stitch_pts.is_empty() and _dbg_near(pos)
+			if mc < WALK + 9.0 or mc > 260.0:
+				if dbg:
+					print("HOF (%.0f, %.0f) Hauptstraße %.0f" % [pos.x, pos.z, mc])
+				continue
+			var ang := float((h / 49) % 8) * PI / 8.0
+			var basis := Basis(Vector3.UP, ang)
+			var foot := _foot(pos, basis, 11.0, 11.0)
+			if not _yard_free(track, foot, grid) or _keepout_hit(track, pos, basis, 6.0, 6.0):
+				if dbg:
+					print("HOF (%.0f, %.0f) belegt: %s" % [pos.x, pos.z, yard_why])
+				continue
+			var kind := (h / 392) % 20  # 0-8 Rasen, 9-13 Pflasterhof, 14-16 Stellplatz, 17-18 Garten, 19 nichts
+			if kind == 19:
+				continue
+			var hx: Vector3 = basis.x * 5.5
+			var hz: Vector3 = basis.z * 5.5
+			var y := Vector3(0, 0.03, 0)
+			var st: SurfaceTool = lawn if kind <= 8 or kind >= 17 else (pave if kind <= 13 else gravel)
+			n[0 if st == lawn else (1 if st == pave else 2)] += 1
+			var quad := [pos - hx - hz, pos + hx - hz, pos + hx + hz, pos - hx + hz]
+			for idx in [0, 1, 2, 0, 2, 3]:
+				var v: Vector3 = quad[idx]
+				st.set_uv(Vector2((v.x + 500.0) / 1000.0, v.z))
+				st.add_vertex(v + y)
+			var r2 := RandomNumberGenerator.new()
+			r2.seed = h * 31 + 7
+			if kind <= 8:
+				for i in r2.randi_range(1, 3):
+					var q: Vector3 = pos + basis.x * r2.randf_range(-4.0, 4.0) + basis.z * r2.randf_range(-4.0, 4.0)
+					if r2.randf() < 0.45:
+						trees.append(q)
+					else:
+						var bs := r2.randf_range(0.6, 1.1)
+						bushes.append(Transform3D(Basis.from_scale(Vector3(bs, bs * 0.8, bs)), q + Vector3(0, bs * 0.5, 0)))
+			elif kind <= 13:
+				for i in r2.randi_range(1, 3):
+					bins.append(Transform3D(basis, pos + basis.x * (4.4 - i * 0.9) + basis.z * 4.6 + Vector3(0, 0.55, 0)))
+				if r2.randf() < 0.5:
+					cars.append(Transform3D(basis.rotated(Vector3.UP, PI * 0.5 * float(r2.randi() % 2)), pos + basis.x * r2.randf_range(-1.5, 1.5)))
+			elif kind <= 16:
+				for i in r2.randi_range(2, 3):
+					cars.append(Transform3D(basis, pos + basis.x * (-3.3 + i * 3.0) + basis.z * 1.5))
+			else:
+				var sp: Vector3 = pos + basis.x * 2.8 + basis.z * 2.8
+				sheds.append(Transform3D(basis, sp + Vector3(0, 1.1, 0)))
+				roofs.append(Transform3D(basis, sp + Vector3(0, 2.35, 0)))
+				trees.append(pos - basis.x * 3.0 - basis.z * 2.5)
+				for i in 3:
+					bushes.append(Transform3D(Basis.from_scale(Vector3(0.7, 0.55, 0.7)), pos - basis.x * (-3.5 + i * 2.0) + basis.z * 4.5 + Vector3(0, 0.35, 0)))
+		x += C
+	if n[0] > 0:
+		_flush(root, lawn, Builder.mat(Color(0.13, 0.22, 0.09), 0.0, 0.95))
+	if n[1] > 0:
+		_flush(root, pave, _walk_mat(1000.0, track["districts"][0] if not track["districts"].is_empty() else ""))
+	if n[2] > 0:
+		_flush(root, gravel, Builder.mat(Color(0.24, 0.22, 0.2), 0.0, 0.95))
+	if not bushes.is_empty():
+		var bm := SphereMesh.new()
+		bm.radius = 1.0
+		bm.height = 1.6
+		bm.radial_segments = 8
+		bm.rings = 4
+		_multi(root, bm, Builder.mat(Color(0.07, 0.18, 0.06), 0.0, 0.9), bushes)
+	if not bins.is_empty():
+		_multi(root, Builder.box(Vector3(0.7, 1.1, 0.75)), Builder.mat(Color(0.12, 0.2, 0.14), 0.2, 0.6), bins)
+	if not sheds.is_empty():
+		_multi(root, Builder.box(Vector3(3.0, 2.2, 2.6)), Builder.mat(Color(0.36, 0.26, 0.17), 0.0, 0.9), sheds)
+		_multi(root, Builder.box(Vector3(3.4, 0.3, 3.0)), Builder.mat(Color(0.25, 0.12, 0.09), 0.0, 0.85), roofs)
+	if not cars.is_empty():
+		var rngc := RandomNumberGenerator.new()
+		rngc.seed = int(track["length"]) + 5
+		Streets.parked_cars(root, cars, rngc)
+	if not trees.is_empty():
+		var rngt := RandomNumberGenerator.new()
+		rngt.seed = int(track["length"]) + 9
+		Streets._trees(root, trees, rngt)
+	yards_dbg = n
+
+
+static var yards_dbg := [0, 0, 0]
+
+
+## Hof frei? Ganz hinter den Wänden (Fahrbahn, Streifen, Gehweg jeder Straße plus 1 m), nicht im Wasser, auf Gleisen
+## oder in einem Haus (Grundrisse überlappen nicht). Lockerer als _lot_free (Häuser halten zu Straßen mehr Abstand).
+static var yard_why := ""
+
+
+static func _yard_free(track: Dictionary, foot: Array, grid: Dictionary) -> bool:
+	var c2: Vector2 = foot[0]
+	yard_why = ""
+	for su in [-1.0, 0.0, 1.0]:
+		for sv in [-1.0, 0.0, 1.0]:
+			var q2: Vector2 = c2 + foot[1] * foot[3] * su + foot[2] * foot[4] * sv
+			var q := Vector3(q2.x, 0, q2.y)
+			if track.has("sgrid"):
+				if Streets.branch_clear(track, q, false, true) < 1.0 or Streets.main_clear(track, q) < WALK + 1.5:
+					yard_why = "Straße %.1f/%.1f" % [Streets.branch_clear(track, q, false, true), Streets.main_clear(track, q)]
+					return false
+			elif _branch_clearance(track, q, false, true) < 1.0 or _main_clearance(track, q) < WALK + 1.5:
+				return false
+			if (not track["rivers"].is_empty() and _river_near(track, q, 6.0) < 4.0) or _in_lake(track, q, 4.0) or _rail_clearance(track, q) < 4.0:
+				yard_why = "Wasser/Bahn"
+				return false
+	if grid.is_empty():
+		return true
+	var r := Vector2(foot[3], foot[4]).length()
+	var key := Vector2i(floori(c2.x / LOT_CELL), floori(c2.y / LOT_CELL))
+	var reach := int(ceil((r + grid["fmax"]) / LOT_CELL))
+	for gx in range(key.x - reach, key.x + reach + 1):
+		for gz in range(key.y - reach, key.y + reach + 1):
+			for o in grid["feet"].get(Vector2i(gx, gz), []):
+				if c2.distance_to(o["foot"][0]) < r + o["fr"] and _foot_pen(foot, o["foot"]) > 0.0:
+					yard_why = "Haus"
+					return false
+	reach = int(ceil((r + grid["cmax"]) / LOT_CELL))
+	for gx in range(key.x - reach, key.x + reach + 1):
+		for gz in range(key.y - reach, key.y + reach + 1):
+			for o in grid["circ"].get(Vector2i(gx, gz), []):
+				if c2.distance_to(Vector2(o["pos"].x, o["pos"].z)) < o["r"] + r * 0.65:
+					yard_why = "Kreis r=%.0f" % o["r"]
+					return false
+	return true
+
+
 static func _foot(center: Vector3, basis: Basis, depth: float, w: float) -> Array:
 	return [Vector2(center.x, center.z), Vector2(basis.x.x, basis.x.z).normalized(), Vector2(basis.z.x, basis.z.z).normalized(),
 		depth / 2.0, w / 2.0]
@@ -6660,6 +6899,87 @@ static func _build_walkers(root: Node3D, track: Dictionary) -> void:
 		hn.name = "PassantenNacht"
 		holders.append(hn)
 	track["walker_nodes"] = holders
+
+
+## Passanten auf dem Gehweg (seit 2.52, nur Open World): kleine Gruppen an Haupt- und Nebenstraßen, nicht zu dicht
+## (an der Hauptstraße etwa jede 150 m je Seite, an Nebenstraßen seltener), nicht an Einmündungen, Laternen, auf
+## Brücken oder über Land. Anders als die Passanten vor den Fassaden (hinter der Randwand) erreicht man sie: angefahren
+## fliegen sie davon wie Laternen (knock_person.gd). Fest aus Lage und Seed.
+static func _build_sidewalk_people(root: Node3D, track: Dictionary) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = int(track["length"]) * 5 + 23
+	var spots := []  # Transform3D je Figur
+	var curve: Curve3D = track["curve"]
+	var L: float = track["length"]
+	for side in [-1.0, 1.0]:
+		var d := 30.0
+		while d < L - 30.0:
+			d += rng.randf_range(35.0, 60.0)
+			if rng.randf() > 0.3 or _in_zone(track, d, 8.0) or _near_post(track, d, 4.0) or not bridge_at(track, d).is_empty() \
+					or not tunnel_at(track, d, 10.0).is_empty() or _lift(track, d) > 0.2 or _district_at(track, d).get("rural", false):
+				continue
+			var f := frame_at(curve, d)
+			var pos: Vector3 = f["pos"] + f["right"] * side * (hw(track, d) + WALK * 0.55)
+			if _branch_clearance(track, pos, false, true) < 3.0:
+				continue
+			_people_group(spots, pos, f["fwd"], -f["right"] * side, rng)
+	for p in track["paths"]:
+		if not p.has("net") or p["kind"] != "lane" or float(p["walk"]) < 0.9:
+			continue
+		var c: Curve3D = p["curve"]
+		var len: float = p["length"]
+		for side in [-1.0, 1.0]:
+			var d2 := rng.randf_range(10.0, 40.0)
+			while d2 < len - 15.0:
+				d2 += rng.randf_range(45.0, 80.0)
+				if d2 > len - 15.0 or rng.randf() > 0.22:
+					continue
+				var f2 := frame_at(c, d2)
+				var lat: float = Streets.edge(p, side) - float(p["walk"]) * 0.5
+				var pos2: Vector3 = f2["pos"] + f2["right"] * side * lat
+				pos2.y = 0.0
+				if Streets.main_clear(track, pos2) < WALK + 3.0 or Streets.branch_clear(track, pos2, true, false, p["id"]) < 3.0:
+					continue
+				_people_group(spots, pos2, f2["fwd"], -f2["right"] * side, rng)
+	if spots.is_empty():
+		return
+	var slots := []
+	var holder := People.crowd(root, spots, [People.WAIT, People.PHONE, People.WAIT, People.WAVE], rng, 160.0, slots)
+	holder.name = "PassantenGehweg"
+	var shape := BoxShape3D.new()
+	shape.size = Vector3(0.55, 1.7, 0.55)
+	for j in spots.size():
+		var kb: RigidBody3D = KnockPerson.new()
+		kb.mass = 70.0
+		kb.slowdown = 0.97
+		kb.slots = slots[j][0]
+		kb.shirt = slots[j][1]
+		kb.custom = slots[j][2]
+		kb.position = (spots[j] as Transform3D).origin
+		var cs := CollisionShape3D.new()
+		cs.shape = shape
+		cs.position = Vector3(0, 0.85, 0)
+		kb.add_child(cs)
+		root.add_child(kb)
+	track["sidewalk_people"] = spots.size()
+
+
+static func _people_group(spots: Array, pos: Vector3, fwd: Vector3, to_road: Vector3, rng: RandomNumberGenerator) -> void:
+	var n := 1 if rng.randf() < 0.55 else rng.randi_range(2, 3)
+	for i in n:
+		var q: Vector3 = pos + fwd * (float(i) * 0.8 - 0.4 * float(n - 1)) + to_road * rng.randf_range(-0.4, 0.4)
+		var face: Vector3
+		match rng.randi() % 3:
+			0:
+				face = to_road
+			1:
+				face = fwd
+			_:
+				face = -fwd
+		if n >= 2 and i == 1:
+			face = -fwd
+		spots.append(Transform3D(Basis.looking_at(face.rotated(Vector3.UP, rng.randf_range(-0.4, 0.4)), Vector3.UP),
+			Vector3(q.x, CURB_H, q.z)))
 
 
 ## Tag oder Nacht für die Passanten (day 0..1 wie in Moods)
