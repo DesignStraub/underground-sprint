@@ -18,6 +18,12 @@ const OWN_LIGHT_MASK := 0xFFFFF & ~SMOKE_LAYER
 const SHELL_SUB := 3  # Teilstücke je Band beim Verfeinern der Querschnitte (_refine)
 const FRONT_SEAM := 0.075  # Fuge Frontschürze (t)
 const REAR_SEAM := 0.94  # Fuge Heckschürze (t)
+## Aus einem Guss (seit 2.53): Bug und Heck mit deutlich runderen Kanten (Radius edge_f/edge_r mal EDGE_K, vorher 1,0),
+## Flanken mit mehr Bauch (FLANK_BULGE nach außen in der Flankenmitte, vorher 0,012 m). Vorher wirkten Heck und Flanken
+## wie flache Wände mit scharfen Kanten, die Autos kastig.
+const EDGE_K := 2.2
+const TAPER := 0.07  # so viel schmaler je Seite an Bug und Heck (_section)
+const FLANK_BULGE := 0.03
 
 static var _glow_tex: ImageTexture
 static var _mesh_cache := {}  # Reifen, Speichen, Flügel, Kennzeichen: einmal gebaut, von allen Autos geteilt
@@ -290,7 +296,7 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 		"paint": paint,
 		"glass": glass_mat(tint["color"], 1.0 if int(cfg.get("tint", 0)) == 3 else 0.0),
 		"under": mat(Color(0.025, 0.025, 0.03), 0.0, 0.85),
-		"seam": mat(Color(0.012, 0.012, 0.016), 0.2, 0.7),
+		"seam": mat(Color(0.03, 0.03, 0.035), 0.2, 0.7),  # seit 2.53 etwas weicher als Schwarz
 		"head": mat(Color(1, 1, 0.95).lerp(light_c, 0.5), 0, 0.3, light_c, 2.6),
 		"tail": mat(Color(0.6, 0, 0), 0, 0.3, Color(1, 0.05, 0.02), 2.2),
 		"stripe": stripe_m,
@@ -3092,7 +3098,7 @@ const POPUP_IN := {"ronin": 0.3, "hachi": 0.24, "kitsune": 0.25, "tenshi": 0.29,
 static func _panel_lines(body: Node3D, car_id: String, S: Dictionary, W: float, L: float, flare: float, gap: Material) -> void:
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var wd := 0.0065
+	var wd := 0.0045  # seit 2.53 feiner (vorher 6,5 mm)
 	var hx := func(t: float) -> float:
 		var p: PackedVector2Array = _section(S, t, W, L, flare)["p"]
 		var x: float = p[7].x - 0.022
@@ -4126,6 +4132,8 @@ static func _section(S: Dictionary, t: float, W: float, L: float, flare: float) 
 	var w := W / 2.0 - maxf(S["hips"], 0.015) - (0.045 if S.get("overfenders", false) else 0.0)
 	w -= S["round_f"] * pow(maxf(1.0 - t / 0.14, 0.0), 2.0)
 	w -= S["round_r"] * pow(maxf(1.0 - (1.0 - t) / 0.12, 0.0), 2.0)
+	# seit 2.53: Bug und Heck laufen in der Draufsicht weich zu (keine Wand mit Ecken), zusätzlich zu round_f/round_r
+	w -= TAPER * (pow(maxf(1.0 - t / 0.2, 0.0), 2.0) + pow(maxf(1.0 - (1.0 - t) / 0.2, 0.0), 2.0))
 	var hip: float = (S["hips"] + flare) * exp(-pow((t - tr) / 0.1, 2.0))
 	var fend: float = (0.015 + flare) * exp(-pow((t - tf) / 0.08, 2.0))
 	var w2 := w + hip + fend
@@ -4150,9 +4158,9 @@ static func _section(S: Dictionary, t: float, W: float, L: float, flare: float) 
 	belt += S["fender"] * exp(-pow((t - tf) / 0.075, 2.0))
 	var top := _top_c(S, t)
 	# Bug und Heck oben abgerundet: die obere Kante fällt zum Ende ab und zieht sich nach innen (keine Kiste)
-	var er := smoothstep(0.955, 1.0, t)
+	var er := smoothstep(0.94, 1.0, t)
 	var ef := smoothstep(0.04, 0.0, t)
-	top -= 0.07 * er + 0.03 * ef
+	top -= 0.09 * er + 0.03 * ef
 	belt -= 0.06 * er + 0.02 * ef
 	w3 -= 0.1 * er + 0.06 * ef
 	w2 -= 0.035 * er
@@ -4163,7 +4171,7 @@ static func _section(S: Dictionary, t: float, W: float, L: float, flare: float) 
 	var w_in := w2 - 0.36 if arch else x1  # Innenwand des Radhauses, mit Abstand zum breitesten Reifen
 	var pts := PackedVector2Array([
 		Vector2(0.0, C), Vector2(w_in, C), Vector2(w_in, ybot), Vector2(x1, ybot), Vector2(w2, y2),
-		Vector2((w2 + w3) / 2.0 + 0.012, (y2 + belt) / 2.0), Vector2(w3, belt), p4,
+		Vector2((w2 + w3) / 2.0 + FLANK_BULGE, (y2 + belt) / 2.0), Vector2(w3, belt), p4,
 		Vector2(p4.x * 0.55, top + (p4.y - top) * 0.3025), Vector2(p4.x * 0.18, top + (p4.y - top) * 0.0324),
 		Vector2(0.0, top)])
 	# Doppelbuckel-Dach (bubble, seit 2.36): die Dachmitte liegt etwas tiefer als die Buckel über den Sitzen
@@ -4175,7 +4183,7 @@ static func _section(S: Dictionary, t: float, W: float, L: float, flare: float) 
 	# Bug und Heck mit runden Kanten (Viertelkreis, Radius edge_f/edge_r): in den letzten Zentimetern rücken Flanke,
 	# Schulter und Dach nach innen, die Stirnfläche wird kleiner. Bis 2.20 endete das Auto in einer senkrechten Wand
 	# mit scharfer Kante. Die Unterkante bleibt (Lippe, Einlass, Diffusor hängen dort), vorn auch die Haubenkante.
-	var rad: float = S.get("edge_f", 0.075) if t < 0.5 else S.get("edge_r", 0.065)
+	var rad: float = S.get("edge_f", 0.075) * EDGE_K if t < 0.5 else S.get("edge_r", 0.065) * EDGE_K
 	var de := minf(t, 1.0 - t) * L
 	if de < rad:
 		var ins := rad - sqrt(maxf(rad * rad - (rad - de) * (rad - de), 0.0))
@@ -4446,7 +4454,7 @@ static func _shell(body: Node3D, S: Dictionary, W: float, L: float, flare: float
 	# Feste Querschnitte: Fugen (zwei dicht beieinander) und Radkanten (senkrechter Übergang)
 	var must := []
 	for sm in seams:
-		must.append_array([sm, sm + 0.006 / L])
+		must.append_array([sm, sm + 0.004 / L])  # Fugen seit 2.53 4 statt 6 mm (aus einem Guss)
 	for wz in [-L / 2.0 + axle(S), L / 2.0 - axle(S)]:
 		for e in [-1.0, 1.0]:
 			must.append_array([(wz + e * (ra - 0.002)) / L + 0.5, (wz + e * (ra + 0.002)) / L + 0.5])
@@ -4461,7 +4469,7 @@ static func _shell(body: Node3D, S: Dictionary, W: float, L: float, flare: float
 		extra.append(float(i) / n)
 	extra.append_array([0.004, 0.012, 0.025, 0.045, 0.07, 0.955, 0.975, 0.988, 0.996])
 	# Rundung an Bug und Heck: dichte Querschnitte in den letzten Zentimetern
-	for d in [0.002, 0.006, 0.012, 0.02, 0.03, 0.042, 0.056, 0.07]:
+	for d in [0.002, 0.006, 0.012, 0.02, 0.03, 0.042, 0.056, 0.07, 0.088, 0.108, 0.13, 0.155]:
 		extra.append_array([d / L, 1.0 - d / L])
 	for key in ["cowl", "rf", "rr", "ge", "cp"]:
 		extra.append(S[key])
