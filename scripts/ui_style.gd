@@ -50,7 +50,8 @@ static func font(kind := "cond", slant := 0.2, spacing := 0) -> Font:
 			fam = a.substr(9)
 	match fam + "/" + kind:
 		"inter/cond":
-			base = load("res://assets/fonts/inter/InterDisplay-Bold.ttf")
+			# seit 2.53: Anzeigeschrift Oxanium (Severin Meyer, OFL), kantig und technisch; nur für Großes
+			base = load("res://assets/fonts/oxanium/Oxanium-Variable.ttf")
 		"inter/wide":
 			base = load("res://assets/fonts/inter/Inter-Bold.ttf")
 		"inter/bold":
@@ -75,6 +76,10 @@ static func font(kind := "cond", slant := 0.2, spacing := 0) -> Font:
 			base = load("res://assets/fonts/saira/SairaCondensed-ExtraBold.ttf")
 	var fv := FontVariation.new()
 	fv.base_font = base
+	if fam == "inter" and kind == "cond":
+		var ts := TextServerManager.get_primary_interface()
+		fv.variation_opentype = {ts.name_to_tag("wght"): 700}
+		fv.fallbacks = [load("res://assets/fonts/inter/Inter-Bold.ttf")]  # Pfeile, Sonderzeichen
 	if fam == "din":
 		# Pfeile, Mittelpunkt & Co. fehlen in D-DIN: aus Rajdhani nachladen
 		fv.fallbacks = [load("res://assets/fonts/rajdhani/Rajdhani-SemiBold.ttf")]

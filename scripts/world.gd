@@ -1094,7 +1094,7 @@ func _cover() -> CanvasLayer:
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	l.add_theme_font_override("font", UI.font("cond", 0.2))
 	l.add_theme_font_size_override("font_size", 22)
-	l.add_theme_color_override("font_color", UI.CYAN)
+	l.add_theme_color_override("font_color", UI.TEXT)
 	l.size = Vector2(500, 40)
 	l.position = Vector2(-250, -20)
 	l.text = tr("Welt wird gebaut …")
@@ -1181,7 +1181,7 @@ func _build_hud() -> void:
 	prompt.anchor_bottom = 0.24
 	prompt.offset_left = -300.0
 	prompt.offset_right = 300.0
-	prompt.add_theme_color_override("font_color", UI.CYAN)
+	prompt.add_theme_color_override("font_color", UI.TEXT)
 	prompt.visible = false
 	hud["prompt"] = prompt
 	var help := _label(root, 9, HORIZONTAL_ALIGNMENT_RIGHT)
@@ -1202,7 +1202,7 @@ func _build_hud() -> void:
 	xbg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(xbg)
 	var xfill := ColorRect.new()
-	xfill.color = Color(UI.CYAN.r, UI.CYAN.g, UI.CYAN.b, 0.8)
+	xfill.color = Color(UI.ACCENT.r, UI.ACCENT.g, UI.ACCENT.b, 0.8)
 	xfill.anchor_top = 1.0
 	xfill.anchor_bottom = 1.0
 	xfill.offset_top = -3.0

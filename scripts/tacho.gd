@@ -1,7 +1,8 @@
 extends Control
-## Drehzahlmesser im Underground-Stil: LED-Bogen aus Segmenten (Cyan, Weiß, Orange, im roten Bereich Rot) mit
-## Leuchtschein, kursive Ziffern, spitze Nadel mit Glühen, Gang in der Nabe (neongrün), Tempo groß und kursiv in
-## einem dunklen Feld mit blassen führenden Nullen, Nitro als Segmentbogen unten in der Lücke. Am Begrenzer blinkt
+## Drehzahlmesser: LED-Bogen aus Segmenten mit Leuchtschein, spitze Nadel mit Glühen, Gang in der Nabe, Tempo groß
+## mit blassen führenden Nullen, Nitro als Segmentbogen unten in der Lücke. Seit 2.53 in den Farben der Menüs
+## (Akzentgrün, im roten Bereich Rot, Haarlinie als Rand), Zahlen in der Anzeigeschrift Oxanium; Drag behält
+## Cyan-Orange, weil dort Grün den Schaltbereich markiert. Am Begrenzer blinkt
 ## der Rand rot, mit Nitro leuchtet er blau und das Instrument zittert leicht.
 ## Drag: grüner Schaltbereich auf dem Bogen, Schaltlicht und Motortemperatur.
 ##
@@ -53,8 +54,8 @@ var _state_key := ""
 
 func _ready() -> void:
 	size = Vector2(SIZE, SIZE)
-	_wide = UI.font("wide", 0.2)
-	_cond = UI.font("cond", 0.2)
+	_wide = UI.font("cond", 0.0)  # große Zahlen: Anzeigeschrift (seit 2.53)
+	_cond = UI.font("wide", 0.0, 1)  # kleine Beschriftungen: Inter
 	_root = Control.new()
 	_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_root)
@@ -115,6 +116,9 @@ func _led(f: float) -> Color:
 	var red := REDLINE / MAX_RPM
 	if f >= red:
 		return Color(1.0, 0.16, 0.12)
+	if not drag:
+		# seit 2.53 in den Farben der Menüs: Akzentgrün, zum roten Bereich hin heller
+		return UI.ACCENT.lerp(Color(0.92, 1.0, 0.86), clampf((f - 0.45) / (red - 0.45), 0.0, 1.0) * 0.7)
 	if f < 0.5:
 		return UI.CYAN.lerp(Color(0.8, 0.96, 1.0), f / 0.5)
 	return Color(0.8, 0.96, 1.0).lerp(Color(1.0, 0.55, 0.1), (f - 0.5) / (red - 0.5))
@@ -184,16 +188,13 @@ func _draw_static(l: Control) -> void:
 	for i in 9:
 		var f := i / 8.0
 		var d := Vector2.from_angle(_ang(f))
-		var tick_col := Color(1, 0.35, 0.3) if f >= red_frac else Color(0.9, 0.93, 1.0)
+		var tick_col := Color(1, 0.35, 0.3) if f >= red_frac else UI.DIM
 		l.draw_line(c + d * (R - BAND - 3.0), c + d * (R - BAND - 7.0), tick_col, 1.5, true)
 		l.draw_string(_wide, c + d * (R - BAND - 14.0) + Vector2(-8, 4.5), str(i), HORIZONTAL_ALIGNMENT_CENTER, 16, 12, tick_col)
 	if not drag:
-		l.draw_string(_cond, c + Vector2(-30, -26), tr("x1000 U/min").to_upper(), HORIZONTAL_ALIGNMENT_CENTER, 60, 6, Color(0.6, 0.7, 0.85))
-	# Tempofeld (schräg) und Beschriftungen
-	var box := PackedVector2Array([c + Vector2(-27, 24), c + Vector2(33, 24), c + Vector2(28, 46), c + Vector2(-32, 46)])
-	l.draw_colored_polygon(box, Color(0.0, 0.0, 0.0, 0.75))
-	l.draw_polyline(PackedVector2Array([box[0], box[1], box[2], box[3], box[0]]), Color(UI.CYAN.r, UI.CYAN.g, UI.CYAN.b, 0.35), 1.0, true)
-	l.draw_string(_cond, c + Vector2(-20, 56), "KM/H", HORIZONTAL_ALIGNMENT_CENTER, 40, 9, UI.CYAN)
+		l.draw_string(_cond, c + Vector2(-30, -26), tr("x1000 U/min").to_upper(), HORIZONTAL_ALIGNMENT_CENTER, 60, 6, UI.FAINT)
+	# Tempo ohne eigenes Feld (seit 2.53), Beschriftung klein in Inter
+	l.draw_string(_cond, c + Vector2(-20, 57), "KM/H", HORIZONTAL_ALIGNMENT_CENTER, 40, 8, UI.DIM)
 	_nitro(l, NITRO_SEGS, Color(1, 1, 1, 0.1))
 	l.draw_string(_cond, c + Vector2(-25, R + 17.0), "NITRO", HORIZONTAL_ALIGNMENT_CENTER, 50, 9, Color(0.45, 0.75, 1.0))
 	if drag:
@@ -232,7 +233,7 @@ func _draw_hub(l: Control) -> void:
 
 ## Gang in der Nabe, Tempo mit blassen führenden Nullen (Ziffern sind gleich breit)
 func _draw_text(l: Control) -> void:
-	var gcol := UI.GREEN
+	var gcol := UI.ACCENT
 	if gear == "R":
 		gcol = Color(1.0, 0.35, 0.3)
 	elif gear == "N":
@@ -242,10 +243,10 @@ func _draw_text(l: Control) -> void:
 	var lead := 0
 	while lead < 2 and txt[lead] == "0":
 		lead += 1
-	var right := C.x + _wide.get_char_size(48, 23).x * 1.5 + 1.0
-	var left := UI.digits_right(l, _wide, right, C.y + 43.5, txt.substr(lead), 23, Color.WHITE)
+	var right := C.x + _wide.get_char_size(48, 27).x * 1.5
+	var left := UI.digits_right(l, _wide, right, C.y + 46.0, txt.substr(lead), 27, UI.TEXT)
 	if lead > 0:
-		UI.digits_right(l, _wide, left, C.y + 43.5, txt.substr(0, lead), 23, Color(1, 1, 1, 0.13))
+		UI.digits_right(l, _wide, left, C.y + 46.0, txt.substr(0, lead), 27, Color(1, 1, 1, 0.1))
 
 
 ## Rand (blinkt rot am Begrenzer, blau mit Nitro), Nitro-Segmente, Schaltlicht und Temperatur
@@ -253,14 +254,14 @@ func _draw_state(l: Control) -> void:
 	var t := Time.get_ticks_msec() / 1000.0
 	var c := C
 	var limiter := rpm > (PERFECT.y if drag else REDLINE + 200.0)
-	var rim := Color(UI.CYAN.r, UI.CYAN.g, UI.CYAN.b, 0.75)
+	var rim := UI.LINE_HI
 	if nitro_on:
 		rim = Color(0.55, 0.85, 1.0)
 		l.draw_arc(c, R + 6.5, 0.0, TAU, 48, Color(0.3, 0.6, 1.0, 0.35), 7.0)
 	if limiter and fmod(t, 0.16) < 0.08:
 		rim = Color(1.0, 0.15, 0.1)
 		l.draw_arc(c, R + 6.5, 0.0, TAU, 48, Color(1.0, 0.1, 0.05, 0.35), 7.0)
-	l.draw_arc(c, R + 6.5, 0.0, TAU, 72, rim, 2.0, true)
+	l.draw_arc(c, R + 6.5, 0.0, TAU, 72, rim, 1.0 if rim == UI.LINE_HI else 2.0, true)
 	_nitro(l, int(nitro * NITRO_SEGS + 0.5), Color(0.6, 0.9, 1.0) if nitro_on and fmod(t, 0.2) < 0.1 else Color(0.2, 0.55, 1.0))
 	if drag:
 		var ls := _lamp_state()

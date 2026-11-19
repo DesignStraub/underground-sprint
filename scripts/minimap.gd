@@ -206,12 +206,12 @@ func _draw_world() -> void:
 func _draw_rim(l: Control) -> void:
 	l.draw_arc(C, R - 2.0, 0.0, TAU, 56, Color(0, 0, 0, 0.35), 4.0, true)
 	l.draw_arc(C, R, 0.0, TAU, 64, Color(0, 0, 0, 0.6), 4.5, true)
-	l.draw_arc(C, R, 0.0, TAU, 64, Color(UI.CYAN.r, UI.CYAN.g, UI.CYAN.b, 0.9), 1.6, true)
+	l.draw_arc(C, R, 0.0, TAU, 64, UI.LINE_HI, 1.2, true)  # Haarlinie wie die Menüs (seit 2.53, vorher Cyan)
 
 
 func _draw_north(l: Control) -> void:
 	l.draw_circle(Vector2.ZERO, 5.0, Color(0.02, 0.03, 0.06, 0.95))
-	l.draw_arc(Vector2.ZERO, 5.0, 0.0, TAU, 16, Color(UI.CYAN.r, UI.CYAN.g, UI.CYAN.b, 0.8), 1.0, true)
+	l.draw_arc(Vector2.ZERO, 5.0, 0.0, TAU, 16, UI.DIM, 1.0, true)
 	l.draw_string(_font, Vector2(-5, 3.2), "N", HORIZONTAL_ALIGNMENT_CENTER, 10, 9, Color.WHITE)
 
 

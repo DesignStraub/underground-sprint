@@ -797,7 +797,7 @@ func _build_hud() -> void:
 			mm.offset_bottom = mm.offset_top + MINIMAP.SIZE
 
 	hud["center"] = _label(root, 36 if _split else 64, HORIZONTAL_ALIGNMENT_CENTER)  # Splitscreen: halbe Höhe
-	hud["center"].label_settings.font = UI.font("wide", 0.2)
+	hud["center"].label_settings.font = UI.font("cond", 0.0)
 	hud["center"].anchor_left = 0.5
 	hud["center"].anchor_right = 0.5
 	hud["center"].anchor_top = 0.5
@@ -806,19 +806,37 @@ func _build_hud() -> void:
 	hud["center"].offset_right = 200
 	hud["center"].offset_top = -90
 	hud["center"].offset_bottom = 0
-	# Unter dem Countdown: Art und Ziel in der Farbe der Art, bis kurz nach dem Start
-	hud["goal"] = _label(root, 13, HORIZONTAL_ALIGNMENT_CENTER)
-	hud["goal"].label_settings.font = UI.font("cond", 0.2)
-	hud["goal"].label_settings.font_color = UI.TYPE_COL.get(event_type, UI.CYAN)
-	hud["goal"].text = tr(Catalog.EVENT_TYPES[event_type]["label"]).to_upper() + "  ·  " + _goal_text().to_upper().trim_suffix(".")
-	hud["goal"].anchor_left = 0.5
-	hud["goal"].anchor_right = 0.5
-	hud["goal"].anchor_top = 0.5
-	hud["goal"].anchor_bottom = 0.5
-	hud["goal"].offset_left = -260
-	hud["goal"].offset_right = 260
-	hud["goal"].offset_top = 2
-	hud["goal"].offset_bottom = 22
+	# Unter dem Countdown: kurzes Ziel groß (seit 2.53 „2 RUNDEN“ statt des ganzen Satzes), darunter klein Art und
+	# Rennen, auf Glas mit einer Kante in der Farbe der Art; bis kurz nach dem Start
+	var gp := PanelContainer.new()
+	var gsb := UI.flat(Color(UI.PANEL.r, UI.PANEL.g, UI.PANEL.b, 0.8), Color(0, 0, 0, 0), 0, 0, 16.0, 6.0)
+	gsb.border_color = UI.TYPE_COL.get(event_type, UI.ACCENT)
+	gsb.border_width_left = 3
+	gp.add_theme_stylebox_override("panel", gsb)
+	gp.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var gv := VBoxContainer.new()
+	gv.add_theme_constant_override("separation", 0)
+	gp.add_child(gv)
+	var gh := _label(gv, 26, HORIZONTAL_ALIGNMENT_CENTER)
+	gh.label_settings.font = UI.font("cond", 0.0)
+	var head := tr(Catalog.EVENT_TYPES[event_type]["label"]).to_upper()
+	if event_type == "circuit":
+		head = tr("%d RUNDEN") % track["laps"]
+	elif event_type == "drift":
+		head = tr("%d PUNKTE") % drift_targets[2]
+	gh.text = head
+	var gs := _label(gv, 8, HORIZONTAL_ALIGNMENT_CENTER)
+	gs.label_settings.font = UI.font("wide", 0.0, 1)
+	gs.label_settings.font_color = UI.DIM
+	gs.text = tr(Catalog.EVENT_TYPES[event_type]["label"]).to_upper() + "  ·  " + tr(race["name"]).to_upper()
+	root.add_child(gp)
+	gp.anchor_left = 0.5
+	gp.anchor_right = 0.5
+	gp.anchor_top = 0.5
+	gp.anchor_bottom = 0.5
+	gp.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	gp.offset_top = 6
+	hud["goal"] = gp
 	hud["goal"].visible = false
 
 	# Unten links über dem Radar (Drag: ohne Radar direkt in der Ecke; Handy: unter dem Radar oben links): Ort,

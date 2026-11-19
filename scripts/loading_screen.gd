@@ -88,7 +88,7 @@ func _draw() -> void:
 	var wide := UI.font("wide", 0.0, 1)
 	var cond := UI.font("cond", 0.0, 1)
 	var bold := UI.font("bold", 0.0)
-	_text(UI.font("wide", 0.0, 2), Vector2(14.5, 15), "NEED FOR", 6, UI.DIM)
+	_text(UI.font("wide", 0.0, 3), Vector2(14.5, 15), "NEED FOR", 6, UI.ACCENT)
 	_text(cond, Vector2(14, 28), "GESCHWINDIGKEIT", 12, UI.TEXT)
 
 	# Event: Art als Abzeichen, Name groß, Akzentstrich, Ort, Ziel

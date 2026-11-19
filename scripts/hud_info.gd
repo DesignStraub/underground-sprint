@@ -1,5 +1,6 @@
 extends Control
-## Renn-Anzeigen im Underground-Stil (schräge dunkle Glasleisten, kursive DIN-Schrift, Neongrün und Cyan):
+## Renn-Anzeigen (seit 2.53 im Stil der Menüs: gerade dunkle Glasflächen mit grüner Kante, Zahlen in Oxanium,
+## Beschriftungen klein in Inter; bis 2.52 schräge Leisten in Neongrün und Cyan):
 ## oben links Platz groß mit „/4“ (leuchtet bei Platzwechsel grün oder rot auf), darunter Zeit, Runde und Rennname;
 ## oben mittig ein Fortschrittsbalken mit allen Fahrern (du als gelbes Dreieck, Gegner in Lackfarbe, Ziel kariert).
 ## Drift: statt Platz die Punkte.
@@ -8,7 +9,7 @@ extends Control
 ## nur bei Änderung, die Fahrer auf dem Balken sind einmal gezeichnete Marken, die nur verschoben werden.
 
 const UI := preload("res://scripts/ui_style.gd")
-const SK := 0.28  # Schräge der Leisten (wie die Menü-Knöpfe)
+const SK := 0.0  # Schräge der Leisten (bis 2.52 0.28)
 const BAR_W := 210.0
 const BAR_Y := 11.0
 const X := 8.0
@@ -49,13 +50,13 @@ var _me: Control
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	_wide = UI.font("wide", 0.2)
-	_cond = UI.font("cond", 0.2)
+	_wide = UI.font("cond", 0.0)  # große Zahlen: Anzeigeschrift (seit 2.53)
+	_cond = UI.font("wide", 0.0, 1)  # kleine Beschriftungen: Inter
 	_vals = _layer(_draw_vals)
 	_time = _layer(_draw_time)
 	resized.connect(queue_redraw)
 	_fill = ColorRect.new()
-	_fill.color = Color(UI.CYAN.r, UI.CYAN.g, UI.CYAN.b, 0.85)
+	_fill.color = Color(UI.ACCENT.r, UI.ACCENT.g, UI.ACCENT.b, 0.85)
 	_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_fill.size = Vector2(0, 3)
 	add_child(_fill)
@@ -121,19 +122,18 @@ static func _slab(ci: CanvasItem, pos: Vector2, w: float, h: float, col: Color) 
 func _draw() -> void:
 	var y := Y
 	_slab(self, Vector2(X, y), PLACE_W, PLACE_H, UI.GLASS)
-	_slab(self, Vector2(X, y), 3.0, PLACE_H, UI.GREEN)
-	draw_line(Vector2(X + SK * PLACE_H + 3.0, y), Vector2(X + SK * PLACE_H + PLACE_W, y), Color(UI.CYAN.r, UI.CYAN.g, UI.CYAN.b, 0.5), 1.0)
+	_slab(self, Vector2(X, y), 3.0, PLACE_H, UI.ACCENT)
 	if drift:
-		draw_string(_cond, Vector2(X + 18, y + 13), tr("PUNKTE"), HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI.GREEN)
+		draw_string(_cond, Vector2(X + 14, y + 13), tr("PUNKTE"), HORIZONTAL_ALIGNMENT_LEFT, -1, 8, UI.DIM)
 	else:
-		draw_string(_cond, Vector2(X + PLACE_W - 52, y + 15), tr("PLATZ"), HORIZONTAL_ALIGNMENT_RIGHT, 44, 10, UI.GREEN)
+		draw_string(_cond, Vector2(X + PLACE_W - 52, y + 14), tr("PLATZ"), HORIZONTAL_ALIGNMENT_RIGHT, 44, 8, UI.DIM)
 	y = TIME_Y
 	_row(Vector2(X, y), tr("ZEIT"))
 	y += 21.0
 	if lap > 0:
 		_row(Vector2(X, y), tr("RUNDE"))
 		y += 21.0
-	draw_string(_cond, Vector2(X + 4, y + 10), title, HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color(0.75, 0.8, 0.9, 0.85))
+	draw_string(_cond, Vector2(X + 4, y + 10), title, HORIZONTAL_ALIGNMENT_LEFT, -1, 9, UI.DIM)
 
 	if show_bar:
 		var x0 := size.x / 2.0 - BAR_W / 2.0
@@ -150,8 +150,8 @@ func _draw() -> void:
 
 func _row(pos: Vector2, cap: String) -> void:
 	_slab(self, pos, ROW_W, 17.0, UI.GLASS)
-	_slab(self, pos, 2.0, 17.0, UI.CYAN)
-	draw_string(_cond, pos + Vector2(10, 12.5), cap, HORIZONTAL_ALIGNMENT_LEFT, -1, 9, UI.CYAN)
+	_slab(self, pos, 2.0, 17.0, UI.ACCENT)
+	draw_string(_cond, pos + Vector2(9, 12.0), cap, HORIZONTAL_ALIGNMENT_LEFT, -1, 8, UI.DIM)
 
 
 ## Platz (oder Punkte) und Runde; kurzes Aufleuchten beim Platzwechsel
@@ -164,7 +164,7 @@ func _draw_vals(l: Control) -> void:
 		var big := str(place)
 		var bw := _wide.get_string_size(big, HORIZONTAL_ALIGNMENT_LEFT, -1, 38).x
 		l.draw_string(_wide, Vector2(X + 18, Y + 40), big, HORIZONTAL_ALIGNMENT_LEFT, -1, 38, Color.WHITE)
-		l.draw_string(_wide, Vector2(X + 20 + bw, Y + 40), "/%d" % racers, HORIZONTAL_ALIGNMENT_LEFT, -1, 17, Color(0.65, 0.75, 0.88))
+		l.draw_string(_wide, Vector2(X + 20 + bw, Y + 40), "/%d" % racers, HORIZONTAL_ALIGNMENT_LEFT, -1, 17, UI.DIM)
 	if lap > 0:
 		l.draw_string(_wide, Vector2(X + 10, TIME_Y + 34.5), "%d/%d" % [lap, laps], HORIZONTAL_ALIGNMENT_RIGHT, ROW_W - 6.0, 13, Color.WHITE)
 

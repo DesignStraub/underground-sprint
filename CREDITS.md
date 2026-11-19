@@ -51,6 +51,8 @@ weiterzugeben oder anzubieten. Wie die Tracks im öffentlichen Repo behandelt we
 
 ## Schrift
 Menüs und Anzeigen seit 2.30: Inter von Rasmus Andersson, SIL Open Font License 1.1 (`assets/fonts/inter/LICENSE.txt`).
+Große Zahlen, Überschriften und Knöpfe seit 2.53: Oxanium von Severin Meyer, SIL Open Font License 1.1
+(`assets/fonts/oxanium/OFL.txt`).
 Ladenschilder, Wegweiser und Kennzeichen: D-DIN von Datto, SIL Open Font License 1.1 (`assets/fonts/COPYING.txt`).
 Zum Vergleich liegen Rajdhani (Indian Type Foundry, OFL, `assets/fonts/rajdhani/`),
 Chakra Petch (The Chakra Petch Project Authors, OFL, `assets/fonts/chakrapetch/`) und Saira Condensed (Omnibus-Type,

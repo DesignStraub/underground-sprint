@@ -219,7 +219,7 @@ func _build_ui() -> void:
 	root.add_child(hair)
 
 	# Wortmarke oben links: klein und ruhig, der Abschnittstitel darunter trägt die Seite
-	var small := UI.label(root, 6, "wide", UI.DIM, 2)
+	var small := UI.label(root, 6, "wide", UI.ACCENT, 3)
 	small.text = "NEED FOR"
 	small.position = Vector2(14.5, 9)
 	title = UI.label(root, 12, "cond", UI.TEXT, 1)

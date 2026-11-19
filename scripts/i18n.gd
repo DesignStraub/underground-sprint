@@ -206,7 +206,7 @@ const EN := {
 	# --- Rennen ---
 	"%s   ·   %s   ·   Gas/Enter: los": "%s   ·   %s   ·   Throttle/Enter: go",
 	"%s   ·   %s   ·   Karte © OpenStreetMap-Mitwirkende   ·   Gas/Enter: los": "%s   ·   %s   ·   Map © OpenStreetMap contributors   ·   Throttle/Enter: go",
-	"SPRINT": "SPRINT", "RUNDKURS · %d RUNDEN": "CIRCUIT · %d LAPS", "DRIFT · %d RUNDEN": "DRIFT · %d LAPS",
+	"SPRINT": "SPRINT", "%d RUNDEN": "%d LAPS", "%d PUNKTE": "%d POINTS", "RUNDKURS · %d RUNDEN": "CIRCUIT · %d LAPS", "DRIFT · %d RUNDEN": "DRIFT · %d LAPS",
 	"DRAG · A/D SPUR · S/X SCHALTEN": "DRAG · A/D LANE · S/X SHIFT", "ALLEIN": "SOLO", "4 FAHRER": "4 DRIVERS",
 	"W/S Gas/Bremse  A/D Lenken\nLeertaste Handbremse  Shift Nitro\nC Kamera  R Zurücksetzen\n. Musik  , Sender  - Aussortieren\nF Vollbild  Esc Pause":
 		"W/S Throttle/Brake  A/D Steer\nSpace Handbrake  Shift Nitro\nC Camera  R Reset\n. Music  , Station  - Never again\nF Fullscreen  Esc Pause", ",  Radio": ",  Radio",
