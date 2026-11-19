@@ -476,6 +476,14 @@ static func step(job: Dictionary) -> float:
 				# Stadtfüllung hinter der Front (seit 2.39, city_fill.gd): in Stücken, eigener Zufall
 				job["us"].append(Time.get_ticks_usec() - t0)
 				return (_steps_done(3) + STEP_W[4] * CityFill.progress(job)) / _steps_done(STEP_W.size() - 1)
+			if city.is_empty() and track["world"] and track.has("sgrid"):
+				# entworfene Städte mit Straßennetz: Höfe in den Lücken zwischen Front, Nebenstraßen und Füllung
+				var fb := []
+				for b in job.get("fill_blocks", []):
+					var c3: Vector3 = b["c"]
+					fb.append({"pos": c3, "r": 0.0, "foot": [Vector2(c3.x, c3.z), Vector2(b["x"].x, b["x"].z),
+						Vector2(b["z"].x, b["z"].z), b["hd"] + 7.0, b["hl"] + 7.0]})
+				_build_yards(root, track, job["occupied"] + job["buildings"] + fb)
 		5:
 			if type != "drift":
 				_build_fences(root, track, job["buildings"] + job["occupied"])
