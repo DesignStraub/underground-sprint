@@ -216,6 +216,7 @@ func _wallcheck() -> void:
 	print("WANDCHECK %d Stellen" % bad)
 	# offene Enden: Anfang oder Ende eines Nebenweges, das an keinem anderen Weg liegt (Sackgasse)
 	var open := 0
+	print("ENDENCHECK startet")
 	for p in track["paths"]:
 		if p["id"] == 0 or p["kind"] in ["platz", "ramp"]:
 			continue
@@ -230,4 +231,55 @@ func _wallcheck() -> void:
 				print("OFFENES ENDE #%d %s %s bei (%.0f, %.0f), %.0f m vom nächsten Weg" % [p["id"], p["kind"], p.get("street_name", ""), q3.x, q3.z, best])
 				open += 1
 	print("ENDENCHECK %d offene Enden" % open)
+	# Ränder (Zaun, Hecke, Mauer): ragt ein Stück (1,5 m nach vorn und hinten) in die Fahrbahn eines Weges?
+	var pg := {}
+	for p in track["paths"]:
+		var c: Curve3D = p["curve"]
+		var L := c.get_baked_length()
+		var d := 0.0
+		while d <= L:
+			var q3 := c.sample_baked(d)
+			var k := Vector2i(floori(q3.x / 10.0), floori(q3.z / 10.0))
+			if not pg.has(k):
+				pg[k] = []
+			pg[k].append([Vector2(q3.x, q3.z), float(p["half_w"]), p])
+			d += 1.0
+	var nb := 0
+	var seen := {}
+	print("RANDCHECK prüft %d Randstücke" % Track.border_dbg.size())
+	for e in Track.border_dbg:
+		var xf: Transform3D = e[1]
+		for o in [-1.5, 0.0, 1.5]:
+			var q3: Vector3 = xf.origin - xf.basis.z * o  # gekürzte Stücke: Basis längs gestaucht
+			var q := Vector2(q3.x, q3.z)
+			var k := Vector2i(floori(q.x / 10.0), floori(q.y / 10.0))
+			var hit: Dictionary = {}
+			var depth := 0.0
+			for gx in range(k.x - 2, k.x + 3):
+				for gz in range(k.y - 2, k.y + 3):
+					for s in pg.get(Vector2i(gx, gz), []):
+						var dd: float = s[1] - (s[0] as Vector2).distance_to(q)
+						if dd > 0.35 and dd > depth:
+							depth = dd
+							hit = s[2]
+			if not hit.is_empty():
+				var key := Vector2i(floori(q.x / 12.0), floori(q.y / 12.0))
+				if not seen.has(key):
+					seen[key] = true
+					var own := []
+					var bd := 1e9
+					for ow in Track.border_own:
+						var dd2: float = Vector2((ow[0] as Vector3).x, (ow[0] as Vector3).z).distance_to(Vector2(xf.origin.x, xf.origin.z))
+						if dd2 < bd:
+							bd = dd2
+							own = ow
+					var op: Dictionary = track["paths"][0]
+					for pp in track["paths"]:
+						if not own.is_empty() and int(pp["id"]) == int(own[1]):
+							op = pp
+					print("RAND AUF WEG %s %.1f m in #%d %s %s (%.0f, %.0f), gehört zu #%d %s Seite %d bei %.0f m" % [e[0], depth, hit["id"], hit["kind"],
+						hit.get("street_name", ""), q.x, q.y, op["id"], op.get("street_name", op["kind"]), int(own[2]) if own else 0, float(own[3]) if own else 0.0])
+					nb += 1
+				break
+	print("RANDCHECK %d Stellen" % nb)
 

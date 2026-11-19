@@ -31,10 +31,15 @@ const CAR_BANK := {
 	# seit 2.36: Yari mit rauem Turbo-Vierzylinder (etwas tiefer als die kleinen Turbos), Tatsumaki mit derselben
 	# Kreiskolben-Aufnahme wie der Ronin, aber höher gedreht (kleiner, leichter Motor ohne V8-Umbau)
 	"yari": ["i4_turbo", 0.9], "tatsumaki": ["wankel", 1.1],
-	"kumo": ["i6", 1.0], "vortex": ["f6", 0.96], "kaze": ["f6", 1.04], "kaido": ["i6", 0.94], "hakone": ["i6", 1.05],
-	"ryujin": ["f6", 0.9], "shiden": ["f6", 0.86], "falke": ["f6", 1.0],
-	"ronin": ["wankel", 1.0], "kagura": ["v10", 1.0], "furia": ["v12", 1.0], "raiden": ["f6", 1.12], "tengu": ["i6", 1.14],
+	# seit 2.52 tiefer: Kaze (1,04), Raiden (1,12), Tengu (1,14) und Hakone (1,05) klangen oben heraus schrill und
+	# übertönten die Musik; der V10 ist zusätzlich gefiltert (tools/engine_rec/tame.py)
+	"kumo": ["i6", 1.0], "vortex": ["f6", 0.96], "kaze": ["f6", 0.92], "kaido": ["i6", 0.94], "hakone": ["i6", 0.98],
+	"ryujin": ["f6", 0.89], "shiden": ["f6", 0.86], "falke": ["f6", 1.0],
+	"ronin": ["wankel", 1.0], "kagura": ["v10", 1.0], "furia": ["v12", 1.0], "raiden": ["f6", 1.02], "tengu": ["i6", 1.03],
 }
+## Höchste gespielte Drehzahl (seit 2.52; vorher 15 % über der obersten Schleife): darüber wird die Schleife nicht
+## weiter hochgezogen, sonst kreischt sie
+const R_MAX := 7400.0 * 1.04
 
 var bus := "Master":
 	set(v):
@@ -148,10 +153,11 @@ func _process_sound(delta: float) -> void:
 	_cut_k = move_toward(_cut_k, 1.0 if _cut > 0.0 else 0.0, delta * 25.0)
 	_update_life(delta)
 	_update_engine()
-	# Turbo pfeift unter Last, Tonhöhe mit der Drehzahl
+	# Turbo pfeift unter Last, Tonhöhe mit der Drehzahl (seit 2.52 leiser und oben begrenzt: bei vollem Lader stach es
+	# über der Musik heraus)
 	var wl := _turbo * turbo_amount
-	_whistle.volume_db = -80.0 if wl < 0.02 else linear_to_db(wl) - 17.0
-	_whistle.pitch_scale = clampf((700.0 + rpm / 10.0) / 1100.0, 0.5, 1.6)
+	_whistle.volume_db = -80.0 if wl < 0.02 else linear_to_db(wl) - 21.0
+	_whistle.pitch_scale = clampf((700.0 + rpm / 10.0) / 1100.0, 0.5, 1.25)
 
 
 ## Langsame Zufallskurven (je eine neue Zielmarke alle 0,3–1,1 s, weich angefahren) und wie gleichmäßig die Drehzahl
@@ -181,7 +187,7 @@ func _update_engine() -> void:
 	# Leben im Dauerton: nur bei gleichmäßiger, hoher Drehzahl (dort fällt die Wiederholung auf)
 	var life := _steady * smoothstep(3500.0, 6000.0, rpm * _k) * live
 	var r0 := rpm * _k * (1.0 + life * (0.011 * _wand[0] + randf_range(-0.003, 0.003)))
-	var r := clampf(r0, RPMS[0] * 0.8, RPMS[RPMS.size() - 1] * 1.15)
+	var r := clampf(r0, RPMS[0] * 0.8, R_MAX)
 	var i := 0
 	while i < RPMS.size() - 2 and r > RPMS[i + 1]:
 		i += 1

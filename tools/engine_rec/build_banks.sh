@@ -56,4 +56,7 @@ mkdir -p "$W/traffic"
 cp "$W/fin/i4_turbo/off_1850.wav" "$W/traffic/off_1850.wav"
 "$W/eng" fill "$W/traffic" 1850,2100 2>/dev/null
 cp "$W/traffic/off_2100.wav" assets/engine/traffic_car_2100.wav
+# seit 2.52: zu schrille Aufnahmen entschärfen (Tiefpass, Pegel bleibt)
+python3 tools/engine_rec/tame.py assets/engine/v10 2200 2
+python3 tools/engine_rec/tame.py assets/engine/f6 3000 1
 echo fertig

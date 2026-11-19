@@ -94,8 +94,7 @@ const DUCK_DB := -13.0
 
 
 ## Seit 2.30: Musik auf eigenem Bus, alles andere (Motor, Reifen, Verkehr, Menüklänge) 3 dB leiser (gut 30 %):
-## der Master-Bus wird um SFX_CUT gesenkt, der Musik-Bus um dasselbe angehoben, die Musik bleibt gleich laut
-const SFX_CUT := 3.0
+## der Master-Bus wird gesenkt, der Musik-Bus um dasselbe angehoben (GameState.apply_audio, mit den Reglern seit 2.52)
 
 
 func _ready() -> void:
@@ -105,8 +104,7 @@ func _ready() -> void:
 		var bi := AudioServer.bus_count - 1
 		AudioServer.set_bus_name(bi, "Musik")
 		AudioServer.set_bus_send(bi, "Master")
-		AudioServer.set_bus_volume_db(bi, SFX_CUT)
-		AudioServer.set_bus_volume_db(0, AudioServer.get_bus_volume_db(0) - SFX_CUT)
+	GameState.apply_audio()  # Lautstärke aus dem Spielstand (Master für Effekte, Musik-Bus gleicht aus)
 	for i in 2:
 		var p := AudioStreamPlayer.new()
 		p.bus = "Musik"

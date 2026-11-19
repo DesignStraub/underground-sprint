@@ -12,6 +12,7 @@ const PlayerCar := preload("res://scripts/player_car.gd")
 const PixelView := preload("res://scripts/pixel_view.gd")
 const Moods := preload("res://scripts/moods.gd")
 const UI := preload("res://scripts/ui_style.gd")
+const PauseSettings := preload("res://scripts/pause_settings.gd")
 const TACHO := preload("res://scripts/tacho.gd")
 const SPEED_FX := preload("res://shaders/speed_fx.gdshader")
 const SKY_SHADER := preload("res://shaders/night_sky.gdshader")
@@ -78,6 +79,7 @@ var minimap: Control
 var map_view: Control
 var _pins := {}  # race_index -> Node3D am Start (für die Minikarte, immer da)
 var pause_panel: Control
+var settings_panel: PauseSettings  # Esc > Einstellungen (seit 2.52)
 var fx_mat: ShaderMaterial
 var _fx_rect: ColorRect
 var _nitro_fx := 0.0
@@ -1421,12 +1423,17 @@ func _build_pause(root: Control) -> void:
 	pause_panel.add_theme_constant_override("separation", 3)
 	pause_panel.visible = false
 	root.add_child(pause_panel)
-	pause_panel.visibility_changed.connect(func(): dim.visible = pause_panel.visible)
+	settings_panel = PauseSettings.new()
+	root.add_child(settings_panel)
+	settings_panel.closed.connect(_settings_closed.bind(pause_panel))
+	var upd_dim := func(): dim.visible = pause_panel.visible or settings_panel.visible
+	pause_panel.visibility_changed.connect(upd_dim)
+	settings_panel.visibility_changed.connect(upd_dim)
 	var title := UI.label(pause_panel, 20, "cond", UI.TEXT, 1, HORIZONTAL_ALIGNMENT_CENTER)
 	title.text = tr("PAUSE")
 	for entry in [["Weiter", _toggle_pause], ["Karte", func(): _toggle_pause(); _open_map()],
 			["Tuning", _to_garage.bind("tuning")], ["Auto wechseln", _to_garage.bind("cars")], ["Fahrer", _to_garage.bind("driver")],
-			["Vollbild", GameState.toggle_fullscreen],
+			["Einstellungen", _open_settings],
 			["Garage", _leave_to_garage], ["Rennen aufgeben", _give_up]]:
 		var b := Button.new()
 		b.text = tr(entry[0]).to_upper()  # wie in der Garage: Großbuchstaben, linksbündig
@@ -1436,6 +1443,19 @@ func _build_pause(root: Control) -> void:
 		b.set_meta("key", entry[0])
 		pause_panel.add_child(b)
 		UI.menu_fx(b)  # Auswahl gleitet ein, Maus darüber wählt aus (wie in der Garage)
+
+
+## Esc > Einstellungen: Lautstärke, Kamera & Tempo, Anzeige, ohne die Welt zu verlassen
+func _open_settings() -> void:
+	pause_panel.visible = false
+	settings_panel.open()
+
+
+func _settings_closed(panel: Control) -> void:
+	panel.visible = true
+	for b in panel.get_children():
+		if b.get_meta("key", "") == "Einstellungen":
+			(b as Button).grab_focus()
 
 
 ## Esc > Garage: ins Hauptmenü der Garage; "Losfahren" bringt einen an die gemerkte Stelle zurück (seit 2.42)
@@ -1630,6 +1650,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		var half: float = p["half_w"] - 2.0
 		player.place(xf * Track.xform_at(p["curve"], loc["d"], clampf(loc["lat"], -half, half)))
 	elif event.is_action_pressed("pause", false, true):
+		if settings_panel.visible:
+			get_viewport().set_input_as_handled()
+			settings_panel.back()
+			return
 		_toggle_pause()
 
 
@@ -1637,13 +1661,16 @@ func _process(dt: float) -> void:
 	if not _ready_done:
 		return
 	if get_tree().paused:
-		if OS.get_cmdline_user_args().has("--wmap"):
-			_shot_check(dt)  # Test: Bild der offenen Karte
+		if OS.get_cmdline_user_args().has("--wmap") or OS.get_cmdline_user_args().has("--wsettings"):
+			_shot_check(dt)  # Test: Bild der offenen Karte bzw. der Einstellungen
 		_travel_test(dt)
 		return
 	_travel_test(dt)
 	if OS.get_cmdline_user_args().has("--wmap") and _shot_t < 0.0 and map_view and not map_view.visible:
 		_open_map()
+	if OS.get_cmdline_user_args().has("--wsettings") and _intro == null and not settings_panel.visible and not get_tree().paused:  # Test: Esc > Einstellungen
+		_toggle_pause()
+		_open_settings()
 	if OS.get_cmdline_user_args().has("--wdrive"):
 		_autopilot()
 	for a in OS.get_cmdline_user_args():

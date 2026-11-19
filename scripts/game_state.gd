@@ -73,6 +73,10 @@ var language := ""
 var vsync := true
 var fps_limit := 0
 var fullscreen := false
+## Lautstärke (seit 2.52) in Stufen 0..10: Musik und Effekte (Motor, Reifen, Verkehr, Menütöne). Effekte stehen von
+## Haus aus eine Stufe tiefer (gut 3 dB), damit Motor und Reifen die Musik nicht übertönen.
+var vol_music := 10
+var vol_sfx := 8
 
 var wins := 0  # Rennsiege (Sprint + Rundkurs)
 var drift_wins := 0
@@ -288,6 +292,22 @@ func apply_display() -> void:
 		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
 
 
+const SFX_CUT := 3.0
+
+
+## Lautstärke anwenden. Musik läuft auf dem Bus "Musik", alles andere direkt oder über "Hall" auf Master; der Musik-Bus
+## gleicht darum aus, was Master für die Effekte leiser wird (SFX_CUT: Effekte von Haus aus 3 dB unter der Musik, seit 2.30).
+## Stufe -> dB: 40·log10(Stufe/10) (8 = -3,9 dB, 5 = -12 dB), 0 = stumm.
+func apply_audio() -> void:
+	var sfx_db := -60.0 if vol_sfx <= 0 else 40.0 * log(vol_sfx / 10.0) / log(10.0)
+	var mus_db := 40.0 * log(maxf(vol_music, 1) / 10.0) / log(10.0)
+	AudioServer.set_bus_volume_db(0, -SFX_CUT + sfx_db)
+	var bi := AudioServer.get_bus_index("Musik")
+	if bi >= 0:
+		AudioServer.set_bus_volume_db(bi, SFX_CUT - sfx_db + mus_db)
+		AudioServer.set_bus_mute(bi, vol_music <= 0)
+
+
 ## Eine Einstellung weiterschalten (dir -1: zurück), anwenden und speichern
 func cycle_setting(key: String, dir := 1) -> void:
 	if GFX.has(key):
@@ -330,6 +350,12 @@ func cycle_setting(key: String, dir := 1) -> void:
 			difficulty = posmod(difficulty + dir, 3)
 		"show_fps":
 			show_fps = not show_fps
+		"vol_music":
+			vol_music = posmod(vol_music + dir, 11)
+			apply_audio()
+		"vol_sfx":
+			vol_sfx = posmod(vol_sfx + dir, 11)
+			apply_audio()
 	apply_display()
 	graphics_changed.emit()
 	save_game()
@@ -442,6 +468,10 @@ func setting_text(key: String) -> String:
 			return tr("Kamerawackeln: ") + tr("An" if cam_shake else "Aus")
 		"difficulty":
 			return tr("Schwierigkeit: ") + tr(DIFFICULTY_NAMES[difficulty])
+		"vol_music":
+			return tr("Musik: ") + ("%d %%" % (vol_music * 10) if vol_music > 0 else tr("Aus"))
+		"vol_sfx":
+			return tr("Effekte: ") + ("%d %%" % (vol_sfx * 10) if vol_sfx > 0 else tr("Aus"))
 	if GFX.has(key):
 		return tr(GFX[key]["label"]) + ": " + tr(GFX[key]["levels"][gfx[key]])
 	return key
@@ -823,7 +853,7 @@ func save_game() -> void:
 		"gfx": {"preset": preset, "opts": gfx, "pixel": pixel_look, "vsync": vsync, "fps": fps_limit, "fullscreen": fullscreen,
 			"touch": touch_mode, "show_fps": show_fps, "jump_cam": jump_cam, "motion_blur": motion_blur,
 			"speed_fov": speed_fov, "cam_shake": cam_shake, "cam": cam_mode},
-		"language": language, "difficulty": difficulty,
+		"language": language, "difficulty": difficulty, "audio": {"music": vol_music, "sfx": vol_sfx},
 		"world_pos": world_pos, "towns_known": towns_known, "last_town": last_town, "highway_won": highway_won,
 		"drift_best": drift_best, "places_known": places_known, "secret_pos": secret_pos, "track_revs": track_revs,
 	}, "\t")
@@ -939,6 +969,11 @@ func load_game() -> void:
 	cam_shake = bool(g.get("cam_shake", true))
 	cam_mode = clampi(int(g.get("cam", 0)), 0, 3)
 	difficulty = clampi(int(data.get("difficulty", 1)), 0, 2)
+	var au = data.get("audio", {})
+	if typeof(au) == TYPE_DICTIONARY:
+		vol_music = clampi(int(au.get("music", 10)), 0, 10)
+		vol_sfx = clampi(int(au.get("sfx", 8)), 0, 10)
+	apply_audio()
 	world_pos = []
 	var wp = data.get("world_pos", [])
 	if typeof(wp) == TYPE_ARRAY and wp.size() == 4:

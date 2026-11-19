@@ -1355,6 +1355,8 @@ const CREDITS_TEXT := "Motorklänge aus echten Aufnahmen (Wikimedia Commons, CC 
 
 ## Erklärung je Einstellung (unten im Infofeld)
 const SETTING_HINTS := {
+	"vol_music": "Lautstärke der Musik.",
+	"vol_sfx": "Lautstärke von Motor, Reifen, Verkehr und Menütönen.",
 	"graphics": "Grafik wie in großen PC-Spielen: Voreinstellung wählen oder jede Option einzeln anpassen.",
 	"preset": "Niedrig: für Handy, Tablet und schwache Rechner. Mittel: ausgewogen. Hoch und Ultra: für starke Grafikkarten. Links/Rechts wechselt.",
 	"res": "Höchste Auflösung der 3D-Welt, darüber wird weich hochskaliert. Größter Hebel für die Bildrate.",
@@ -1396,6 +1398,9 @@ func _show_settings(focus := "") -> void:
 	var mo := _button("Kamera & Tempo  >", _show_motion)
 	mo.focus_entered.connect(func(): info.text = tr(SETTING_HINTS["motion"]))
 	mo.set_meta("key", "motion")
+	var so := _button("Ton  >", _show_sound)
+	so.focus_entered.connect(func(): info.text = tr(SETTING_HINTS["vol_sfx"]))
+	so.set_meta("key", "sound")
 	for key in ["language", "difficulty", "show_fps", "vsync", "fps", "fullscreen", "touch"]:
 		_setting_button(key).set_meta("key", key)
 	_button("Spielstand zurücksetzen", _confirm_reset).set_meta("key", "reset")
@@ -1431,6 +1436,19 @@ func _show_graphics() -> void:
 		_setting_button(key)
 	_button("< Zurück", _back)
 	info.text = tr(SETTING_HINTS["preset"])
+	_focus_first()
+
+
+## Ton (seit 2.52): Lautstärke von Musik und Effekten (auch im Esc-Menü von Welt und Rennen)
+func _show_sound() -> void:
+	_clear_menu()
+	_menu_width(280.0)
+	_back = _show_settings.bind("sound")
+	_set_section("TON")
+	for key in ["vol_music", "vol_sfx"]:
+		_setting_button(key)
+	_button("< Zurück", _back)
+	info.text = tr(SETTING_HINTS["vol_music"])
 	_focus_first()
 
 

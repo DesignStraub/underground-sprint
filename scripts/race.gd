@@ -16,6 +16,7 @@ const Traffic := preload("res://scripts/traffic_car.gd")
 const SKY_SHADER := preload("res://shaders/night_sky.gdshader")
 const RaceShow := preload("res://scripts/race_show.gd")
 const UI := preload("res://scripts/ui_style.gd")
+const PauseSettings := preload("res://scripts/pause_settings.gd")
 const DriftMeter := preload("res://scripts/drift_meter.gd")  # Drift-Wertung mit Anzeige (seit 2.45)
 const SplitScreen := preload("res://scripts/split_screen.gd")  # Splitscreen für zwei (seit 2.47)
 const TOUCH := preload("res://scripts/touch_controls.gd")
@@ -71,6 +72,7 @@ var _race_xp := 0  # Stilpunkte dieses Rennens (seit 2.32: werden am Ziel zu Fah
 var _xp_gain := 0
 var _xp_lines := []
 var pause_panel: Control
+var settings_panel: PauseSettings  # Esc > Einstellungen (seit 2.52)
 var env: Environment
 var moon: DirectionalLight3D
 var _reverb: AudioEffectReverb
@@ -1291,6 +1293,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		var half: float = p["half_w"] - 2.0
 		player.place(Track.xform_at(p["curve"], loc["d"], clampf(loc["lat"], -half, half)))
 	elif event.is_action_pressed("pause", false, true) and state != State.FINISHED:  # genau: Alt+Enter ist Vollbild
+		if settings_panel.visible:
+			settings_panel.back()
+			return
 		_toggle_pause()
 
 
@@ -1477,10 +1482,17 @@ func _build_pause(root: Control) -> void:
 	pause_panel.add_theme_constant_override("separation", 3)
 	pause_panel.visible = false
 	root.add_child(pause_panel)
-	pause_panel.visibility_changed.connect(func(): dim.visible = pause_panel.visible)
+	settings_panel = PauseSettings.new()
+	root.add_child(settings_panel)
+	settings_panel.closed.connect(func():
+		pause_panel.visible = true
+		(pause_panel.get_child(2) as Button).grab_focus())
+	var upd_dim := func(): dim.visible = pause_panel.visible or settings_panel.visible
+	pause_panel.visibility_changed.connect(upd_dim)
+	settings_panel.visibility_changed.connect(upd_dim)
 	var title := UI.label(pause_panel, 20, "cond", UI.TEXT, 1, HORIZONTAL_ALIGNMENT_CENTER)
 	title.text = "PAUSE"
-	for entry in [["Weiter", _toggle_pause], ["Vollbild", GameState.toggle_fullscreen],
+	for entry in [["Weiter", _toggle_pause], ["Einstellungen", func(): pause_panel.visible = false; settings_panel.open()],
 			["Neustart", func(): _unpause(); get_tree().reload_current_scene()],
 			["Zur Welt" if GameState.in_world else "Garage", func(): _unpause(); get_tree().change_scene_to_file(_back_scene())]]:
 		var b := Button.new()

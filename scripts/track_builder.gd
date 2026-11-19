@@ -3028,7 +3028,12 @@ static func _spur_details(root: Node3D, track: Dictionary, p: Dictionary, rng: R
 
 ## Sichtbare Begrenzung: überall, wo die (sonst unsichtbare) Randwand nicht von einem Haus verdeckt wird,
 ## steht ein Zaun genau auf ihrer Linie. So gibt es keine unsichtbaren Hindernisse.
+static var border_dbg := []  # Prüfwerkzeug (tools/track_map.gd --wallcheck): [Art, Transform] je Randstück
+static var border_own := []  # dazu: [Mitte, Weg-Id, Seite] je gesetztem Stück
+
+
 static func _build_fences(root: Node3D, track: Dictionary, blockers: Array) -> void:
+	border_own = []
 	var posts := []
 	var rails := []
 	var mesh_panels := []
@@ -3038,6 +3043,16 @@ static func _build_fences(root: Node3D, track: Dictionary, blockers: Array) -> v
 	var low_walls := []
 	var caps := []
 	var bollards := []
+	# seit 2.52: Vorgärten (weißer Lattenzaun, Rasen, Büsche, ab und zu ein Baum) und hohe Backsteinmauern mit Pfeilern
+	var pickets := []
+	var picket_rails := []
+	var lawns := []
+	var garden_bushes := []
+	var garden_trunks := []
+	var garden_crowns := []
+	var bricks := []
+	var brick_caps := []
+	var brick_piers := []
 	var lines := []  # [Weg, Querabstand-Funktion, Bedingung]
 	var bgrid := {}  # Rasterzelle -> Häuser/Wahrzeichen (nur die nahen prüfen)
 	var bmax := 0.0
@@ -3057,6 +3072,11 @@ static func _build_fences(root: Node3D, track: Dictionary, blockers: Array) -> v
 					if _flat(q - b["pos"]).length() < b["r"] * 0.85 + margin:
 						return false
 		return true
+	# Gärten: so weit weg von jeder Fahrbahn (Nebenstraßen, Plätze, Hauptstraße samt Gehweg)?
+	var off_road := func(q: Vector3, m: float) -> bool:
+		if _branch_clearance(track, q, false, true) <= m:
+			return false
+		return (Streets.main_clear(track, q) if track.has("sgrid") else _main_clearance(track, q)) > WALK + m
 	var fan_rng := RandomNumberGenerator.new()
 	fan_rng.seed = int(track["length"] * 7.0) + 11
 	var next_fans := {-1.0: 30.0, 1.0: 70.0}  # frühestes d für die nächste Gruppe je Seite
@@ -3102,6 +3122,23 @@ static func _build_fences(root: Node3D, track: Dictionary, blockers: Array) -> v
 						break
 				if hidden:
 					continue
+				# Enden des 3-m-Stücks (seit 2.52): an Einmündungen und Kreuzungen ragten sie bis 1,8 m in die andere Fahrbahn
+				# ("Gitter halb auf der Straße"). Jetzt wird das Stück auf den freien Teil gekürzt.
+				var span := _fence_span(track, p, pos, f["fwd"], main)
+				if span.y - span.x < 0.6:
+					continue
+				border_own.append([pos, int(p["id"]), side, d])
+				# außen in Kurven ist der Bogen länger als 3 m: Stück strecken, sonst klaffen Lücken (Mauern, Hecken)
+				var stretch := 1.0
+				if d > 1.5 and d < len - 1.5:
+					var fa := frame_at(c, d - 1.5)
+					var fb := frame_at(c, d + 1.5)
+					var pa: Vector3 = fa["pos"] + fa["right"] * side * lat
+					var pb: Vector3 = fb["pos"] + fb["right"] * side * lat
+					stretch = clampf(_flat(pb - pa).length() / 3.0, 1.0, 1.6)
+				var sx := Transform3D.IDENTITY
+				if span.y - span.x < 2.99 or stretch > 1.01:
+					sx = Transform3D(Basis.from_scale(Vector3(1.0, 1.0, (span.y - span.x) / 3.0 * stretch)), Vector3(0, 0, -(span.x + span.y) / 2.0))
 				var bf := Basis.looking_at(f["fwd"], Vector3.UP)
 				var base := Vector3(pos.x, CURB_H + (_lift(track, d) if main else f["y"]), pos.z)
 				# Zuschauer: ab und zu eine Gruppe hinter dem Zaun, die dem Rennen zuschaut
@@ -3138,24 +3175,82 @@ static func _build_fences(root: Node3D, track: Dictionary, blockers: Array) -> v
 					continue
 				# Open World (seit 2.39): Ränder je Abschnitt verschieden (Zaun, Hecke, niedrige Mauer, Poller), passend zum Viertel
 				var style := _border_style(track, p, d, side) if track["world"] else 0
+				# Freie Flächen hinter dem Rand (seit 2.52): wo weit und breit kein Haus steht, Bäume und Büsche wie in einer
+				# Grünanlage, statt leerem Boden bis zum nächsten Block
+				if track["world"] and style != 4:
+					var fh := posmod(hash([int(p["id"]), int(side), int(d), 7]), 1000)
+					if fh < 260:
+						var od: Vector3 = f["right"] * side
+						var fq: Vector3 = base + od * (5.5 + float(fh % 9) * 0.6) + f["fwd"] * (float(fh % 3) - 1.0)
+						if free.call(fq, 5.0) and off_road.call(fq, 3.5):
+							var gy := base.y - CURB_H
+							if fh < 150:
+								var ts2 := 0.85 + float(fh % 6) * 0.08
+								garden_trunks.append(Transform3D(Basis.from_scale(Vector3(1, ts2, 1)), Vector3(fq.x, gy + 1.2 * ts2, fq.z)))
+								garden_crowns.append(Transform3D(Basis.from_scale(Vector3(ts2, ts2 * 1.15, ts2)), Vector3(fq.x, gy + 4.0 * ts2, fq.z)))
+							else:
+								var bs2 := 0.7 + float(fh % 5) * 0.15
+								garden_bushes.append(Transform3D(Basis.from_scale(Vector3(bs2, bs2 * 0.8, bs2)), Vector3(fq.x, gy + bs2 * 0.55, fq.z)))
 				# Innenseite genau auf der Linie der Wand (nach außen versetzt), sonst ragte die Hecke in die Fahrbahn
-				if style == 1:
-					hedges.append(Transform3D(bf, base + Vector3(0, 0.65, 0) + f["right"] * side * 0.45))
-					continue
 				if style == 2:
-					low_walls.append(Transform3D(bf, base + Vector3(0, 0.45, 0) + f["right"] * side * 0.23))
-					caps.append(Transform3D(bf, base + Vector3(0, 0.95, 0) + f["right"] * side * 0.23))
+					low_walls.append(Transform3D(bf, base + Vector3(0, 0.45, 0) + f["right"] * side * 0.23) * sx)
+					caps.append(Transform3D(bf, base + Vector3(0, 0.95, 0) + f["right"] * side * 0.23) * sx)
+					continue
+				if style == 4 or style == 1:
+					# Vorgarten hinter Lattenzaun oder Hecke: Rasen bis 5 m hinter der Linie, Büsche, ab und zu ein Baum; nur wo
+					# kein Haus steht (sonst wüchse er in die Fassade)
+					var out_dir: Vector3 = f["right"] * side
+					var gh := posmod(hash([int(p["id"]), int(side), int(d)]), 1000)
+					var lq: Vector3 = base + out_dir * 2.9
+					if style == 4 and free.call(lq, 0.5) and off_road.call(lq, 2.6):
+						lawns.append(Transform3D(bf, Vector3(lq.x, base.y - CURB_H + 0.03, lq.z)) * sx)
+					if gh < 380:
+						var bq: Vector3 = base + out_dir * (1.4 + float(gh % 7) * 0.4) + f["fwd"] * (float(gh % 5) * 0.5 - 1.0)
+						if free.call(bq, 0.8) and off_road.call(bq, 1.0):
+							var bs := 0.55 + float(gh % 4) * 0.15
+							garden_bushes.append(Transform3D(Basis.from_scale(Vector3(bs, bs * 0.8, bs)), Vector3(bq.x, base.y - CURB_H + bs * 0.55, bq.z)))
+					elif gh > 870:
+						var tq: Vector3 = base + out_dir * 3.6
+						if free.call(tq, 2.2) and off_road.call(tq, 2.0):
+							var ts := 0.8 + float(gh % 5) * 0.1
+							var ty := base.y - CURB_H
+							garden_trunks.append(Transform3D(Basis.from_scale(Vector3(1, ts, 1)), Vector3(tq.x, ty + 1.2 * ts, tq.z)))
+							garden_crowns.append(Transform3D(Basis.from_scale(Vector3(ts, ts * 1.15, ts)), Vector3(tq.x, ty + 2.4 * ts + 1.6 * ts, tq.z)))
+				if style == 4:
+					# weißer Lattenzaun, 0,9 m: Latten alle 0,5 m, zwei Querlatten; Innenseite auf der Wand
+					for o in [-1.25, -0.75, -0.25, 0.25, 0.75, 1.25]:
+						if o > span.x and o < span.y:
+							pickets.append(Transform3D(bf, base + Vector3(0, 0.45, 0) + f["fwd"] * o + f["right"] * side * 0.05))
+					for ry in [0.3, 0.72]:
+						picket_rails.append(Transform3D(bf, base + Vector3(0, ry, 0) + f["right"] * side * 0.08) * sx)
+					continue
+				if style == 5:
+					# hohe Backsteinmauer (1,7 m) mit Abdeckung, alle 6 m ein Pfeiler
+					bricks.append(Transform3D(bf, base + Vector3(0, 0.85, 0) + f["right"] * side * 0.18) * sx)
+					brick_caps.append(Transform3D(bf, base + Vector3(0, 1.74, 0) + f["right"] * side * 0.18) * sx)
+					if int(d / 3.0) % 2 == 0 and span.x <= -1.25:
+						brick_piers.append(Transform3D(bf, base + Vector3(0, 0.95, 0) - f["fwd"] * 1.4 + f["right"] * side * 0.22))
+					continue
+				if style == 1:
+					hedges.append(Transform3D(bf, base + Vector3(0, 0.65, 0) + f["right"] * side * 0.45) * sx)
 					continue
 				if style == 3:
 					# Poller alle 1,5 m: dazwischen kommt man zu Fuß durch, mit dem Auto nicht (die Wand steht auf der Linie)
 					for o in [-0.75, 0.75]:
-						bollards.append(Transform3D(bf, base + Vector3(0, 0.45, 0) + f["fwd"] * o + f["right"] * side * 0.13))
+						if o > span.x and o < span.y:
+							bollards.append(Transform3D(bf, base + Vector3(0, 0.45, 0) + f["fwd"] * o + f["right"] * side * 0.13))
 					continue
-				posts.append(Transform3D(bf, base + Vector3(0, 0.6, 0)))
+				var sxp := Transform3D(Basis(), sx.origin)  # Pfosten nur versetzen, nicht stauchen
+				posts.append(Transform3D(bf, base + Vector3(0, 0.6, 0)) * sxp)
 				for ry in [0.45, 1.05]:
-					rails.append(Transform3D(bf, base + Vector3(0, ry, 0)))
-				mesh_panels.append(Transform3D(bf, base + Vector3(0, 0.6, 0)))
+					rails.append(Transform3D(bf, base + Vector3(0, ry, 0)) * sx)
+				mesh_panels.append(Transform3D(bf, base + Vector3(0, 0.6, 0)) * sx)
 			d += 3.0
+	border_dbg = []
+	for pair in [["Zaun", mesh_panels], ["Hecke", hedges], ["Mauer", low_walls], ["Leitplanke", guard], ["Koppelzaun", wood_posts],
+			["Lattenzaun", picket_rails], ["Backstein", bricks]]:
+		for xf in pair[1]:
+			border_dbg.append([pair[0], xf])
 	var metal := Builder.mat(Color(0.25, 0.26, 0.28), 0.7, 0.4)
 	var mesh_m := Builder.mat(Color(0.3, 0.32, 0.34, 0.35), 0.6, 0.5)
 	mesh_m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
@@ -3165,6 +3260,36 @@ static func _build_fences(root: Node3D, track: Dictionary, blockers: Array) -> v
 	_multi(root, Builder.box(Vector3(0.01, 1.05, 3.0)), mesh_m, mesh_panels)
 	if not hedges.is_empty():
 		_multi(root, Builder.box(Vector3(0.9, 1.3, 3.05)), Builder.mat(Color(0.05, 0.2, 0.07), 0.0, 0.9), hedges)
+	if not pickets.is_empty():
+		var white := Builder.mat(Color(0.86, 0.86, 0.82), 0.0, 0.8)
+		_multi(root, Builder.box(Vector3(0.03, 0.9, 0.08)), white, pickets)
+		_multi(root, Builder.box(Vector3(0.025, 0.07, 3.02)), white, picket_rails)
+	if not lawns.is_empty():
+		_multi(root, Builder.box(Vector3(5.0, 0.05, 3.02)), Builder.mat(Color(0.16, 0.3, 0.1), 0.0, 0.95), lawns)
+	if not garden_bushes.is_empty():
+		var gb := SphereMesh.new()
+		gb.radius = 1.0
+		gb.height = 1.6
+		gb.radial_segments = 8
+		gb.rings = 4
+		_multi(root, gb, Builder.mat(Color(0.07, 0.2, 0.06), 0.0, 0.9), garden_bushes)
+	if not garden_trunks.is_empty():
+		var tm := CylinderMesh.new()
+		tm.top_radius = 0.12
+		tm.bottom_radius = 0.18
+		tm.height = 2.4
+		tm.radial_segments = 6
+		_multi(root, tm, Builder.mat(Color(0.12, 0.08, 0.05), 0.0, 0.9), garden_trunks)
+		var cm := SphereMesh.new()
+		cm.radius = 1.6
+		cm.height = 3.2
+		cm.radial_segments = 7
+		cm.rings = 4
+		_multi(root, cm, Builder.mat(Color(0.05, 0.14, 0.05), 0.0, 0.9), garden_crowns)
+	if not bricks.is_empty():
+		_multi(root, Builder.box(Vector3(0.36, 1.7, 3.02)), Builder.mat(Color(0.42, 0.21, 0.15), 0.0, 0.92), bricks)
+		_multi(root, Builder.box(Vector3(0.46, 0.08, 3.04)), Builder.mat(Color(0.5, 0.47, 0.44), 0.0, 0.85), brick_caps)
+		_multi(root, Builder.box(Vector3(0.5, 1.9, 0.5)), Builder.mat(Color(0.38, 0.19, 0.14), 0.0, 0.92), brick_piers)
 	if not bollards.is_empty():
 		var bm := CylinderMesh.new()
 		bm.top_radius = 0.11
@@ -3185,6 +3310,32 @@ static func _build_fences(root: Node3D, track: Dictionary, blockers: Array) -> v
 		_multi(root, Builder.box(Vector3(0.06, 0.12, 3.04)), wood, wood_rails)
 
 
+## Freier Teil eines Randstücks (-1,5..1,5 m längs um pos, in Schritten von 0,25 m): (von, bis); liegt ein Ende auf
+## einer anderen Fahrbahn (Einmündung, Kreuzung), wird es dort abgeschnitten.
+static func _fence_span(track: Dictionary, p: Dictionary, pos: Vector3, fwd: Vector3, main: bool) -> Vector2:
+	var own: Curve3D = p["curve"]
+	var clear := func(q: Vector3) -> bool:
+		if main:
+			return _branch_clearance(track, q, false, true) > 1.0
+		# eigene Fahrbahn: in scharfen Ecken liegt der Rand der Innenseite sonst auf der Straße selbst
+		if _flat(q - own.get_closest_point(q)).length() < float(p["half_w"]) + 0.1:
+			return false
+		if (Streets.main_clear(track, q) if p.has("net") else _main_clearance(track, q)) < WALK + 0.4:
+			return false
+		return not (p["kind"] == "lane" or p["kind"] == "passage") or _other_branch_clear(track, q, p["id"]) >= 0.3
+	if clear.call(pos + fwd * 1.5) and clear.call(pos - fwd * 1.5):
+		return Vector2(-1.5, 1.5)
+	if not clear.call(pos):
+		return Vector2.ZERO
+	var lo := 0.0
+	var hi := 0.0
+	while hi < 1.5 and clear.call(pos + fwd * (hi + 0.25)):
+		hi += 0.25
+	while lo > -1.5 and clear.call(pos + fwd * (lo - 0.25)):
+		lo -= 0.25
+	return Vector2(lo, hi)
+
+
 ## Rand einer Auffahrt oder Verbindung (seit 2.40): 0 Leitplanke, 1 Hecke, 2 Koppelzaun. Wechselt je 60-150 m, fest aus
 ## Weg, Seite und Lage (ohne Zufallszahlen); nahe am Ring (erste 90 m) immer Leitplanke wie an der Autobahn.
 static func _ramp_border(p: Dictionary, d: float, side: float) -> int:
@@ -3195,18 +3346,24 @@ static func _ramp_border(p: Dictionary, d: float, side: float) -> int:
 	return 0 if h < 50 else (1 if h < 78 else 2)
 
 
-## Rand an der Wand, wo kein Haus davor steht (Open World, seit 2.39): 0 Zaun, 1 Hecke, 2 niedrige Mauer, 3 Poller.
+## Rand an der Wand, wo kein Haus davor steht (Open World, seit 2.39): 0 Zaun, 1 Hecke, 2 niedrige Mauer, 3 Poller,
+## seit 2.52 dazu 4 Vorgarten (Lattenzaun, Rasen, Büsche, Bäume) und 5 hohe Backsteinmauer; hinter Hecken auch Gärten.
 ## Wechselt alle 30-60 m, je nach Viertel (Altstadt und Vorstadt Hecken und Mauern, Hafen und Schnellstraße Zaun,
 ## Bankenviertel Mauer und Poller); fest aus Lage und Weg, ohne Zufallszahlen. Die unsichtbare Wand bleibt an derselben
 ## Stelle.
 static func _border_style(track: Dictionary, p: Dictionary, d: float, side: float) -> int:
 	var key: String = track["districts"][clampi(int((d if p["id"] == 0 else float(p["from"])) / DISTRICT_LEN), 0, track["districts"].size() - 1)]
-	var w: Array = {"residential": [3, 4, 3, 0], "altstadt_de": [3, 3, 3, 1], "vorstadt_de": [3, 5, 2, 0], "kurviertel_de": [2, 5, 3, 0],
-		"shops": [4, 2, 2, 2], "innenstadt_de": [3, 3, 2, 2], "kiez_de": [5, 2, 1, 2], "chinatown": [5, 1, 3, 1], "downtown": [3, 2, 3, 2],
-		"campus_de": [3, 4, 2, 1], "boulevard": [3, 4, 2, 1], "industrial": [8, 0, 2, 0]}.get(key, [1, 0, 0, 0])
+	# Gewichte [Zaun, Hecke, niedrige Mauer, Poller, Vorgarten, Backstein]; seit 2.52 weniger Gitter in Wohn- und Altstadtvierteln
+	var w: Array = {"residential": [1, 3, 2, 0, 4, 2], "altstadt_de": [1, 3, 2, 1, 2, 4], "vorstadt_de": [1, 4, 1, 0, 5, 1],
+		"kurviertel_de": [1, 4, 2, 0, 4, 1], "shops": [3, 2, 2, 2, 0, 2], "innenstadt_de": [1, 2, 2, 2, 2, 3], "kiez_de": [3, 2, 1, 2, 1, 3],
+		"chinatown": [5, 1, 3, 1, 0, 1], "downtown": [3, 2, 3, 2, 0, 1], "campus_de": [1, 4, 2, 1, 2, 2], "boulevard": [2, 4, 2, 1, 2, 1],
+		"industrial": [8, 0, 2, 0, 0, 2]}.get(key, [1, 0, 0, 0, 0, 0])
 	var seg := int(floor(d / (30.0 + float(posmod(int(p["id"]) * 7 + int(side), 4)) * 10.0)))
-	var h: float = posmod(hash([int(p["id"]), int(side), seg, int(track["length"])]), 1000) / 1000.0 * float(w[0] + w[1] + w[2] + w[3])
-	for k in 4:
+	var tot := 0.0
+	for x in w:
+		tot += float(x)
+	var h: float = posmod(hash([int(p["id"]), int(side), seg, int(track["length"])]), 1000) / 1000.0 * tot
+	for k in w.size():
 		h -= float(w[k])
 		if h < 0.0:
 			return k

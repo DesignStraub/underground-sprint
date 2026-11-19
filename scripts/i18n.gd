@@ -359,6 +359,9 @@ const EN := {
 	"Unter der Hochbahn der U1 durch die Skalitzer Straße, über die Oberbaumbrücke, an der East Side Gallery entlang und über die Schillingbrücke zurück zum Kotti.":
 		"Under the elevated U1 along Skalitzer Straße, over the Oberbaumbrücke, past the East Side Gallery and back over the Schillingbrücke to Kotti.",
 	"Touch-Knöpfe im Rennen. Auto: nur auf Handy und Tablet.": "On-screen buttons in races. Auto: only on phones and tablets.",
+	"Effekte: ": "Effects: ", "Ton  >": "Sound  >", "TON": "SOUND", "Grafik, V-Sync und FPS-Limit: in der Garage unter Einstellungen.": "Graphics, V-Sync and FPS limit: in the garage under Settings.",
+	"Lautstärke der Musik.": "Music volume.",
+	"Lautstärke von Motor, Reifen, Verkehr und Menütönen.": "Volume of engine, tyres, traffic and menu sounds.",
 	"Schwierigkeit: ": "Difficulty: ", "Leicht": "Easy", "Normal": "Normal", "Schwer": "Hard",
 	"Wie stark die Gegner fahren. Leicht: zum Kennenlernen der Strecken. Schwer: schnellere Autos, und wer führt, wird gejagt.":
 		"How strong the rivals drive. Easy: for getting to know the tracks. Hard: faster cars, and whoever leads gets hunted.",
