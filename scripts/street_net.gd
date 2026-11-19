@@ -1849,11 +1849,27 @@ static func parked_cars(root: Node3D, cars: Array, rng: RandomNumberGenerator) -
 		for k in 5:
 			pick.append(keys[(rng.randi() % keys.size())])
 		keys = pick
-	var groups := {}  # [Mesh, Material] -> Transforms
+	# Seit 2.53 nach Feldern (PARK_CELL) aufgeteilt, mit Sichtweite: bis 2.52 lag jedes Teil jedes Modells als ein
+	# MultiMesh über der ganzen Stadt, ohne Grenze. In Aachen kamen so über 3 Mio. Dreiecke je Bild nur von parkenden
+	# Autos (Felgen, Speichen, Fugen auch 2 km entfernt). Jetzt: Details bis PARK_NEAR, dahinter zwei Quader im Lack
+	# des Modells (wie früher die Platzhalter), ab der Sichtweite der Stadt gar nichts.
+	var groups := {}  # [Feld, Mesh, Material] -> Transforms
+	var far := {}  # [Feld, Lack] -> Transforms (Fernansicht)
 	var body := StaticBody3D.new()
 	body.name = "ParkedCars"
 	root.add_child(body)
 	var simple := []
+	var paint_of := {}
+	for k in keys:
+		var best: Material = null
+		var bv := -1
+		for it in models[k]:
+			if it[0] is Mesh and (it[0] as Mesh).get_surface_count() > 0:
+				var nv: int = (it[0] as Mesh).surface_get_array_len(0)
+				if nv > bv and it[2] is Material and not (it[2] is BaseMaterial3D and (it[2] as BaseMaterial3D).emission_enabled):
+					bv = nv
+					best = it[2]
+		paint_of[k] = best
 	for xf in cars:
 		var key: String = keys[rng.randi() % keys.size()] if not keys.is_empty() else ""
 		var van := key.begins_with("van")
@@ -1867,28 +1883,65 @@ static func parked_cars(root: Node3D, cars: Array, rng: RandomNumberGenerator) -
 		if key == "":
 			simple.append(xf)
 			continue
+		var cell := Vector2i(floori(xf.origin.x / PARK_CELL), floori(xf.origin.z / PARK_CELL))
 		for it in models[key]:
 			if it[0] is String or not it[0] is Mesh:
 				continue
 			var m = it[2]
 			if m is BaseMaterial3D and (m as BaseMaterial3D).emission_enabled:
 				continue  # Scheinwerfer und Rücklichter aus
-			var gk := [it[0], m]
+			var gk := [cell, it[0], m]
 			if not groups.has(gk):
 				groups[gk] = []
 			groups[gk].append(xf * (it[1] as Transform3D))
+		var fk := [cell, paint_of[key], van]
+		if not far.has(fk):
+			far[fk] = []
+		far[fk].append(xf)
 	for gk in groups:
-		Track._multi(root, gk[0], gk[1], groups[gk])
+		_park_mm(root, gk[1], gk[2], groups[gk], 0.0, PARK_NEAR)
+	var glass := Track.Builder.mat(Color(0.04, 0.05, 0.07), 0.6, 0.15)
+	var box_car := Track.Builder.box(Vector3(1.8, 0.75, 4.4))
+	var box_cab := Track.Builder.box(Vector3(1.55, 0.55, 2.2))
+	var box_van := Track.Builder.box(Vector3(1.95, 1.75, 5.1))
+	for fk in far:
+		var bx := []
+		var cb := []
+		for xf in far[fk]:
+			if fk[2]:
+				bx.append(xf * Transform3D(Basis(), Vector3(0, 1.1, 0)))
+			else:
+				bx.append(xf * Transform3D(Basis(), Vector3(0, 0.6, 0)))
+				cb.append(xf * Transform3D(Basis(), Vector3(0, 1.25, 0.2)))
+		var pm: Material = fk[1] if fk[1] else Track.Builder.mat(Color(0.3, 0.32, 0.36), 0.3, 0.4)
+		_park_mm(root, box_van if fk[2] else box_car, pm, bx, PARK_NEAR, PARK_FAR)
+		_park_mm(root, box_cab, glass, cb, PARK_NEAR, PARK_FAR)
 	if not simple.is_empty():
 		var paint := Track.Builder.mat(Color(0.3, 0.32, 0.36), 0.3, 0.4)
-		var glass := Track.Builder.mat(Color(0.04, 0.05, 0.07), 0.6, 0.15)
 		var bx := []
 		var cb := []
 		for xf in simple:
 			bx.append(xf * Transform3D(Basis(), Vector3(0, 0.6, 0)))
 			cb.append(xf * Transform3D(Basis(), Vector3(0, 1.25, 0.2)))
-		Track._multi(root, Track.Builder.box(Vector3(1.8, 0.75, 4.4)), paint, bx)
-		Track._multi(root, Track.Builder.box(Vector3(1.55, 0.55, 2.2)), glass, cb)
+		Track._multi(root, box_car, paint, bx)
+		Track._multi(root, box_cab, glass, cb)
+
+
+const PARK_CELL := 100.0  # Feldgröße für parkende Autos (m); der Sichtbereich misst ab der Mitte der Autos im Feld
+const PARK_NEAR := 220.0  # bis hier mit Details (sicher bis gut 150 m, je nach Lage im Feld)
+const PARK_FAR := 700.0  # bis hier die Quader
+
+
+## MultiMesh mit Sichtbereich [von, bis] (gemessen ab der Mitte des Feldes, daher etwas Zugabe)
+static func _park_mm(root: Node3D, mesh: Mesh, m: Material, xforms: Array, from: float, to: float) -> void:
+	if xforms.is_empty():
+		return
+	Track._multi(root, mesh, m, xforms)
+	var mmi := root.get_child(root.get_child_count() - 1) as MultiMeshInstance3D
+	mmi.visibility_range_begin = from
+	mmi.visibility_range_end = to
+	if from > 0.0:
+		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
 
 ## Sichtbare Ränder entlang der Wände, wo kein Haus davor steht, macht _build_fences (Zaun, Hecke, Mauer). Am Platz

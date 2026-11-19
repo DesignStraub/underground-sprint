@@ -697,6 +697,7 @@ func _bench_report(race) -> void:
 	print("BENCH race=%s q=%d frames=%d frame=%.2fms med=%.2fms p99=%.2fms gpu=%.2fms gpu3d=%.2fms process=%.2fms physics=%.2fms draws=%d objs=%d tris=%dk %s" % [
 		race.race["name"], GameState.preset, _bench.size(), sums[0] / n, med, worst[int(n * 0.99) - 1], sums[1] / n, sums[2] / n,
 		sums[6] / n, sums[7] / n, int(sums[3] / n), int(sums[4] / n), int(sums[5] / n / 1000.0), counts])
+	print("BENCH fenster=%s 3d=%s skala=%.2f" % [DisplayServer.window_get_size(), race.world.size if "size" in race.world else get_viewport().size, get_viewport().scaling_3d_scale])
 	print("BENCH audio=%.3fms" % [EngineAudioScript.bench_us / 1000.0 / n])
 	print("BENCH spikes=%d %s" % [spikes.size(), " ".join(spikes.slice(0, 40))])
 	print("BENCH vram=%dMB tex=%dMB buf=%dMB" % [Performance.get_monitor(Performance.RENDER_VIDEO_MEM_USED) / 1048576.0,

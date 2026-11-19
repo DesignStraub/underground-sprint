@@ -2612,6 +2612,10 @@ func _remove_challenger() -> void:
 var _wd_t := 0.0
 
 
+var _wd_n := 0
+var _wd_slow := 0
+
+
 func _autopilot() -> void:
 	var tr: Dictionary = player.track
 	if tr.is_empty() or player.loc.is_empty():
@@ -2640,13 +2644,36 @@ func _autopilot() -> void:
 	else:
 		Input.action_release("nitro")
 	_wd_t += get_process_delta_time()
+	_wd_n += 1
+	if get_process_delta_time() > 0.025:
+		_wd_slow += 1
 	if _wd_t > 2.0:
+		print("WDFRAMES n=%d slow=%d avg=%.1fms" % [_wd_n, _wd_slow, _wd_t * 1000.0 / maxf(_wd_n, 1)])
+		_wd_n = 0
+		_wd_slow = 0
 		_wd_t = 0.0
 		var built := entries.filter(func(e): return e["state"] == "ready").size()
 		print("WD pos=(%.0f,%.0f) y=%.1f fahrbahn=%.1f luft=%s v=%d strecke=%s weg=%s d=%.0f geladen=%d baut=%s fps=%d verkehr=%d schlange=%d" % [player.global_position.x, player.global_position.z,
 			player.global_position.y, (xf * Vector3(0, Track.elev_at(c, d), 0)).y, str(player.airborne),
 			int(player.speed_fwd * 3.6), active.get("race", {}).get("name", "-"), player.loc["path"]["kind"], d, built, str(_task >= 0 or not _job.is_empty()),
 			Engine.get_frames_per_second(), traffic.size(), _tq.size()])
+		if OS.get_cmdline_user_args().has("--trisplit"):
+			_tri_split()
+		var vp := get_viewport().get_viewport_rid()
+		RenderingServer.viewport_set_measure_render_time(vp, true)
+		var rs := RenderingServer
+		var wv: RID = world.get_viewport().get_viewport_rid()
+		rs.viewport_set_measure_render_time(wv, true)
+		print("WDPERF main_gpu=%.1fms main_cpu=%.1fms fr=%.1fms shadow_draws=%d canvas_draws=%d total=%d" % [rs.viewport_get_measured_render_time_gpu(vp), rs.viewport_get_measured_render_time_cpu(vp), get_process_delta_time() * 1000.0,
+			rs.viewport_get_render_info(wv, rs.VIEWPORT_RENDER_INFO_TYPE_SHADOW, rs.VIEWPORT_RENDER_INFO_DRAW_CALLS_IN_FRAME),
+			rs.viewport_get_render_info(vp, rs.VIEWPORT_RENDER_INFO_TYPE_CANVAS, rs.VIEWPORT_RENDER_INFO_DRAW_CALLS_IN_FRAME),
+			Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)])
+		print("WDPERF gpu=%.1fms cpu=%.1fms proc=%.1fms phys=%.1fms draws=%d objs=%d tris=%dk" % [rs.viewport_get_measured_render_time_gpu(wv),
+			rs.viewport_get_measured_render_time_cpu(wv), Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0,
+			Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0,
+			rs.viewport_get_render_info(wv, rs.VIEWPORT_RENDER_INFO_TYPE_VISIBLE, rs.VIEWPORT_RENDER_INFO_DRAW_CALLS_IN_FRAME),
+			rs.viewport_get_render_info(wv, rs.VIEWPORT_RENDER_INFO_TYPE_VISIBLE, rs.VIEWPORT_RENDER_INFO_OBJECTS_IN_FRAME),
+			rs.viewport_get_render_info(wv, rs.VIEWPORT_RENDER_INFO_TYPE_VISIBLE, rs.VIEWPORT_RENDER_INFO_PRIMITIVES_IN_FRAME) / 1000])
 
 
 func _update_speed_fx(dt: float) -> void:
@@ -3045,3 +3072,70 @@ func _world_check() -> void:
 
 func _wc_name(e: Dictionary) -> String:
 	return ("%s %d/%d" % [e["race"]["name"], e["ring"], e["seg_i"]]) if e["kind"] == "seg" else str(Catalog.RACES[e["race_index"]]["name"])
+
+
+## Test (--wdrive --trisplit): Dreiecke im Bild nach Herkunft (Name des obersten benannten Knotens unter der Welt)
+func _tri_split() -> void:
+	var cam: Camera3D = world.get_camera_3d()
+	var planes := cam.get_frustum()
+	var out := {}
+	var cnt := {}
+	var stack: Array = [world]
+	while not stack.is_empty():
+		var nd: Node = stack.pop_back()
+		stack.append_array(nd.get_children())
+		if not nd is GeometryInstance3D or not (nd as Node3D).is_visible_in_tree():
+			continue
+		var gi := nd as GeometryInstance3D
+		var aabb := gi.global_transform * gi.get_aabb()
+		var c := aabb.get_center()
+		var r := aabb.size.length() * 0.5
+		var dist := c.distance_to(cam.global_position)
+		if dist - r > cam.far or (gi.visibility_range_end > 0.0 and dist - r > gi.visibility_range_end):
+			continue
+		var inside := true
+		for pl in planes:
+			if pl.distance_to(c) > r:
+				inside = false
+				break
+		if not inside:
+			continue
+		var tris := 0
+		var m: Mesh = null
+		var mult := 1
+		if gi is MeshInstance3D:
+			m = (gi as MeshInstance3D).mesh
+		elif gi is MultiMeshInstance3D and (gi as MultiMeshInstance3D).multimesh:
+			var mm := (gi as MultiMeshInstance3D).multimesh
+			m = mm.mesh
+			mult = mm.visible_instance_count if mm.visible_instance_count >= 0 else mm.instance_count
+		if m:
+			for si in m.get_surface_count():
+				var a := m.surface_get_arrays(si)
+				var idx = a[Mesh.ARRAY_INDEX]
+				tris += (idx.size() if idx != null and idx.size() > 0 else (a[Mesh.ARRAY_VERTEX] as PackedVector3Array).size()) / 3
+		tris *= mult
+		var path := []
+		var p: Node = nd
+		while p and p != world:
+			path.push_front(p.name if not p.get_script() else p.get_script().resource_path.get_file())
+			p = p.get_parent()
+		var per := tris / maxi(mult, 1)
+		var mat: Material = gi.material_override if gi.material_override else (m.surface_get_material(0) if m and m.get_surface_count() > 0 else null)
+		var mn := ""
+		if mat is ShaderMaterial and (mat as ShaderMaterial).shader:
+			mn = (mat as ShaderMaterial).shader.resource_path.get_file()
+		elif mat is StandardMaterial3D:
+			mn = "std%s%s" % [(mat as StandardMaterial3D).albedo_color.to_html(false), "+tex" if (mat as StandardMaterial3D).albedo_texture else ""]
+		var k := "%s | n=%d per=%d vr=%.0f size=%.0f %s %s" % [str(path[0]).left(14), mult, per, gi.visibility_range_end, aabb.size.length(), mn, m.get_class() if m else ""]
+		k = k.left(110)
+		out[k] = out.get(k, 0) + tris
+		cnt[k] = cnt.get(k, 0) + 1
+	var keys := out.keys()
+	keys.sort_custom(func(a, b): return out[a] > out[b])
+	var tot := 0
+	for k in keys:
+		tot += out[k]
+	print("TRIS gesamt=%dk" % (tot / 1000))
+	for k in keys.slice(0, 25):
+		print("TRIS %7dk x%-4d %s" % [out[k] / 1000, cnt[k], k])
