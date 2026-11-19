@@ -1690,9 +1690,15 @@ static func _plan_world_exit(track: Dictionary) -> void:
 ## als zweite selbst nur eine Stelle mitten in der Stadt, die nach innen zeigte, und blieb ohne Weg zum Außenring
 static func _design_exit(track: Dictionary, key: String) -> Dictionary:
 	var lay: Dictionary = Design.LAYOUTS.get(track.get("layout_key", ""), {})
-	if not lay.has(key) or not track.has("ctrl_offs"):
+	if not lay.has(key):
 		return {}
-	var d: float = track["ctrl_offs"][int(lay[key]["at"])]
+	var d := 0.0
+	if lay[key].has("d"):
+		d = float(lay[key]["d"])  # Meter entlang der Strecke (Bremen, Stuttgart, Nürnberg: wie vor dem Straßennetz)
+	elif track.has("ctrl_offs"):
+		d = track["ctrl_offs"][int(lay[key]["at"])]
+	else:
+		return {}
 	var f := frame_at(track["curve"], d)
 	var want := Vector3(float(lay[key]["dir"][0]), 0.0, float(lay[key]["dir"][1]))
 	var out: Vector3 = f["right"] * signf((f["right"] as Vector3).dot(want))
@@ -2167,7 +2173,7 @@ static func _stitch_walls(root: Node3D, track: Dictionary) -> void:
 		var ok: bool = line_ok.call(a, b)
 		var why := "" if ok else "Fahrbahn auf der Linie"
 		var via := Vector3.INF
-		if not ok and float(pr[0]) < 25.0:
+		if not ok and float(pr[0]) < 40.0:
 			# spitze Ecke (zwei Gassen im V): die Fahrbahn ragt über die Linie, außen herum über einen Knick
 			var m := (a + b) / 2.0
 			var nrm := Vector3(-(b - a).z, 0, (b - a).x).normalized()

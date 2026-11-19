@@ -91,7 +91,7 @@ static func plan(track: Dictionary, race: Dictionary) -> void:
 static func net_for(race: Dictionary) -> Array:
 	if no_net:
 		return []
-	for k in [str(race.get("city", "")), str(race.get("layout", ""))]:
+	for k in [str(race.get("city", "")), str(race.get("layout", "")), str(race.get("net", ""))]:  # net: entworfen ohne Layout (Berlin)
 		if k != "" and CityNet.NETS.has(k):
 			return CityNet.NETS[k]
 	return []
@@ -1290,11 +1290,21 @@ static func _plan_plazas(ctx: Dictionary, rng: RandomNumberGenerator) -> void:
 			for i in pts.size():
 				var q := Vector2(pts[i].x, pts[i].z)
 				if float(i) * 2.0 < e0 + 2.0:
+					# Einfahrt: liegt sie an einer Kreuzung, ragte der Platz in die andere Straße (seit 2.52 geprüft)
+					for lat0 in [-half, half]:
+						if _branch_near(ctx, q + Vector2(f["fwd"].x, f["fwd"].z) * lat0, [p["id"]], 40.0) < 2.0:
+							ok = false
 					continue
 				for lat in [-half, 0.0, half]:
 					var qq: Vector2 = q + Vector2(f["fwd"].x, f["fwd"].z) * lat
 					if _main_near(ctx, qq, 40.0).x < Track.WALK + 6.0 or _branch_near(ctx, qq, [p["id"]], 40.0) < 5.0 \
 							or _blocked(ctx, qq, 3.0) != "":
+						ok = false
+					# auch die eigene Straße: in einer Haarnadel lag ihr anderer Schenkel im Platz (geparkte Autos auf der
+					# Fahrbahn, seit 2.52 geprüft)
+					var q3 := Vector3(qq.x, 0.0, qq.y)
+					var cp := c.get_closest_point(q3)
+					if Vector2(cp.x - qq.x, cp.z - qq.y).length() < minf(float(i) * 2.0, e0 + 5.0) - 1.0:
 						ok = false
 				if not ok:
 					break
@@ -1732,7 +1742,17 @@ static func _strip_details(root: Node3D, track: Dictionary, p: Dictionary, runs:
 					var fa2 := Track.frame_at(c, x - 4.0)
 					var fb2 := Track.frame_at(c, x + 9.6)
 					var bend: float = (fa2["fwd"] as Vector3).angle_to(fb2["fwd"]) / 13.6
-					if bend < 1.0 / 70.0 and rng.randf() < 0.72:
+					# und nie mit der Schnauze auf einer anderen Fahrbahn (schräge Einmündungen, seit 2.52)
+					var car_free := true
+					for o in [-2.4, 0.0, 2.4]:
+						for l in [-0.9, 0.9]:
+							var cq: Vector3 = pos + f["fwd"] * o + f["right"] * l
+							if branch_clear(track, cq, true, false, p["id"]) < 0.2 or main_clear(track, cq) < 0.2:
+								car_free = false
+							# eigene Straße: in einem spitzen Knick stand der eine Schenkel auf dem anderen
+							elif Track._flat(cq - c.get_closest_point(cq)).length() < half + 0.2:
+								car_free = false
+					if car_free and bend < 1.0 / 70.0 and rng.randf() < 0.72:
 						var bs := Basis.looking_at(f["fwd"] * (1.0 if rng.randf() < 0.5 else -1.0), Vector3.UP)
 						cars.append(Transform3D(bs, pos + f["fwd"] * rng.randf_range(-0.3, 0.3)))
 					var fl := Track.frame_at(c, x)
@@ -2044,7 +2064,16 @@ static func build_junctions(root: Node3D, track: Dictionary, rng: RandomNumberGe
 ## Steht ein Mast hier auf keiner Fahrbahn (weder Hauptstraße noch ein Weg)?
 static func _free_spot(root: Node3D, pos: Vector3) -> bool:
 	var track: Dictionary = root.get_meta("track_ref")
-	return main_clear(track, pos) > 0.4 and branch_clear(track, pos, true, false) > 0.4
+	if main_clear(track, pos) <= 0.4 or branch_clear(track, pos, true, false) <= 0.4:
+		return false
+	# genau gegen jede Fahrbahn (seit 2.52): das Raster misst nur zu Stützpunkten, ein Mast stand so in einer Einfahrt
+	for p in track["paths"]:
+		if int(p["id"]) == 0 or p["kind"] == "spur":
+			continue
+		var cp := (p["curve"] as Curve3D).get_closest_point(pos)
+		if Track._flat(cp - pos).length() < float(p["half_w"]) + 0.6:
+			return false
+	return true
 
 
 static func _mm_add(mm: Dictionary, key: String, mesh: Mesh, mat: Material, xf: Transform3D) -> void:

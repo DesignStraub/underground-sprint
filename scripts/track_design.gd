@@ -132,6 +132,7 @@ const LAYOUTS := {
 			{"name": "EUROPAHAFEN", "width": 60.0, "pts": [-90, 2, 60, 8, 200, 32, 330, 38, 370, 40]}],
 		"landmarks": [{"kind": "roland", "x": -195.0, "z": -5.0}],
 		"cross": [[66, 20]],
+		"exit": {"d": 1020.0, "dir": [0.37, -0.93]},  # seit 2.52 festgeschrieben: ohne Querstraße (Straßennetz) wie vorher
 		"clear": [[13, 19], [48, 64], [69, 73]],
 	},
 	# Stuttgart (Nachtschicht): im Kessel die Kulturmeile (B14, Wagenburgtunnel), dann die Weinsteige: zwei Spitzkehren den
@@ -165,6 +166,8 @@ const LAYOUTS := {
 		"trees": 0.45,
 		"landmarks": [{"kind": "stuttgart_turm", "x": -60.0, "z": 395.0}],
 		"cross": [[2, 20]],
+		"exit": {"d": 1925.0, "dir": [-0.9, -0.45]},  # seit 2.52 festgeschrieben (wie vor dem Straßennetz)
+		"exit2": {"d": 480.0, "dir": [0.87, -0.5]},
 	},
 	# Hamburg (Hafen-Drift): Containerterminal an der Elbe statt Stern aus zwölf gleichen Kehren. Start am Kai, weiter
 	# Linksbogen, Schlangenlinie zwischen den Containerstapeln, Büroklammer aus zwei Spitzkehren unter den Kränen, ein Knick,
@@ -336,6 +339,8 @@ const LAYOUTS := {
 			{"kind": "stadttor", "at": 75, "name": "SPITTLERTOR"}],
 		"stadtmauer": [[2, 14, -1], [24, 32, -1]],
 		"cross": [[24, 63, 0.4, -1, -1], [6, 27, 0.4, -1, -1]],
+		"exit": {"d": 320.0, "dir": [0.0, 1.0]},  # seit 2.52 festgeschrieben (wie vor dem Straßennetz)
+		"exit2": {"d": 960.0, "dir": [1.0, 0.0]},
 		"clear": [[16, 23], [34, 40], [48, 53], [58, 63], [75, 81], [84, 90]],
 	},
 	"dortmund": {

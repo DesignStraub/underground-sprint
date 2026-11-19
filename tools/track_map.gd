@@ -371,11 +371,11 @@ func _leakcheck() -> void:
 				continue
 			cell[j] |= 4
 			if (cell[j] & 2) == 0:
-				# dahinter weiterfüllen (bis 600 Zellen = 150 m²): ringsum geschlossene Streifen zwischen Zone und Wand sind
+				# dahinter weiterfüllen (bis 2000 Zellen = 500 m²): ringsum geschlossene Streifen zwischen Zone und Wand sind
 				# keine Lücke
 				var sub := PackedInt32Array([j])
 				var sh := 0
-				while sh < sub.size() and sub.size() < 600:
+				while sh < sub.size() and sub.size() < 2000:
 					var si := sub[sh]
 					sh += 1
 					var sx := si % W
@@ -390,7 +390,7 @@ func _leakcheck() -> void:
 							continue
 						cell[tj] |= 4
 						sub.append(tj)
-				if sub.size() < 600:
+				if sub.size() < 2000:
 					continue
 				var q := Vector2(nx, ny) * CS + r.position
 				var dup := false

@@ -44,7 +44,10 @@ MOUTH_MIN_ANG = 38.0  # flacher darf eine Straße nicht in die Hauptstraße mün
 CLS = {"primary": "breit", "secondary": "strasse", "tertiary": "strasse", "unclassified": "strasse",
        "residential": "strasse", "primary_link": "strasse", "secondary_link": "strasse", "tertiary_link": "strasse",
        "living_street": "gasse", "pedestrian": "gasse"}
-CITIES = ["aachen", "koeln"]
+CITIES = ["aachen", "koeln", "wuerzburg", "tbb", "hammelburg", "badkissingen", "frankfurt", "muenchen", "hafenrunde",
+          "dortmund", "bremen", "heidelberg", "rostock", "nuernberg", "berlin"]
+# Stuttgart (Nachtschicht) fehlt mit Absicht: die Strecke liegt fast überall am Hang oder hat einen Mittelstreifen, kein
+# Netz könnte einmünden; dort bleiben die bisherigen Seitenstraßen (DESIGN-Eintrag steht für später bereit)
 REACH_D = 250.0  # entworfene Städte: so weit von der Strecke
 # Entworfene Städte (track_design-Layout statt OSM): Raster und Straßennamen
 DESIGN = {
@@ -59,6 +62,67 @@ DESIGN = {
                  "Moltkestraße", "Lütticher Straße", "Maastrichter Straße", "Limburger Straße", "Flandrische Straße",
                  "Antwerpener Straße", "Genter Straße", "Lübecker Straße", "Luxemburger Straße", "Bonner Straße",
                  "Vorgebirgstraße", "Eifelstraße", "Volksgartenstraße"],
+    },
+    # seit 2.52: die übrigen entworfenen Städte (gasse_x 1e9: Altstadt, viele Gassen; -1e9: keine)
+    "frankfurt": {
+        "seed": 61, "spacing": (86.0, 76.0), "angle": -0.12, "warp": 20.0, "jitter": 8.0, "drop": 0.15, "diag": 0.07,
+        "arterial": 4, "main_band": 30.0, "gasse_x": -1e9,
+        "rows": ["Kaiserstraße", "Taunusstraße", "Münchener Straße", "Neue Mainzer Straße", "Große Gallusstraße", "Junghofstraße", "Goethestraße", "Biebergasse", "Zeil", "Steinweg", "Bethmannstraße", "Weserstraße", "Moselstraße", "Elbestraße"],
+        "cols": ["Taunusanlage", "Mainzer Landstraße", "Westendstraße", "Bockenheimer Landstraße", "Wiesenhüttenstraße", "Niddastraße", "Gutleutstraße", "Karlstraße", "Düsseldorfer Straße", "Hochstraße", "Börsenstraße", "Schillerstraße", "Stiftstraße", "Fahrgasse"],
+    },
+    "muenchen": {
+        "seed": 62, "spacing": (88.0, 78.0), "angle": 0.08, "warp": 18.0, "jitter": 8.0, "drop": 0.15, "diag": 0.07,
+        "arterial": 4, "main_band": 30.0, "gasse_x": -1e9,
+        "rows": ["Brienner Straße", "Theresienstraße", "Gabelsbergerstraße", "Schellingstraße", "Türkenstraße", "Amalienstraße", "Sendlinger Straße", "Fürstenfelder Straße", "Herzogspitalstraße", "Kaufingerstraße", "Neuhauser Straße", "Residenzstraße", "Barer Straße", "Arcisstraße"],
+        "cols": ["Augustenstraße", "Schleißheimer Straße", "Dachauer Straße", "Karlstraße", "Sophienstraße", "Ottostraße", "Maxburgstraße", "Hackenstraße", "Rosental", "Tal", "Thierschstraße", "Liebigstraße", "Widenmayerstraße", "Zweibrückenstraße"],
+    },
+    "hafenrunde": {
+        "seed": 63, "spacing": (80.0, 70.0), "angle": 0.31, "warp": 26.0, "jitter": 8.0, "drop": 0.15, "diag": 0.07,
+        "arterial": 4, "main_band": 30.0, "gasse_x": -1e9,
+        "rows": ["Reeperbahn", "Davidstraße", "Hafenstraße", "Bernhard-Nocht-Straße", "Große Elbstraße", "Palmaille", "Holstenstraße", "Wohlwillstraße", "Talstraße", "Simon-von-Utrecht-Straße", "Budapester Straße", "Paul-Roosen-Straße"],
+        "cols": ["Kastanienallee", "Hein-Hoyer-Straße", "Detlev-Bremer-Straße", "Friedrichstraße", "Silbersackstraße", "Hopfenstraße", "Antonistraße", "Erichstraße", "Herbertstraße", "Clemens-Schultz-Straße", "Seilerstraße", "Lincolnstraße"],
+    },
+    "dortmund": {
+        "seed": 64, "spacing": (90.0, 80.0), "angle": -0.05, "warp": 16.0, "jitter": 8.0, "drop": 0.15, "diag": 0.07,
+        "arterial": 4, "main_band": 30.0, "gasse_x": -1e9,
+        "rows": ["Westenhellweg", "Ostenhellweg", "Kampstraße", "Brückstraße", "Hansastraße", "Kleppingstraße", "Betenstraße", "Silberstraße", "Rheinische Straße", "Münsterstraße", "Schützenstraße", "Bornstraße"],
+        "cols": ["Hohe Straße", "Lindemannstraße", "Kreuzstraße", "Möllerstraße", "Arndtstraße", "Kaiserstraße", "Lessingstraße", "Kuithanstraße", "Saarlandstraße", "Hamburger Straße", "Gneisenaustraße", "Mallinckrodtstraße"],
+    },
+    "bremen": {
+        "seed": 65, "spacing": (78.0, 68.0), "angle": 0.42, "warp": 26.0, "jitter": 8.0, "drop": 0.15, "diag": 0.07,
+        "arterial": 4, "main_band": 30.0, "gasse_x": 1e9,
+        "rows": ["Obernstraße", "Sögestraße", "Langenstraße", "Martinistraße", "Am Wall", "Knochenhauerstraße", "Hutfilterstraße", "Böttcherstraße", "Schlachte", "Faulenstraße", "Ostertorsteinweg", "Vor dem Steintor"],
+        "cols": ["Bürgermeister-Smidt-Straße", "Wachtstraße", "Pelzerstraße", "Hakenstraße", "Ansgaritorstraße", "Sandstraße", "Domsheide", "Schnoor", "Balgebrückstraße", "Herdentorsteinweg", "Bahnhofstraße", "Contrescarpe"],
+    },
+    "stuttgart": {
+        "seed": 66, "spacing": (84.0, 74.0), "angle": 0.18, "warp": 22.0, "jitter": 8.0, "drop": 0.15, "diag": 0.07,
+        "arterial": 4, "main_band": 30.0, "gasse_x": -1e9,
+        "rows": ["Königstraße", "Calwer Straße", "Rotebühlstraße", "Marienstraße", "Tübinger Straße", "Hauptstätter Straße", "Eberhardstraße", "Lange Straße", "Kronprinzstraße", "Büchsenstraße", "Hospitalstraße", "Lautenschlagerstraße"],
+        "cols": ["Theodor-Heuss-Straße", "Schlossstraße", "Kronenstraße", "Friedrichstraße", "Kriegsbergstraße", "Heilbronner Straße", "Olgastraße", "Charlottenstraße", "Neckarstraße", "Urbanstraße", "Weißenburgstraße", "Paulinenstraße"],
+    },
+    "heidelberg": {
+        "seed": 67, "spacing": (76.0, 66.0), "angle": 0.05, "warp": 24.0, "jitter": 8.0, "drop": 0.15, "diag": 0.07,
+        "arterial": 4, "main_band": 30.0, "gasse_x": 1e9,
+        "rows": ["Hauptstraße", "Untere Straße", "Plöck", "Ingrimstraße", "Neugasse", "Bienenstraße", "Kettengasse", "Sandgasse", "Theaterstraße", "Märzgasse", "Schiffgasse", "Friedrich-Ebert-Anlage"],
+        "cols": ["Steingasse", "Dreikönigstraße", "Heiliggeiststraße", "Mittelbadgasse", "Krämergasse", "Fischmarkt", "Merianstraße", "Grabengasse", "Seminarstraße", "Akademiestraße", "Brunnengasse", "Floringasse"],
+    },
+    "rostock": {
+        "seed": 68, "spacing": (78.0, 68.0), "angle": -0.22, "warp": 24.0, "jitter": 8.0, "drop": 0.15, "diag": 0.07,
+        "arterial": 4, "main_band": 30.0, "gasse_x": 1e9,
+        "rows": ["Kröpeliner Straße", "Lange Straße", "Breite Straße", "Am Strande", "Wokrenter Straße", "Große Wasserstraße", "Schnickmannstraße", "Kleine Wasserstraße", "Fischerbruch", "Grubenstraße", "Altschmiedestraße", "Hinter dem Rathaus"],
+        "cols": ["Burgwall", "Hopfenmarkt", "Faule Grube", "Blutstraße", "Neuer Markt", "Strandstraße", "Koßfelder Straße", "Mönchentor", "Badstüberstraße", "Wollenweberstraße", "Kuhstraße", "Pädagogienstraße"],
+    },
+    "nuernberg": {
+        "seed": 69, "spacing": (76.0, 66.0), "angle": 0.27, "warp": 26.0, "jitter": 8.0, "drop": 0.15, "diag": 0.07,
+        "arterial": 4, "main_band": 30.0, "gasse_x": 1e9,
+        "rows": ["Königstraße", "Karolinenstraße", "Kaiserstraße", "Breite Gasse", "Winklerstraße", "Weinmarkt", "Bergstraße", "Burgstraße", "Tucherstraße", "Hallplatz", "Vordere Ledergasse", "Lorenzer Straße"],
+        "cols": ["Theresienstraße", "Albrecht-Dürer-Straße", "Ludwigstraße", "Spitalgasse", "Füll", "Obstmarkt", "Augustinerstraße", "Färberstraße", "Adlerstraße", "Kornmarkt", "Hintere Ledergasse", "Irrerstraße"],
+    },
+    "berlin": {  # lange Strecke (4 km): schmaleres Band, sonst über 30 km Straßen (zu viel für den Browser)
+        "seed": 70, "spacing": (88.0, 76.0), "angle": 0.14, "warp": 18.0, "jitter": 8.0, "drop": 0.25, "diag": 0.07, "reach": 150.0,
+        "arterial": 4, "main_band": 30.0, "gasse_x": -1e9,
+        "rows": ["Oranienstraße", "Wiener Straße", "Skalitzer Straße", "Reichenberger Straße", "Manteuffelstraße", "Waldemarstraße", "Naunynstraße", "Muskauer Straße", "Köpenicker Straße", "Falckensteinstraße", "Görlitzer Straße", "Glogauer Straße"],
+        "cols": ["Adalbertstraße", "Mariannenstraße", "Wrangelstraße", "Lausitzer Straße", "Ohlauer Straße", "Pücklerstraße", "Forster Straße", "Liegnitzer Straße", "Eisenbahnstraße", "Graefestraße", "Kottbusser Straße", "Dresdener Straße"],
     },
 }
 
@@ -333,7 +397,7 @@ def design_ways(cfg, main, ways, fake):
 def build(folder, city):
     cfg = DESIGN.get(city)
     main_cut = cfg["main_band"] if cfg else MAIN_CUT
-    reach = REACH_D if cfg else REACH
+    reach = cfg.get("reach", REACH_D) if cfg else REACH
     blocked = lambda q: False
     main = None
     nomouth = []
@@ -352,7 +416,12 @@ def build(folder, city):
             caps.append((a, b, r + BLOCK_PAD))
         circ = [((c[0], c[1]), c[2] + BLOCK_PAD) for c in blk["circles"]]
         west = cfg.get("west_of", 1e9) if cfg else 1e9
-        blocked = lambda q: q[0] > west or any(seg_dist(q, a, b) < r for a, b, r in caps) or any(math.dist(q, c) < r for c, r in circ)
+        # Raster (8 m) mit Wasser, Bahn, Gelände, Parks (seit 2.52)
+        mask = set((round(m[0] / 8.0), round(m[1] / 8.0)) for m in blk.get("mask", []))
+        def in_mask(q):
+            i, j = round(q[0] / 8.0), round(q[1] / 8.0)
+            return any((i + a, j + b) in mask for a in (-1, 0, 1) for b in (-1, 0, 1))
+        blocked = lambda q: q[0] > west or any(seg_dist(q, a, b) < r for a, b, r in caps) or any(math.dist(q, c) < r for c, r in circ) or in_mask(q)
     elif cfg:
         sys.exit("entworfene Stadt braucht %s (tools/net_blocks.gd)" % bp)
     else:

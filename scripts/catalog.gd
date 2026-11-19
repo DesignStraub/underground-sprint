@@ -827,7 +827,7 @@ const RACES := [
 		"shops": ["WEINSTADT", "HÄCKERWIRTSCHAFT", "SAALETAL", "WEINFEST", "WINZERSTUBE", "STADTSCHÄNKE"],
 		"districts": {"altstadt_de": 0.5, "vorstadt_de": 0.5},
 		"desc": "Über die Bahnlinie in die Altstadt, am Rathaus mit Marktbrunnen vorbei, über die Saale hinauf zu Schloss Saaleck."},
-	{"name": "Berlin Kreuzberg", "geo": Vector2(52.4990, 13.4300), "mood": "kiez", "type": "circuit", "tier": 3, "laps": 2,
+	{"name": "Berlin Kreuzberg", "net": "berlin", "geo": Vector2(52.4990, 13.4300), "mood": "kiez", "type": "circuit", "tier": 3, "laps": 2,
 		"seed": 806, "city": "kreuzberg", "town": "Berlin", "greet": "NA, ALLET JUT?",
 		"shops": ["SPÄTI", "DÖNER", "CURRYWURST", "PLATTENLADEN", "VEGAN", "SHISHA BAR", "KIEZKNEIPE", "FAHRRADLADEN", "TATTOO"],
 		"districts": {"kiez_de": 0.7, "innenstadt_de": 0.3},
