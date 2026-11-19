@@ -120,8 +120,8 @@ const SHAPES := {
 		"doors": [0.39, 0.66], "intake": Vector2(0.42, 0.1), "pipes": [-0.32, 0.32], "softtop": true,
 	},
 	"hachi": {  # 80er-Fließheck (AE86): kantig, Klappscheinwerfer, schwarze Stoßfänger, breites Leuchtenband
-		"nose": 0.63, "hood": 0.84, "cowl": 0.31, "rf": 0.46, "rr": 0.66, "ge": 0.9, "cp": 0.75,
-		"roof": 1.22, "deck": 0.96, "tail": 0.95, "belt": 0.87, "fender": 0.0, "hips": 0.015,
+		"nose": 0.63, "hood": 0.84, "cowl": 0.31, "rf": 0.46, "rr": 0.62, "ge": 0.95, "cp": 0.75,
+		"roof": 1.22, "deck": 0.94, "tail": 0.95, "belt": 0.87, "fender": 0.0, "hips": 0.015,
 		"round_f": 0.05, "round_r": 0.04, "tumble": 0.15, "hl": {}, "tl": {},
 		"doors": [0.325, 0.6], "intake": Vector2(0.7, 0.05), "pipes": [-0.46], "pipe_r": 0.04,
 		"tire_w": 0.2,
@@ -142,7 +142,7 @@ const SHAPES := {
 	},
 	"tenshi": {  # Mittelmotor (MR2-Gefühl): kurze flache Nase mit Klappscheinwerfern, Kabine weit vorn, steiles kleines
 		# Heckfenster, lange Motorhaube hinten, breite Hüften mit Lufteinlässen, Bürzel
-		"nose": 0.56, "hood": 0.76, "cowl": 0.31, "rf": 0.445, "rr": 0.57, "ge": 0.665, "cp": 0.65,
+		"nose": 0.56, "hood": 0.76, "cowl": 0.31, "rf": 0.43, "rr": 0.6, "ge": 0.72, "cp": 0.7,
 		"roof": 1.18, "deck": 0.99, "tail": 0.97, "belt": 0.8, "fender": 0.03, "hips": 0.045,
 		"round_f": 0.2, "round_r": 0.1, "tumble": 0.21, "hl": {}, "tl": {},
 		"doors": [0.33, 0.575], "intake": Vector2(0.45, 0.07), "pipes": [-0.36, 0.36], "mid": true,
@@ -184,8 +184,8 @@ const SHAPES := {
 		"wheel_r": 0.27, "axle": 0.52, "tire_w": 0.165,
 	},
 	"tanuki": {  # Allrad-Turbo-Kleinwagen (GR-Yaris-Gefühl): kurz und breit, flaches Dach, riesige Hüften, großes Gitter vorn
-		"nose": 0.66, "hood": 0.89, "cowl": 0.3, "rf": 0.46, "rr": 0.72, "ge": 0.925, "cp": 0.86,
-		"roof": 1.35, "deck": 1.02, "tail": 0.99, "belt": 0.87, "fender": 0.04, "hips": 0.06,
+		"nose": 0.66, "hood": 0.89, "cowl": 0.3, "rf": 0.46, "rr": 0.7, "ge": 0.95, "cp": 0.86,
+		"roof": 1.35, "deck": 0.98, "tail": 0.99, "belt": 0.87, "fender": 0.04, "hips": 0.06,
 		"round_f": 0.13, "round_r": 0.07, "tumble": 0.2, "hl": {}, "tl": {},
 		"doors": [0.34, 0.62], "intake": Vector2(0.72, 0.17), "pipes": [-0.36, 0.36], "pipe_r": 0.055,
 		"wheel_r": 0.31, "axle": 0.66,
@@ -203,8 +203,8 @@ const SHAPES := {
 	},
 	"hakone": {  # 70er-Fließheck (S30-Gefühl): sehr lange Haube, Scheinwerfer in Mulden vorn in den Kotflügeln, kleines
 		# Maul, Dach fließt bis ans Heck, Leuchten in einem schwarzen Feld
-		"nose": 0.6, "hood": 0.83, "cowl": 0.415, "rf": 0.53, "rr": 0.63, "ge": 0.93, "cp": 0.81,
-		"roof": 1.27, "deck": 0.96, "tail": 0.93, "belt": 0.82, "fender": 0.045, "hips": 0.03,
+		"nose": 0.6, "hood": 0.83, "cowl": 0.415, "rf": 0.53, "rr": 0.6, "ge": 0.95, "cp": 0.81,
+		"roof": 1.27, "deck": 0.92, "tail": 0.9, "belt": 0.82, "fender": 0.045, "hips": 0.03,
 		"round_f": 0.16, "round_r": 0.06, "tumble": 0.18, "hl": {}, "tl": {},
 		"doors": [0.43, 0.675], "intake": Vector2(0.42, 0.09), "pipes": [0.4], "pipe_r": 0.045,
 		"wheel_r": 0.3, "axle": 0.72, "tire_w": 0.21, "chrome_bumpers": true,
@@ -220,16 +220,16 @@ const SHAPES := {
 	},
 	"falke": {  # Heckmotor-Sportwagen (911-Gefühl): runde Scheinwerfer oben auf den Kotflügeln, flache Haube dazwischen,
 		# Dach fällt in einem Bogen zum Heck, breite Hüften, Leuchtenband über das ganze Heck, Entenbürzel
-		"nose": 0.56, "hood": 0.74, "cowl": 0.32, "rf": 0.46, "rr": 0.58, "ge": 0.8, "cp": 0.73,
-		"roof": 1.27, "deck": 0.97, "tail": 0.95, "belt": 0.83, "fender": 0.085, "hips": 0.06,
+		"nose": 0.56, "hood": 0.74, "cowl": 0.32, "rf": 0.46, "rr": 0.55, "ge": 0.97, "cp": 0.73,
+		"roof": 1.27, "deck": 0.9, "tail": 0.86, "belt": 0.83, "fender": 0.085, "hips": 0.06,
 		"round_f": 0.23, "round_r": 0.19, "tumble": 0.25, "hl": {}, "tl": {},
 		"doors": [0.335, 0.61], "intake": Vector2(0.6, 0.1), "pipes": [-0.11, 0.11], "pipe_r": 0.05,
 		"wheel_r": 0.33, "axle": 0.92, "tire_w": 0.26, "rear_engine": true,
 	},
 	"furia": {  # V12-Keil (Countach-Gefühl): sehr flach und breit, spitze Nase, Kanzel weit vorn, hoher Motordeckel mit
 		# Lamellen, Y-Leuchten, sechseckige Einlässe, Endrohre in der Mitte
-		"nose": 0.5, "hood": 0.71, "cowl": 0.3, "rf": 0.445, "rr": 0.545, "ge": 0.63, "cp": 0.66,
-		"roof": 1.13, "deck": 1.0, "tail": 1.0, "belt": 0.8, "fender": 0.03, "hips": 0.045,
+		"nose": 0.45, "hood": 0.71, "cowl": 0.3, "rf": 0.445, "rr": 0.52, "ge": 0.66, "cp": 0.66,
+		"roof": 1.13, "deck": 1.05, "tail": 1.04, "belt": 0.8, "fender": 0.03, "hips": 0.045,
 		"round_f": 0.06, "round_r": 0.04, "tumble": 0.27, "hl": {6: 0.07}, "tl": {},
 		"doors": [0.31, 0.59], "intake": Vector2(0.74, 0.12), "pipes": [-0.075, 0.075], "pipe_r": 0.058, "mid": true,
 		"wheel_r": 0.345, "axle": 1.0, "tire_w": 0.3,
@@ -243,7 +243,7 @@ const SHAPES := {
 	},
 	"tengu": {  # Drift-Monster (seit 2.32, Level 16): kurzer Überhang hinten, breite Backen, großes Mittelrohr
 		"nose": 0.55, "hood": 0.79, "cowl": 0.36, "rf": 0.48, "rr": 0.605, "ge": 0.84, "cp": 0.72,
-		"roof": 1.2, "deck": 0.97, "tail": 0.96, "belt": 0.83, "fender": 0.075, "hips": 0.07,
+		"roof": 1.2, "deck": 0.97, "tail": 0.96, "belt": 0.83, "fender": 0.09, "hips": 0.1,
 		"round_f": 0.15, "round_r": 0.08, "tumble": 0.24, "hl": {6: 0.1}, "tl": {},
 		"doors": [0.37, 0.64], "intake": Vector2(0.6, 0.13), "pipes": [0.0], "pipe_r": 0.065,
 		"wheel_r": 0.335, "axle": 0.9, "tire_w": 0.3,
@@ -318,6 +318,9 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 	var head_m: Material = mats["head"]
 	var amber := mat(Color(1, 0.55, 0.05), 0, 0.3, Color(1, 0.5, 0.0), 1.5)
 	var fw: float = front[6].x  # halbe Breite der Bugfläche in Gürtelhöhe
+	# seit 2.53: nicht breiter als die Stirnfläche selbst zwischen Flankenmitte und Gürtel (die verfeinerte Kurve liegt dort
+	# innen): flache Leuchten und Einlässe standen sonst an den runden Ecken über
+	fw = minf(fw, minf(_side_x(S, 0.0, front[5].y, W, L, flare), _side_x(S, 0.0, front[6].y - 0.03, W, L, flare)) - 0.012)
 	var iv: Vector2 = S["intake"]
 	var iw := fw * 2.0 * iv.x
 	var ic_k := 0.86  # Breite des Ladeluftkühlers im Einlass
@@ -341,7 +344,8 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 			_add(fb, box(Vector3(icw, 0.006, 0.012)), dark, Vector3(0, CLEARANCE + 0.07 + iv.y / 2.0 - ich / 2.0 + 0.011 + k * 0.022, zf - 0.017))
 	if kit == 0:
 		# dezente Frontlippe ab Werk (sportlich, nicht so ausladend wie das Bodykit)
-		_add(fb, rbox(Vector3(fw * 2.0 - 0.18, 0.018, 0.08)), dark, Vector3(0, CLEARANCE + 0.005, zf + 0.03))
+		# seit 2.53 direkt unter der Schürze (deren Unterkante liegt vorn 6 cm höher, _section): vorher 5 cm darunter
+		_add(fb, rbox(Vector3(fw * 2.0 - 0.18, 0.018, 0.08)), dark, Vector3(0, CLEARANCE + 0.052, zf + 0.03))
 	elif kit != 1 and kit != 2:
 		_bodykit(body, fb, S, W, L, flare, kit, fw, dark, paint, mats)
 	var hy: float = S["nose"] - 0.09
@@ -611,8 +615,9 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 	var rbm: Node3D = body.get_node("RearBumper")
 	var tail_m: Material = mats["tail"]
 	var rev_m := mat(Color(0.85, 0.85, 0.85), 0, 0.3, Color(1, 1, 1), 0.35)
-	var rw: float = rear[6].x
 	var ty: float = S["tail"] - 0.2
+	# seit 2.53 wie fw: höchstens so breit wie die Heckfläche in Leuchtenhöhe
+	var rw: float = minf(rear[6].x, minf(_side_x(S, 1.0, ty, W, L, flare), _side_x(S, 1.0, rear[5].y, W, L, flare)) - 0.012)
 	# Höhen auf der Heckfläche: Gürtellinie und Flankenmitte; Leuchten liegen dazwischen und laufen um die Ecke
 	var r_belt: float = rear[6].y
 	var r_mid: float = rear[5].y
@@ -623,9 +628,11 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 	_add(rbm, box(Vector3(0.33, 0.165, 0.01)), mat(Color(0.85, 0.85, 0.8), 0.0, 0.5), Vector3(0, CLEARANCE + 0.3, zr + 0.004))
 	_add(rbm, box(Vector3(0.342, 0.177, 0.006)), dark, Vector3(0, CLEARANCE + 0.3, zr + 0.001))
 	_near(_add(rbm, _plate_text(plate_text(car_id, cfg)), dark, Vector3(0, CLEARANCE + 0.296, zr + 0.0095)))
-	_add(rbm, box(Vector3(rw * 1.1, 0.07, 0.05)), dark, Vector3(0, CLEARANCE + 0.04, zr - 0.01))
+	# seit 2.53 an die Unterkante der Heckschürze (hinten 10 cm höher als der Unterboden, _section): vorher hingen
+	# Leiste und Finnen gut 2 cm darunter
+	_add(rbm, box(Vector3(rw * 1.1, 0.07, 0.05)), dark, Vector3(0, CLEARANCE + 0.066, zr - 0.01))
 	for k in 5:  # Diffusor-Finnen
-		_add(rbm, box(Vector3(0.012, 0.09, 0.22)), dark, Vector3((k - 2) * rw * 0.22, CLEARANCE + 0.03, zr - 0.1))
+		_add(rbm, box(Vector3(0.012, 0.09, 0.22)), dark, Vector3((k - 2) * rw * 0.22, CLEARANCE + 0.056, zr - 0.1))
 	match car_id:
 		"ronin":  # dunkles Band über das ganze Heck, darin runde Leuchten
 			_add(rbm, box(Vector3(rw * 2.0 - 0.08, 0.13, 0.01)), dark, Vector3(0, ty, zr + 0.004))
@@ -935,7 +942,9 @@ static func build(car_id: String, cfg: Dictionary, headlights := true, lod := tr
 		var rp: PackedVector2Array = _section(S, S["rr"], W, L, flare)["p"]
 		for k in 7:
 			var x := -0.36 + k * 0.12
-			_add(body, box(Vector3(0.012, 0.04, 0.09)), dark, Vector3(x, _top_y(rp, absf(x) / rp[7].x) + 0.015, zf + S["rr"] * L + 0.03))
+			# seit 2.53 noch auf dem Dach (vorher 3 cm dahinter über der abfallenden Heckscheibe: die Finnen schwebten)
+			var rp2: PackedVector2Array = _section(S, S["rr"] - 0.05 / L, W, L, flare)["p"]
+			_add(body, box(Vector3(0.012, 0.04, 0.09)), dark, Vector3(x, _top_y(rp2, absf(x) / rp2[7].x) + 0.018, zf + S["rr"] * L - 0.05))
 		var flap := mat(Color(0.5, 0.03, 0.03), 0.0, 0.8)
 		for zi in [-1, 1]:
 			for s in [-1, 1]:
@@ -3382,7 +3391,9 @@ static func _lamp_detail(body: Node3D, mats: Dictionary, L: float, light_c: Colo
 				found[m].append([mi, si, pts])
 	var hot_h := mat(Color(1, 1, 1), 0.0, 0.3, Color(1, 1, 1).lerp(light_c, 0.6), 5.0)
 	var bezel := mat(Color(0.75, 0.75, 0.78), 0.95, 0.15)
-	var lens_h := mat(Color(0.55, 0.57, 0.6), 1.0, 0.08, Color(1, 1, 0.97).lerp(light_c, 0.5), 0.5)
+	# seit 2.53 dunkleres Klarglas mit schwachem Schein: vorher hell grauweiß mit Leuchten, die Scheinwerferflächen auf
+	# den Kotflügeln wirkten wie weiße Aufkleber; die hellen Lampen darin (hot_h) bleiben
+	var lens_h := mat(Color(0.3, 0.32, 0.36), 1.0, 0.06, Color(1, 1, 0.97).lerp(light_c, 0.5), 0.18)
 	var lens_t := mat(Color(0.32, 0.015, 0.015), 0.3, 0.14, Color(0.95, 0.04, 0.02), 1.25)
 	var hot_t := mat(Color(1, 0.2, 0.15), 0.0, 0.3, Color(1, 0.1, 0.05), 4.2)
 	var red_in := mat(Color(0.25, 0.02, 0.02), 0.2, 0.25, Color(0.5, 0.0, 0.0), 0.5)  # wie die Blende hinten (build)
@@ -4324,7 +4335,9 @@ static func _lamp(parent: Node3D, S: Dictionary, W: float, L: float, flare: floa
 	var ring := []
 	for i in n + 1:
 		var t := lerpf(end, t_wrap, float(i) / n) if n > 0 else end
-		ring.append([_side_x(S, t, y0, W, L, flare), _side_x(S, t, y1, W, L, flare), (t - 0.5) * L])
+		# seit 2.53 5 mm in die Haut gezogen: zwischen zwei Querschnitten ist die Haut eine Gerade, die Kurve liegt dort
+		# außen; die Enden der Leuchten standen an den runden Ecken sonst über
+		ring.append([_side_x(S, t, y0, W, L, flare) - 0.005, _side_x(S, t, y1, W, L, flare) - 0.005, (t - 0.5) * L])
 	# Außennormale der Flanke je Ring (in der Draufsicht), daran wird der Streifen etwas abgehoben
 	var nrm := []
 	for i in n + 1:
