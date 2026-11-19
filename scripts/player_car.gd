@@ -238,6 +238,8 @@ var _slope_pitch := 0.0
 var _yaw_prev := 0.0
 var _slope_roll := 0.0
 var _cam_yaw := 0.0
+var _cam_dip := 0.0  # Kamera sackt nach einer Landung so weit ein (m), _cam_dip_s geglättet
+var _cam_dip_s := 0.0
 var _cam_pos := Vector3.ZERO
 var _cam_init := false
 var jump_cam := false
@@ -1528,6 +1530,7 @@ func _land(gh: float, water: bool, soft := false) -> void:
 		Sfx.play("thud", linear_to_db(clampf(impact / 14.0, 0.3, 1.0)), randf_range(0.9, 1.05))
 		audio.crash(clampf(impact / 30.0, 0.1, 0.4))
 	_shake = minf(_shake + impact * 0.025, 0.7)
+	_cam_dip = minf(_cam_dip + maxf(impact - 2.0, 0.0) * 0.03, 0.3)
 	# schief aufgesetzt kostet mehr Tempo als sauber auf allen vier Rädern
 	velocity *= (0.97 if impact < 10.0 else 0.92) * (1.0 - 0.3 * clampf(nose + roll * 0.5, 0.0, 1.0))
 	model.get_meta("body").rotation.x = -clampf(impact * 0.012, 0.05, 0.16)  # Federn tauchen ein
@@ -1750,8 +1753,15 @@ func _update_camera(dt: float, sf: float) -> void:
 		_cam_yaw = lerp_angle(_cam_yaw, yaw, 1.0 - exp(-dt * (2.0 if airborne else 4.5 * _cam_k)))
 		var target := global_position + Basis(Vector3.UP, _cam_yaw) * Vector3(0, height, dist)
 		_cam_pos = _cam_pos.lerp(target, 1.0 - exp(-dt * 20.0))
-		_cam_pos.y = lerpf(_cam_pos.y, target.y, 1.0 - exp(-dt * (6.0 if airborne else 20.0)))
-		cam.global_position = _cam_pos
+		# Höhe (seit 2.53 wie in Underground): folgt auch am Boden etwas weich (bis 2.52 fast starr), so hebt sich das
+		# Auto an einer Kuppe im Bild und taucht dahinter ab; höchstens 0,6 m unter bzw. 1,2 m über dem Soll. Beim
+		# Aufsetzen sackt sie kurz ein (_cam_dip, aus _land) und federt zurück.
+		_cam_pos.y = lerpf(_cam_pos.y, target.y, 1.0 - exp(-dt * (6.0 if airborne else 9.0)))
+		if not airborne:
+			_cam_pos.y = clampf(_cam_pos.y, target.y - 0.6, target.y + 1.2)
+		_cam_dip = move_toward(_cam_dip, 0.0, dt * 1.4)
+		_cam_dip_s = lerpf(_cam_dip_s, _cam_dip, 1.0 - exp(-dt * 16.0))
+		cam.global_position = _cam_pos - Vector3(0, _cam_dip_s if GameState.cam_shake else 0.0, 0)
 		cam.look_at(global_position + Basis(Vector3.UP, _cam_yaw) * Vector3(0, cs["look_y"], cs["look_z"]), Vector3.UP)
 		if GameState.cam_shake:
 			cam.rotate_object_local(Vector3.FORWARD, -steer * sf * 0.02)

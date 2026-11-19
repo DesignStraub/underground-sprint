@@ -255,6 +255,18 @@ Außenring → nächste Stadt → Autobahn. Rundkurse und Drift-Kurse sind Schle
 - **Köln als Pilot für größere Städte: Innenstadtring mit Altstadt-Schleife** (seit 2.51, Einzelheiten dort).
 - **Straßennetze in allen Städten, dichte Ränder, Höfe, Passanten zum Umfahren, leisere Motoren** (seit 2.52,
   Einzelheiten dort).
+- **Kantigere Autos, mehr Bilder pro Sekunde, Kuppen in Aachen** (in Arbeit, Einzelheiten dort).
+
+## In Arbeit (nach 2.52)
+- **Autos:** je Modell eigene Kantigkeit (flache Dächer, harte Kanten bei den eckigen Vorbildern), Klappscheinwerfer
+  nur noch als saubere, geschlossene Deckel, Lippe und Diffusor sitzen an, eigene Proportionen für mehrere Modelle;
+  die Front hebt beim Driften kaum noch an.
+- **Bilder pro Sekunde:** parkende Autos nur bis 220 m mit Details, dahinter als einfache Form, ab 700 m gar nicht
+  (vorher wurden alle Teile aller parkenden Autos der Stadt gezeichnet); die Minikarte zeichnet nur noch die Straßen
+  in ihrer Nähe. Testfahrt durch Aachen in der freien Fahrt: 99 statt vorher 60 fps.
+- **Kuppen:** drei kurze Kuppen auf dem Aachener Grabenring (1,5 m hoch, je 30 m Anstieg), weit weg von
+  Einmündungen. Ab gut 155 km/h hebt das Auto ab. Die Kamera folgt der Höhe jetzt weicher und sackt beim Aufsetzen
+  kurz ein, wie in Underground.
 
 ## Straßennetze in allen Städten (2.52)
 - **Straßennetze:** Aachen, Würzburg, Bad Kissingen, Tauberbischofsheim und Hammelburg mit echten Straßen aus

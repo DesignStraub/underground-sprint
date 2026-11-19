@@ -462,7 +462,7 @@ func _process(dt: float) -> void:
 				near += " T(%.1f,%.1f)" % [t.progress - pl.progress, t.lateral()]
 		print("t=%.1f d=%.1f lat=%.2f v=%.1f path=%d y=%.2f luft=%s fps=%d%s" % [_t, pl.progress, pl.lateral, pl.speed_fwd, pl.path_id, pl.position.y, pl.airborne, Engine.get_frames_per_second(), near])
 		print("   runde=%d gesamt=%.0f ziel=%.0f status=%d platz=%d drift=%d kette=%d" % [pl.lap, pl.total, race.track["finish"], race.state, race._place(), int(race.drift_score), int(race.drift_chain)])
-		print("   rutscht=%s winkel=%.0f tempo=%.1f lenk=%.2f wand=%d manoever=%.2f" % [pl._sliding, pl.drift_angle, pl.velocity.length(), pl.steer, pl.wall_hits, _drift_t])
+		print("   rutscht=%s winkel=%.0f tempo=%.1f lenk=%.2f wand=%d manoever=%.2f" % [str(pl.get("_sliding")), pl.drift_angle, pl.velocity.length(), pl.steer, pl.wall_hits, _drift_t])
 		for n in get_tree().get_nodes_in_group("ambient"):
 			if "_cars" in n:
 				print("   zug aktiv=%s d=%.0f (%.0f-%.0f) sichtbar=%s y=%.1f" % [n._active, n._d, n.d_from, n.d_to, n._cars[0].visible, n._cars[0].global_position.y])
