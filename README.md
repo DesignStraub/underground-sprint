@@ -253,6 +253,21 @@ Außenring → nächste Stadt → Autobahn. Rundkurse und Drift-Kurse sind Schle
 - **Ruhigeres Grundtempo, Kamera nach echtem Tempo, neue Karte mit Zoom und Springen** (seit 2.49, Einzelheiten dort).
 - **Versteckte Werkstätten und Kennzeichen in jeder Stadt** (seit 2.50, Einzelheiten dort).
 - **Köln als Pilot für größere Städte: Innenstadtring mit Altstadt-Schleife** (seit 2.51, Einzelheiten dort).
+- **Straßennetze in allen Städten, dichte Ränder, Höfe, Passanten zum Umfahren, leisere Motoren** (seit 2.52,
+  Einzelheiten dort).
+
+## Straßennetze in allen Städten (2.52)
+- **Straßennetze:** Aachen, Würzburg, Bad Kissingen, Tauberbischofsheim und Hammelburg mit echten Straßen aus
+  OpenStreetMap, die übrigen Städte (außer Stuttgart) mit entworfenen Netzen und echten Straßennamen. Köln mit
+  Netz rund um und quer durch den Innenstadtring.
+- **Dicht:** keine offenen Stellen mehr ins Grüne oder aufs Wasser, keine unsichtbaren Wände an engen Ecken; offene
+  Wandenden werden geschlossen, Wände auf Fahrbahnen entfernt. Kein Flackern mehr an den Einmündungen.
+- **Ränder:** neben Gitter auch Vorgärten mit Zaun und Backsteinmauern.
+- **Gefüllte Städte:** OSM-Häuser werden zur Straße hin gekürzt statt weggelassen; Lücken füllen Höfe und Gärten
+  (Rasen, Pflasterhof mit Tonnen, Kies-Stellplatz, Garten mit Gartenhaus).
+- **Passanten auf den Gehwegen** in kleinen Gruppen; angefahren fliegen sie davon wie Laternen.
+- **Ton:** schrille Motoren (z. B. Kaze TT) gedämpft, Effekte leiser; Lautstärke für Musik und Effekte einstellbar,
+  Einstellungen auch im Pausenmenü (Esc).
 
 ## Köln als Pilot für größere Städte (2.51)
 Rückmeldung: die Städte sind meist nur ein kurzer Rundkurs, das Spiel ist zu einfach, Strecken sollen enger und
