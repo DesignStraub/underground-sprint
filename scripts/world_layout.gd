@@ -302,6 +302,7 @@ static func build() -> Dictionary:
 		roads.append([a["access"], 1])
 	# Höhen und Tiefen (seit 2.40): Ringe, Querspangen, Spangen und Verbindungen folgen dem Gelände (_plan_profiles);
 	# --flach: alles auf Höhe 0 wie bis 2.39 (Vergleich)
+	_plan_mountains(mid, offroad)
 	var plines := []
 	if not OS.get_cmdline_user_args().has("--flach"):
 		var tp := Time.get_ticks_msec()
@@ -1490,15 +1491,77 @@ static func _plan_cuts(segments: Array) -> Array:
 # --- Höhen und Tiefen (seit 2.40) -------------------------------------------------------------------------------------
 
 const PROF_DS := 20.0  # Abstand der Höhenwerte entlang einer Linie (m)
-const PROF_HMAX := 42.0  # so hoch steigt eine Straße über Land höchstens
-const PROF_DROP := 10.0  # so weit liegt sie unter dem natürlichen Gelände (fährt durch Senken und über Sättel)
+const PROF_HMAX := 62.0  # so hoch steigt eine Straße über Land höchstens (bis 2.52: 42 m)
+const PROF_DROP := 6.0  # so weit liegt sie unter dem natürlichen Gelände (fährt durch Senken und über Sättel; bis 2.52: 10 m)
 const PROF_G := 0.055  # größte Steigung
-const PROF_PIN_G := 0.055  # so steil darf es weg von flachen Stellen ansteigen
+const PROF_SMOOTH := 14  # Glättungsdurchgänge (je gut 200 m); bis 2.52: 26, die Autobahn wirkte dadurch eintönig
+## Wellen (seit 2.53, Rückmeldung: "vor allem die Autobahn ist super monoton"): zusätzlich zum Gelände hebt und senkt
+## sich jede Linie um bis zu WAVE_H, Wellenlänge um 900 m (nie unter 0, an flachen Stellen nichts)
+const WAVE_H := 11.0
+## Bergland (seit 2.53, "fast schon eine Berglandschaft"): im Inneren des Rings rund um eine Querspange (weg vom
+## Gelände zum Austoben) Berge bis MTN_H über dem übrigen Gelände; die Querspange wird zur Passstraße, höchstens
+## MTN_HMAX hoch und MTN_G steil, durch die höchsten Rücken in Tunneln
+const MTN_H := 360.0
+const MTN_HMAX := 175.0
+const MTN_G := 0.10
+const MTN_ARC := 0.95  # halbe Breite in Bogenmaß um die Querspange
+const MTN_R := Vector2(1150.0, 3950.0)  # von der Mitte aus (Kreisel bis kurz vor den inneren Ring)
+const PROF_PIN_G := 0.062  # so steil darf es weg von flachen Stellen ansteigen (bis 2.52: 0,055; im Bergland MTN_G)
 const PIN_CELL := 300.0
 
 static var _hn: FastNoiseLite = null
 static var _dn: FastNoiseLite = null
 static var _land_tunnels := []  # zuletzt geplante Tunnel (für die Landschaft: Hügel ohne Bäume der Landschaft)
+static var _mtn_a := NAN  # Winkel der Querspange durchs Bergland (NAN: keins)
+static var _mn: FastNoiseLite = null
+static var _wn: FastNoiseLite = null
+
+
+## Anteil Bergland an p (0 außerhalb, 1 mittendrin), weiche Ränder
+static func mountain_k(p: Vector2) -> float:
+	if is_nan(_mtn_a):
+		return 0.0
+	var r := p.length()
+	var kr := smoothstep(MTN_R.x, MTN_R.x + 500.0, r) * (1.0 - smoothstep(MTN_R.y - 450.0, MTN_R.y, r))
+	if kr <= 0.0:
+		return 0.0
+	var da := absf(wrapf(p.angle() - _mtn_a, -PI, PI))
+	return kr * (1.0 - smoothstep(MTN_ARC * 0.55, MTN_ARC, da))
+
+
+## Höhe der Berge allein (ohne das übrige Gelände)
+static func mountain_h(p: Vector2) -> float:
+	var k := mountain_k(p)
+	if k <= 0.0:
+		return 0.0
+	if _mn == null:
+		var mn := FastNoiseLite.new()
+		mn.seed = 4711
+		mn.frequency = 1.0 / 1100.0
+		mn.fractal_type = FastNoiseLite.FRACTAL_RIDGED
+		mn.fractal_octaves = 4
+		_mn = mn
+	var n := clampf(_mn.get_noise_2d(p.x, p.y) * 0.5 + 0.5, 0.0, 1.0)
+	return k * (40.0 + pow(n, 1.6) * MTN_H)
+
+
+## Bergland festlegen: die Querspange, deren Richtung am weitesten weg vom Gelände zum Austoben liegt
+static func _plan_mountains(mid: Dictionary, offroad: Array) -> void:
+	_mtn_a = NAN
+	if OS.get_cmdline_user_args().has("--nomtn"):
+		return
+	var best := -1.0
+	for arm in mid["arms"]:
+		var p0: Vector3 = arm[0]
+		var a := Vector2(p0.x, p0.z).angle()
+		var sc := PI
+		for ar in offroad:
+			sc = minf(sc, absf(wrapf((ar["mid"] as Vector2).angle() - a, -PI, PI)))
+		if sc > best:
+			best = sc
+			_mtn_a = a
+	if OS.get_cmdline_user_args().has("--worldlog"):
+		print("WELT Bergland um die Querspange bei %.0f° (Ring bei %s)" % [rad_to_deg(_mtn_a), str(Vector2.from_angle(_mtn_a) * 4624.0)])
 
 
 ## Natürliche Geländehöhe ohne Rücksicht auf Straßen (dieselbe Formel und dasselbe Rauschen wie die Landschaft,
@@ -1516,7 +1579,7 @@ static func raw_height(p: Vector2) -> float:
 		hn.fractal_octaves = 3
 		_hn = hn
 	var n := clampf(_hn.get_noise_2d(p.x, p.y) * 1.1 + 0.5, 0.0, 1.0)
-	return pow(n, 1.7) * 115.0 + _dn.get_noise_2d(p.x, p.y) * 12.0 + 6.0
+	return pow(n, 1.7) * 115.0 + _dn.get_noise_2d(p.x, p.y) * 12.0 + 6.0 + mountain_h(p)
 
 
 ## Höhenprofile der Verbindungen über Land (Rückmeldung zu 2.39: "mehr mit Höhen und Tiefen spielen ... mal einen Berg
@@ -1585,12 +1648,12 @@ static func _plan_profiles(ring: Array, oring: Array, mid: Dictionary, spokes: A
 		race["crests"] = (race.get("crests", []) as Array).filter(func(cr): return (cr as Array).size() > 3)
 	var cap_at := func(q: Vector2) -> float:
 		var c0 := Vector2i(floori(q.x / PIN_CELL), floori(q.y / PIN_CELL))
-		var best := PROF_HMAX / PROF_PIN_G
+		var best := MTN_HMAX / PROF_PIN_G * 2.0
 		for dy in range(-5, 6):
 			for dx in range(-5, 6):
 				for pn in pins.get(c0 + Vector2i(dx, dy), []):
 					best = minf(best, maxf((pn[0] as Vector2).distance_to(q) - float(pn[1]), 0.0))
-		return best * PROF_PIN_G
+		return best * lerpf(PROF_PIN_G, MTN_G, mountain_k(q))
 	var lines := []
 	lines.append(_line_profile(ring, true, "Ring", cap_at))
 	lines.append(_line_profile(oring, true, "Außenring", cap_at))
@@ -1627,6 +1690,13 @@ static func _plan_profiles(ring: Array, oring: Array, mid: Dictionary, spokes: A
 				hi = maxf(hi, y)
 				if y > 3.0:
 					up += 1
+			var pp: PackedVector2Array = ln["pts"]
+			var mrow := ""
+			for i in range(0, ys.size(), 10):
+				if mountain_k(pp[i]) > 0.05:
+					mrow += " %d/%d/%d" % [int(ys[i]), int(ln["raw"][i]), int(ln["cap"][i])]
+			if mrow != "":
+				print("WELT Bergland %s (Straße/Gelände/Grenze je 200 m):%s" % [ln["name"], mrow])
 			if hi > 0.5:
 				print("WELT Profil %-24s %5.1f km, höchstens %4.1f m, %3.0f %% über 3 m" % [ln["name"], ys.size() * PROF_DS / 1000.0,
 					hi, 100.0 * up / maxf(ys.size(), 1)])
@@ -1663,16 +1733,31 @@ static func _line_profile(src: Array, closed: bool, name: String, cap_at: Callab
 	y.resize(n)
 	var raw := PackedFloat32Array()
 	raw.resize(n)
+	var gs := PackedFloat32Array()  # größte Steigung je Punkt (im Bergland steiler)
+	gs.resize(n)
 	for i in n:
-		cap[i] = cap_at.call(pts[i])
+		var mk := mountain_k(pts[i])
+		cap[i] = minf(cap_at.call(pts[i]), lerpf(PROF_HMAX, MTN_HMAX, mk))
 		raw[i] = raw_height(pts[i])
-		y[i] = minf(clampf(raw[i] - PROF_DROP, 0.0, PROF_HMAX), cap[i])
+		gs[i] = lerpf(PROF_G, MTN_G, mk)
+		y[i] = minf(maxf(raw[i] - PROF_DROP, 0.0), cap[i])
 	# glätten (gleitender Mittelwert über gut 200 m), dabei nie über die Grenze
-	for it in 26:
+	for it in PROF_SMOOTH:
 		y = _box(y, 5, closed)
 		for i in n:
 			y[i] = minf(y[i], cap[i])
-	y = _grade(y, closed)
+	# Wellen: entlang der Linie (Weg-Meter als Eingabe), an flachen Stellen ausgeblendet
+	if _wn == null:
+		var wn := FastNoiseLite.new()
+		wn.seed = 91
+		wn.frequency = 1.0 / 900.0
+		wn.fractal_octaves = 2
+		_wn = wn
+	var off := float(name.hash() % 100000)
+	for i in n:
+		var w := _wn.get_noise_1d(off + i * PROF_DS) * 1.6 * WAVE_H
+		y[i] = clampf(y[i] + w * smoothstep(4.0, 30.0, cap[i]), 0.0, cap[i])
+	y = _grade(y, closed, gs)
 	for it in 4:
 		y = _box(y, 2, closed)
 		for i in n:
@@ -1700,18 +1785,17 @@ static func _box(y: PackedFloat32Array, r: int, closed: bool) -> PackedFloat32Ar
 
 
 ## Steigung begrenzen: Kuppen so weit absenken, dass es nirgends steiler als PROF_G wird (vorwärts und rückwärts)
-static func _grade(y: PackedFloat32Array, closed: bool) -> PackedFloat32Array:
+static func _grade(y: PackedFloat32Array, closed: bool, gs := PackedFloat32Array()) -> PackedFloat32Array:
 	var n := y.size()
-	var g := PROF_G * PROF_DS
 	for rnd in (3 if closed else 1):
 		for i in range(1, n + (n if closed else 0)):
 			var a := posmod(i - 1, n)
 			var b := posmod(i, n)
-			y[b] = minf(y[b], y[a] + g)
+			y[b] = minf(y[b], y[a] + (gs[b] if gs.size() == n else PROF_G) * PROF_DS)
 		for i in range(n - 2 + (n if closed else 0), -1, -1):
 			var a := posmod(i + 1, n)
 			var b := posmod(i, n)
-			y[b] = minf(y[b], y[a] + g)
+			y[b] = minf(y[b], y[a] + (gs[b] if gs.size() == n else PROF_G) * PROF_DS)
 	return y
 
 

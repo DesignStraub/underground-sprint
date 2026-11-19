@@ -64,6 +64,13 @@ func _plan() -> void:
 	if only == "" or only == "outer":
 		for e in rings[1]:
 			legs.append({"e": e, "find": func(_tr): return 0, "rev": false, "name": "Außenring %d" % e["seg_i"]})
+	if only == "quer":  # nur die Querspangen (seit 2.53: Passstraße durchs Bergland), hin und zurück
+		for ri in range(3, rings.size()):
+			for e in rings[ri]:
+				if str(e["race"]["name"]).begins_with("Querspange"):
+					for rv in [false, true]:
+						legs.append({"e": e, "find": func(_tr): return 0, "rev": rv, "name": "%s %d/%d%s" % [e["race"]["name"], ri, e["seg_i"], " zurück" if rv else ""]})
+		return
 	if only == "" or only == "mitte":
 		for ri in range(2, rings.size()):
 			for e in rings[ri]:

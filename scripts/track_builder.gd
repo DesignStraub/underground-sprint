@@ -369,6 +369,8 @@ static func begin(race: Dictionary) -> Dictionary:
 		_plan_spurs(track, rng)
 		if not track.has("fixed_el"):
 			_plan_el(track, rng)  # Stadt-Entwürfe: Hochbahn und Mittelstreifen nur, wo sie es wollen (Design.plan)
+		if type in ["circuit", "sprint"]:
+			_plan_city_crests(track, race)
 		if not track.has("fixed_medians"):
 			_plan_medians(track, rng)
 	if not track["elev0"].is_empty():
@@ -5358,14 +5360,28 @@ static func _plan_city_crossing(track: Dictionary, race: Dictionary) -> void:
 ## city_net.gd), Start, Ziel, Bahnübergang und Brücken. Form: CREST_H hoch, CREST_RAMP lang hinauf und hinunter,
 ## oben CREST_TOP flach. Die Krümmung oben (6 h / l²) lässt das Auto ab gut 155 km/h abheben (player_car, crest).
 ## Als Zone eingetragen: dort mündet nichts ein, keine Sackgasse, kein Mittelstreifen.
-const CITY_CRESTS := {"aachen": 3}
+const CITY_CRESTS := {"aachen": 3}  # sonst eine je CREST_EVERY Meter, höchstens CREST_MAX
+const CREST_EVERY := 850.0
+const CREST_MAX := 4
 const CREST_H := 1.5
 const CREST_RAMP := 30.0
 const CREST_TOP := 8.0
-const CREST_CLEAR := 45.0  # so weit bleibt jede Einmündung vom Fuß der Kuppe weg
+const CREST_CLEAR := 30.0  # so weit bleibt jede Einmündung vom Fuß der Kuppe weg
+
+## Wie _in_zone, aber ohne lange Zonen (über 300 m: Abschnitte ohne Seitenstraßen, etwa die Kölner Altstadt-Schleife);
+## kurze Zonen sind Einmündungen, Bahnübergänge und Start
+static func _in_short_zone(track: Dictionary, d: float, margin: float) -> bool:
+	for z in track["zones"]:
+		if float(z["to"]) - float(z["from"]) <= 300.0 and d > z["from"] - margin and d < z["to"] + margin:
+			return true
+	return false
+
 
 static func _plan_city_crests(track: Dictionary, race: Dictionary) -> void:
-	var want: int = CITY_CRESTS.get(str(race.get("city", "")), 0)
+	if race.get("type", "") not in ["circuit", "sprint"] or OS.get_cmdline_user_args().has("--nocrests"):
+		return
+	var key := str(race.get("city", race.get("layout", "")))
+	var want: int = CITY_CRESTS.get(key, clampi(int(float(track["length"]) / CREST_EVERY), 1, CREST_MAX))
 	if want <= 0:
 		return
 	var curve: Curve3D = track["curve"]
@@ -5385,7 +5401,8 @@ static func _plan_city_crests(track: Dictionary, race: Dictionary) -> void:
 	var cand := []
 	var d := 160.0
 	while d < (L - 160.0 if loop else minf(L, track["finish"]) - 160.0):
-		var ok := not _in_zone(track, d, half + 20.0) and bridge_at(track, d).is_empty() and absf(elev_at(curve, d)) < 0.05
+		var ok := not _in_short_zone(track, d, half + 20.0) and bridge_at(track, d).is_empty() and absf(elev_at(curve, d)) < 0.05 \
+			and tunnel_at(track, d, half + 40.0).is_empty() and _el_side(track, d, half + 20.0) == 0.0 and _trough_at(track, d) == 0
 		if ok and track["crossing_d"] >= 0.0 and absf(d - track["crossing_d"]) < half + 80.0:
 			ok = false
 		if ok:
@@ -5399,7 +5416,7 @@ static func _plan_city_crests(track: Dictionary, race: Dictionary) -> void:
 		if ok:
 			var f0 := frame_at(curve, d - half - 20.0)
 			var f1 := frame_at(curve, d + half + 20.0)
-			ok = (f0["fwd"] as Vector3).angle_to(f1["fwd"]) < 0.12
+			ok = (f0["fwd"] as Vector3).angle_to(f1["fwd"]) < 0.2
 		if ok:
 			cand.append(d)
 		d += 5.0
@@ -5426,6 +5443,8 @@ static func _plan_city_crests(track: Dictionary, race: Dictionary) -> void:
 		track["elev0"].append({"a": c - half, "b": c - CREST_TOP / 2.0, "c": c + CREST_TOP / 2.0, "e": c + half, "h": CREST_H})
 		track["zones"].append({"from": c - half - 10.0, "to": c + half + 10.0})
 		track["city_crests"] = track.get("city_crests", []) + [c]
+	if OS.get_cmdline_user_args().has("--leakcheck"):
+		print("KUPPEN %s: %d von %d bei %s" % [key, picked.size(), want, str(picked.map(func(x): return int(x)))])
 
 
 # --- Bebauung --------------------------------------------------------------
