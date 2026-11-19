@@ -1652,6 +1652,14 @@ static func build_street(root: Node3D, track: Dictionary, p: Dictionary, rng: Ra
 					continue
 				if not free and branch_clear(track, wm, true, true, own) < 0.3:
 					continue
+				# Innenseite enger Kurven (seit 2.52): ist der Radius kleiner als der Abstand der Wand, faltet sich ihre Linie
+				# zurück und liegt auf der eigenen Fahrbahn (unsichtbare Wand in kleinen, eckigen Kurven). Die Lücke
+				# schließt danach Track._stitch_walls außen herum.
+				if r0.dot(r1) < 0.995:
+					var lim := a2 + 0.3 - 0.5
+					if Track._flat(wa - c.get_closest_point(wa)).length() < lim or Track._flat(wb - c.get_closest_point(wb)).length() < lim \
+							or Track._flat(wm - c.get_closest_point(wm)).length() < lim:
+						continue
 				Track._wall_shape(walls, wa, wb)
 				wall_runs[i].append([wa, wb, d, rm * sd])
 		prev = cur

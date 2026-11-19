@@ -8,6 +8,7 @@ const Catalog := preload("res://scripts/catalog.gd")
 const Track := preload("res://scripts/track_builder.gd")
 const Knockable := preload("res://scripts/knockable.gd")
 const Layout := preload("res://scripts/world_layout.gd")
+const Streets := preload("res://scripts/street_net.gd")
 
 const KIND_COL := {"main": Color(0.45, 0.45, 0.5), "fork": Color(0.2, 0.8, 1.0), "alley": Color(1.0, 0.4, 0.9),
 	"spur": Color(0.6, 0.5, 1.0), "lake": Color(0.3, 1.0, 0.6)}
@@ -20,6 +21,7 @@ var out := "/tmp/track_map.png"
 var rect := Rect2()
 var fixed := Rect2()
 var _frames := 0
+var leak_pts: Array = []  # --leakcheck: Lücken (cyan Ringe)
 
 
 func _ready() -> void:
@@ -36,6 +38,11 @@ func _ready() -> void:
 		elif a.begins_with("--zoom="):
 			var z := a.substr(7).split(":")
 			zoom = Vector2(float(z[0]), float(z[1]))
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--stitchat="):  # x:z[,x:z...]
+			for pt in a.substr(11).split(","):
+				var xz := pt.split(":")
+				Track.stitch_pts.append(Vector3(float(xz[0]), 0, float(xz[1])))
 	track = Track.build(Layout.world_race(race_i) if OS.get_cmdline_user_args().has("--world") else Catalog.RACES[race_i])
 	var root: Node3D = track["node"]
 	add_child(root)  # nur für globale Lagen, wird nicht gezeichnet (kein Kamera-Viewport)
@@ -59,6 +66,8 @@ func _ready() -> void:
 		rect = fixed
 	if OS.get_cmdline_user_args().has("--wallcheck"):
 		_wallcheck()
+	if OS.get_cmdline_user_args().has("--leakcheck"):
+		_leakcheck()
 	print("Karte: %s, %.0f x %.0f m, %d Wandstücke, %d Lampen" % [Catalog.RACES[race_i]["name"], rect.size.x, rect.size.y, walls.size(), lights.size()])
 
 
@@ -71,6 +80,8 @@ func _collect(n: Node) -> void:
 				var a: Vector3 = xf * f[i]
 				var b: Vector3 = xf * f[i + 1]
 				var e: Vector3 = xf * f[i + 2]
+				if absf((b - a).cross(e - a).normalized().y) > 0.7:
+					continue  # Boden, keine Wand
 				# senkrechte Wand: zwei Ecken unten, eine oben; als Strecke die weiteste Ausdehnung in XZ
 				var seg := [Vector2(a.x, a.z), Vector2(b.x, b.z), Vector2(e.x, e.z)]
 				var best := [seg[0], seg[1]]
@@ -107,7 +118,8 @@ func _process(_dt: float) -> void:
 	queue_redraw()
 	_frames += 1
 	if _frames == 4:
-		get_viewport().get_texture().get_image().save_png(out)
+		if DisplayServer.get_name() != "headless":  # ohne Fenster gibt es kein Bild, nur die Prüfungen
+			get_viewport().get_texture().get_image().save_png(out)
 		get_tree().quit()
 
 
@@ -176,6 +188,9 @@ func _draw() -> void:
 
 
 ## --wallcheck: steht irgendwo eine Wand auf der Fahrbahn eines Weges? (Mittellinie alle 2 m gegen alle Wandstücke)
+	for q in leak_pts:
+		draw_arc(_px(q), 14.0, 0, TAU, 24, Color(0.2, 1.0, 1.0), 3.0)
+
 func _wallcheck() -> void:
 	var g := {}
 	for w in walls:
@@ -195,7 +210,7 @@ func _wallcheck() -> void:
 	for p in track["paths"]:
 		var c: Curve3D = p["curve"]
 		var L := c.get_baked_length()
-		var lim: float = float(p["half_w"]) * 0.7
+		var lim: float = float(p["half_w"]) - 0.3  # seit 2.52 bis an den Fahrbahnrand (vorher 70 % der halben Breite)
 		var d := 3.0
 		var last := -100.0
 		while d < L - 3.0:
@@ -283,3 +298,138 @@ func _wallcheck() -> void:
 				break
 	print("RANDCHECK %d Stellen" % nb)
 
+
+
+## --leakcheck: kommt man irgendwo von den Straßen weg ins Freie? Raster 0,5 m, Wände sperren. Die Straßenzone reicht je
+## Seite genau bis zur Wandlinie (+0,4 m): Fahrbahn, Park-/Grünstreifen, Gehweg. Von der Hauptstraße aus nur innerhalb
+## der Zone füllen; jede Zelle außerhalb, die man ohne Wand dazwischen erreicht, ist eine Lücke (je 8 m eine gemeldet).
+func _leakcheck() -> void:
+	const CS := 0.5
+	var r := rect.grow(40.0)
+	var W := int(r.size.x / CS) + 1
+	var H := int(r.size.y / CS) + 1
+	var cell := PackedByteArray()
+	cell.resize(W * H)  # Bit 1 Wand, Bit 2 Straßenzone, Bit 4 besucht
+	var idx := func(q: Vector2) -> int:
+		var x := int((q.x - r.position.x) / CS)
+		var y := int((q.y - r.position.y) / CS)
+		return -1 if x < 0 or y < 0 or x >= W or y >= H else y * W + x
+	var starts := []
+	for p in track["paths"]:
+		var c: Curve3D = p["curve"]
+		var L := c.get_baked_length()
+		var main: bool = int(p["id"]) == 0
+		var d := 0.0
+		while d <= L:
+			var f := Track.frame_at(c, d)
+			var o: Vector3 = f["pos"]
+			var rr: Vector3 = f["right"]
+			for sd in [-1.0, 1.0]:
+				var ext: float = (Track.hw(track, d) + Track.WALK + 2.6 if main else Streets.edge(p, sd) + (3.5 if p["kind"] == "ramp" else 0.0)) + 0.4
+				var t := 0.0
+				while t <= ext:
+					var i: int = idx.call(Vector2(o.x + rr.x * sd * t, o.z + rr.z * sd * t))
+					if i >= 0:
+						cell[i] |= 2
+					t += CS * 0.4
+			if main:
+				starts.append(Vector2(o.x, o.z))
+			d += CS * 0.4
+		if p["kind"] == "ramp":
+			var f2 := Track.frame_at(c, minf(40.0, L))
+			var o2: Vector3 = f2["pos"]
+			var r2: Vector3 = f2["right"]
+			walls.append([Vector2(o2.x - r2.x * 30.0, o2.z - r2.z * 30.0), Vector2(o2.x + r2.x * 30.0, o2.z + r2.z * 30.0)])
+	for w in walls:
+		var a: Vector2 = w[0]
+		var b: Vector2 = w[1]
+		var n := int(ceil(a.distance_to(b) / (CS * 0.4))) + 1
+		for k in n + 1:
+			var i: int = idx.call(a.lerp(b, float(k) / float(n)))
+			if i >= 0:
+				cell[i] |= 1
+	var queue := PackedInt32Array()
+	for q in starts:
+		var i: int = idx.call(q)
+		if i >= 0 and (cell[i] & 5) == 0:
+			cell[i] |= 4
+			queue.append(i)
+	var head := 0
+	var gaps := []
+	while head < queue.size():
+		var i := queue[head]
+		head += 1
+		var x := i % W
+		var y := i / W
+		for o in [[1, 0], [-1, 0], [0, 1], [0, -1]]:
+			var nx: int = x + o[0]
+			var ny: int = y + o[1]
+			if nx < 0 or ny < 0 or nx >= W or ny >= H:
+				continue
+			var j := ny * W + nx
+			if cell[j] & 5:
+				continue
+			cell[j] |= 4
+			if (cell[j] & 2) == 0:
+				# dahinter weiterfüllen (bis 600 Zellen = 150 m²): ringsum geschlossene Streifen zwischen Zone und Wand sind
+				# keine Lücke
+				var sub := PackedInt32Array([j])
+				var sh := 0
+				while sh < sub.size() and sub.size() < 600:
+					var si := sub[sh]
+					sh += 1
+					var sx := si % W
+					var sy := si / W
+					for so in [[1, 0], [-1, 0], [0, 1], [0, -1]]:
+						var tx: int = sx + so[0]
+						var ty: int = sy + so[1]
+						if tx < 0 or ty < 0 or tx >= W or ty >= H:
+							continue
+						var tj := ty * W + tx
+						if cell[tj] & 7:
+							continue
+						cell[tj] |= 4
+						sub.append(tj)
+				if sub.size() < 600:
+					continue
+				var q := Vector2(nx, ny) * CS + r.position
+				var dup := false
+				for g in gaps:
+					if (g as Vector2).distance_to(q) < 8.0:
+						dup = true
+						break
+				if not dup:
+					gaps.append(q)
+				continue
+			queue.append(j)
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--probe="):
+			var xz := a.substr(8).split(":")
+			var c0: int = idx.call(Vector2(float(xz[0]), float(xz[1])))
+			var cx0 := c0 % W
+			var cy0 := c0 / W
+			for yy in range(cy0 - 8, cy0 + 9):
+				var row := ""
+				for xx in range(cx0 - 12, cx0 + 13):
+					var v := cell[yy * W + xx]
+					row += "#" if v & 1 else ("o" if (v & 6) == 6 else ("." if v & 2 else ("X" if v & 4 else " ")))
+				print("PROBE |" + row + "|")
+	var pts := []
+	for q in gaps:
+		var best := 1e9
+		var nm := ""
+		for p in track["paths"]:
+			var cp := (p["curve"] as Curve3D).get_closest_point(Vector3(q.x, 0, q.y))
+			var dd := Vector2(cp.x, cp.z).distance_to(q)
+			if dd < best:
+				best = dd
+				nm = "%s@%.0f" % [p.get("street_name", "") if p.get("street_name", "") != "" else p["kind"], (p["curve"] as Curve3D).get_closest_offset(Vector3(q.x, 0, q.y))]
+		var mc: Curve3D = track["paths"][0]["curve"]
+		var md := mc.get_closest_offset(Vector3(q.x, 0, q.y))
+		var mp := mc.sample_baked(md)
+		leak_pts.append(q)
+		print("LÜCKE (%.0f, %.0f) %s  [%.1f m von der Mitte der Hauptstraße, hw %.1f]" % [q.x, q.y, nm, Vector2(mp.x, mp.z).distance_to(q), Track.hw(track, md)])
+		pts.append("%.0f:%.0f" % [q.x, q.y])
+	print("LECKPUNKTE ", ",".join(pts))
+	print("NAHTSTELLEN %d geschlossen" % Track.stitch_dbg)
+	print("LECKCHECK %d Lücken" % gaps.size())

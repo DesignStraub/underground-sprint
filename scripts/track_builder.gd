@@ -521,6 +521,7 @@ static func step(job: Dictionary) -> float:
 			gb.add_child(gs)
 			root.add_child(gb)
 			_bb_flush(root)
+			_stitch_walls(root, track)
 			_finalize_walls(root)
 			_auto_collide(root, track)
 		9:
@@ -2043,6 +2044,234 @@ static func _wall_shape(walls: StaticBody3D, a: Vector3, b: Vector3, h := WALL_H
 	f.append_array([a + lo, b + lo, b + up, a + lo, b + up, a + up])
 
 
+## Offene Wandenden schließen (seit 2.52). An Einmündungen hörte die Wand der Nebenstraße vor der Linie der
+## Hauptstraße auf und die Hauptstraße war breiter geöffnet als die Nebenstraße: an beiden Ecken blieb eine Lücke von
+## 2-4 m in den Block dahinter (man fuhr ins Grüne und weiter bis aufs Wasser); ebenso in scharfen Ecken, wo der
+## Streifen aussetzt, und wo eine Straße auf 30 m ohne Wand blieb. Jetzt werden je zwei offene Enden bis 40 m Abstand
+## (die nächsten zuerst) verbunden, wenn die Verbindung über keine
+## Fahrbahn und keinen Gehweg führt (sonst wäre es eine Einfahrt). Jede neue Wand bekommt eine sichtbare Mauer.
+static var stitch_dbg := 0
+static var stitch_at := Vector3.INF  # Prüfwerkzeug: Enden und Paare um diesen Punkt ausgeben
+static var stitch_pts: Array = []  # ... oder um mehrere Punkte
+
+
+static func _dbg_near(q: Vector3) -> bool:
+	if stitch_at != Vector3.INF and _flat(q - stitch_at).length() < 25.0:
+		return true
+	for sp in stitch_pts:
+		if _flat(q - sp).length() < 25.0:
+			return true
+	return false
+
+
+static func _stitch_walls(root: Node3D, track: Dictionary) -> void:
+	_drop_road_walls(root, track)
+	var segs := []  # [a, b]
+	var stack: Array = [root]
+	while not stack.is_empty():
+		var n: Node = stack.pop_back()
+		for c in n.get_children():
+			if c is StaticBody3D and c.has_meta("faces") and (c as Node3D).transform.is_equal_approx(Transform3D.IDENTITY) \
+					and (n == root or (n is Node3D and (n as Node3D).transform.is_equal_approx(Transform3D.IDENTITY))):
+				var f: Array = c.get_meta("faces")
+				for k in range(0, f.size() - 5, 6):
+					var a: Vector3 = f[k]
+					var b: Vector3 = f[k + 1]
+					if _flat(b - a).length() > 0.4:  # Splitter am Ende einer Wand ließen das Ende sonst verbunden aussehen
+						segs.append([Vector3(a.x, 0, a.z), Vector3(b.x, 0, b.z)])
+			elif c.get_child_count() > 0 and not c is MeshInstance3D and c is Node3D and (c as Node3D).transform.is_equal_approx(Transform3D.IDENTITY):
+				stack.append(c)
+			elif c is StaticBody3D and c.has_meta("faces") and not stitch_pts.is_empty():
+				print("NAHT ÜBERSPRUNGEN: %s unter %s" % [c.name, n.name])
+	# doppelte Stücke (gleiche Enden, auch umgekehrt) nur einmal: sonst gälte ein Ende als verbunden
+	var seen := {}
+	var uniq := []
+	for sg in segs:
+		var ka := Vector2i(roundi(sg[0].x * 10.0), roundi(sg[0].z * 10.0))
+		var kb := Vector2i(roundi(sg[1].x * 10.0), roundi(sg[1].z * 10.0))
+		var key := [ka, kb] if str(ka) < str(kb) else [kb, ka]
+		if not seen.has(str(key)):
+			seen[str(key)] = true
+			uniq.append(sg)
+	segs = uniq
+	# Endpunkte im Raster: ein Ende ist offen, wenn kein anderes Stück dort anfängt oder aufhört
+	const G := 2.0
+	var grid := {}
+	for i in segs.size():
+		for e in 2:
+			var q: Vector3 = segs[i][e]
+			var k := Vector2i(floori(q.x / G), floori(q.z / G))
+			if not grid.has(k):
+				grid[k] = []
+			grid[k].append([i, e])
+	var near := func(q: Vector3, r: float, skip: int) -> Array:
+		var out := []
+		var k := Vector2i(floori(q.x / G), floori(q.z / G))
+		var n := int(ceil(r / G))
+		for gx in range(k.x - n, k.x + n + 1):
+			for gz in range(k.y - n, k.y + n + 1):
+				for it in grid.get(Vector2i(gx, gz), []):
+					if it[0] != skip and _flat((segs[it[0]][it[1]] as Vector3) - q).length() <= r:
+						out.append(it)
+		return out
+	var open := []
+	for i in segs.size():
+		for e in 2:
+			if (near.call(segs[i][e], 0.35, i) as Array).is_empty():
+				open.append([i, e])
+	if stitch_at != Vector3.INF or not stitch_pts.is_empty():
+		for o in open:
+			var qd: Vector3 = segs[o[0]][o[1]]
+			if _dbg_near(qd):
+				print("OFFENES WANDENDE (%.1f, %.1f)" % [qd.x, qd.z])
+	for sp in stitch_pts:
+		for i in segs.size():
+			for e in 2:
+				if _flat((segs[i][e] as Vector3) - sp).length() < 14.0:
+					print("STÜCK-ENDE (%.2f, %.2f) von Stück %d (%.2f, %.2f)-(%.2f, %.2f)" % [segs[i][e].x, segs[i][e].z, i, segs[i][0].x, segs[i][0].z, segs[i][1].x, segs[i][1].z])
+	var used := {}
+	var pairs := []
+	for o in open:
+		var q: Vector3 = segs[o[0]][o[1]]
+		for it in near.call(q, 40.0, o[0]):
+			var q2: Vector3 = segs[it[0]][it[1]]
+			if (near.call(q2, 0.35, it[0]) as Array).is_empty() and str(o) < str(it):
+				pairs.append([_flat(q2 - q).length(), o, it])
+	pairs.sort_custom(func(x, y): return x[0] < y[0])
+	# Plätze zählen nicht als Fahrbahn: ihre geplante Breite reicht oft über die Straße davor hinweg (dort fehlte darum
+	# die Wand der Straße gegenüber)
+	var platz_ids := {}
+	for pp in track["paths"]:
+		if pp["kind"] == "platz":
+			platz_ids[int(pp["id"])] = true
+	var body := StaticBody3D.new()
+	body.name = "WallsStitch"
+	root.add_child(body)
+	var vis := []
+	for pr in pairs:
+		if used.has(str(pr[1])) or used.has(str(pr[2])) or float(pr[0]) < 0.3:
+			continue
+		var a: Vector3 = segs[pr[1][0]][pr[1][1]]
+		var b: Vector3 = segs[pr[2][0]][pr[2][1]]
+		# Gehwegecken dürfen angeschnitten werden (beide Enden liegen auf Wandlinien), Fahrbahnen nie: wer eine Fahrbahn
+		# quert, kommt über ihre Mitte (Abstand -halbe Breite, mindestens -3,3 m); -0,6 lässt Rasterfehler zu
+		var line_ok := func(p0: Vector3, p1: Vector3) -> bool:
+			var nn := int(ceil(_flat(p1 - p0).length() / 0.5))
+			for k in range(1, nn):
+				var q := p0.lerp(p1, float(k) / float(nn))
+				if _flat(q - a).length() < 1.0 or _flat(q - b).length() < 1.0:
+					continue  # die Enden selbst stehen oft direkt an einer Fahrbahnkante (Platz, Rampe)
+				if _carriage_clear(track, q, platz_ids) < -0.6 or (Streets.main_clear(track, q) if track.has("sgrid") else _main_clearance(track, q)) < 1.5:
+					return false
+			return true
+		var ok: bool = line_ok.call(a, b)
+		var why := "" if ok else "Fahrbahn auf der Linie"
+		var via := Vector3.INF
+		if not ok and float(pr[0]) < 25.0:
+			# spitze Ecke (zwei Gassen im V): die Fahrbahn ragt über die Linie, außen herum über einen Knick
+			var m := (a + b) / 2.0
+			var nrm := Vector3(-(b - a).z, 0, (b - a).x).normalized()
+			# weg von der nächsten Fahrbahnmitte (in Ecken lag der Knick sonst auf der Fahrbahnseite)
+			var nc := _nearest_center(track, m, platz_ids)
+			if nc != Vector3.INF and Vector3(m.x - nc.x, 0, m.z - nc.z).dot(nrm) < 0.0:
+				nrm = -nrm
+			# erst weg von der nächsten Fahrbahnmitte, dann die andere Seite (liegt die Linie über einer Spitze, ist die
+			# nächste Mitte die Spitze selbst und die Richtung unklar)
+			for side in [1.0, -1.0]:
+				for t in [2.0, 3.5, 5.0, 7.0, 9.0, 12.0, 15.0, 19.0, 24.0]:
+					var c: Vector3 = m + nrm * side * float(t)
+					if _carriage_clear(track, c, platz_ids) > 1.5 and line_ok.call(a, c) and line_ok.call(c, b):
+						via = c
+						ok = true
+						why = "außen herum"
+						break
+				if ok:
+					break
+		if _dbg_near(a) or _dbg_near(b):
+			print("PAAR (%.1f, %.1f)-(%.1f, %.1f) %s" % [a.x, a.z, b.x, b.z, "ok " + why if ok else "über Fahrbahn: " + why])
+		if not ok:
+			continue
+		used[str(pr[1])] = true
+		used[str(pr[2])] = true
+		var legs := [[a, b]] if via == Vector3.INF else [[a, via], [via, b]]
+		for lg in legs:
+			var la: Vector3 = lg[0]
+			var lb: Vector3 = lg[1]
+			_wall_shape(body, la, lb)
+			var dir := (lb - la).normalized()
+			if dir.length() > 0.5:
+				vis.append(Transform3D(Basis.looking_at(dir, Vector3.UP) * Basis.from_scale(Vector3(1, 1, _flat(lb - la).length() + 0.3)), (la + lb) / 2.0 + Vector3(0, CURB_H + 0.45, 0)))
+	stitch_dbg = vis.size()
+	if not vis.is_empty():
+		_multi(root, Builder.box(Vector3(0.45, 0.9, 1.0)), Builder.mat(Color(0.47, 0.43, 0.38), 0.0, 0.9), vis)
+
+
+## Wandstücke auf einer Fahrbahn entfernen (seit 2.52): in eckigen Kurven und an Einmündungen schmaler Straßen lagen
+## Stücke der Innenseite oder der Nachbarstraße auf dem Asphalt (unsichtbare Wand). Nur Wände der Nebenstraßen
+## (WallsBranch*), die Hauptstraße hat eigene Regeln (Mittelstreifen, Tunnel).
+static func _drop_road_walls(root: Node3D, track: Dictionary) -> void:
+	if not track.has("sgrid"):
+		return
+	var none := {}
+	for c in root.get_children():
+		if not (c is StaticBody3D and c.has_meta("faces") and str(c.name).begins_with("WallsBranch")):
+			continue
+		var f: Array = c.get_meta("faces")
+		var keep := []
+		for k in range(0, f.size() - 5, 6):
+			var a: Vector3 = f[k]
+			var b: Vector3 = f[k + 1]
+			var bad := false
+			for t in [0.15, 0.5, 0.85]:
+				var q: Vector3 = a.lerp(b, t)
+				q.y = 0.0
+				if _carriage_clear(track, q, none) < -0.3 or Streets.main_clear(track, q) < -0.3:
+					bad = true
+					break
+			if not bad:
+				keep.append_array(f.slice(k, k + 6))
+		c.set_meta("faces", keep)
+
+
+## Nächster Punkt einer Fahrbahnmitte (Nebenwege ohne skip, und die Hauptstraße)
+static func _nearest_center(track: Dictionary, q3: Vector3, skip: Dictionary) -> Vector3:
+	var best := 1e9
+	var out := Vector3.INF
+	if track.has("sgrid"):
+		var fine: Dictionary = track["sgrid"]["f"]
+		var q := Vector2(q3.x, q3.z)
+		var key := Vector2i(floori(q.x / Streets.GRID), floori(q.y / Streets.GRID))
+		for k in 3:
+			for ck in Streets._ring(key, k):
+				for e in fine.get(ck, []):
+					if not skip.has(int(e[1])):
+						var dd := q.distance_to(e[0]) - float(e[2])
+						if dd < best:
+							best = dd
+							out = Vector3(e[0].x, 0, e[0].y)
+	var mc: Curve3D = track["curve"]
+	var mp := mc.get_closest_point(q3)
+	if _flat(mp - q3).length() - HALF_W < best:
+		out = Vector3(mp.x, 0, mp.z)
+	return out
+
+
+## Abstand zur nächsten Fahrbahn eines Nebenweges (ohne die in skip), negativ: darauf
+static func _carriage_clear(track: Dictionary, q3: Vector3, skip: Dictionary) -> float:
+	if not track.has("sgrid"):
+		return _branch_clearance(track, q3, false, false)
+	var fine: Dictionary = track["sgrid"]["f"]
+	var q := Vector2(q3.x, q3.z)
+	var key := Vector2i(floori(q.x / Streets.GRID), floori(q.y / Streets.GRID))
+	var best := 1e9
+	for k in 3:
+		for ck in Streets._ring(key, k):
+			for e in fine.get(ck, []):
+				if not skip.has(int(e[1])):
+					best = minf(best, q.distance_to(e[0]) - float(e[2]))
+	return best
+
+
 static func _finalize_walls(n: Node) -> void:
 	for c in n.get_children():
 		if c is StaticBody3D and c.has_meta("faces"):
@@ -3318,7 +3547,7 @@ static func _fence_span(track: Dictionary, p: Dictionary, pos: Vector3, fwd: Vec
 		if main:
 			return _branch_clearance(track, q, false, true) > 1.0
 		# eigene Fahrbahn: in scharfen Ecken liegt der Rand der Innenseite sonst auf der Straße selbst
-		if _flat(q - own.get_closest_point(q)).length() < float(p["half_w"]) + 0.1:
+		if _flat(q - own.get_closest_point(q)).length() < float(p["half_w"]) + 0.5:
 			return false
 		if (Streets.main_clear(track, q) if p.has("net") else _main_clearance(track, q)) < WALK + 0.4:
 			return false
