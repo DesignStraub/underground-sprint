@@ -159,6 +159,16 @@ func _process(dt: float) -> void:
 					if "shadow" in kinds:
 						nd.shadow_enabled = false
 				st.append_array(nd.get_children())
+	if OS.get_cmdline_user_args().has("--nohud"):
+		# Test: Bild ohne Oberfläche (Entwürfe für Anzeige und Schrift darüberlegen); Ebenen in der 3D-Welt bleiben
+		var stk: Array = get_tree().root.get_children()
+		while not stk.is_empty():
+			var nd: Node = stk.pop_back()
+			if nd is SubViewport:
+				continue
+			if nd is CanvasLayer and nd.layer >= 0:
+				nd.visible = false
+			stk.append_array(nd.get_children())
 	if OS.get_cmdline_user_args().has("--nomusic"):
 		for mp in Music._players:
 			mp.volume_db = -80.0  # Musik aus (Aufnahmen mit eigener Musik, Effekte allein)
