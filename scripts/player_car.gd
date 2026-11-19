@@ -746,7 +746,11 @@ func _physics_process(dt: float) -> void:
 	var sf := clampf(spd / top_speed, 0.0, 1.0)
 	# Gewichtsverlagerung: Nase taucht beim Bremsen ein, hebt sich beim Beschleunigen; Wanken nach der echten
 	# Querbeschleunigung (Gierrate * Tempo) nach außen, im Rutschen zusätzlich zur Rutschseite
-	var pitch := clampf(a * 0.0026 * _roll_k, -0.045 * _roll_k, 0.03 * _roll_k)
+	# seit 2.53: Nase hebt sich höchstens 0,012 rad (vorher 0,03: bei 2,2 m Halblänge gut 9 cm, die Vorderräder
+	# standen beim Driften mit Vollgas frei im Radhaus), im Drift und mit Handbremse nur halb so stark nicken
+	var pitch := clampf(a * 0.0026 * _roll_k, -0.035 * _roll_k, 0.012 * _roll_k)
+	if drifting or hb:
+		pitch *= 0.5
 	_acc_s = lerpf(_acc_s, clampf(a, -25.0, 15.0), 1.0 - exp(-dt * 4.0))
 	if airborne:
 		pitch = 0.0  # in der Luft dreht sich das ganze Auto (unten), nicht die Karosserie
@@ -763,9 +767,9 @@ func _physics_process(dt: float) -> void:
 		roll = 0.0
 	# Federung: knapp 1,6 Hz, leicht unterdämpft (wippt beim Einlenken und Bremsen einmal sanft nach)
 	var w0 := 10.0
-	_roll_sv += (w0 * w0 * (roll - _roll_s) - 2.0 * 0.45 * w0 * _roll_sv) * dt
+	_roll_sv += (w0 * w0 * (roll - _roll_s) - 2.0 * 0.6 * w0 * _roll_sv) * dt
 	_roll_s += _roll_sv * dt
-	_pitch_sv += (w0 * w0 * (pitch - _pitch_s) - 2.0 * 0.5 * w0 * _pitch_sv) * dt
+	_pitch_sv += (w0 * w0 * (pitch - _pitch_s) - 2.0 * 0.75 * w0 * _pitch_sv) * dt  # seit 2.53 stärker gedämpft (vorher 0,5): kein Nachwippen
 	_pitch_s += _pitch_sv * dt
 	if not offroad.is_empty() and not airborne and spd > 3.0:
 		# Gelände: feines Rütteln der Karosserie (Kies und Erde mehr als Rasen), dezent: Bruchteile eines Grads
