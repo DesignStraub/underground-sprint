@@ -187,6 +187,9 @@ func _ready() -> void:
 	pc.drift_mode = GameState.world_drift or OS.get_cmdline_user_args().has("--botdrift")
 	print("START %s: (%.0f, %.1f, %.0f), Stadt zuletzt %s, entdeckt %d" % [_spawn_src, spawn.origin.x, spawn.origin.y,
 		spawn.origin.z, GameState.last_town, GameState.towns_known.size()])
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--wprobe="):  # Test: --wprobe=x:z[:r]  was hier kollidiert (Name und Pfad)
+			_wprobe(a.substr(9).split(":"))
 	_note_spot(spawn, true)  # hier geht es weiter, falls man gleich wieder beendet (etwa nach einer Schnellreise)
 	_save_spot()
 	var zoom := _intro_kind(returning)
@@ -2620,6 +2623,7 @@ func _autopilot() -> void:
 	var tr: Dictionary = player.track
 	if tr.is_empty() or player.loc.is_empty():
 		return
+	player.debug_hits = true
 	var xf: Transform3D = tr["xf"]
 	# Weg, auf dem man gerade ist (Auffahrt, Ausfahrt, Hauptstraße)
 	var c: Curve3D = player.loc["path"]["curve"]
@@ -2657,6 +2661,9 @@ func _autopilot() -> void:
 			player.global_position.y, (xf * Vector3(0, Track.elev_at(c, d), 0)).y, str(player.airborne),
 			int(player.speed_fwd * 3.6), active.get("race", {}).get("name", "-"), player.loc["path"]["kind"], d, built, str(_task >= 0 or not _job.is_empty()),
 			Engine.get_frames_per_second(), traffic.size(), _tq.size()])
+		if player.last_hit != "":
+			print("WDHIT ", player.last_hit)
+			player.last_hit = ""
 		if OS.get_cmdline_user_args().has("--trisplit"):
 			_tri_split()
 		var vp := get_viewport().get_viewport_rid()
@@ -3139,3 +3146,24 @@ func _tri_split() -> void:
 	print("TRIS gesamt=%dk" % (tot / 1000))
 	for k in keys.slice(0, 25):
 		print("TRIS %7dk x%-4d %s" % [out[k] / 1000, cnt[k], k])
+
+
+## Test (--wprobe=x:z[:r]): alle Körper im Umkreis r (Standard 6 m) um x/z in Fahrhöhe, mit Pfad und Lage
+func _wprobe(xz: PackedStringArray) -> void:
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	print("WPROBE start")
+	var r := float(xz[2]) if xz.size() > 2 else 6.0
+	var p := Vector3(float(xz[0]), 0.0, float(xz[1]))
+	if land != null:
+		p.y = land.ground_h(Vector2(p.x, p.z))
+	var q := PhysicsShapeQueryParameters3D.new()
+	var sp := SphereShape3D.new()
+	sp.radius = r
+	q.shape = sp
+	q.collision_mask = 0xFFFFFFFF
+	q.transform = Transform3D(Basis.IDENTITY, p + Vector3(0, 1.0, 0))
+	for hit in get_world_3d().direct_space_state.intersect_shape(q, 64):
+		var o: Object = hit["collider"]
+		var pos := (o as Node3D).global_position if o is Node3D else Vector3.ZERO
+		print("WPROBE %s  bei (%.0f, %.1f, %.0f)  form %d" % [str((o as Node).get_path()) if o is Node else str(o), pos.x, pos.y, pos.z, hit["shape"]])

@@ -256,6 +256,15 @@ Außenring → nächste Stadt → Autobahn. Rundkurse und Drift-Kurse sind Schle
 - **Straßennetze in allen Städten, dichte Ränder, Höfe, Passanten zum Umfahren, leisere Motoren** (seit 2.52,
   Einzelheiten dort).
 - **Kantigere Autos, mehr Bilder pro Sekunde, Kuppen in den Städten, Bergland** (seit 2.53, Einzelheiten dort).
+- **Keine unsichtbaren Wände mehr an den Stadtausfahrten** (seit 2.54, Einzelheiten dort).
+
+## Keine unsichtbaren Wände mehr an den Stadtausfahrten (2.54)
+- **Fehler seit 2.52:** an praktisch jeder Stadtausfahrt standen Wände quer oder schräg auf der Fahrbahn, auch gleich
+  am Start eines neuen Spiels in Frankfurt (man blieb nach 50 m hängen). Ursache: Stadt und Autobahnrampe schlossen
+  ihre offenen Wandenden am Übergang jeweils über die Fahrbahn der anderen Strecke, die sie nicht kennen. Jetzt gibt es
+  hinter dem Ende jeder Ausfahrt keine solchen Nähte mehr.
+- **Neue Prüfung** `tools/world_wallcheck.tscn`: baut die ganze Welt (66 Strecken) und prüft jeden Weg gegen die Wände
+  aller Strecken; vorher 151 Stellen, jetzt 0.
 
 ## Kantigere Autos, mehr Bilder pro Sekunde, Kuppen, Bergland (2.53)
 - **Autos:** je Modell eigene Kantigkeit (flache Dächer, harte Kanten bei den eckigen Vorbildern), Klappscheinwerfer

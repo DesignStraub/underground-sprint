@@ -2072,6 +2072,8 @@ static func _wall_shape(walls: StaticBody3D, a: Vector3, b: Vector3, h := WALL_H
 ## Streifen aussetzt, und wo eine Straße auf 30 m ohne Wand blieb. Jetzt werden je zwei offene Enden bis 40 m Abstand
 ## (die nächsten zuerst) verbunden, wenn die Verbindung über keine
 ## Fahrbahn und keinen Gehweg führt (sonst wäre es eine Einfahrt). Jede neue Wand bekommt eine sichtbare Mauer.
+const SEAM_LEN := 70.0  # so weit hinter dem Ende einer Ausfahrt keine Naht (Fahrbahn der Nachbarstrecke)
+const SEAM_R := HALF_W + AB_EXTRA + 0.5  # breiteste Rampe (Autobahnbreite) und etwas Rand
 static var stitch_dbg := 0
 static var stitch_at := Vector3.INF  # Prüfwerkzeug: Enden und Paare um diesen Punkt ausgeben
 static var stitch_pts: Array = []  # ... oder um mehrere Punkte
@@ -2167,6 +2169,22 @@ static func _stitch_walls(root: Node3D, track: Dictionary) -> void:
 	for pp in track["paths"]:
 		if pp["kind"] == "platz":
 			platz_ids[int(pp["id"])] = true
+	# Übergänge zur nächsten Strecke (seit 2.54): jede Ausfahrt der Welt ("ramp") endet dort, wo die Fahrbahn der
+	# Nachbarstrecke weitergeht (Stadtausfahrt -> Autobahnrampe und umgekehrt). Diese Strecke kennt die Fahrbahn
+	# dahinter nicht; bis 2.53 verband sie die offenen Wandenden am Übergang darum quer über die Fahrbahn der anderen
+	# (unsichtbare Wände an praktisch jeder Stadtausfahrt, auch am Start eines neuen Spiels in Frankfurt).
+	var seams := []  # [Anfang, Ende] der Fortsetzung hinter dem Übergang (Streckenkoordinaten, flach)
+	if track.get("world", false):
+		for pp in track["paths"]:
+			if pp["kind"] != "ramp":
+				continue
+			var rc: Curve3D = pp["curve"]
+			var rl := rc.get_baked_length()
+			if rl < 2.0:
+				continue
+			var e0 := _flat(rc.sample_baked(rl))
+			var dv := (e0 - _flat(rc.sample_baked(rl - 2.0))).normalized()
+			seams.append([e0 - dv * 2.0, e0 + dv * SEAM_LEN])
 	var fill := SurfaceTool.new()  # Gehweg in den Ecken vor den Nähten (seit 2.52; vorher nackter, flackernder Boden)
 	fill.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var body := StaticBody3D.new()
@@ -2188,6 +2206,10 @@ static func _stitch_walls(root: Node3D, track: Dictionary) -> void:
 					continue  # die Enden selbst stehen oft direkt an einer Fahrbahnkante (Platz, Rampe)
 				if _carriage_clear(track, q, platz_ids) < -0.6 or (Streets.main_clear(track, q) if track.has("sgrid") else _main_clearance(track, q)) < 1.5:
 					return false
+				for sm in seams:
+					var qf := _flat(q)
+					if Geometry2D.get_closest_point_to_segment(qf, sm[0], sm[1]).distance_to(qf) < SEAM_R:
+						return false
 			return true
 		var ok: bool = line_ok.call(a, b)
 		var why := "" if ok else "Fahrbahn auf der Linie"
