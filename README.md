@@ -255,9 +255,9 @@ Außenring → nächste Stadt → Autobahn. Rundkurse und Drift-Kurse sind Schle
 - **Köln als Pilot für größere Städte: Innenstadtring mit Altstadt-Schleife** (seit 2.51, Einzelheiten dort).
 - **Straßennetze in allen Städten, dichte Ränder, Höfe, Passanten zum Umfahren, leisere Motoren** (seit 2.52,
   Einzelheiten dort).
-- **Kantigere Autos, mehr Bilder pro Sekunde, Kuppen in den Städten, Bergland** (in Arbeit, Einzelheiten dort).
+- **Kantigere Autos, mehr Bilder pro Sekunde, Kuppen in den Städten, Bergland** (seit 2.53, Einzelheiten dort).
 
-## In Arbeit (nach 2.52)
+## Kantigere Autos, mehr Bilder pro Sekunde, Kuppen, Bergland (2.53)
 - **Autos:** je Modell eigene Kantigkeit (flache Dächer, harte Kanten bei den eckigen Vorbildern), Klappscheinwerfer
   nur noch als saubere, geschlossene Deckel, Lippe und Diffusor sitzen an, eigene Proportionen für mehrere Modelle;
   die Front hebt beim Driften kaum noch an.
